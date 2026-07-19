@@ -1,32 +1,52 @@
 import "./globals.css";
-import { SECTIONS } from "@/lib/sections";
+import Link from "next/link";
+import type { Metadata } from "next";
 
-// Root landing. On production custom domains the proxy rewrites to the section,
-// so this mainly serves localhost as a dev directory of sections.
+export const metadata: Metadata = {
+  title: "Pasatiempo Golf Club — Events & Tournaments",
+};
+
+// Public hub landing for the umbrella's root. Each section also has (or will
+// have) its own domain; this is the friendly front door for the bare URL.
 export default function Home() {
+  const cardStyle: React.CSSProperties = {
+    display: "block",
+    textDecoration: "none",
+    color: "inherit",
+  };
   return (
-    <main className="wrap">
-      <p className="eyebrow">Pasatiempo</p>
-      <h1>Pasatiempo App</h1>
-      <p className="lead">
-        Umbrella app. Each section below has its own custom domain and its own
-        isolated data, all under one project. This index is for local
-        development.
+    <main className="container narrow" style={{ paddingTop: 56 }}>
+      <p className="eyebrow">Pasatiempo Golf Club</p>
+      <h1 style={{ fontSize: 32, marginBottom: 8 }}>Events &amp; Tournaments</h1>
+      <p className="lead">Where would you like to go?</p>
+
+      <div style={{ display: "grid", gap: 16 }}>
+        <Link href="/events" className="card" style={cardStyle}>
+          <div className="ev-title" style={{ fontSize: 19 }}>
+            Event Planner →
+          </div>
+          <p style={{ margin: "6px 0 0", color: "var(--muted)" }}>
+            Sign up for club events and clinics. Open the private link you were
+            sent to register.
+          </p>
+        </Link>
+
+        <Link href="/mhi" className="card" style={cardStyle}>
+          <div className="ev-title" style={{ fontSize: 19 }}>
+            Marion Hollins Invitational →
+          </div>
+          <p style={{ margin: "6px 0 0", color: "var(--muted)" }}>
+            Tournament information — schedule, flights, formats, the Horse Race,
+            and contests.
+          </p>
+        </Link>
+      </div>
+
+      <p style={{ marginTop: 28, fontSize: 13 }}>
+        <Link href="/admin" style={{ color: "var(--muted)" }}>
+          Staff sign in →
+        </Link>
       </p>
-
-      {SECTIONS.map((s) => (
-        <a key={s.key} className="card" href={s.pathPrefix}>
-          <h3>{s.label}</h3>
-          <span>
-            {s.pathPrefix} · schema <code>{s.schema}</code>
-          </span>
-        </a>
-      ))}
-
-      <a className="card" href="/admin">
-        <h3>Admin</h3>
-        <span>/admin · manage every section</span>
-      </a>
     </main>
   );
 }
