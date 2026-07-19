@@ -101,8 +101,11 @@ export async function proxy(request: NextRequest) {
     return res;
   };
 
-  // --- 3) Admin gate (keyed on the RESOLVED internal path) -----------------
-  if (isAdminPath(internalPath) && !user) {
+  // --- 3) Staff gate: the admin area AND the hub root (the section directory)
+  //        require a signed-in user. Public visitors reach the individual
+  //        sections directly (/mhi, /events/…, /sombrero) — never the hub. ----
+  const staffOnly = isAdminPath(internalPath) || internalPath === "/";
+  if (staffOnly && !user) {
     const redirect = url.clone();
     redirect.pathname = "/login";
     return withCookies(NextResponse.redirect(redirect));
