@@ -120,6 +120,28 @@ export default async function AdminHome() {
               View site ↗
             </a>
           </div>
+
+          {/* El Sombrero (static info page — nothing to manage) */}
+          <div className="evrow">
+            <div className="ev-main">
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <span className="ev-title">El Sombrero</span>
+                <span className="badge gray">static</span>
+              </div>
+              <div className="ev-meta">
+                <span>Men&apos;s Club info page</span>
+                <span>edit the HTML to change it</span>
+              </div>
+            </div>
+            <a
+              href="/sombrero"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn secondary small"
+            >
+              View site ↗
+            </a>
+          </div>
         </div>
 
         <p className="muted" style={{ marginTop: 22, fontSize: 13 }}>
