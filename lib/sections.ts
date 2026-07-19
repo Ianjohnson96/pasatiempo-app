@@ -58,9 +58,8 @@ export const SECTIONS: Section[] = [
   {
     key: "sombrero",
     label: "El Sombrero",
-    // Static-HTML microsite (no database) served straight from /public.
+    // Real React route at app/sombrero (static content, no database).
     pathPrefix: "/sombrero",
-    staticFile: "/sombrero.html",
     hosts: [
       "el-sombrero.example.com", // TODO: real El Sombrero domain
       "sombrero.local",
