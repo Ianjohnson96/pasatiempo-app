@@ -1,57 +1,132 @@
 import Link from "next/link";
-import { SECTIONS } from "@/lib/sections";
+import { redirect } from "next/navigation";
+import { getViewer } from "@/lib/events/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-// Unified admin dashboard — one place to manage every section.
-// All admins see every section; access is gated by the proxy (signed-in user).
+// Unified admin dashboard — one home for every section. Access is gated by the
+// proxy (signed-in Supabase user) and re-checked here via getViewer().
 export const dynamic = "force-dynamic";
 
-// Which sections have a management UI wired up yet.
-const ADMIN_ROUTE: Record<string, string | null> = {
-  events: "/admin/events",
-  mhi: null, // built in a later phase
-};
+async function eventsStats() {
+  try {
+    const s = createAdminClient("events");
+    const [{ count: events }, { count: regs }] = await Promise.all([
+      s.from("events").select("*", { count: "exact", head: true }),
+      s.from("registrations").select("*", { count: "exact", head: true }),
+    ]);
+    return { events: events ?? 0, regs: regs ?? 0, ok: true };
+  } catch {
+    return { events: 0, regs: 0, ok: false };
+  }
+}
 
-export default function AdminHome() {
+async function mhiStats() {
+  try {
+    const s = createAdminClient("mhi");
+    const [{ count: teams }, { count: players }] = await Promise.all([
+      s.from("teams").select("*", { count: "exact", head: true }),
+      s.from("team_players").select("*", { count: "exact", head: true }),
+    ]);
+    return { teams: teams ?? 0, players: players ?? 0, ok: true };
+  } catch {
+    return { teams: 0, players: 0, ok: false };
+  }
+}
+
+export default async function AdminHome() {
+  const viewer = await getViewer();
+  if (!viewer) redirect("/login");
+
+  const [ev, mhi] = await Promise.all([eventsStats(), mhiStats()]);
+
   return (
-    <main className="wrap">
-      <p className="eyebrow">Pasatiempo</p>
-      <h1>Admin</h1>
-      <p className="lead">
-        Manage every section from one place. Each section&apos;s tools read and
-        write only its own data.
-      </p>
-
-      <div className="evlist">
-        {SECTIONS.map((s) => {
-          const route = ADMIN_ROUTE[s.key];
-          const inner = (
-            <div className="evrow">
-              <div className="ev-main">
-                <div className="ev-title">{s.label}</div>
-                <div className="ev-meta">
-                  <span>schema: {s.schema}</span>
-                  <span>{route ? "manage →" : "coming soon"}</span>
-                </div>
-              </div>
-            </div>
-          );
-          return route ? (
-            <Link key={s.key} href={route} style={{ color: "inherit" }}>
-              {inner}
-            </Link>
-          ) : (
-            <div key={s.key} style={{ opacity: 0.6 }}>
-              {inner}
-            </div>
-          );
-        })}
+    <>
+      <div className="appbar">
+        <div className="appbar-inner">
+          <Link href="/admin" className="brand">
+            <span className="mark">P</span> Pasatiempo Admin
+          </Link>
+          <span className="spacer" />
+          <span className="navlink">{viewer.email}</span>
+          <form action="/auth/signout" method="post" style={{ margin: 0 }}>
+            <button className="btn secondary small" type="submit">
+              Sign out
+            </button>
+          </form>
+        </div>
       </div>
 
-      <form action="/auth/signout" method="post" style={{ marginTop: 28 }}>
-        <button className="btn secondary small" type="submit">
-          Sign out
-        </button>
-      </form>
-    </main>
+      <main className="container">
+        <div className="page-head">
+          <div>
+            <h1>Dashboard</h1>
+            <div className="sub">Manage every Pasatiempo section from one place.</div>
+          </div>
+        </div>
+
+        <div className="evlist">
+          {/* Event Planner */}
+          <div className="evrow">
+            <div className="ev-main">
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <span className="ev-title">Event Planner</span>
+                <span className="badge open">live</span>
+              </div>
+              <div className="ev-meta">
+                <span>schema: events</span>
+                {!ev.ok && <span style={{ color: "var(--danger)" }}>⚠︎ unreachable</span>}
+              </div>
+            </div>
+            <div className="ev-count">
+              <div className="num">{ev.events}</div>
+              <div className="lbl">events</div>
+            </div>
+            <div className="ev-count">
+              <div className="num">{ev.regs}</div>
+              <div className="lbl">signups</div>
+            </div>
+            <Link href="/admin/events" className="btn secondary small">
+              Manage
+            </Link>
+          </div>
+
+          {/* Marion Hollins Invitational */}
+          <div className="evrow">
+            <div className="ev-main">
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <span className="ev-title">Marion Hollins Invitational</span>
+                <span className="badge gray">display</span>
+              </div>
+              <div className="ev-meta">
+                <span>schema: mhi</span>
+                <span>roster edited in Supabase for now</span>
+                {!mhi.ok && <span style={{ color: "var(--danger)" }}>⚠︎ unreachable</span>}
+              </div>
+            </div>
+            <div className="ev-count">
+              <div className="num">{mhi.teams}</div>
+              <div className="lbl">teams</div>
+            </div>
+            <div className="ev-count">
+              <div className="num">{mhi.players}</div>
+              <div className="lbl">players</div>
+            </div>
+            <a
+              href="/mhi"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn secondary small"
+            >
+              View site ↗
+            </a>
+          </div>
+        </div>
+
+        <p className="muted" style={{ marginTop: 22, fontSize: 13 }}>
+          More sections can be added here as they&apos;re built — each stays isolated
+          in its own schema.
+        </p>
+      </main>
+    </>
   );
 }
