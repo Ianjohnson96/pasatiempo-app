@@ -20,3 +20,6 @@
 *.tsbuildinfo
 next-env.d.ts
 supabase/schema-mhi.sql
+
+# editor/office lock files
+~$*
