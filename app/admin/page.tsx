@@ -130,7 +130,7 @@ export default async function AdminHome() {
               </div>
               <div className="ev-meta">
                 <span>Men&apos;s Club info page</span>
-                <span>edit the HTML to change it</span>
+                <span>edited in code (app/sombrero)</span>
               </div>
             </div>
             <a
