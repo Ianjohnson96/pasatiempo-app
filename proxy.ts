@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { sectionForHost, isAdminHost } from "@/lib/sections";
+import { sectionForHost, isAdminHost, SECTIONS } from "@/lib/sections";
 
 // ===========================================================================
 // Proxy (Next.js 16's renamed "middleware"). Two jobs:
@@ -25,10 +25,29 @@ function isAdminPath(p: string): boolean {
   return p === "/admin" || p.startsWith("/admin/");
 }
 
+// A static-HTML section (e.g. El Sombrero) served straight from /public — either
+// because the request came in on that section's domain, or by path prefix.
+function staticSectionFor(host: string | null, path: string) {
+  const byHost = sectionForHost(host);
+  if (byHost?.staticFile) return byHost;
+  return SECTIONS.find(
+    (s) =>
+      s.staticFile &&
+      (path === s.pathPrefix || path.startsWith(s.pathPrefix + "/")),
+  );
+}
+
 export async function proxy(request: NextRequest) {
   const host = request.headers.get("host");
   const url = request.nextUrl.clone();
   const path = url.pathname;
+
+  // --- 0) Static-HTML sections (public, no auth): serve the file directly ---
+  const staticSec = staticSectionFor(host, path);
+  if (staticSec?.staticFile) {
+    url.pathname = staticSec.staticFile;
+    return NextResponse.rewrite(url);
+  }
 
   // --- 1) Resolve the internal path + whether we need to rewrite -----------
   let internalPath = path;

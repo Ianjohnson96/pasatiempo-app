@@ -40,6 +40,15 @@ export default function Home() {
             and contests.
           </p>
         </Link>
+
+        <a href="/sombrero" className="card" style={cardStyle}>
+          <div className="ev-title" style={{ fontSize: 19 }}>
+            El Sombrero →
+          </div>
+          <p style={{ margin: "6px 0 0", color: "var(--muted)" }}>
+            Men&apos;s Club event information — schedule, format, and details.
+          </p>
+        </a>
       </div>
 
       <p style={{ marginTop: 28, fontSize: 13 }}>

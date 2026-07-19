@@ -15,15 +15,17 @@
 // touching your hosts file.
 // ===========================================================================
 
-export type SectionKey = "events" | "mhi";
+export type SectionKey = "events" | "mhi" | "sombrero";
 
 export interface Section {
   key: SectionKey;
   label: string;
-  /** Postgres schema in the hub Supabase project that holds this section's tables. */
-  schema: string;
+  /** Postgres schema in the hub Supabase project (omit for static sections). */
+  schema?: string;
   /** Internal Next.js route prefix (folder under app/). */
   pathPrefix: string;
+  /** For a static-HTML section: the file in /public to serve (e.g. "/sombrero.html"). */
+  staticFile?: string;
   /** Hostnames that resolve to this section (production + local aliases). */
   hosts: string[];
 }
@@ -51,6 +53,18 @@ export const SECTIONS: Section[] = [
       // TODO: add a custom domain here too, e.g. "marionhollinsinvitational.com"
       "mhi.local",
       "mhi.local:3000",
+    ],
+  },
+  {
+    key: "sombrero",
+    label: "El Sombrero",
+    // Static-HTML microsite (no database) served straight from /public.
+    pathPrefix: "/sombrero",
+    staticFile: "/sombrero.html",
+    hosts: [
+      "el-sombrero.example.com", // TODO: real El Sombrero domain
+      "sombrero.local",
+      "sombrero.local:3000",
     ],
   },
 ];
