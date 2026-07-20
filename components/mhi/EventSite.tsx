@@ -453,7 +453,7 @@ export default function EventSite({ teams }: { teams: Team[] }) {
               <h4 className="mt40">Teams &amp; Pairings</h4>
               {flightsPresent ? (
                 <>
-                  <p className="fine">Team and player indexes as of July 11 — final adjustments may occur before play.</p>
+                  <p className="fine">Team and player indexes per the latest club report — final adjustments may occur before play.</p>
                   {groups.map((g) => (
                     <div className="flight-group" key={g.label}>
                       <h4>{g.label}</h4>
