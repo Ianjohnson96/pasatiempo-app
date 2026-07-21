@@ -208,6 +208,41 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                     course alongside Bobby Jones, Glenna Collett, and Cyril Tolley. Her instinct for great golfing ground
                     also helped inspire the 16th at Cypress Point and shaped the land that became Augusta National.
                   </p>
+                  <p>
+                    Beyond the golf course, she was an accomplished equestrienne and polo player, and one of the few
+                    women of her era with the standing to commission championship courses on her own terms. That same
+                    boldness &mdash; competitive, generous, and utterly unafraid &mdash; is what this invitational
+                    honors every August.
+                  </p>
+
+                  <h4>Milestones</h4>
+                  <ul className="timeline">
+                    <li>
+                      <span className="yr">1892</span>
+                      <span className="yr-text">Marion Hollins is born, into a family with deep ties to Long Island golf and horse racing.</span>
+                    </li>
+                    <li>
+                      <span className="yr">1921</span>
+                      <span className="yr-text">Wins the U.S. Women&rsquo;s Amateur, the top title in women&rsquo;s golf.</span>
+                    </li>
+                    <li>
+                      <span className="yr">1926</span>
+                      <span className="yr-text">Her feel for the land helps shape the par-3 16th at Cypress Point &mdash; still one of golf&rsquo;s most photographed holes.</span>
+                    </li>
+                    <li>
+                      <span className="yr">1929</span>
+                      <span className="yr-text">Founds Pasatiempo Golf Club, commissioning Dr.&nbsp;Alister MacKenzie to design the course.</span>
+                    </li>
+                    <li>
+                      <span className="yr">Sept 8, 1929</span>
+                      <span className="yr-text">Opening Day &mdash; over 2,000 spectators watch her play alongside Bobby Jones, Glenna Collett, and Cyril Tolley.</span>
+                    </li>
+                    <li>
+                      <span className="yr">1944</span>
+                      <span className="yr-text">Marion Hollins passes away, leaving behind some of golf&rsquo;s most celebrated ground.</span>
+                    </li>
+                  </ul>
+
                   <div className="pullquote">
                     A champion in a man&rsquo;s world &mdash; this invitational carries her name, and her spirit of bold,
                     joyful competition.
