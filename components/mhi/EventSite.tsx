@@ -739,8 +739,9 @@ export default function EventSite({ teams }: { teams: Team[] }) {
           <section className="block">
             <div className="wrap">
               <p className="lead">
-                Wager on the Horse Race just as you would at the track. Players and spectators alike may bet on any team
-                entered &mdash; then cheer them home.
+                Wager on the Horse Race just as you would at the track &mdash; study the field and place your bets ahead
+                of time through <strong>Homestretch</strong>, our online pari-mutuel platform, then cheer your picks
+                home.
               </p>
 
               <div className="center mt24">
@@ -753,22 +754,39 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                 <div className="betcard"><div className="wps">Show</div><div className="big">3rd</div><div className="cap">Your team finishes in the top three.</div></div>
               </div>
 
-              <div className="grid g2 mt12">
+              <div className="grid g2 mt30">
                 <div className="panel">
-                  <h3>House Rules</h3>
+                  <h3>Pari-Mutuel Wagering</h3>
+                  <p>
+                    Get in on the wagering fun through <strong>Homestretch</strong>, an online pari-mutuel betting
+                    platform you can use from your computer or phone to study the field and place your bets ahead of
+                    time.
+                  </p>
                   <ul className="clean">
                     <li>Minimum bet <strong>$5</strong> · maximum bet <strong>$20</strong>. You may make several different bets.</li>
-                    <li>All betting is in <strong>cash</strong> &mdash; correct change encouraged.</li>
-                    <li>You&rsquo;ll receive a <strong>ticket</strong> showing your bets; present it to claim your winnings.</li>
+                    <li>Cash for your wagers is still collected in person &mdash; at check-in or after lunch on Day 1.</li>
                     <li>One team from each flight reaches the final hole &mdash; place your bets accordingly.</li>
                   </ul>
                 </div>
                 <div className="panel">
-                  <h3>Paying Out</h3>
-                  <p>The pool is divided among the winning tickets after the Championship hole is decided. Odds move with the money &mdash; the more that&rsquo;s wagered on a team, the shorter the return.</p>
-                  <p>Payouts are <strong>announced at lunch on Day&nbsp;2</strong> and are separate from the Horse Race prize purse.</p>
-                  <p className="fine">Betting is all in good fun and in support of the day&rsquo;s festivities. Cash only.</p>
+                  <h3>Questions on Wagering?</h3>
+                  <p>
+                    Details and sign-in instructions for Homestretch will be sent in a separate email closer to the
+                    event. You&rsquo;ll receive a <strong>ticket</strong> showing your bets; present it to claim your
+                    winnings.
+                  </p>
+                  <p className="fine mt8">Studying up from home beats a snap decision after lunch.</p>
                 </div>
+              </div>
+
+              <div className="panel mt22 center">
+                <h3 className="mb6">Paying Out</h3>
+                <p className="lead center">
+                  The pool is divided among the winning tickets after the Championship hole is decided. Odds move with
+                  the money &mdash; the more that&rsquo;s wagered on a team, the shorter the return. Payouts are{" "}
+                  <strong>announced at lunch on Day&nbsp;2</strong> and are separate from the Horse Race prize purse.
+                </p>
+                <p className="fine mt8">Betting is all in good fun and in support of the day&rsquo;s festivities. Cash only.</p>
               </div>
             </div>
           </section>
