@@ -354,7 +354,12 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                       <div className="t">1:00 PM</div>
                       <div className="d">
                         <strong>Free practice round</strong> &mdash; 1:00 PM shotgun start.
-                        <div className="sub">Can&rsquo;t make the shotgun? Individual tee times run 1:30&ndash;3:30 PM. Grab your guests and get a look at the course before the competition begins.</div>
+                        <div className="sub">
+                          Tee times are also available from 1:30&ndash;3:30 PM if your team can&rsquo;t make the 1:00 PM
+                          shotgun &mdash; just email{" "}
+                          <a href="mailto:Ijohnson@pasatiempo.com">Ijohnson@pasatiempo.com</a> to let us know. Grab your
+                          guests and get a look at the course before the competition begins.
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -703,8 +708,8 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                 <div className="panel">
                   <div className="eyebrow">Prize Pool</div>
                   <h3>Racing for the Purse</h3>
-                  <div className="prize"><span className="nm big">Champion</span><span className="aw">1st place &mdash; 70% of the buy-in</span></div>
-                  <div className="prize"><span className="nm big">Runner-Up</span><span className="aw">2nd place &mdash; 30% of the buy-in</span></div>
+                  <div className="prize"><span className="nm big">Champion</span><span className="aw">1st place &mdash; 70% of the purse</span></div>
+                  <div className="prize"><span className="nm big">Runner-Up</span><span className="aw">2nd place &mdash; 30% of the purse</span></div>
                   <p className="fine mt12">The Horse Race pays the last two teams standing. Parimutuel betting payouts are separate &mdash; see the next tab.</p>
                 </div>
               </div>
@@ -798,8 +803,8 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                   <div className="prize"><span className="nm">Anywhere on the Green</span><span className="aw">All par-3 holes, each day</span></div>
                   <div className="prize"><span className="nm">Putting Contest</span><span className="aw">Day 1 &mdash; practice green by Hole 1</span></div>
                   <div className="prize"><span className="nm">Chipping Contest</span><span className="aw">Day 2 &mdash; practice green by Hole 1</span></div>
-                  <div className="prize"><span className="nm">Horse Race &mdash; Champion</span><span className="aw">1st place, 70% of the buy-in</span></div>
-                  <div className="prize"><span className="nm">Horse Race &mdash; Runner-Up</span><span className="aw">2nd place, 30% of the buy-in</span></div>
+                  <div className="prize"><span className="nm">Horse Race &mdash; Champion</span><span className="aw">1st place, 70% of the purse</span></div>
+                  <div className="prize"><span className="nm">Horse Race &mdash; Runner-Up</span><span className="aw">2nd place, 30% of the purse</span></div>
                   <div className="prize"><span className="nm">Parimutuel Payouts</span><span className="aw">Win / Place / Show</span></div>
                   <p className="fine mt14">The Horse Race pays the last two teams standing; betting payouts are announced at Day&nbsp;2 lunch.</p>
                 </div>
