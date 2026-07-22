@@ -160,7 +160,7 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                 <div>
                   <div className="k">Practice Round</div>
                   <div className="v">Aug 3</div>
-                  <div className="n">1:00 PM tee times &amp; on</div>
+                  <div className="n">1:00 PM shotgun start</div>
                 </div>
                 <div>
                   <div className="k">The Rounds</div>
@@ -353,8 +353,8 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                     <div className="evt">
                       <div className="t">1:00 PM</div>
                       <div className="d">
-                        <strong>Free practice round</strong> &mdash; tee times from 1:00 PM and on.
-                        <div className="sub">Grab your guests and get a look at the course before the competition begins.</div>
+                        <strong>Free practice round</strong> &mdash; 1:00 PM shotgun start.
+                        <div className="sub">Can&rsquo;t make the shotgun? Individual tee times run 1:30&ndash;3:30 PM. Grab your guests and get a look at the course before the competition begins.</div>
                       </div>
                     </div>
                   </div>
@@ -368,7 +368,10 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                   <div className="day-events">
                     <div className="evt">
                       <div className="t">7:30 AM</div>
-                      <div className="d"><strong>Check-in &amp; breakfast</strong> at the Hollins House.</div>
+                      <div className="d">
+                        <strong>Check-in &amp; breakfast</strong> at the Hollins House.
+                        <div className="sub">Pick up your tee prizes and place your parimutuel bets for the Horse Race.</div>
+                      </div>
                     </div>
                     <div className="evt">
                       <div className="t">9:00 AM</div>
@@ -385,7 +388,7 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                       <div className="t">After lunch</div>
                       <div className="d">
                         <strong>The Horse Race</strong> &mdash; 4-person alternate shot elimination.
-                        <div className="sub">Parimutuel betting for players and spectators; drinks on course at holes 1, 3 &amp; 5.</div>
+                        <div className="sub">Parimutuel bets can be placed at check-in or after lunch on Day 1; drinks on course at holes 1, 4 &amp; 7.</div>
                       </div>
                     </div>
                   </div>
@@ -475,13 +478,13 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                         </tr>
                       </thead>
                       <tbody>
-                        <tr><td className="hs">Green Flight 1</td><td>5, 6 &amp; 7</td></tr>
-                        <tr><td className="hs">Combo Flight</td><td>3, 4 &amp; 5</td></tr>
-                        <tr><td className="hs">Green Flight 2</td><td>1, 2 &amp; 3</td></tr>
+                        <tr><td className="hs">Green Flight 1</td><td>1, 2 &amp; 3</td></tr>
+                        <tr><td className="hs">Green Flight 2</td><td>4, 5 &amp; 6</td></tr>
+                        <tr><td className="hs">Combo Flight</td><td>7, 8 &amp; 9</td></tr>
                       </tbody>
                     </table>
                   </div>
-                  <p className="fine">Flight winners meet on Hole 9 for the Championship Final. Full rules are on the Horse Race tab.</p>
+                  <p className="fine">Flight winners meet on Hole 17 to begin the Championship Final, played over Holes 17 and 18. Full rules are on the Horse Race tab.</p>
                 </div>
               </div>
 
@@ -623,7 +626,7 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                     <li>On the greens, place within <strong>one putter-head</strong> of the selected putt, no nearer the hole.</li>
                   </ul>
                   <h4>Tees</h4>
-                  <p>Choose the <strong>Green Tees</strong> or the <strong>Green/Hollins Combo Tees</strong>. All players in a group must play from the same tees.</p>
+                  <p>You will be playing from either the <strong>Green tees</strong> or the <strong>Green/Hollins Combo tees</strong>. Your team&rsquo;s tee assignment is based on your overall combined team index. All players in a group must play from the same tees.</p>
                 </div>
               </div>
               <p className="fine center mt22">
@@ -659,7 +662,7 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                     <li>Each team sets its <strong>shot order before the first tee</strong> &mdash; and it&rsquo;s locked for the whole race. If Player&nbsp;3 holes the putt and the team advances, Player&nbsp;4 tees off next.</li>
                     <li>Teams are grouped into three flights, each playing its own set of three holes.</li>
                     <li>One or more teams are <strong>eliminated at the end of every hole</strong>; counts per flight are announced before the race.</li>
-                    <li>After three holes, <strong>one winner from each flight</strong> advances to the Championship Final on <strong>Hole 9</strong>.</li>
+                    <li>After three holes, <strong>one winner from each flight</strong> advances to the Championship Final, played over <strong>Holes 17 and 18</strong>.</li>
                     <li>It&rsquo;s a <strong>handicapped</strong> race based on each team&rsquo;s total index &mdash; every team has a fair shot.</li>
                   </ul>
                 </div>
@@ -672,7 +675,7 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                     <li>A ball on the green beats a ball off the green; closest to the hole advances.</li>
                   </ul>
                   <h4>Championship Final</h4>
-                  <p>The three flight winners meet on Hole 9. A final chip-off, if needed, settles 1st (<em>Win</em>), 2nd (<em>Place</em>) and 3rd (<em>Show</em>).</p>
+                  <p>The three flight winners meet on Hole 17 to begin the Championship Final, played over Holes 17 and 18. A final chip-off, if needed, settles 1st (<em>Win</em>), 2nd (<em>Place</em>) and 3rd (<em>Show</em>).</p>
                 </div>
               </div>
 
@@ -689,13 +692,13 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                         </tr>
                       </thead>
                       <tbody>
-                        <tr><td className="hs">Green Flight 1</td><td>5, 6 &amp; 7</td></tr>
-                        <tr><td className="hs">Combo Flight</td><td>3, 4 &amp; 5</td></tr>
-                        <tr><td className="hs">Green Flight 2</td><td>1, 2 &amp; 3</td></tr>
+                        <tr><td className="hs">Green Flight 1</td><td>1, 2 &amp; 3</td></tr>
+                        <tr><td className="hs">Green Flight 2</td><td>4, 5 &amp; 6</td></tr>
+                        <tr><td className="hs">Combo Flight</td><td>7, 8 &amp; 9</td></tr>
                       </tbody>
                     </table>
                   </div>
-                  <p className="fine">All three flight winners converge on Hole 9 for the final.</p>
+                  <p className="fine">All three flight winners converge on Hole 17 to begin the Championship Final, played over Holes 17 and 18.</p>
                 </div>
                 <div className="panel">
                   <div className="eyebrow">Prize Pool</div>
@@ -711,7 +714,7 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                 <div className="veil" />
                 <div className="inner">
                   <div className="q">&ldquo;Two days of great golf, friendly competition &mdash; and a little horse race.&rdquo;</div>
-                  <div className="a">Drinks on course at holes 1, 3 &amp; 5</div>
+                  <div className="a">Drinks on course at holes 1, 4 &amp; 7</div>
                 </div>
               </div>
             </div>
@@ -792,6 +795,9 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                   <div className="eyebrow">On the Course &amp; At the Race</div>
                   <h3>Contests &amp; the Race</h3>
                   <div className="prize"><span className="nm big">Closest to the Pin</span><span className="aw">Multiple holes, each day</span></div>
+                  <div className="prize"><span className="nm">Anywhere on the Green</span><span className="aw">All par-3 holes, each day</span></div>
+                  <div className="prize"><span className="nm">Putting Contest</span><span className="aw">Day 1 &mdash; practice green by Hole 1</span></div>
+                  <div className="prize"><span className="nm">Chipping Contest</span><span className="aw">Day 2 &mdash; practice green by Hole 1</span></div>
                   <div className="prize"><span className="nm">Horse Race &mdash; Champion</span><span className="aw">1st place, 70% of the buy-in</span></div>
                   <div className="prize"><span className="nm">Horse Race &mdash; Runner-Up</span><span className="aw">2nd place, 30% of the buy-in</span></div>
                   <div className="prize"><span className="nm">Parimutuel Payouts</span><span className="aw">Win / Place / Show</span></div>
@@ -805,8 +811,9 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                 </div>
                 <h3 className="mb6">Every Day, Something to Play For</h3>
                 <p className="lead center">
-                  Low gross, low net, flight honors, closest-to-the-pin on designated holes, and the thrill of the Horse
-                  Race &mdash; there&rsquo;s a prize and a story waiting on nearly every hole.
+                  Low gross, low net, flight honors, closest-to-the-pin &mdash; including anywhere on the green on all
+                  par&nbsp;3s &mdash; and the thrill of the Horse Race: there&rsquo;s a prize and a story waiting on
+                  nearly every hole.
                 </p>
               </div>
             </div>

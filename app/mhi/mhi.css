@@ -181,11 +181,11 @@ ul.plainlist li{margin:5px 0;}
 @media (max-width:760px){.facts{grid-template-columns:1fr 1fr;}.facts>div:nth-child(odd){border-left:none;}.facts>div:nth-child(n+3){border-top:1px solid var(--line);}}
 
 /* heritage feature */
-.feature{display:grid;grid-template-columns:0.85fr 1.15fr;gap:40px;align-items:start;}
+.feature{display:grid;grid-template-columns:0.85fr 1.15fr;gap:40px;align-items:stretch;}
 @media (max-width:820px){.feature{grid-template-columns:1fr;gap:26px;}}
-.portrait-stack{display:flex;flex-direction:column;gap:20px;}
+.portrait-stack{display:flex;flex-direction:column;justify-content:center;gap:28px;}
 .portrait-stack figure{margin:0;}
-@media (max-width:820px){.portrait-stack{flex-direction:row;gap:16px;}.portrait-stack figure{flex:1;}}
+@media (max-width:820px){.portrait-stack{flex-direction:row;justify-content:flex-start;gap:16px;}.portrait-stack figure{flex:1;}}
 .portrait{position:relative;}
 .portrait img{width:100%;border:1px solid var(--rule);box-shadow:var(--shadow);filter:sepia(.12);}
 .portrait figcaption{font-family:var(--disp);font-style:italic;text-align:center;color:var(--ink-soft);font-size:15px;margin-top:10px;}
