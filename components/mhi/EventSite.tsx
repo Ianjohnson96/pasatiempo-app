@@ -741,7 +741,8 @@ export default function EventSite({ teams }: { teams: Team[] }) {
               <p className="lead">
                 Wager on the Horse Race just as you would at the track &mdash; study the field and place your bets ahead
                 of time through <strong>Homestretch</strong>, our online pari-mutuel platform, then cheer your picks
-                home.
+                home. <strong>Bets aren&rsquo;t final until paid in cash at check-in</strong> &mdash; be sure to bring
+                cash with you Tuesday morning.
               </p>
 
               <div className="center mt24">
@@ -764,7 +765,7 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                   </p>
                   <ul className="clean">
                     <li>Minimum bet <strong>$5</strong> · maximum bet <strong>$20</strong>. You may make several different bets.</li>
-                    <li>Cash for your wagers is still collected in person &mdash; at check-in or after lunch on Day 1.</li>
+                    <li><strong>Cash is required at check-in</strong> to finalize any bets placed through Homestretch.</li>
                     <li>One team from each flight reaches the final hole &mdash; place your bets accordingly.</li>
                   </ul>
                 </div>
@@ -772,8 +773,8 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                   <h3>Questions on Wagering?</h3>
                   <p>
                     Details and sign-in instructions for Homestretch will be sent in a separate email closer to the
-                    event. You&rsquo;ll receive a <strong>ticket</strong> showing your bets; present it to claim your
-                    winnings.
+                    event. You&rsquo;ll be notified of your winnings by <strong>text or email</strong>, based on the
+                    contact information you provide when signing in.
                   </p>
                   <p className="fine mt8">Studying up from home beats a snap decision after lunch.</p>
                 </div>
@@ -782,7 +783,7 @@ export default function EventSite({ teams }: { teams: Team[] }) {
               <div className="panel mt22 center">
                 <h3 className="mb6">Paying Out</h3>
                 <p className="lead center">
-                  The pool is divided among the winning tickets after the Championship hole is decided. Odds move with
+                  The pool is divided among the winning bets after the Championship hole is decided. Odds move with
                   the money &mdash; the more that&rsquo;s wagered on a team, the shorter the return. Payouts are{" "}
                   <strong>announced at lunch on Day&nbsp;2</strong> and are separate from the Horse Race prize purse.
                 </p>
