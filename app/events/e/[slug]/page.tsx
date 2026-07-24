@@ -5,7 +5,12 @@ import RichText from "@/components/events/RichText";
 import RegistrationForm, {
   type SeatInfo,
 } from "@/components/events/RegistrationForm";
-import { availability, getEventBySlug, registrationsFor } from "@/lib/events/data";
+import {
+  availability,
+  rosterAvailability,
+  getEventBySlug,
+  registrationsFor,
+} from "@/lib/events/data";
 import { formatSlot, formatWhen, rosterName, TYPE_LABEL } from "@/lib/events/format";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +26,7 @@ export default async function PublicEventPage({
 
   const regs = await registrationsFor(event.id);
   const eventAvail = availability(event, regs);
+  const rosterAvail = rosterAvailability(event, regs);
   const seats: SeatInfo = {
     remaining: eventAvail.remaining,
     full: eventAvail.full,
@@ -89,6 +95,21 @@ export default async function PublicEventPage({
     }
   }
 
+  // Program roster fact (shown for both single and multi-date events).
+  let rosterFact: { text: string; pct: number; full: boolean } | null = null;
+  if (event.rosterLimit != null) {
+    rosterFact = {
+      text: rosterAvail.full
+        ? "Roster full"
+        : `${rosterAvail.remaining} of ${event.rosterLimit} spots open`,
+      pct: Math.min(
+        100,
+        Math.round((rosterAvail.count / event.rosterLimit) * 100),
+      ),
+      full: rosterAvail.full,
+    };
+  }
+
   const heroImg = event.photos[0];
   const heroStyle = heroImg
     ? { backgroundImage: `url(${heroImg})` }
@@ -149,6 +170,19 @@ export default async function PublicEventPage({
                     <span style={{ width: `${spotsFact.pct}%` }} />
                   </div>
                 )}
+              </div>
+            )}
+            {rosterFact && (
+              <div className="fact">
+                <div className="lbl">Program roster</div>
+                <div className="val">
+                  <small style={rosterFact.full ? { color: "var(--danger)" } : undefined}>
+                    {rosterFact.text}
+                  </small>
+                </div>
+                <div className="spots-bar">
+                  <span style={{ width: `${rosterFact.pct}%` }} />
+                </div>
               </div>
             )}
           </div>
@@ -259,6 +293,14 @@ export default async function PublicEventPage({
         {open && (
           <section className="pub-section reveal" id="register">
             <h2>Register</h2>
+            {rosterAvail.full && (
+              <div className="notice warn" style={{ marginTop: 14 }}>
+                The program roster is <strong>full</strong> — new sign-ups are
+                closed. If you&apos;re already on the roster you can still add
+                dates below; otherwise contact the golf shop to be added to a
+                waiting list.
+              </div>
+            )}
             <div style={{ marginTop: 14 }}>
               <RegistrationForm event={event} seats={seats} />
             </div>
