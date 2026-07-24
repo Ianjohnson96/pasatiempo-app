@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { eventToRow, rowToEvent, rowToReg } from "./map";
 import { newId, newSlug, slugify } from "./ids";
-import { availability } from "./data";
+import { availability, rosterCount, onRoster } from "./data";
 import { formatSlot } from "./format";
 import type {
   CustomField,
@@ -54,6 +54,7 @@ export interface EventInput {
   slotsPrompt: string;
   slots: Slot[];
   capacity: number | null;
+  rosterLimit: number | null;
   waitlistEnabled: boolean;
   allowGuests: boolean;
   maxGuests: number | null;
@@ -124,6 +125,7 @@ async function saveEventInner(input: EventInput): Promise<SaveEventResult> {
     slotsPrompt: input.scheduleMode === "slots" ? input.slotsPrompt.trim() : "",
     slots: input.scheduleMode === "slots" ? cleanSlots : [],
     capacity: input.capacity,
+    rosterLimit: input.rosterLimit,
     waitlistEnabled: input.waitlistEnabled,
     allowGuests: input.allowGuests,
     maxGuests: input.maxGuests,
@@ -412,6 +414,19 @@ export async function register(input: RegisterInput): Promise<RegisterResult> {
   const regs: Registration[] = (regRows ?? []).map(rowToReg);
 
   const partySize = Math.max(1, Math.floor(input.partySize || 1));
+
+  // Program roster cap — counts unique people (registrant + guests) across the
+  // whole event. Someone already on the roster may keep adding dates; a NEW
+  // person is turned away once the cap is reached.
+  if (ev.rosterLimit != null && !onRoster(regs, email)) {
+    if (rosterCount(regs) + partySize > ev.rosterLimit) {
+      return {
+        ok: false,
+        error:
+          "Sorry — this program's roster is full. Please contact the golf shop to be added to a waiting list.",
+      };
+    }
+  }
 
   let slotIds: string[] = [];
   if (ev.scheduleMode === "slots") {

@@ -23,6 +23,7 @@ export function rowToEvent(r: any): EventRec {
     slotsPrompt: r.slots_prompt ?? "",
     slots: r.slots ?? [],
     capacity: r.capacity,
+    rosterLimit: r.roster_limit ?? null,
     waitlistEnabled: r.waitlist_enabled,
     allowGuests: r.allow_guests,
     maxGuests: r.max_guests,
@@ -60,6 +61,7 @@ export function eventToRow(e: Partial<EventRec>): Record<string, unknown> {
   if (e.slotsPrompt !== undefined) row.slots_prompt = e.slotsPrompt;
   if (e.slots !== undefined) row.slots = e.slots;
   if (e.capacity !== undefined) row.capacity = e.capacity;
+  if (e.rosterLimit !== undefined) row.roster_limit = e.rosterLimit;
   if (e.waitlistEnabled !== undefined) row.waitlist_enabled = e.waitlistEnabled;
   if (e.allowGuests !== undefined) row.allow_guests = e.allowGuests;
   if (e.maxGuests !== undefined) row.max_guests = e.maxGuests;

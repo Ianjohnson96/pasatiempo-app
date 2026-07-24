@@ -78,6 +78,12 @@ export default function EventEditor({ event }: { event?: EventRec }) {
   const [waitlistEnabled, setWaitlistEnabled] = useState(
     event?.waitlistEnabled ?? true,
   );
+  const [hasRosterLimit, setHasRosterLimit] = useState(
+    event?.rosterLimit != null,
+  );
+  const [rosterLimit, setRosterLimit] = useState(
+    String(event?.rosterLimit ?? 20),
+  );
 
   const [allowGuests, setAllowGuests] = useState(event?.allowGuests ?? true);
   const [maxGuests, setMaxGuests] = useState(String(event?.maxGuests ?? 3));
@@ -204,6 +210,9 @@ export default function EventEditor({ event }: { event?: EventRec }) {
         scheduleMode === "single" && hasCapacity
           ? Math.max(1, parseInt(capacity, 10) || 1)
           : null,
+      rosterLimit: hasRosterLimit
+        ? Math.max(1, parseInt(rosterLimit, 10) || 1)
+        : null,
       waitlistEnabled,
       allowGuests,
       maxGuests: allowGuests ? Math.max(1, parseInt(maxGuests, 10) || 1) : null,
@@ -568,6 +577,38 @@ export default function EventEditor({ event }: { event?: EventRec }) {
               </span>
             </label>
           </>
+        )}
+
+        <label className="check" style={{ marginBottom: 12 }}>
+          <input
+            type="checkbox"
+            checked={hasRosterLimit}
+            onChange={(e) => setHasRosterLimit(e.target.checked)}
+          />
+          <span>
+            <span className="ck-label">Cap the total program roster</span>
+            <br />
+            <span className="ck-hint">
+              Limits how many <strong>different people</strong> can enroll across
+              the whole event. Someone who signs up counts once no matter how many
+              dates they pick, and can still add more dates after the cap is hit —
+              but new people are turned away when it&apos;s full. Separate from the
+              per-date spots above.
+            </span>
+          </span>
+        </label>
+        {hasRosterLimit && (
+          <div className="row" style={{ marginBottom: 12 }}>
+            <div className="field" style={{ marginBottom: 0, maxWidth: 200 }}>
+              <label>Max people on roster</label>
+              <input
+                type="number"
+                min={1}
+                value={rosterLimit}
+                onChange={(e) => setRosterLimit(e.target.value)}
+              />
+            </div>
+          </div>
         )}
 
         <label className="check">

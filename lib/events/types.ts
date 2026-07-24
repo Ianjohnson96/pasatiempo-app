@@ -56,6 +56,11 @@ export interface EventRec {
 
   // Capacity (single mode; slots carry their own)
   capacity: number | null; // total seats; null = unlimited
+  // Program roster cap — max distinct people (registrant + guests) enrolled across
+  // the WHOLE event, regardless of how many dates each picks. null = no cap.
+  // Independent of per-slot/per-event capacity; used to cap a multi-date clinic's
+  // total enrollment. Once someone is on the roster they can still add more dates.
+  rosterLimit: number | null;
   waitlistEnabled: boolean;
 
   // Guests

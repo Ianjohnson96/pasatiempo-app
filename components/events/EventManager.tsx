@@ -42,6 +42,21 @@ export default function EventManager({
   const cancelled = registrations.filter((r) => r.status === "cancelled");
   const seats = confirmed.reduce((n, r) => n + Math.max(1, r.partySize), 0);
 
+  // Program roster: distinct confirmed people (registrant + guests), de-duped by
+  // email so multi-date sign-ups count once. Matches the public cap logic.
+  const rosterPeople = (() => {
+    const heads = new Map<string, number>();
+    for (const r of confirmed) {
+      const e = r.email.trim().toLowerCase();
+      heads.set(e, Math.max(heads.get(e) ?? 0, Math.max(1, r.partySize)));
+    }
+    let t = 0;
+    for (const n of heads.values()) t += n;
+    return t;
+  })();
+  const rosterFull =
+    event.rosterLimit != null && rosterPeople >= event.rosterLimit;
+
   function changeStatus(s: "draft" | "open" | "closed") {
     start(async () => {
       await setEventStatus(event.id, s);
@@ -242,6 +257,12 @@ export default function EventManager({
               <span>{formatWhen(event.startsAt, event.endsAt)}</span>
               {event.location && <span>📍 {event.location}</span>}
               {event.inviteOnly && <span>🔒 Invite-only</span>}
+              {event.rosterLimit != null && (
+                <span style={{ color: rosterFull ? "var(--danger)" : "var(--muted)" }}>
+                  👥 Roster {rosterPeople}/{event.rosterLimit}
+                  {rosterFull ? " · full" : ""}
+                </span>
+              )}
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
