@@ -496,17 +496,23 @@ export default function EventSite({ teams }: { teams: Team[] }) {
               <h4 className="mt40">Teams &amp; Pairings</h4>
               {flightsPresent ? (
                 <>
-                  <p className="fine">Team and player indexes per the latest club report — final adjustments may occur before play.</p>
+                  <p className="fine">
+                    Teams are listed low to high by combined team index within each flight. Indexes are per the latest
+                    club report &mdash; final adjustments may occur before play.
+                  </p>
                   {groups.map((g) => (
                     <div className="flight-group" key={g.label}>
                       <h4>{g.label}</h4>
                       <div className="teamgrid">
-                        {g.teams.map((t) => (
+                        {g.teams.map((t, ti) => (
                           <div className="teamcard" key={t.id}>
                             <div className="tname">
-                              <span>{t.name || "Team"}</span>
+                              <span className="trank">{ti + 1}</span>
+                              <span className="tnm">{t.name || "Team"}</span>
                               {t.teamIndex !== null ? (
-                                <span className="hrtag">{fmtIndex(t.teamIndex)}</span>
+                                <span className="hrtag" title="Combined team index">
+                                  Idx {fmtIndex(t.teamIndex)}
+                                </span>
                               ) : (
                                 t.horseRaceFlight &&
                                 HR_LABEL[t.horseRaceFlight] && (
@@ -514,12 +520,18 @@ export default function EventSite({ teams }: { teams: Team[] }) {
                                 )
                               )}
                             </div>
+                            <div className="prow-head">
+                              <span>Player</span>
+                              <span>Index</span>
+                            </div>
                             <ul>
                               {t.players.map((p, i) => (
                                 <li key={i}>
-                                  {p.name}
-                                  {p.index !== null && <span className="pidx"> ({fmtIndex(p.index)})</span>}
-                                  {!p.isMember && <span className="guest"> · guest</span>}
+                                  <span className="pnm">
+                                    {p.name}
+                                    {!p.isMember && <span className="guest"> · guest</span>}
+                                  </span>
+                                  {p.index !== null && <span className="pidx">{fmtIndex(p.index)}</span>}
                                 </li>
                               ))}
                             </ul>

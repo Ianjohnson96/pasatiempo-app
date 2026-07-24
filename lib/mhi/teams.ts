@@ -38,7 +38,7 @@ export async function getTeams(): Promise<Team[]> {
       players = pl || [];
     }
 
-    return teams.map((t: any) => ({
+    const mapped = teams.map((t: any) => ({
       id: t.id,
       name: t.name ?? null,
       flight: t.flight ?? null,
@@ -52,6 +52,10 @@ export async function getTeams(): Promise<Team[]> {
           index: p.index ?? null,
         })),
     }));
+
+    // Within each flight, order teams by combined team index (lowest first).
+    // Teams without an index yet (e.g. incomplete rosters) sort to the end.
+    return mapped.sort((a, b) => (a.teamIndex ?? Infinity) - (b.teamIndex ?? Infinity));
   } catch {
     return [];
   }

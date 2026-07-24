@@ -269,17 +269,21 @@ td.num,th.num{text-align:right;}
 .tba .big{font-family:var(--disp);font-style:normal;font-size:22px;color:var(--ink);display:block;margin-bottom:8px;letter-spacing:.02em;}
 .flight-group{margin-top:26px;}
 .flight-group h4{margin-bottom:12px;}
-.teamgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;}
+.teamgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
 .teamcard{background:var(--panel-2);border:1px solid var(--rule);padding:18px 20px;}
-.teamcard .tname{font-family:var(--disp);font-weight:600;font-size:19px;color:var(--green);margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+.teamcard .tname{font-family:var(--disp);font-weight:600;font-size:18px;color:var(--green);margin-bottom:10px;display:flex;align-items:center;gap:10px;}
 :root[data-theme="dark"] .teamcard .tname{color:var(--gold-bright);}
 @media (prefers-color-scheme:dark){.teamcard .tname{color:var(--gold-bright);}:root[data-theme="light"] .teamcard .tname{color:var(--green);}}
-.teamcard .hrtag{font-family:var(--disp);font-style:normal;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:2px;padding:2px 7px;white-space:nowrap;}
+.teamcard .trank{flex:none;width:24px;height:24px;border-radius:50%;border:1.5px solid var(--gold);color:var(--gold);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;}
+.teamcard .tnm{flex:1 1 auto;min-width:0;}
+.teamcard .hrtag{flex:none;font-family:var(--disp);font-style:normal;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:2px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.teamcard .prow-head{display:flex;justify-content:space-between;font-family:var(--disp);text-transform:uppercase;letter-spacing:.1em;font-size:10.5px;color:var(--gold);font-weight:600;padding-bottom:5px;border-bottom:1px solid var(--line);margin-bottom:2px;}
 .teamcard ul{list-style:none;margin:0;padding:0;}
-.teamcard li{padding:4px 0;border-bottom:1px dotted var(--line);font-size:15.5px;}
+.teamcard li{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:5px 0;border-bottom:1px dotted var(--line);font-size:15.5px;}
 .teamcard li:last-child{border-bottom:none;}
+.teamcard li .pnm{flex:1 1 auto;min-width:0;}
 .teamcard li .guest{color:var(--ink-soft);font-style:italic;}
-.teamcard li .pidx{color:var(--ink-soft);font-variant-numeric:tabular-nums;}
+.teamcard li .pidx{flex:none;color:var(--ink-soft);font-variant-numeric:tabular-nums;font-size:14px;}
 
 /* divider band with photo */
 .histband{position:relative;height:340px;overflow:hidden;display:flex;align-items:center;justify-content:center;text-align:center;margin:8px 0;}
