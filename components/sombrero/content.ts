@@ -200,6 +200,12 @@ td.num,th.num{text-align:right;}
 .histband .q{font-family:var(--disp);font-style:italic;font-size:clamp(22px,3.6vw,34px);line-height:1.4;text-shadow:0 2px 16px rgba(0,0,0,.5);}
 .histband .a{font-family:var(--disp);text-transform:uppercase;letter-spacing:.22em;font-size:13px;color:#e7c877;margin-top:16px;}
 
+.heritage{align-items:center;}
+.histphoto{background:var(--panel);border:1px solid var(--rule);padding:10px;box-shadow:var(--shadow);}
+.histphoto img{width:100%;height:auto;filter:sepia(.14) contrast(1.02);}
+.histphoto .cap{display:block;text-align:center;font-family:var(--disp);font-style:italic;font-size:14px;color:var(--ink-soft);padding:9px 6px 3px;}
+.heritage h4:first-child{margin-top:0;}
+
 footer.site{background:var(--green-deep);color:#e9dfc4;margin-top:60px;padding:52px 22px 40px;text-align:center;}
 footer.site .crest{width:118px;margin:0 auto 20px;background:#f4eedd;border-radius:10px;padding:16px 22px;box-shadow:0 10px 26px -14px rgba(0,0,0,.6);}
 footer.site h4{color:#e7c877;}
@@ -285,6 +291,41 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
       <div class="a">El Sombrero &middot; Pasatiempo Men's Club</div>
     </div>
   </div>
+
+  <!-- Heritage / Pasatiempo history -->
+  <section class="block">
+    <div class="wrap">
+      <div class="center">
+        <div class="rule-orn"><span class="eyebrow" style="color:var(--gold);">Since 1929</span></div>
+        <h3 style="margin:14px 0 8px;">A Pasatiempo Tradition</h3>
+        <p class="lead center" style="margin:0 auto 30px;">The El Sombrero is played over one of Alister MacKenzie's masterpieces &mdash; a course born of the same spirit of camaraderie and competition that Marion Hollins brought to Santa Cruz nearly a century ago.</p>
+      </div>
+      <div class="grid g2 heritage">
+        <div class="histphoto">
+          <img src="/sombrero/img/history-hollins.avif" alt="Marion Hollins, founder of Pasatiempo Golf Club, c. 1922" loading="lazy">
+          <span class="cap">Marion Hollins, founder &mdash; c. 1922</span>
+        </div>
+        <div>
+          <h4>The Founder</h4>
+          <p>Pasatiempo was the vision of <strong>Marion Hollins</strong> &mdash; 1921 U.S. Women's Amateur champion, businesswoman, and one of the great sporting figures of her age. She opened the club in <strong>1929</strong> and named it <em>Pasatiempo</em>, Spanish for &ldquo;pastime.&rdquo;</p>
+          <h4>The Architect</h4>
+          <p>She entrusted the design to <strong>Dr. Alister MacKenzie</strong> &mdash; architect of Cypress Point and Augusta National &mdash; who considered Pasatiempo among his finest work and made his home along the sixth fairway.</p>
+        </div>
+      </div>
+      <div class="grid g2 heritage" style="margin-top:26px;">
+        <div>
+          <h4>Opening Day</h4>
+          <p>The club opened <strong>September 8, 1929</strong> with an exhibition for the ages &mdash; <strong>Bobby Jones</strong>, Glenna Collett, Cyril Tolley, and Hollins herself christening the new links before the gathered crowd.</p>
+          <h4>The Men's Club Carries It On</h4>
+          <p>Nearly a hundred years on, the El Sombrero keeps that tradition alive &mdash; two days of partners, matches, and the Horserace, played the way Pasatiempo has always been enjoyed: together.</p>
+        </div>
+        <div class="histphoto">
+          <img src="/sombrero/img/history-swing.avif" alt="Marion Hollins mid golf swing, 1916" loading="lazy">
+          <span class="cap">Marion Hollins, mid-swing &mdash; 1916</span>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <!-- Nav cards -->
   <section class="block">
