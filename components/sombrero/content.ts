@@ -155,9 +155,10 @@ ul.plainlist li{margin:5px 0;}
 .evt .d .sub{color:var(--ink-soft);font-style:italic;font-size:14.5px;}
 @media (max-width:760px){.day{grid-template-columns:1fr;gap:12px;}.day-h{text-align:left;}.evt{grid-template-columns:104px 1fr;gap:12px;}}
 
-.tablewrap{overflow-x:auto;margin:12px 0;}
+.tablewrap{overflow-x:auto;margin:12px 0;-webkit-overflow-scrolling:touch;}
 table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;}
 th,td{padding:11px 16px;text-align:left;border-bottom:1px solid var(--line);}
+@media (max-width:600px){th,td{padding:9px 10px;}table{font-size:15px;}.tablewrap table{min-width:360px;}}
 thead th{font-family:var(--disp);text-transform:uppercase;letter-spacing:.14em;font-size:13px;color:var(--gold);font-weight:600;border-bottom:2px solid var(--gold);}
 tbody tr:last-child td{border-bottom:none;}
 td.num,th.num{text-align:right;}
@@ -206,6 +207,12 @@ footer.site .contacts{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-wi
 @media (max-width:560px){footer.site .contacts{grid-template-columns:1fr;}}
 footer.site .cn{font-family:var(--disp);font-size:22px;color:#f4eedd;}
 footer.site .cr{font-style:italic;font-size:14px;color:#b9c3a6;margin-bottom:6px;}
+footer.site .committee{display:flex;flex-wrap:wrap;justify-content:center;gap:18px 30px;max-width:780px;margin:16px auto 0;}
+footer.site .committee>div{min-width:150px;padding:0 4px;}
+footer.site .committee .cn{font-size:19px;}
+footer.site .committee .cr{margin-bottom:0;color:#c8d0b6;}
+footer.site .committee .lead-role{color:#e7c877;}
+@media (max-width:520px){footer.site .committee{gap:16px 22px;}footer.site .committee>div{min-width:132px;}}
 footer.site a{color:#e7c877;}
 footer.site .legacy{max-width:60ch;margin:26px auto 0;font-size:15px;color:#c8d0b6;line-height:1.6;}
 footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
@@ -643,12 +650,14 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
     <div><div class="cn">Ken Woods</div><div class="cr">Director of Golf</div><div>(831) 459-9159</div></div>
     <div><div class="cn">Chris Ingram</div><div class="cr">Head Golf Professional</div><div>(831) 459-9155</div></div>
   </div>
-  <div class="eyebrow" style="color:#e7c877;margin-top:34px;">Tournament Committee</div>
-  <p class="legacy" style="margin-top:10px;">
-    Tyler Doyle, Men's Club President &middot; Stu Hurvitz, Vice President &middot;
-    Ken Woods, PGA Director of Golf &middot; Tommy Dembski, Board Member &middot;
-    Mark Collishaw, Board Member
-  </p>
+  <div class="rule-orn" style="margin-top:40px;"><span class="eyebrow" style="color:#e7c877;">Tournament Committee</span></div>
+  <div class="committee">
+    <div><div class="cn">Tyler Doyle</div><div class="cr lead-role">Men's Club President</div></div>
+    <div><div class="cn">Stu Hurvitz</div><div class="cr lead-role">Vice President</div></div>
+    <div><div class="cn">Ken Woods</div><div class="cr">PGA Director of Golf</div></div>
+    <div><div class="cn">Tommy Dembski</div><div class="cr">Board Member</div></div>
+    <div><div class="cn">Mark Collishaw</div><div class="cr">Board Member</div></div>
+  </div>
   <p class="legacy" style="margin-top:22px;">The El Sombrero &mdash; the Pasatiempo Men's Club's premier Member-Member of the season.</p>
   <p class="fine">Pasatiempo Golf Club &middot; Santa Cruz, California</p>
 </footer>
