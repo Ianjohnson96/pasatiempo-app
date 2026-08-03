@@ -241,7 +241,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
     <div class="bg" style="background-image:url('/sombrero/img/img2.avif')"></div>
     <div class="veil"></div>
     <div class="inner">
-      <div class="eyebrow">Pasatiempo Men's Club &middot; 7th Annual</div>
+      <div class="eyebrow">Pasatiempo Men's Club &middot; Member-Member</div>
       <h1>El Sombrero</h1>
       <div class="tagline">&ldquo;Find a Partner &amp; Ride 'Til the Horserace&rdquo;</div>
       <div class="dates"><span>August 14 &amp; 15, 2026</span></div>
@@ -333,31 +333,31 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
     <div class="wrap">
       <div class="panel plain">
         <div class="day">
-          <div class="day-h"><div class="dn">Friday</div><div class="dd">August 14th</div><div class="dtag">Round 1 &amp; Alternate Shot</div></div>
+          <div class="day-h"><div class="dn">Friday</div><div class="dd">August 14th</div><div class="dtag">Matches 1 &amp; 2 + Alternate Shot</div></div>
           <div class="day-events">
-            <div class="evt"><div class="t">7:45 AM</div><div class="d"><strong>Continental breakfast</strong> begins.<div class="sub">Made-to-Order breakfast (burrito, sandwich, or the MacKenzie breakfast; vegetarian available) served 7:45&ndash;8:45 AM.</div></div></div>
-            <div class="evt"><div class="t">Shotgun</div><div class="d"><strong>Round 1 &mdash; Match Play.</strong><div class="sub">Two-man teams, second ball breaks ties.</div></div></div>
-            <div class="evt"><div class="t">12&ndash;12:45 PM</div><div class="d"><strong>Lunch</strong> &mdash; wraps, sandwiches, fruit, chips &amp; cookies.</div></div>
-            <div class="evt"><div class="t">Afternoon</div><div class="d"><strong>Optional 9-hole Alternate Shot</strong> after the 2nd match.<div class="sub">27 holes played Friday for those who opt in &mdash; assumed in unless you tell us otherwise.</div></div></div>
-            <div class="evt"><div class="t">3:15&ndash;4 PM</div><div class="d"><strong>Snacks</strong> between rounds.</div></div>
-            <div class="evt"><div class="t">5:30&ndash;6:30 PM</div><div class="d"><strong>Hosted bar.</strong></div></div>
-            <div class="evt"><div class="t">6:30&ndash;8 PM</div><div class="d"><strong>Dinner</strong> &mdash; BBQ + dessert.</div></div>
+            <div class="evt"><div class="t">7:45 AM</div><div class="d"><strong>Practice facility opens.</strong></div></div>
+            <div class="evt"><div class="t">7:45&ndash;9:30 AM</div><div class="d"><strong>Registration, Prize Pool &amp; Pari-Mutuel tee-prize pickup &mdash; and breakfast.</strong><div class="sub">MacKenzie Bar &amp; Grill.</div></div></div>
+            <div class="evt"><div class="t">9:30&ndash;12 PM</div><div class="d"><strong>Shotgun &mdash; 1st Nine-Hole Match.</strong></div></div>
+            <div class="evt"><div class="t">12&ndash;12:30 PM</div><div class="d"><strong>Break &amp; snacks</strong> &mdash; build-your-own box lunch.</div></div>
+            <div class="evt"><div class="t">12:30&ndash;3 PM</div><div class="d"><strong>Shotgun &mdash; 2nd Nine-Hole Match.</strong></div></div>
+            <div class="evt"><div class="t">3&ndash;3:30 PM</div><div class="d"><strong>Break &amp; snacks.</strong></div></div>
+            <div class="evt"><div class="t">4:15&ndash;6:15 PM</div><div class="d"><strong>Optional Two-Man Alternate Shot.</strong><div class="sub">Field split into two flights; the lowest three teams from each nine win additional $$$, paid at registration.</div></div></div>
+            <div class="evt"><div class="t">6:15&ndash;???</div><div class="d"><strong>BBQ Chicken Dinner.</strong></div></div>
           </div>
         </div>
         <div class="day">
-          <div class="day-h"><div class="dn">Saturday</div><div class="dd">August 15th</div><div class="dtag">Round 2 &amp; the Horserace</div></div>
+          <div class="day-h"><div class="dn">Saturday</div><div class="dd">August 15th</div><div class="dtag">Matches 3 &amp; 4 + the Horserace</div></div>
           <div class="day-events">
-            <div class="evt"><div class="t">7:45 AM</div><div class="d"><strong>Continental &amp; Made-to-Order breakfast</strong>, 7:45&ndash;8:45 AM.</div></div>
-            <div class="evt"><div class="t">Shotgun</div><div class="d"><strong>Round 2 &mdash; Match Play.</strong><div class="sub">Flight winners determined after the 4th match.</div></div></div>
-            <div class="evt"><div class="t">12&ndash;12:45 PM</div><div class="d"><strong>Lunch</strong> &mdash; wings &amp; veggies.</div></div>
-            <div class="evt"><div class="t">3:15&ndash;4 PM</div><div class="d"><strong>Snacks</strong> between rounds.</div></div>
-            <div class="evt"><div class="t">3&ndash;4 PM</div><div class="d"><strong>Hosted bar</strong>, prior to the Horserace.</div></div>
-            <div class="evt"><div class="t">After golf</div><div class="d"><strong>The Horserace</strong> &mdash; 11 teams, 4-hole alternate shot elimination for the championship.</div></div>
-            <div class="evt"><div class="t">3:15&ndash;7 PM</div><div class="d"><strong>Dinner</strong> &mdash; full taco spread.</div></div>
+            <div class="evt"><div class="t">8&ndash;9:30 AM</div><div class="d"><strong>Practice facility opens &amp; breakfast.</strong></div></div>
+            <div class="evt"><div class="t">9:30&ndash;12 PM</div><div class="d"><strong>Shotgun &mdash; 3rd Nine-Hole Match.</strong></div></div>
+            <div class="evt"><div class="t">12&ndash;12:30 PM</div><div class="d"><strong>Break &amp; snacks.</strong></div></div>
+            <div class="evt"><div class="t">12:30&ndash;3 PM</div><div class="d"><strong>Shotgun &mdash; 4th Nine-Hole Match.</strong><div class="sub">Flight winners determined after the 4th match.</div></div></div>
+            <div class="evt"><div class="t">3:15 PM</div><div class="d"><strong>Taco Buffet opens.</strong></div></div>
+            <div class="evt"><div class="t">4:15&ndash;???</div><div class="d"><strong>Horse Race Championship</strong>, followed by the <strong>Awards Presentation</strong>.<div class="sub">Taco Buffet &mdash; MacKenzie Bar &amp; Grill.</div></div></div>
           </div>
         </div>
       </div>
-      <p class="fine center" style="margin-top:22px;">Hosted beer &amp; wine all day, both days. All food and beverage served out of The MacKenzie Room. Times and menus follow last year's format and will be confirmed closer to the event.</p>
+      <p class="fine center" style="margin-top:22px;">All food and beverage served out of The MacKenzie Bar &amp; Grill. Flights, hole assignments and pairings &mdash; along with the Alternate Shot &amp; Horserace rules &mdash; will be sent out the Thursday morning of tournament week.</p>
     </div>
   </section>
 </section>
@@ -392,8 +392,8 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
 
       <h4 style="margin-top:36px;">Teams &amp; Pairings</h4>
       <div class="tba">
-        <span class="big">Flight assignments &amp; pairings</span>
-        Pairings and flight placements will be posted here once finalized. Check back closer to the event &mdash; and see your golf professional with any questions.
+        <span class="big">Rosters &amp; handicaps will be updated soon!</span>
+        Flights, hole assignments, and pairings &mdash; along with the Alternate Shot &amp; Horserace rules &mdash; will be sent out the Thursday morning of tournament week and posted here. Check back soon, and see your golf professional with any questions.
       </div>
     </div>
   </section>
@@ -405,19 +405,54 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
     <div class="inner"><div class="eyebrow">How the Field Is Divided &amp; Played</div><h2>Format</h2></div></div>
   <section class="block">
     <div class="wrap">
-      <p class="lead">If we reach at least <strong>36 teams</strong>, the format is two-man match play with the second ball breaking ties, shotgun start both days. Fewer than 36 teams signed up and the format may change.</p>
+      <p class="lead">A two-man <strong>Member-Member</strong> played as <strong>round-robin match play within your flight</strong>. The field is broken into <strong>nine flights of four teams</strong>, set by the combined indexes of the partners. One team from each of the nine flights qualifies for Saturday afternoon's Horserace.</p>
 
-      <div class="panel" style="margin-top:30px;max-width:640px;margin-left:auto;margin-right:auto;">
+      <div class="panel" style="margin-top:30px;">
         <div class="eyebrow">Both Days</div>
-        <h3>Match Play</h3>
+        <h3>Best Ball, Second Ball Breaks the Tie</h3>
         <ul class="clean">
-          <li>Two-man teams compete head-to-head; the better ball of the team wins the hole.</li>
-          <li>If the match is tied, the <strong>second ball</strong> (the team's other score) breaks the tie.</li>
-          <li>Shotgun start both days.</li>
-          <li>Top-performing twosomes in each flight are eligible for daily and tournament prize money.</li>
+          <li>The format is the <strong>best ball of partners</strong>, with the <strong>second ball breaking the tie</strong> &mdash; spinning off the low handicap in the foursome.</li>
+          <li><strong>One point</strong> is awarded for winning each hole, and an <strong>additional point</strong> for winning the match.</li>
+          <li>Halved holes are worth <strong>&frac12; point each</strong>.</li>
+          <li>Shotgun start, round-robin match play within your own flight across four nine-hole matches over the two days.</li>
         </ul>
       </div>
-      <p class="fine center" style="margin-top:22px;">See the Flights tab for how the nine flights and overall sweeps work.</p>
+
+      <h4 style="margin-top:36px;">The Four Nine-Hole Matches</h4>
+      <p>Every match is Match Play Best Ball Net; the second ball breaks the tie on any given hole. <strong>100% of that day's index</strong> is used.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Match</th><th>Tee Time</th><th>Index</th><th>Flights 1&ndash;5</th><th>Flights 6&ndash;9</th></tr></thead>
+          <tbody>
+            <tr><td class="hs">1st</td><td>Fri, Aug 14 &middot; 9:30 AM</td><td>100% Aug 14</td><td>Front nine</td><td>Back nine</td></tr>
+            <tr><td class="hs">2nd</td><td>Fri, Aug 14 &middot; 12:30 PM</td><td>100% Aug 14</td><td>Back nine</td><td>Front nine</td></tr>
+            <tr><td class="hs">3rd</td><td>Sat, Aug 15 &middot; 9:30 AM</td><td>100% Aug 15</td><td>Front nine</td><td>Back nine</td></tr>
+            <tr><td class="hs">4th</td><td>Sat, Aug 15 &middot; 12:30 PM</td><td>100% Aug 15</td><td>Back nine</td><td>Front nine</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4 style="margin-top:36px;">Policies</h4>
+      <div class="grid g2">
+        <div class="panel">
+          <h3 style="font-size:24px;">Injury or Withdrawal</h3>
+          <p>If a player can't start or continue due to injury, illness, or other unforeseen circumstance, their partner is encouraged to play on as a one-person team &mdash; no substitute or replacement player is permitted.</p>
+          <ul class="clean">
+            <li>Play continues as traditional best ball; each team counts the lowest score of its available players on every hole.</li>
+            <li>Fail to begin, or a full-team withdrawal before completing the 5th hole &mdash; the opposing two-player team earns <strong>6 points</strong>.</li>
+            <li>Withdrawal after the 6th hole begins &mdash; the two-player team's maximum is the points held at that point, plus the hole in play if they win it (5+ points needed, otherwise capped at 6). At 5+ points the bonus match point is awarded.</li>
+            <li>There is no maximum number of points for a single-player team.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3 style="font-size:24px;">Showing Up Late &amp; Ties</h3>
+          <p><strong>Late starts:</strong> a team that misses the start of a match forfeits each hole missed. If one player is present, they may play until their partner arrives. If neither shows, the Injury policy applies.</p>
+          <div class="chip">Flight Ties</div>
+          <p style="margin-top:10px;">If a flight is tied after the fourth match, a <strong>chip-off</strong> between a member of each team determines who advances to the Horserace.</p>
+        </div>
+      </div>
+
+      <p class="fine center" style="margin-top:24px;">Flights, hole assignments and pairings &mdash; along with the full Alternate Shot &amp; Horserace rules &mdash; will be sent out the Thursday morning of tournament week. Please silence cell phones during play; use is limited to the parking lots and clubhouse area before and after your round.</p>
     </div>
   </section>
 </section>
@@ -608,7 +643,13 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
     <div><div class="cn">Ken Woods</div><div class="cr">Director of Golf</div><div>(831) 459-9159</div></div>
     <div><div class="cn">Chris Ingram</div><div class="cr">Head Golf Professional</div><div>(831) 459-9155</div></div>
   </div>
-  <p class="legacy">The 7th Annual El Sombrero &mdash; the Pasatiempo Men's Club's premier event of the season.</p>
+  <div class="eyebrow" style="color:#e7c877;margin-top:34px;">Tournament Committee</div>
+  <p class="legacy" style="margin-top:10px;">
+    Tyler Doyle, Men's Club President &middot; Stu Hurvitz, Vice President &middot;
+    Ken Woods, PGA Director of Golf &middot; Tommy Dembski, Board Member &middot;
+    Mark Collishaw, Board Member
+  </p>
+  <p class="legacy" style="margin-top:22px;">The El Sombrero &mdash; the Pasatiempo Men's Club's premier Member-Member of the season.</p>
   <p class="fine">Pasatiempo Golf Club &middot; Santa Cruz, California</p>
 </footer>
 
