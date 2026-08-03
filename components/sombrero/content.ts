@@ -50,7 +50,7 @@ header.site{
   border-bottom:1px solid var(--line);
 }
 .brandbar{
-  max-width:1120px;margin:0 auto;padding:12px 22px;
+  max-width:1200px;margin:0 auto;padding:12px 22px;
   display:flex;align-items:center;gap:16px;justify-content:space-between;
 }
 .brand{display:flex;align-items:center;gap:13px;text-decoration:none;color:inherit;flex:none;background:none;border:none;cursor:pointer;font:inherit;}
@@ -61,8 +61,8 @@ nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;}
 nav.tabs::-webkit-scrollbar{display:none;}
 nav.tabs button{
   appearance:none;border:none;background:none;cursor:pointer;white-space:nowrap;
-  font-family:var(--disp);font-weight:600;text-transform:uppercase;letter-spacing:.18em;
-  font-size:14px;color:var(--ink-soft);padding:9px 15px 7px;border-bottom:2px solid transparent;
+  font-family:var(--disp);font-weight:600;text-transform:uppercase;letter-spacing:.12em;
+  font-size:14px;color:var(--ink-soft);padding:9px 11px 7px;border-bottom:2px solid transparent;
   transition:color .2s,border-color .2s;
 }
 nav.tabs button:hover{color:var(--ink);}
@@ -275,7 +275,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
     <div class="veil"></div>
     <div class="inner">
       <div class="q">&ldquo;Nine flights, eleven horses, one hole nine finish &mdash; that's El Sombrero.&rdquo;</div>
-      <div class="a">The 7th Annual El Sombrero</div>
+      <div class="a">El Sombrero &middot; Pasatiempo Men's Club</div>
     </div>
   </div>
 
@@ -439,8 +439,8 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
           <p>If a player can't start or continue due to injury, illness, or other unforeseen circumstance, their partner is encouraged to play on as a one-person team &mdash; no substitute or replacement player is permitted.</p>
           <ul class="clean">
             <li>Play continues as traditional best ball; each team counts the lowest score of its available players on every hole.</li>
-            <li>Fail to begin, or a full-team withdrawal before completing the 5th hole &mdash; the opposing two-player team earns <strong>6 points</strong>.</li>
-            <li>Withdrawal after the 6th hole begins &mdash; the two-player team's maximum is the points held at that point, plus the hole in play if they win it (5+ points needed, otherwise capped at 6). At 5+ points the bonus match point is awarded.</li>
+            <li>If a team fails to begin, or the whole team withdraws before completing the 5th hole, the opposing two-player team earns <strong>6 points</strong>.</li>
+            <li>If a player withdraws after the 6th hole has begun, the two-player team's maximum is the points it holds at that point, plus the hole in play if they win it &mdash; provided they have 5 or more points (otherwise they are capped at 6). With 5 or more points, the bonus match point is also awarded.</li>
             <li>There is no maximum number of points for a single-player team.</li>
           </ul>
         </div>
@@ -520,7 +520,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
           <ul class="clean">
             <li>Ties on any hole are settled by a chip-off. The chipper is the player who did <strong>not</strong> hole the team's last putt on that hole.</li>
             <li>For a chip to qualify, the ball must come to rest on the <strong>putting surface</strong>.</li>
-            <li>Team members who participate in a chip-off does not affect the normal alternate-shot order.</li>
+            <li>Taking part in a chip-off does not affect the normal alternate-shot order.</li>
             <li>If tied after Hole #9, a chip-off decides the champion. If both balls miss the green, the chip-off repeats from the same spot.</li>
           </ul>
           <p style="margin-top:10px;"><strong>The eventual winner of the Horserace gets their entry fee back!</strong></p>
