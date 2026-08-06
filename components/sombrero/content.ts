@@ -201,6 +201,12 @@ td.num,th.num{text-align:right;}
 .histband .a{font-family:var(--disp);text-transform:uppercase;letter-spacing:.22em;font-size:13px;color:#e7c877;margin-top:16px;}
 
 .heritage{align-items:center;}
+.coursefacts{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule);margin-top:34px;}
+.coursefacts>div{background:var(--panel);padding:20px 14px;text-align:center;}
+.coursefacts .cf-n{font-family:var(--disp);font-size:30px;color:var(--green);line-height:1;font-weight:600;}
+.coursefacts .cf-l{font-family:var(--disp);text-transform:uppercase;letter-spacing:.16em;font-size:11px;color:var(--gold);margin-top:8px;}
+.coursefacts .cf-s{font-size:12.5px;color:var(--ink-soft);font-style:italic;margin-top:5px;line-height:1.4;}
+@media (max-width:760px){.coursefacts{grid-template-columns:1fr 1fr;}}
 .histphoto{background:var(--panel);border:1px solid var(--rule);padding:10px;box-shadow:var(--shadow);}
 .histphoto img{width:100%;height:auto;display:block;filter:saturate(1.03) contrast(1.02);}
 .histphoto .cap{display:block;text-align:center;font-family:var(--disp);font-style:italic;font-size:14px;color:var(--ink-soft);padding:9px 6px 3px;}
@@ -302,8 +308,8 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
       </div>
       <div class="grid g2 heritage">
         <div class="histphoto">
-          <img src="/sombrero/img/course-bunkers.jpg" alt="Alister MacKenzie's cascading bunkers at Pasatiempo Golf Club" loading="lazy">
-          <span class="cap">MacKenzie's cascading bunkers &mdash; unmistakably Pasatiempo</span>
+          <img src="/sombrero/img/mackenzie-portrait.jpg" alt="Dr. Alister MacKenzie, golf course architect, early 1900s" loading="lazy">
+          <span class="cap">Dr. Alister MacKenzie &middot; Library of Congress</span>
         </div>
         <div>
           <h4>The Architect</h4>
@@ -324,8 +330,37 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
           <span class="cap">Terraced bunkers guarding a MacKenzie green</span>
         </div>
       </div>
+
+      <div class="grid g2 heritage" style="margin-top:26px;">
+        <div class="histphoto">
+          <img src="/sombrero/img/course-bunkers.jpg" alt="Cascading MacKenzie bunkers at Pasatiempo Golf Club" loading="lazy">
+          <span class="cap">Cascading sand &mdash; a MacKenzie signature</span>
+        </div>
+        <div>
+          <h4>The Bunkering</h4>
+          <p>Nothing gives Pasatiempo away faster than its sand. MacKenzie's bunkers sprawl and finger their way into the fairways with ragged, wind-blown edges &mdash; built to look as though the land made them, not a crew with shovels.</p>
+          <p>They are as strategic as they are beautiful: each one asks a question off the tee and again on the approach, rewarding the player who picks a line and commits to it &mdash; exactly the sort of decision match play punishes and rewards.</p>
+        </div>
+      </div>
+
+      <div class="coursefacts">
+        <div><div class="cf-n">1929</div><div class="cf-l">Opened</div><div class="cf-s">September 8th</div></div>
+        <div><div class="cf-n">18</div><div class="cf-l">MacKenzie Holes</div><div class="cf-s">His California home course</div></div>
+        <div><div class="cf-n">6th</div><div class="cf-l">The Doctor's Fairway</div><div class="cf-s">Where he lived until 1934</div></div>
+        <div><div class="cf-n">16th</div><div class="cf-l">The Famous One</div><div class="cf-s">Among the world's great par-4s</div></div>
+      </div>
     </div>
   </section>
+
+  <!-- Course panorama band -->
+  <div class="histband" style="height:420px;">
+    <div class="bg" style="background-image:url('/sombrero/img/course-wide.jpg')"></div>
+    <div class="veil"></div>
+    <div class="inner">
+      <div class="q">&ldquo;The chief object of every golf course architect worth his salt is to imitate the beauties of nature so closely as to make his work indistinguishable from nature itself.&rdquo;</div>
+      <div class="a">Dr. Alister MacKenzie &middot; Golf Architecture, 1920</div>
+    </div>
+  </div>
 
   <!-- Nav cards -->
   <section class="block">
