@@ -307,7 +307,7 @@ export default async function PublicEventPage({
           </section>
         )}
 
-        {open && <ManageRegistration slug={event.slug} />}
+        {open && <ManageRegistration event={event} />}
 
         {event.showRoster && !isSlots && (
           <section className="pub-section reveal">

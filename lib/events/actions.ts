@@ -494,6 +494,11 @@ export interface MyRegistration {
   status: RegStatus;
   partySize: number;
   slots: { id: string; label: string }[]; // resolved slot labels (series)
+  // Full detail so an attendee can edit their own sign-up.
+  phone: string;
+  guestNames: string[];
+  slotIds: string[];
+  answers: Record<string, string>;
 }
 
 export async function lookupMyRegistrations(
@@ -533,8 +538,120 @@ export async function lookupMyRegistrations(
         .map((id) => ev.slots.find((s) => s.id === id))
         .filter((s): s is NonNullable<typeof s> => !!s)
         .map((s) => ({ id: s.id, label: formatSlot(s) })),
+      phone: r.phone,
+      guestNames: r.guestNames,
+      slotIds: r.slotIds,
+      answers: r.answers,
     })),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Attendee self-service edit. Same email-match check as the other self-service
+// actions. Unlike a staff edit this DOES respect capacity: newly added dates
+// must have room, and growing the party must fit the program roster cap.
+// ---------------------------------------------------------------------------
+
+export interface MyRegistrationEdit {
+  name: string;
+  phone: string;
+  partySize: number;
+  guestNames: string[];
+  slotIds: string[];
+  answers: Record<string, string>;
+}
+
+export async function updateMyRegistration(
+  slug: string,
+  email: string,
+  regId: string,
+  input: MyRegistrationEdit,
+): Promise<{ ok: boolean; error?: string }> {
+  const e = email.trim().toLowerCase();
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: "Please enter your name." };
+
+  const supa = createAdminClient("events");
+  const { data: evRow } = await supa
+    .from("events")
+    .select("*")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (!evRow) return { ok: false, error: "Event not found." };
+  const ev = rowToEvent(evRow);
+  if (ev.status !== "open")
+    return { ok: false, error: "This event is closed — please call the golf shop." };
+
+  const { data: allRows } = await supa
+    .from("registrations")
+    .select("*")
+    .eq("event_id", ev.id);
+  const all: Registration[] = (allRows ?? []).map(rowToReg);
+
+  const mine = all.find((r) => r.id === regId);
+  if (!mine || mine.email.trim().toLowerCase() !== e)
+    return { ok: false, error: "That registration wasn't found for that email." };
+
+  const partySize = Math.max(1, Math.floor(input.partySize || 1));
+  if (ev.allowGuests === false && partySize > 1)
+    return { ok: false, error: "Guests aren't allowed for this event." };
+  if (ev.maxGuests != null && partySize - 1 > ev.maxGuests)
+    return { ok: false, error: `You can bring at most ${ev.maxGuests} guest(s).` };
+
+  // Only the chosen slots that actually exist on the event.
+  const slotIds = input.slotIds.filter((id) => ev.slots.some((s) => s.id === id));
+  if (ev.scheduleMode === "slots") {
+    if (slotIds.length === 0)
+      return { ok: false, error: "Please keep at least one date, or cancel instead." };
+    if (!ev.allowMultiSlot && slotIds.length > 1)
+      return { ok: false, error: "Please choose just one date." };
+  }
+
+  // Everyone else's confirmed sign-ups — the baseline for capacity checks.
+  const others = all.filter((r) => r.id !== regId);
+
+  // Newly added dates must have room for this party.
+  const added = slotIds.filter((id) => !mine.slotIds.includes(id));
+  for (const id of added) {
+    const a = availability(ev, others, id);
+    if (a.capacity != null && partySize > (a.remaining ?? 0)) {
+      const slot = ev.slots.find((s) => s.id === id);
+      return {
+        ok: false,
+        error: `${slot ? formatSlot(slot) : "That date"} is full — please call the golf shop.`,
+      };
+    }
+  }
+
+  // Growing the party must still fit the program roster cap.
+  if (ev.rosterLimit != null && partySize > mine.partySize) {
+    if (rosterCount(others) + partySize > ev.rosterLimit)
+      return {
+        ok: false,
+        error: "The roster is full — please call the golf shop to add anyone else.",
+      };
+  }
+
+  const { error } = await supa
+    .from("registrations")
+    .update({
+      name,
+      phone: input.phone.trim(),
+      party_size: partySize,
+      guest_names: input.guestNames
+        .map((g) => g.trim())
+        .filter(Boolean)
+        .slice(0, Math.max(0, partySize - 1)),
+      slot_ids: slotIds,
+      answers: input.answers,
+    })
+    .eq("id", regId);
+  if (error) return { ok: false, error: "Could not save your changes." };
+
+  revalidatePath(`/events/e/${slug}`);
+  revalidatePath(`/admin/events/${ev.id}`);
+  revalidatePath(`/admin/events/${ev.id}/roster`);
+  return { ok: true };
 }
 
 // Cancel an entire registration (verifies the email matches).

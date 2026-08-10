@@ -1462,3 +1462,64 @@ textarea {
     margin: 14mm;
   }
 }
+
+/* ---- Self-service "manage my registration" ------------------------------- */
+.manage-cta {
+  margin: 26px auto 0;
+  max-width: 620px;
+  background: var(--cream);
+  border: 1px solid var(--gold-soft);
+  border-radius: var(--radius);
+  padding: 26px 28px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.manage-cta .mc-title {
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--green);
+  margin-bottom: 6px;
+}
+.manage-cta p {
+  color: var(--muted);
+  margin: 0 auto 18px;
+  max-width: 46ch;
+  font-size: 15.5px;
+}
+.manage-cta .mc-btn {
+  font-size: 17px;
+  padding: 14px 22px;
+}
+@media (max-width: 600px) {
+  .manage-cta {
+    padding: 22px 18px;
+  }
+  .manage-cta .mc-title {
+    font-size: 21px;
+  }
+}
+.manage-open .mc-reg {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 12px;
+}
+.mc-dates {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+}
+.mc-dates li {
+  padding: 5px 0 5px 20px;
+  position: relative;
+  border-top: 1px solid var(--line);
+  font-size: 15px;
+}
+.mc-dates li::before {
+  content: "✓";
+  position: absolute;
+  left: 2px;
+  color: var(--green);
+  font-weight: 700;
+}
