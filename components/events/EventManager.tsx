@@ -11,7 +11,12 @@ import {
   setEventStatus,
   setRegStatus,
 } from "@/lib/events/actions";
-import { formatSlot, formatWhen, TYPE_LABEL } from "@/lib/events/format";
+import {
+  formatSlot,
+  formatSlotShort,
+  formatWhen,
+  TYPE_LABEL,
+} from "@/lib/events/format";
 import type { EventRec, RegStatus, Registration } from "@/lib/events/types";
 
 function slotLabels(ev: EventRec, slotIds: string[]): string {
@@ -209,7 +214,27 @@ export default function EventManager({
             </div>
           )}
         </td>
-        {event.slots.length > 0 && <td>{slotLabels(event, r.slotIds)}</td>}
+        {event.slots.length > 0 && (
+          <td>
+            <div className="slot-count">
+              {r.slotIds.length} of {event.slots.length} dates
+            </div>
+            <div className="slot-chips">
+              {event.slots.map((s) => {
+                const going = r.slotIds.includes(s.id);
+                return (
+                  <span
+                    key={s.id}
+                    className={`slot-chip${going ? " on" : ""}`}
+                    title={formatSlot(s)}
+                  >
+                    {formatSlotShort(s)}
+                  </span>
+                );
+              })}
+            </div>
+          </td>
+        )}
         <td style={{ whiteSpace: "nowrap" }}>
           <button
             className="btn small secondary"

@@ -423,7 +423,7 @@ export async function register(input: RegisterInput): Promise<RegisterResult> {
       return {
         ok: false,
         error:
-          "Sorry — this program's roster is full. Please contact the golf shop to be added to a waiting list.",
+          "Sorry — this program's roster is full. Please email Ian Johnson at Ijohnson@pasatiempo.com to be added to a waiting list.",
       };
     }
   }
@@ -580,7 +580,11 @@ export async function updateMyRegistration(
   if (!evRow) return { ok: false, error: "Event not found." };
   const ev = rowToEvent(evRow);
   if (ev.status !== "open")
-    return { ok: false, error: "This event is closed — please call the golf shop." };
+    return {
+      ok: false,
+      error:
+        "This event is closed — please email Ian Johnson at Ijohnson@pasatiempo.com.",
+    };
 
   const { data: allRows } = await supa
     .from("registrations")
@@ -618,7 +622,7 @@ export async function updateMyRegistration(
       const slot = ev.slots.find((s) => s.id === id);
       return {
         ok: false,
-        error: `${slot ? formatSlot(slot) : "That date"} is full — please call the golf shop.`,
+        error: `${slot ? formatSlot(slot) : "That date"} is full — please email Ian Johnson at Ijohnson@pasatiempo.com.`,
       };
     }
   }
@@ -628,7 +632,8 @@ export async function updateMyRegistration(
     if (rosterCount(others) + partySize > ev.rosterLimit)
       return {
         ok: false,
-        error: "The roster is full — please call the golf shop to add anyone else.",
+        error:
+          "The roster is full — please email Ian Johnson at Ijohnson@pasatiempo.com to add anyone else.",
       };
   }
 

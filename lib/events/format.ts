@@ -72,6 +72,21 @@ export function formatSlot(slot: Slot): string {
   return head || "Option";
 }
 
+// A compact label for scanning lists of dates, e.g. "Aug 21". Falls back to the
+// slot's own label (or time) for undated options.
+export function formatSlotShort(slot: Slot): string {
+  if (slot.date) {
+    const [y, mo, d] = slot.date.split("-").map(Number);
+    return new Date(y, mo - 1, d).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+  }
+  if (slot.label) return slot.label;
+  if (slot.startTime) return to12h(slot.startTime);
+  return "Option";
+}
+
 export function rosterName(name: string, style: RosterStyle): string {
   const parts = name.trim().split(/\s+/);
   if (style === "first_initial" && parts.length > 1) {

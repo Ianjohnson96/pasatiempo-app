@@ -297,8 +297,11 @@ export default async function PublicEventPage({
               <div className="notice warn" style={{ marginTop: 14 }}>
                 The program roster is <strong>full</strong> — new sign-ups are
                 closed. If you&apos;re already on the roster you can still add
-                dates below; otherwise contact the golf shop to be added to a
-                waiting list.
+                dates below; otherwise please email Ian Johnson at{" "}
+                <a href="mailto:Ijohnson@pasatiempo.com">
+                  Ijohnson@pasatiempo.com
+                </a>{" "}
+                to be added to a waiting list.
               </div>
             )}
             <div style={{ marginTop: 14 }}>

@@ -1523,3 +1523,37 @@ textarea {
   color: var(--green);
   font-weight: 700;
 }
+
+/* ---- Admin: dates-attending chips ---------------------------------------- */
+.slot-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 5px;
+  white-space: nowrap;
+}
+.slot-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 230px;
+}
+.slot-chip {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: #b6c0b9;
+  white-space: nowrap;
+  text-decoration: line-through;
+}
+.slot-chip.on {
+  background: var(--green-tint);
+  border-color: var(--green-light);
+  color: var(--green-dark);
+  text-decoration: none;
+}
