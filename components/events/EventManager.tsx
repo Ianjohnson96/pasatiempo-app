@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import CopyLink from "@/components/events/CopyLink";
+import RegistrationEditor from "@/components/events/RegistrationEditor";
 import {
   deleteEvent,
   deleteRegistration,
@@ -36,6 +37,7 @@ export default function EventManager({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
 
   const confirmed = registrations.filter((r) => r.status === "confirmed");
   const waitlist = registrations.filter((r) => r.status === "waitlist");
@@ -163,6 +165,20 @@ export default function EventManager({
 
   function regRow(r: Registration) {
     const busy = busyId === r.id;
+    const cols = event.slots.length > 0 ? 4 : 3;
+    if (editId === r.id) {
+      return (
+        <tr key={r.id}>
+          <td colSpan={cols} style={{ padding: "10px 0" }}>
+            <RegistrationEditor
+              event={event}
+              reg={r}
+              onClose={() => setEditId(null)}
+            />
+          </td>
+        </tr>
+      );
+    }
     return (
       <tr key={r.id} style={{ opacity: r.status === "cancelled" ? 0.55 : 1 }}>
         <td>
@@ -195,6 +211,13 @@ export default function EventManager({
         </td>
         {event.slots.length > 0 && <td>{slotLabels(event, r.slotIds)}</td>}
         <td style={{ whiteSpace: "nowrap" }}>
+          <button
+            className="btn small secondary"
+            disabled={busy}
+            onClick={() => setEditId(r.id)}
+          >
+            Edit
+          </button>
           {r.status === "waitlist" && (
             <button
               className="btn small"
@@ -274,6 +297,12 @@ export default function EventManager({
             >
               View page ↗
             </a>
+            <Link
+              href={`/admin/events/${event.id}/roster`}
+              className="btn secondary"
+            >
+              🖨 Roster
+            </Link>
             <Link
               href={`/admin/events/${event.id}/edit`}
               className="btn secondary"

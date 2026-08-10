@@ -614,6 +614,58 @@ export async function setRegStatus(
   revalidatePath(`/admin/events/${data.event_id}`);
 }
 
+// Full staff edit of an existing sign-up. Unlike the public register() path this
+// deliberately does NOT enforce capacity or the roster cap — staff are making a
+// judgement call (squeezing someone in, fixing a typo, moving a date).
+export interface RegistrationEdit {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  partySize: number;
+  guestNames: string[];
+  slotIds: string[];
+  answers: Record<string, string>;
+  status: RegStatus;
+}
+
+export async function updateRegistration(
+  input: RegistrationEdit,
+): Promise<{ ok: boolean; error?: string }> {
+  const name = input.name.trim();
+  const email = input.email.trim().toLowerCase();
+  if (!name) return { ok: false, error: "Please enter a name." };
+  if (!email || !email.includes("@"))
+    return { ok: false, error: "Please enter a valid email." };
+
+  const partySize = Math.max(1, Math.floor(input.partySize || 1));
+  const supa = createAdminClient("events");
+
+  const { data, error } = await supa
+    .from("registrations")
+    .update({
+      name,
+      email,
+      phone: input.phone.trim(),
+      party_size: partySize,
+      guest_names: input.guestNames
+        .map((g) => g.trim())
+        .filter(Boolean)
+        .slice(0, Math.max(0, partySize - 1)),
+      slot_ids: input.slotIds,
+      answers: input.answers,
+      status: input.status,
+    })
+    .eq("id", input.id)
+    .select("event_id")
+    .single();
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/events/${data.event_id}`);
+  revalidatePath(`/admin/events/${data.event_id}/roster`);
+  return { ok: true };
+}
+
 export async function deleteRegistration(regId: string): Promise<void> {
   const supa = createAdminClient("events");
   const { data, error } = await supa
