@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getEvent, registrationsFor } from "@/lib/events/data";
 import { canManageEvent, getViewer } from "@/lib/events/auth";
-import { formatSlot, formatWhen } from "@/lib/events/format";
+import { formatSlot, formatSlotShort, formatWhen } from "@/lib/events/format";
 import type { Registration } from "@/lib/events/types";
 import PrintButton from "@/components/events/PrintButton";
 
@@ -74,25 +74,30 @@ export default async function RosterPage({
         <Link href={`/admin/events/${event.id}`} className="navlink" style={{ color: "var(--green)" }}>
           ← Back to event
         </Link>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 12 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}>
           <PrintButton />
-          {event.slots.length > 0 && (
-            <>
-              <Link className="btn secondary small" href={`/admin/events/${event.id}/roster`}>
-                All dates
-              </Link>
-              {event.slots.map((s) => (
-                <Link
-                  key={s.id}
-                  className="btn secondary small"
-                  href={`/admin/events/${event.id}/roster?slot=${s.id}`}
-                >
-                  {formatSlot(s)}
-                </Link>
-              ))}
-            </>
-          )}
         </div>
+        {event.slots.length > 0 && (
+          <div className="roster-picker">
+            <span className="rp-label">Print:</span>
+            <Link
+              className={`rp-day${!slotFilter ? " on" : ""}`}
+              href={`/admin/events/${event.id}/roster`}
+            >
+              All
+            </Link>
+            {event.slots.map((s) => (
+              <Link
+                key={s.id}
+                className={`rp-day${slotFilter === s.id ? " on" : ""}`}
+                href={`/admin/events/${event.id}/roster?slot=${s.id}`}
+                title={formatSlot(s)}
+              >
+                {formatSlotShort(s)}
+              </Link>
+            ))}
+          </div>
+        )}
         <hr style={{ margin: "16px 0", border: 0, borderTop: "1px solid var(--line)" }} />
       </div>
 
