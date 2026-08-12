@@ -169,6 +169,25 @@ td.num,th.num{text-align:right;}
 .fmt-nine .nl{font-family:var(--disp);font-weight:600;font-size:20px;color:var(--claret);}
 .chip{display:inline-block;font-family:var(--disp);font-weight:600;text-transform:uppercase;letter-spacing:.1em;font-size:12px;color:var(--gold);border:1px solid var(--gold);padding:3px 12px;margin-top:6px;border-radius:2px;}
 
+/* --- Flight rosters & pairings --- */
+.flightgrid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:20px;}
+@media (max-width:900px){.flightgrid{grid-template-columns:1fr;}}
+.flightcard{background:var(--panel);border:1px solid var(--rule);box-shadow:var(--shadow);padding:22px 24px;}
+.fc-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:2px solid var(--gold);padding-bottom:9px;margin-bottom:4px;}
+.fc-n{font-family:var(--disp);font-weight:600;text-transform:uppercase;letter-spacing:.1em;font-size:21px;color:var(--green);}
+.fc-m{font-family:var(--disp);font-size:14px;color:var(--gold);text-transform:uppercase;letter-spacing:.12em;white-space:nowrap;}
+.fc-team{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:baseline;padding:9px 0;border-bottom:1px dotted var(--line);}
+.fc-team:last-of-type{border-bottom:none;}
+.fc-seed{font-family:var(--disp);font-weight:700;font-size:15px;color:var(--gold);text-align:center;}
+.fc-p{font-size:15.5px;line-height:1.45;}
+.fc-p .idx{color:var(--ink-soft);font-size:13.5px;}
+.fc-c{font-family:var(--disp);font-weight:600;font-size:18px;color:var(--claret);font-variant-numeric:tabular-nums;}
+.fc-holes{margin-top:14px;padding-top:12px;border-top:1px solid var(--rule);}
+.fc-hl{font-family:var(--disp);text-transform:uppercase;letter-spacing:.16em;font-size:11.5px;color:var(--gold);font-weight:600;margin-bottom:7px;}
+.fc-hrow{display:grid;grid-template-columns:1fr auto;gap:10px;font-size:14.5px;padding:4px 0;}
+.fc-hrow .mt{color:var(--ink-soft);font-style:italic;}
+.fc-hrow .hh{font-family:var(--disp);font-weight:600;color:var(--green);font-variant-numeric:tabular-nums;letter-spacing:.04em;}
+
 .prize{display:flex;justify-content:space-between;gap:18px;align-items:baseline;padding:11px 0;border-bottom:1px dotted var(--line);}
 .prize:last-child{border-bottom:none;}
 .prize .nm{font-family:var(--disp);font-size:20px;color:var(--ink);}
@@ -419,19 +438,19 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
           <div class="day-h"><div class="dn">Friday</div><div class="dd">August 14th</div><div class="dtag">Matches 1 &amp; 2 + Alternate Shot</div></div>
           <div class="day-events">
             <div class="evt"><div class="t">7:45 AM</div><div class="d"><strong>Practice facility opens.</strong></div></div>
-            <div class="evt"><div class="t">7:45&ndash;9:30 AM</div><div class="d"><strong>Registration, Prize Pool &amp; Pari-Mutuel tee-prize pickup &mdash; and breakfast.</strong><div class="sub">MacKenzie Bar &amp; Grill.</div></div></div>
+            <div class="evt"><div class="t">7:45&ndash;9:30 AM</div><div class="d"><strong>Registration, Pari-Mutuel, Tee Prize pick-up &amp; breakfast.</strong><div class="sub">MacKenzie Bar &amp; Grill. All optional cash buy-ins and pari-mutuel wagers are collected here &mdash; before the first match tees off.</div></div></div>
             <div class="evt"><div class="t">9:30&ndash;12 PM</div><div class="d"><strong>Shotgun &mdash; 1st Nine-Hole Match.</strong></div></div>
             <div class="evt"><div class="t">12&ndash;12:30 PM</div><div class="d"><strong>Break &amp; snacks</strong> &mdash; build-your-own box lunch.</div></div>
             <div class="evt"><div class="t">12:30&ndash;3 PM</div><div class="d"><strong>Shotgun &mdash; 2nd Nine-Hole Match.</strong></div></div>
             <div class="evt"><div class="t">3&ndash;3:30 PM</div><div class="d"><strong>Break &amp; snacks.</strong></div></div>
-            <div class="evt"><div class="t">4:15&ndash;6:15 PM</div><div class="d"><strong>Optional Two-Man Alternate Shot.</strong><div class="sub">Field split into two flights; the lowest three teams from each nine win additional $$$, paid at registration.</div></div></div>
+            <div class="evt"><div class="t">4:15&ndash;6:15 PM</div><div class="d"><strong>Optional Two-Man Alternate Shot.</strong><div class="sub">Field split into two flights, one on each nine. The top three teams on each side split the cash pool; the low team on each side qualifies for Saturday's Horserace.</div></div></div>
             <div class="evt"><div class="t">6:15&ndash;???</div><div class="d"><strong>BBQ Chicken Dinner.</strong></div></div>
           </div>
         </div>
         <div class="day">
           <div class="day-h"><div class="dn">Saturday</div><div class="dd">August 15th</div><div class="dtag">Matches 3 &amp; 4 + the Horserace</div></div>
           <div class="day-events">
-            <div class="evt"><div class="t">8&ndash;9:30 AM</div><div class="d"><strong>Practice facility opens &amp; breakfast.</strong></div></div>
+            <div class="evt"><div class="t">8:00 AM</div><div class="d"><strong>Practice facility opens &amp; continental breakfast.</strong></div></div>
             <div class="evt"><div class="t">9:30&ndash;12 PM</div><div class="d"><strong>Shotgun &mdash; 3rd Nine-Hole Match.</strong></div></div>
             <div class="evt"><div class="t">12&ndash;12:30 PM</div><div class="d"><strong>Break &amp; snacks.</strong></div></div>
             <div class="evt"><div class="t">12:30&ndash;3 PM</div><div class="d"><strong>Shotgun &mdash; 4th Nine-Hole Match.</strong><div class="sub">Flight winners determined after the 4th match.</div></div></div>
@@ -440,7 +459,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
           </div>
         </div>
       </div>
-      <p class="fine center" style="margin-top:22px;">All food and beverage served out of The MacKenzie Bar &amp; Grill. Flights, hole assignments and pairings &mdash; along with the Alternate Shot &amp; Horserace rules &mdash; will be sent out the Thursday morning of tournament week.</p>
+      <p class="fine center" style="margin-top:22px;">All food and beverage served out of The MacKenzie Bar &amp; Grill. Flights, hole assignments and pairings are now posted on the <strong>Flights</strong> tab, with the full Alternate Shot and Horserace rules on their own tabs. This information will <strong>not</strong> be handed out at Friday check-in &mdash; please print or save it if you'd like it handy during the event.</p>
     </div>
   </section>
 </section>
@@ -474,10 +493,149 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
       </div>
 
       <h4 style="margin-top:36px;">Teams &amp; Pairings</h4>
-      <div class="tba">
-        <span class="big">Rosters &amp; handicaps will be updated soon!</span>
-        Flights, hole assignments, and pairings &mdash; along with the Alternate Shot &amp; Horserace rules &mdash; will be sent out the Thursday morning of tournament week and posted here. Check back soon, and see your golf professional with any questions.
+      <p>Thirty-six teams, nine flights of four, seeded by combined handicap index. All matches are played from the <strong>White tees</strong>. Each flight plays a <strong>round-robin</strong> &mdash; you meet all three of the other teams in your flight.</p>
+
+      <div class="panel plain" style="margin-top:18px;">
+        <div class="eyebrow">The Rotation &mdash; Same in Every Flight</div>
+        <h3 style="font-size:24px;">Who You Play, and When</h3>
+        <p style="margin-top:6px;">Teams below are numbered <strong>1&ndash;4</strong> by seed within each flight. The first three matches are a full round robin &mdash; you meet all three of the other teams &mdash; and the rotation is identical across all nine flights. Find your flight card for your hole assignments.</p>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Match</th><th>Tee Time</th><th>First Hole Listed</th><th>Second Hole Listed</th></tr></thead>
+            <tbody>
+              <tr><td class="hs">1st</td><td>Fri, Aug 14 &middot; 9:30 AM</td><td>Seed 1 vs 4</td><td>Seed 2 vs 3</td></tr>
+              <tr><td class="hs">2nd</td><td>Fri, Aug 14 &middot; 12:30 PM</td><td>Seed 4 vs 2</td><td>Seed 1 vs 3</td></tr>
+              <tr><td class="hs">3rd</td><td>Sat, Aug 15 &middot; 9:30 AM</td><td>Seed 1 vs 2</td><td>Seed 3 vs 4</td></tr>
+              <tr><td class="hs">4th</td><td>Sat, Aug 15 &middot; 12:30 PM</td><td><strong>1st vs 2nd</strong> in flight</td><td><strong>3rd vs 4th</strong> in flight</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="chip">The 4th Match Is Different</div>
+        <p style="margin-top:10px;">Saturday afternoon's final match is <strong>not</strong> part of the round robin &mdash; it is paired off the <strong>standings in your flight</strong> after three matches. The flight leader plays the second-place team, and third plays fourth. Standings, pairings and hole assignments for the 4th match will be posted on site Saturday.</p>
       </div>
+
+      <div class="flightgrid">
+
+        <div class="flightcard">
+          <div class="fc-head"><div class="fc-n">Flight 1</div><div class="fc-m">2.6 &ndash; 7.9</div></div>
+          <div class="fc-team"><span class="fc-seed">1</span><span class="fc-p">Tyler Doyle <span class="idx">(+0.3)</span> &amp; Shawn Medved <span class="idx">(2.9)</span></span><span class="fc-c">2.6</span></div>
+          <div class="fc-team"><span class="fc-seed">2</span><span class="fc-p">Randy Reed <span class="idx">(0.0)</span> &amp; Dennis Ventry Jr. <span class="idx">(4.4)</span></span><span class="fc-c">4.4</span></div>
+          <div class="fc-team"><span class="fc-seed">3</span><span class="fc-p">Joshua Lutz <span class="idx">(4.6)</span> &amp; Ned Nix <span class="idx">(2.7)</span></span><span class="fc-c">7.3</span></div>
+          <div class="fc-team"><span class="fc-seed">4</span><span class="fc-p">Scott Smith <span class="idx">(0.7)</span> &amp; Naiming Fu <span class="idx">(7.2)</span></span><span class="fc-c">7.9</span></div>
+          <div class="fc-holes"><div class="fc-hl">Hole Assignments</div>
+            <div class="fc-hrow"><span class="mt">Match 1 &middot; Fri 9:30 AM</span><span class="hh">1A &middot; 1B</span></div>
+            <div class="fc-hrow"><span class="mt">Match 2 &middot; Fri 12:30 PM</span><span class="hh">10 &middot; 11</span></div>
+            <div class="fc-hrow"><span class="mt">Match 3 &middot; Sat 9:30 AM</span><span class="hh">1A &middot; 1B</span></div>
+          </div>
+        </div>
+
+        <div class="flightcard">
+          <div class="fc-head"><div class="fc-n">Flight 2</div><div class="fc-m">8.6 &ndash; 13.7</div></div>
+          <div class="fc-team"><span class="fc-seed">1</span><span class="fc-p">Matthew Miller <span class="idx">(2.6)</span> &amp; Russell Kingon <span class="idx">(6.0)</span></span><span class="fc-c">8.6</span></div>
+          <div class="fc-team"><span class="fc-seed">2</span><span class="fc-p">Byron Finney <span class="idx">(3.4)</span> &amp; Dave Fawcett <span class="idx">(5.2)</span></span><span class="fc-c">8.6</span></div>
+          <div class="fc-team"><span class="fc-seed">3</span><span class="fc-p">Ron Kaminski <span class="idx">(9.6)</span> &amp; Giuliano Kaminski <span class="idx">(+0.6)</span></span><span class="fc-c">9.0</span></div>
+          <div class="fc-team"><span class="fc-seed">4</span><span class="fc-p">Paul Grossi <span class="idx">(8.1)</span> &amp; Steven Yoshioka <span class="idx">(5.6)</span></span><span class="fc-c">13.7</span></div>
+          <div class="fc-holes"><div class="fc-hl">Hole Assignments</div>
+            <div class="fc-hrow"><span class="mt">Match 1 &middot; Fri 9:30 AM</span><span class="hh">2 &middot; 3</span></div>
+            <div class="fc-hrow"><span class="mt">Match 2 &middot; Fri 12:30 PM</span><span class="hh">12A &middot; 12B</span></div>
+            <div class="fc-hrow"><span class="mt">Match 3 &middot; Sat 9:30 AM</span><span class="hh">2 &middot; 3</span></div>
+          </div>
+        </div>
+
+        <div class="flightcard">
+          <div class="fc-head"><div class="fc-n">Flight 3</div><div class="fc-m">13.9 &ndash; 15.9</div></div>
+          <div class="fc-team"><span class="fc-seed">1</span><span class="fc-p">Gregg Bargas <span class="idx">(3.7)</span> &amp; David Cook <span class="idx">(10.2)</span></span><span class="fc-c">13.9</span></div>
+          <div class="fc-team"><span class="fc-seed">2</span><span class="fc-p">John Airey <span class="idx">(7.5)</span> &amp; Brian Sherer <span class="idx">(6.4)</span></span><span class="fc-c">13.9</span></div>
+          <div class="fc-team"><span class="fc-seed">3</span><span class="fc-p">Stu Hurvitz <span class="idx">(6.3)</span> &amp; Todd Turowski <span class="idx">(8.5)</span></span><span class="fc-c">14.8</span></div>
+          <div class="fc-team"><span class="fc-seed">4</span><span class="fc-p">Korsen Yu <span class="idx">(8.4)</span> &amp; Oscar De la Rosa <span class="idx">(7.5)</span></span><span class="fc-c">15.9</span></div>
+          <div class="fc-holes"><div class="fc-hl">Hole Assignments</div>
+            <div class="fc-hrow"><span class="mt">Match 1 &middot; Fri 9:30 AM</span><span class="hh">4 &middot; 5</span></div>
+            <div class="fc-hrow"><span class="mt">Match 2 &middot; Fri 12:30 PM</span><span class="hh">13 &middot; 14</span></div>
+            <div class="fc-hrow"><span class="mt">Match 3 &middot; Sat 9:30 AM</span><span class="hh">4 &middot; 5</span></div>
+          </div>
+        </div>
+
+        <div class="flightcard">
+          <div class="fc-head"><div class="fc-n">Flight 4</div><div class="fc-m">16.7 &ndash; 18.1</div></div>
+          <div class="fc-team"><span class="fc-seed">1</span><span class="fc-p">Bob Cayton <span class="idx">(6.5)</span> &amp; Craig Viau <span class="idx">(10.2)</span></span><span class="fc-c">16.7</span></div>
+          <div class="fc-team"><span class="fc-seed">2</span><span class="fc-p">Dan Pereyra <span class="idx">(7.3)</span> &amp; Jeff Fraser <span class="idx">(9.6)</span></span><span class="fc-c">16.9</span></div>
+          <div class="fc-team"><span class="fc-seed">3</span><span class="fc-p">Michael Zaballos <span class="idx">(8.1)</span> &amp; Rob Born <span class="idx">(9.7)</span></span><span class="fc-c">17.8</span></div>
+          <div class="fc-team"><span class="fc-seed">4</span><span class="fc-p">Jack Yao <span class="idx">(9.7)</span> &amp; Daniel Busch <span class="idx">(8.4)</span></span><span class="fc-c">18.1</span></div>
+          <div class="fc-holes"><div class="fc-hl">Hole Assignments</div>
+            <div class="fc-hrow"><span class="mt">Match 1 &middot; Fri 9:30 AM</span><span class="hh">6 &middot; 7</span></div>
+            <div class="fc-hrow"><span class="mt">Match 2 &middot; Fri 12:30 PM</span><span class="hh">15 &middot; 16</span></div>
+            <div class="fc-hrow"><span class="mt">Match 3 &middot; Sat 9:30 AM</span><span class="hh">6 &middot; 7</span></div>
+          </div>
+        </div>
+
+        <div class="flightcard">
+          <div class="fc-head"><div class="fc-n">Flight 5</div><div class="fc-m">18.3 &ndash; 19.3</div></div>
+          <div class="fc-team"><span class="fc-seed">1</span><span class="fc-p">Lauren Gagnier <span class="idx">(5.7)</span> &amp; John Mandella <span class="idx">(12.6)</span></span><span class="fc-c">18.3</span></div>
+          <div class="fc-team"><span class="fc-seed">2</span><span class="fc-p">Curtiss Smith <span class="idx">(12.6)</span> &amp; Ben Aslan <span class="idx">(6.3)</span></span><span class="fc-c">18.9</span></div>
+          <div class="fc-team"><span class="fc-seed">3</span><span class="fc-p">Drew Achabal <span class="idx">(5.6)</span> &amp; Mark Luthman <span class="idx">(13.5)</span></span><span class="fc-c">19.1</span></div>
+          <div class="fc-team"><span class="fc-seed">4</span><span class="fc-p">Blake Douglas <span class="idx">(9.1)</span> &amp; Todd Shaffer <span class="idx">(10.2)</span></span><span class="fc-c">19.3</span></div>
+          <div class="fc-holes"><div class="fc-hl">Hole Assignments</div>
+            <div class="fc-hrow"><span class="mt">Match 1 &middot; Fri 9:30 AM</span><span class="hh">8 &middot; 9</span></div>
+            <div class="fc-hrow"><span class="mt">Match 2 &middot; Fri 12:30 PM</span><span class="hh">17 &middot; 18</span></div>
+            <div class="fc-hrow"><span class="mt">Match 3 &middot; Sat 9:30 AM</span><span class="hh">8 &middot; 9</span></div>
+          </div>
+        </div>
+
+        <div class="flightcard">
+          <div class="fc-head"><div class="fc-n">Flight 6</div><div class="fc-m">20.1 &ndash; 22.0</div></div>
+          <div class="fc-team"><span class="fc-seed">1</span><span class="fc-p">Frank Rosales <span class="idx">(12.8)</span> &amp; Matt Romig <span class="idx">(7.3)</span></span><span class="fc-c">20.1</span></div>
+          <div class="fc-team"><span class="fc-seed">2</span><span class="fc-p">Richard Pearce <span class="idx">(10.7)</span> &amp; Eric Takahashi <span class="idx">(10.4)</span></span><span class="fc-c">21.1</span></div>
+          <div class="fc-team"><span class="fc-seed">3</span><span class="fc-p">Mark Collishaw <span class="idx">(6.8)</span> &amp; Stephen McGillin <span class="idx">(14.7)</span></span><span class="fc-c">21.5</span></div>
+          <div class="fc-team"><span class="fc-seed">4</span><span class="fc-p">Sage Turowski <span class="idx">(11.8)</span> &amp; Gregory Rajala <span class="idx">(10.2)</span></span><span class="fc-c">22.0</span></div>
+          <div class="fc-holes"><div class="fc-hl">Hole Assignments</div>
+            <div class="fc-hrow"><span class="mt">Match 1 &middot; Fri 9:30 AM</span><span class="hh">10 &middot; 11</span></div>
+            <div class="fc-hrow"><span class="mt">Match 2 &middot; Fri 12:30 PM</span><span class="hh">1 &middot; 2</span></div>
+            <div class="fc-hrow"><span class="mt">Match 3 &middot; Sat 9:30 AM</span><span class="hh">10 &middot; 11</span></div>
+          </div>
+        </div>
+
+        <div class="flightcard">
+          <div class="fc-head"><div class="fc-n">Flight 7</div><div class="fc-m">22.9 &ndash; 26.0</div></div>
+          <div class="fc-team"><span class="fc-seed">1</span><span class="fc-p">Brad Smith <span class="idx">(15.7)</span> &amp; Mathieu Fidiam <span class="idx">(7.2)</span></span><span class="fc-c">22.9</span></div>
+          <div class="fc-team"><span class="fc-seed">2</span><span class="fc-p">Yukon Cherng <span class="idx">(11.5)</span> &amp; Karuna Cayton <span class="idx">(12.0)</span></span><span class="fc-c">23.5</span></div>
+          <div class="fc-team"><span class="fc-seed">3</span><span class="fc-p">Greg Muller <span class="idx">(6.9)</span> &amp; Ken Grohe <span class="idx">(18.3)</span></span><span class="fc-c">25.2</span></div>
+          <div class="fc-team"><span class="fc-seed">4</span><span class="fc-p">Mike Masunaga <span class="idx">(14.7)</span> &amp; Mark Casey <span class="idx">(11.3)</span></span><span class="fc-c">26.0</span></div>
+          <div class="fc-holes"><div class="fc-hl">Hole Assignments</div>
+            <div class="fc-hrow"><span class="mt">Match 1 &middot; Fri 9:30 AM</span><span class="hh">12 &middot; 13</span></div>
+            <div class="fc-hrow"><span class="mt">Match 2 &middot; Fri 12:30 PM</span><span class="hh">4 &middot; 5</span></div>
+            <div class="fc-hrow"><span class="mt">Match 3 &middot; Sat 9:30 AM</span><span class="hh">12 &middot; 13</span></div>
+          </div>
+        </div>
+
+        <div class="flightcard">
+          <div class="fc-head"><div class="fc-n">Flight 8</div><div class="fc-m">26.5 &ndash; 31.6</div></div>
+          <div class="fc-team"><span class="fc-seed">1</span><span class="fc-p">Daniel Wallis <span class="idx">(9.0)</span> &amp; Marte Formico <span class="idx">(17.5)</span></span><span class="fc-c">26.5</span></div>
+          <div class="fc-team"><span class="fc-seed">2</span><span class="fc-p">Tom Evenson <span class="idx">(18.3)</span> &amp; Rob Selvi <span class="idx">(8.3)</span></span><span class="fc-c">26.6</span></div>
+          <div class="fc-team"><span class="fc-seed">3</span><span class="fc-p">Rob Buntz <span class="idx">(14.2)</span> &amp; James Jackson <span class="idx">(13.1)</span></span><span class="fc-c">27.3</span></div>
+          <div class="fc-team"><span class="fc-seed">4</span><span class="fc-p">Charlie Verutti <span class="idx">(14.1)</span> &amp; Steve Yates <span class="idx">(17.5)</span></span><span class="fc-c">31.6</span></div>
+          <div class="fc-holes"><div class="fc-hl">Hole Assignments</div>
+            <div class="fc-hrow"><span class="mt">Match 1 &middot; Fri 9:30 AM</span><span class="hh">14 &middot; 15</span></div>
+            <div class="fc-hrow"><span class="mt">Match 2 &middot; Fri 12:30 PM</span><span class="hh">6 &middot; 7</span></div>
+            <div class="fc-hrow"><span class="mt">Match 3 &middot; Sat 9:30 AM</span><span class="hh">14 &middot; 15</span></div>
+          </div>
+        </div>
+
+        <div class="flightcard">
+          <div class="fc-head"><div class="fc-n">Flight 9</div><div class="fc-m">34.3 &ndash; 40.1</div></div>
+          <div class="fc-team"><span class="fc-seed">1</span><span class="fc-p">Donald Finn <span class="idx">(19.3)</span> &amp; Patrick Ellington <span class="idx">(15.0)</span></span><span class="fc-c">34.3</span></div>
+          <div class="fc-team"><span class="fc-seed">2</span><span class="fc-p">Michael Rose <span class="idx">(15.4)</span> &amp; Mike Aymar <span class="idx">(21.3)</span></span><span class="fc-c">36.7</span></div>
+          <div class="fc-team"><span class="fc-seed">3</span><span class="fc-p">Richard Battaglia <span class="idx">(16.1)</span> &amp; Kyle Sather <span class="idx">(22.3)</span></span><span class="fc-c">38.4</span></div>
+          <div class="fc-team"><span class="fc-seed">4</span><span class="fc-p">Sahaj Grewall <span class="idx">(21.6)</span> &amp; Jeet Harika <span class="idx">(18.5)</span></span><span class="fc-c">40.1</span></div>
+          <div class="fc-holes"><div class="fc-hl">Hole Assignments</div>
+            <div class="fc-hrow"><span class="mt">Match 1 &middot; Fri 9:30 AM</span><span class="hh">17 &middot; 18</span></div>
+            <div class="fc-hrow"><span class="mt">Match 2 &middot; Fri 12:30 PM</span><span class="hh">8 &middot; 9</span></div>
+            <div class="fc-hrow"><span class="mt">Match 3 &middot; Sat 9:30 AM</span><span class="hh">17 &middot; 18</span></div>
+          </div>
+        </div>
+
+      </div>
+
+      <p class="fine center" style="margin-top:26px;">Flights 1&ndash;5 open on the front nine Friday morning; Flights 6&ndash;9 open on the back. Please print or save this page &mdash; hole assignments will <strong>not</strong> be handed out at Friday check-in. Questions? See your golf professional.</p>
     </div>
   </section>
 </section>
@@ -535,7 +693,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
         </div>
       </div>
 
-      <p class="fine center" style="margin-top:24px;">Flights, hole assignments and pairings &mdash; along with the full Alternate Shot &amp; Horserace rules &mdash; will be sent out the Thursday morning of tournament week. Please silence cell phones during play; use is limited to the parking lots and clubhouse area before and after your round.</p>
+      <p class="fine center" style="margin-top:24px;">Flights, hole assignments and pairings are now posted on the <strong>Flights</strong> tab. Please silence cell phones during play; use is limited to the parking lots and clubhouse area before and after your round.</p>
     </div>
   </section>
 </section>
@@ -552,23 +710,24 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
         <div class="panel">
           <h3>How It's Played</h3>
           <ul class="clean">
-            <li>Team handicap uses <strong>50%</strong> of the combined 9-hole indexes for your designated holes.</li>
-            <li>Before the round, each team assigns one player to odd-numbered holes and the other to even-numbered holes &mdash; that assignment holds all round.</li>
-            <li>Partners alternate shots until the team holes out; the pre-assigned player always hits the next tee shot, regardless of who finished the prior hole.</li>
+            <li><strong>Both players hit a tee shot.</strong> Once you select which tee shot to play, the player who did <em>not</em> hit that drive plays the next shot &mdash; then partners alternate shots until the ball is holed.</li>
+            <li>A minimum of <strong>three drives must be used by each player</strong> over the 9-hole competition.</li>
+            <li>Team handicap uses <strong>50%</strong> of the combined nine-hole indexes of the partners on your designated nine holes.</li>
           </ul>
+          <p class="fine" style="margin-top:10px;">The field is split into two flights &mdash; one on each nine of the golf course.</p>
         </div>
         <div class="panel">
           <h3>Opting In &mdash; and the Horserace</h3>
-          <p><strong>If we don't hear otherwise, we'll assume you and your partner are in</strong> &mdash; just let us know before your second match Friday if you'd like to opt out.</p>
+          <p><strong>If we don't hear otherwise, we'll assume you and your partner are in</strong> &mdash; just let us know before you go out for your second match Friday if you'd like to opt out. This is optional and does <strong>not</strong> affect your standing in your flight.</p>
           <div class="chip">Bonus Qualification</div>
-          <p style="margin-top:10px;">The <strong>low team from each side</strong> of the course in the Alternate Shot automatically qualifies for Saturday's Horserace &mdash; even without winning a flight.</p>
+          <p style="margin-top:10px;">The <strong>low team from each side</strong> of the course in the Alternate Shot automatically qualifies for Saturday's Horserace &mdash; a way in <em>without</em> winning your flight.</p>
         </div>
       </div>
 
       <h4 style="margin-top:36px;">Optional Cash Pool</h4>
       <div class="panel plain">
         <div class="prize"><span class="nm big">Alternate Shot Pool</span><span class="aw">$40 per team</span></div>
-        <p class="fine" style="margin-top:8px;">Pays the top three teams on each side of the course. Cash only, collected at registration.</p>
+        <p class="fine" style="margin-top:8px;">Pays the top three teams on each side of the course. Cash only, collected at Friday registration.</p>
       </div>
     </div>
   </section>
@@ -596,7 +755,9 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
               </tbody>
             </table>
           </div>
-          <p class="fine">Team handicap = 50% of combined team total. The lowest-handicap team is stroked off, with handicap priority given in the order above.</p>
+          <p class="fine">Team handicap = 50% of combined team total. The lowest-handicap team is stroked off, with handicap priority given in the order above &mdash; Hole #1 (1), Hole #7 (2), Hole #8 (3), Hole #9 (4).</p>
+          <div class="chip">Order of Play</div>
+          <p style="margin-top:10px;">Before teeing off on the 1st hole, each team selects the player who hits the <strong>initial tee shot</strong>. Partners alternate from that point forward until the competition is complete.</p>
         </div>
         <div class="panel">
           <h3>The Chip-Off</h3>
@@ -612,10 +773,10 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
 
       <h4 style="margin-top:36px;">Horserace Purse</h4>
       <div class="panel plain">
-        <div class="prize"><span class="nm big">Winner</span><span class="aw">$800</span></div>
-        <div class="prize"><span class="nm big">Runner-up</span><span class="aw">$500</span></div>
-        <div class="prize"><span class="nm">3rd place</span><span class="aw">$300</span></div>
-        <div class="prize"><span class="nm">Each other team from the winning team's flight</span><span class="aw">$100 per team</span></div>
+        <div class="prize"><span class="nm big">Winner</span><span class="aw">$600</span></div>
+        <div class="prize"><span class="nm big">Runner-up</span><span class="aw">$350</span></div>
+        <div class="prize"><span class="nm">3rd place</span><span class="aw">$200</span></div>
+        <div class="prize"><span class="nm">Other three teams from the winning team's flight</span><span class="aw">$50 per team</span></div>
       </div>
 
       <div class="histband" style="margin-top:34px;">
@@ -672,40 +833,62 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
         <div class="prize"><span class="nm big">Closest to the Pin</span><span class="aw">$50 per hole, per day &mdash; all 5 par-3s</span></div>
       </div>
 
-      <h4 style="margin-top:36px;">Flight Money (Per Team)</h4>
+      <p class="fine" style="margin-top:14px;">All payouts below are <strong>per team</strong>, paid in cash.</p>
+
+      <h4 style="margin-top:30px;">Day Money</h4>
       <div class="grid g2">
         <div class="panel">
-          <div class="eyebrow">Day 1</div>
-          <div class="prize"><span class="nm">Most points, each flight</span><span class="aw">$50</span></div>
-          <div class="prize"><span class="nm">Most points, flights 1&ndash;5 overall</span><span class="aw">$200</span></div>
-          <div class="prize"><span class="nm">Most points, flights 6&ndash;9 overall</span><span class="aw">$200</span></div>
+          <div class="eyebrow">Day 1 &mdash; Friday</div>
+          <div class="prize"><span class="nm big">Most points, flights 1&ndash;5 overall</span><span class="aw">$100</span></div>
+          <div class="prize"><span class="nm big">Most points, flights 6&ndash;9 overall</span><span class="aw">$100</span></div>
+          <div class="prize"><span class="nm">2nd most points, flights 1&ndash;5 overall</span><span class="aw">$50</span></div>
+          <div class="prize"><span class="nm">2nd most points, flights 6&ndash;9 overall</span><span class="aw">$50</span></div>
         </div>
         <div class="panel">
-          <div class="eyebrow">Day 2</div>
-          <div class="prize"><span class="nm">Most points, each flight</span><span class="aw">$50</span></div>
-          <div class="prize"><span class="nm">Most points, flights 1&ndash;5</span><span class="aw">$200</span></div>
-          <div class="prize"><span class="nm">Most points, flights 6&ndash;9</span><span class="aw">$200</span></div>
+          <div class="eyebrow">Day 2 &mdash; Saturday</div>
+          <div class="prize"><span class="nm big">Most points, flights 1&ndash;5 overall</span><span class="aw">$100</span></div>
+          <div class="prize"><span class="nm big">Most points, flights 6&ndash;9 overall</span><span class="aw">$100</span></div>
+          <div class="prize"><span class="nm">2nd most points, flights 1&ndash;5 overall</span><span class="aw">$50</span></div>
+          <div class="prize"><span class="nm">2nd most points, flights 6&ndash;9 overall</span><span class="aw">$50</span></div>
         </div>
       </div>
 
       <div class="grid g2" style="margin-top:22px;">
         <div class="panel">
           <div class="eyebrow">Tournament Overall</div>
+          <h3 style="font-size:24px;">Overall Payouts</h3>
           <div class="prize"><span class="nm big">Most points, flights 1&ndash;5</span><span class="aw">$300</span></div>
           <div class="prize"><span class="nm big">Most points, flights 6&ndash;9</span><span class="aw">$300</span></div>
           <div class="prize"><span class="nm">Flights 1&ndash;5 &mdash; runner-up</span><span class="aw">$200</span></div>
           <div class="prize"><span class="nm">Flights 6&ndash;9 &mdash; runner-up</span><span class="aw">$200</span></div>
-          <div class="prize"><span class="nm">Flights 1&ndash;5 &mdash; 3rd place</span><span class="aw">$150</span></div>
-          <div class="prize"><span class="nm">Flights 6&ndash;9 &mdash; 3rd place</span><span class="aw">$150</span></div>
+          <div class="prize"><span class="nm">Flights 1&ndash;5 &mdash; 3rd place</span><span class="aw">$100</span></div>
+          <div class="prize"><span class="nm">Flights 6&ndash;9 &mdash; 3rd place</span><span class="aw">$100</span></div>
         </div>
+        <div class="panel">
+          <div class="eyebrow">Each of the Nine Flights</div>
+          <h3 style="font-size:24px;">Flight Winners &amp; Runners-Up</h3>
+          <div class="prize"><span class="nm big">1st place</span><span class="aw">$150</span></div>
+          <div class="prize"><span class="nm">2nd place</span><span class="aw">$50</span></div>
+          <p class="fine" style="margin-top:10px;">Each of the nine flight winners also earns a place in Saturday afternoon's Horserace.</p>
+        </div>
+      </div>
+
+      <div class="grid g2" style="margin-top:22px;">
         <div class="panel">
           <div class="eyebrow">Saturday Afternoon</div>
           <h3 style="font-size:24px;">Horserace Purse</h3>
-          <div class="prize"><span class="nm big">Winner</span><span class="aw">$800</span></div>
-          <div class="prize"><span class="nm big">Runner-up</span><span class="aw">$500</span></div>
-          <div class="prize"><span class="nm">3rd place</span><span class="aw">$300</span></div>
-          <div class="prize"><span class="nm">Other 3 teams from winner's flight</span><span class="aw">$100 each</span></div>
+          <div class="prize"><span class="nm big">Winner</span><span class="aw">$600</span></div>
+          <div class="prize"><span class="nm big">Runner-up</span><span class="aw">$350</span></div>
+          <div class="prize"><span class="nm">3rd place</span><span class="aw">$200</span></div>
+          <div class="prize"><span class="nm">Other three teams from the winning team's flight</span><span class="aw">$50 each</span></div>
           <p class="fine" style="margin-top:10px;">The Horserace champion also gets their entry fee back.</p>
+        </div>
+        <div class="panel">
+          <div class="eyebrow">Optional Buy-Ins</div>
+          <h3 style="font-size:24px;">Hole-in-One &amp; Most Points</h3>
+          <div class="prize"><span class="nm">Hole-in-One pool</span><span class="aw">$20 of the $40</span></div>
+          <div class="prize"><span class="nm">Most points over the entire field</span><span class="aw">$20 of the $40</span></div>
+          <p class="fine" style="margin-top:10px;">If no ace is made, the closest shot on any Closest-to-the-Pin contest Friday or Saturday wins <strong>$400</strong>. Most-points ties are broken by matches won over the two days. See the Wagering tab for full details.</p>
         </div>
       </div>
 
