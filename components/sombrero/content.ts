@@ -119,6 +119,10 @@ h4{font-family:var(--disp);font-weight:600;text-transform:uppercase;letter-spaci
 @media (max-width:600px){.panel{padding:24px 20px;}}
 
 .grid{display:grid;gap:22px;}
+/* Grid items default to min-width:auto, so a panel wrapping a wide table
+   (e.g. the Horserace elimination table's mobile min-width) refuses to shrink
+   and overflows the page on phones. Let them shrink; .tablewrap scrolls. */
+.grid>*{min-width:0;}
 .g2{grid-template-columns:1fr 1fr;}
 .g3{grid-template-columns:repeat(3,1fr);}
 @media (max-width:820px){.g2,.g3{grid-template-columns:1fr;}}
