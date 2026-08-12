@@ -452,8 +452,8 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
           <div class="day-events">
             <div class="evt"><div class="t">8:00 AM</div><div class="d"><strong>Practice facility opens &amp; continental breakfast.</strong></div></div>
             <div class="evt"><div class="t">9:30&ndash;12 PM</div><div class="d"><strong>Shotgun &mdash; 3rd Nine-Hole Match.</strong></div></div>
-            <div class="evt"><div class="t">12&ndash;12:30 PM</div><div class="d"><strong>Break &amp; snacks.</strong></div></div>
-            <div class="evt"><div class="t">12:30&ndash;3 PM</div><div class="d"><strong>Shotgun &mdash; 4th Nine-Hole Match.</strong><div class="sub">Flight winners determined after the 4th match.</div></div></div>
+            <div class="evt"><div class="t">12&ndash;12:30 PM</div><div class="d"><strong>Break &amp; snacks</strong> &mdash; box lunch pick-up.</div></div>
+            <div class="evt"><div class="t">12:30&ndash;3 PM</div><div class="d"><strong>Shotgun &mdash; 4th Nine-Hole Match.</strong><div class="sub">Paired off flight standings &mdash; 1st plays 2nd, 3rd plays 4th. Flight winners determined after this match.</div></div></div>
             <div class="evt"><div class="t">3:15 PM</div><div class="d"><strong>Taco Buffet opens.</strong></div></div>
             <div class="evt"><div class="t">4:15&ndash;???</div><div class="d"><strong>Horse Race Championship</strong>, followed by the <strong>Awards Presentation</strong>.<div class="sub">Taco Buffet &mdash; MacKenzie Bar &amp; Grill.</div></div></div>
           </div>
