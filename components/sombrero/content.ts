@@ -477,11 +477,17 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
       <div class="grid g2" style="margin-top:10px;">
         <div class="panel">
           <div class="eyebrow">Two-Day Competition</div>
-          <h3>Tournament Flights</h3>
-          <p>The field of two-man teams is divided into <strong>nine flights</strong> by team handicap. Every flight plays for its own daily and tournament money, and the flights are grouped into two overall sweeps for the biggest prizes.</p>
+          <h3>Flights &amp; Divisions</h3>
+          <p>The 36 teams are split into <strong>nine flights of four</strong>, seeded by combined handicap index. Those nine flights are then grouped into <strong>two divisions</strong>. The two levels play for different money &mdash; worth knowing which prize you're chasing.</p>
+
+          <h4 style="margin-top:22px;">Your Flight &mdash; Four Teams</h4>
+          <p>Round-robin match play against the other three teams in your flight. This decides your <strong>flight winner and runner-up</strong> ($150 and $50) and who advances to the Horserace.</p>
+
+          <h4 style="margin-top:22px;">Your Division &mdash; Flights 1&ndash;5 or 6&ndash;9</h4>
+          <p>Every team on your side of the draw competes on <strong>total points</strong> for the day money and the overall payouts. That is <em>one</em> pool across the whole division &mdash; there is no separate day-money pot for each individual flight.</p>
           <ul class="clean">
-            <li><strong>Flights 1&ndash;5</strong> &mdash; lower-index teams, own overall sweep</li>
-            <li><strong>Flights 6&ndash;9</strong> &mdash; higher-index teams, own overall sweep</li>
+            <li><strong>Flights 1&ndash;5</strong> &mdash; the lower-index division, 20 teams</li>
+            <li><strong>Flights 6&ndash;9</strong> &mdash; the higher-index division, 16 teams</li>
           </ul>
         </div>
         <div class="panel">
@@ -838,6 +844,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
       </div>
 
       <p class="fine" style="margin-top:14px;">All payouts below are <strong>per team</strong>, paid in cash.</p>
+      <p style="margin-top:10px;">The <strong>Day Money</strong> and <strong>Overall Payouts</strong> below are contested across the two divisions &mdash; <strong>Flights 1&ndash;5</strong> as one pool and <strong>Flights 6&ndash;9</strong> as another &mdash; on total points. They are <em>not</em> awarded flight by flight. Each of the nine individual flights pays its own winner and runner-up separately; see <em>Flight Winners &amp; Runners-Up</em>.</p>
 
       <h4 style="margin-top:30px;">Day Money</h4>
       <div class="grid g2">
