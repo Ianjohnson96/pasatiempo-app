@@ -280,7 +280,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
 <!-- ============================ HOME ============================ -->
 <section class="view" id="home" role="tabpanel">
   <div class="hero">
-    <div class="bg" style="background-image:url('/sombrero/img/img2.avif')"></div>
+    <div class="bg" style="background-image:url('/sombrero/img/home-hero.jpg');background-position:center 52%;"></div>
     <div class="veil"></div>
     <div class="inner">
       <div class="eyebrow">Pasatiempo Men's Club &middot; Member-Member</div>
