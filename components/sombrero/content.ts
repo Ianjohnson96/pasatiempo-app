@@ -296,7 +296,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
   <section class="block">
     <div class="wrap narrow center">
       <div class="rule-orn"><span class="eyebrow" style="color:var(--gold);">The Men's Club's Premier Event</span></div>
-      <p class="lead center" style="margin:18px auto 0;">Two days of two-man match play, hosted food and beverage, and a Friday alternate-shot side event, all building to Saturday's four-hole Horserace — a sudden-death alternate-shot showdown that crowns the champions of El Sombrero.</p>
+      <p class="lead center" style="margin:18px auto 0;">Two days of two-man match play, meals both days, and a Friday alternate-shot side event, all building to Saturday's four-hole Horserace — a sudden-death alternate-shot showdown that crowns the champions of El Sombrero.</p>
     </div>
   </section>
 
@@ -306,7 +306,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
         <div><div class="k">The Rounds</div><div class="v">Aug 14 &amp; 15</div><div class="n">Friday &amp; Saturday</div></div>
         <div><div class="k">Format</div><div class="v">Match Play</div><div class="n">2-man teams, 2nd ball tiebreak</div></div>
         <div><div class="k">Friday Extra</div><div class="v">Alternate Shot</div><div class="n">Optional 9-hole side event</div></div>
-        <div><div class="k">The Clubhouse</div><div class="v">MacKenzie Room</div><div class="n">All meals &amp; hosted drinks</div></div>
+        <div><div class="k">The Clubhouse</div><div class="v">MacKenzie Room</div><div class="n">All meals, both days</div></div>
       </div>
     </div>
   </section>
@@ -316,7 +316,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
     <div class="bg" style="background-image:url('/sombrero/img/img3.avif')"></div>
     <div class="veil"></div>
     <div class="inner">
-      <div class="q">&ldquo;Nine flights, eleven horses, and Pasatiempo &mdash; that's El Sombrero.&rdquo;</div>
+      <div class="q">&ldquo;Nine flights, eleven horses, and one Pasatiempo &mdash; that's El Sombrero.&rdquo;</div>
       <div class="a">El Sombrero &middot; Pasatiempo Men's Club</div>
     </div>
   </div>
@@ -399,7 +399,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
         <button class="navcard" data-tab="flights">
           <div class="ni"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4v16M4 4h13l-2 3 2 3H4"/></svg></div>
           <h4>Flights</h4>
-          <p>Nine flights, two overall sweeps, and the path to the Horserace.</p>
+          <p>Nine flights, two big flights, and the path to the Horserace.</p>
         </button>
         <button class="navcard" data-tab="format">
           <div class="ni"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
@@ -447,7 +447,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
             <div class="evt"><div class="t">12&ndash;12:30 PM</div><div class="d"><strong>Break &amp; snacks</strong> &mdash; build-your-own box lunch.</div></div>
             <div class="evt"><div class="t">12:30&ndash;3 PM</div><div class="d"><strong>Shotgun &mdash; 2nd Nine-Hole Match.</strong></div></div>
             <div class="evt"><div class="t">3&ndash;3:30 PM</div><div class="d"><strong>Break &amp; snacks.</strong></div></div>
-            <div class="evt"><div class="t">4:15&ndash;6:15 PM</div><div class="d"><strong>Optional Two-Man Alternate Shot.</strong><div class="sub">Field split into two flights, one on each nine. The top three teams on each side split the cash pool; the low team on each side qualifies for Saturday's Horserace.</div></div></div>
+            <div class="evt"><div class="t">4:15&ndash;6:15 PM</div><div class="d"><strong>Optional Two-Man Alternate Shot.</strong><div class="sub">Field split into two big flights, one on each nine. The top three teams on each side split the cash pool; the low team on each side qualifies for Saturday's Horserace.</div></div></div>
             <div class="evt"><div class="t">6:15&ndash;???</div><div class="d"><strong>BBQ Chicken Dinner.</strong></div></div>
           </div>
         </div>
@@ -477,17 +477,17 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
       <div class="grid g2" style="margin-top:10px;">
         <div class="panel">
           <div class="eyebrow">Two-Day Competition</div>
-          <h3>Flights &amp; Divisions</h3>
-          <p>The 36 teams are split into <strong>nine flights of four</strong>, seeded by combined handicap index. Those nine flights are then grouped into <strong>two divisions</strong>. The two levels play for different money &mdash; worth knowing which prize you're chasing.</p>
+          <h3>Flights &amp; Big Flights</h3>
+          <p>The 36 teams are split into <strong>nine flights of four</strong>, seeded by combined handicap index. Those nine flights are then grouped into <strong>two big flights</strong>. The two levels play for different money &mdash; worth knowing which prize you're chasing.</p>
 
           <h4 style="margin-top:22px;">Your Flight &mdash; Four Teams</h4>
           <p>Round-robin match play against the other three teams in your flight. This decides your <strong>flight winner and runner-up</strong> ($150 and $50) and who advances to the Horserace.</p>
 
-          <h4 style="margin-top:22px;">Your Division &mdash; Flights 1&ndash;5 or 6&ndash;9</h4>
-          <p>Every team on your side of the draw competes on <strong>total points</strong> for the day money and the overall payouts. That is <em>one</em> pool across the whole division &mdash; there is no separate day-money pot for each individual flight.</p>
+          <h4 style="margin-top:22px;">Your Big Flight &mdash; Flights 1&ndash;5 or 6&ndash;9</h4>
+          <p>Every team in your big flight competes on <strong>total points</strong> for the day money and the overall payouts. That is <em>one</em> pool across the whole big flight &mdash; there is no separate day-money pot for each individual flight.</p>
           <ul class="clean">
-            <li><strong>Flights 1&ndash;5</strong> &mdash; the lower-index division, 20 teams</li>
-            <li><strong>Flights 6&ndash;9</strong> &mdash; the higher-index division, 16 teams</li>
+            <li><strong>Flights 1&ndash;5</strong> &mdash; the lower-index big flight, 20 teams</li>
+            <li><strong>Flights 6&ndash;9</strong> &mdash; the higher-index big flight, 16 teams</li>
           </ul>
         </div>
         <div class="panel">
@@ -656,7 +656,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
     <div class="inner"><div class="eyebrow">How the Field Is Divided &amp; Played</div><h2>Format</h2></div></div>
   <section class="block">
     <div class="wrap">
-      <p class="lead">A two-man <strong>Member-Member</strong> played as <strong>round-robin match play within your flight</strong>. The field is broken into <strong>nine flights of four teams</strong>, set by the combined indexes of the partners. One team from each of the nine flights qualifies for Saturday afternoon's Horserace.</p>
+      <p class="lead">A two-man <strong>Member-Member</strong> played as <strong>match play within your flight</strong>. The field is broken into <strong>nine flights of four teams</strong>, set by the combined indexes of the partners. The first three matches are a full round robin; the fourth is paired off your flight standings. <strong>Eleven teams</strong> reach Saturday afternoon's Horserace &mdash; the winner of each of the nine flights, plus two from Friday's optional Alternate Shot.</p>
 
       <div class="panel" style="margin-top:30px;">
         <div class="eyebrow">Both Days</div>
@@ -665,7 +665,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
           <li>The format is the <strong>best ball of partners</strong>, with the <strong>second ball breaking the tie</strong> &mdash; spinning off the low handicap in the foursome.</li>
           <li><strong>One point</strong> is awarded for winning each hole, and an <strong>additional point</strong> for winning the match.</li>
           <li>Halved holes are worth <strong>&frac12; point each</strong>.</li>
-          <li>Shotgun start, round-robin match play within your own flight across four nine-hole matches over the two days.</li>
+          <li>Shotgun start, match play within your own flight across four nine-hole matches over the two days &mdash; the <strong>first three a full round robin</strong>, the <strong>fourth paired off your flight standings</strong> (1st plays 2nd, 3rd plays 4th).</li>
         </ul>
       </div>
 
@@ -682,6 +682,8 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
           </tbody>
         </table>
       </div>
+
+      <p class="fine">The 4th match is <strong>paired off your flight standings</strong> after three matches &mdash; 1st plays 2nd, 3rd plays 4th. Hole assignments for that match are posted on site Saturday.</p>
 
       <h4 style="margin-top:36px;">Policies</h4>
       <div class="grid g2">
@@ -724,7 +726,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
             <li>A minimum of <strong>three drives must be used by each player</strong> over the 9-hole competition.</li>
             <li>Team handicap uses <strong>50%</strong> of the combined nine-hole indexes of the partners on your designated nine holes.</li>
           </ul>
-          <p class="fine" style="margin-top:10px;">The field is split into two flights &mdash; one on each nine of the golf course.</p>
+          <p class="fine" style="margin-top:10px;">The field is split into <strong>two big flights</strong> &mdash; one on each nine of the golf course.</p>
         </div>
         <div class="panel">
           <h3>Opting In &mdash; and the Horserace</h3>
@@ -824,7 +826,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
         </div>
         <div class="panel">
           <h3>Questions on Wagering?</h3>
-          <p>Details and sign-in instructions for Homestretch will be sent in a separate email closer to the event. Cash for both the pools and pari-mutuel wagers is collected in person at registration.</p>
+          <p>Details and sign-in instructions for Homestretch will be sent in a separate email shortly. Cash for both the pools and pari-mutuel wagers is collected in person at registration.</p>
           <p class="fine" style="margin-top:10px;">Studying up from home beats a snap decision on the first tee.</p>
         </div>
       </div>
@@ -844,7 +846,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
       </div>
 
       <p class="fine" style="margin-top:14px;">All payouts below are <strong>per team</strong>, paid in cash.</p>
-      <p style="margin-top:10px;">The <strong>Day Money</strong> and <strong>Overall Payouts</strong> below are contested across the two divisions &mdash; <strong>Flights 1&ndash;5</strong> as one pool and <strong>Flights 6&ndash;9</strong> as another &mdash; on total points. They are <em>not</em> awarded flight by flight. Each of the nine individual flights pays its own winner and runner-up separately; see <em>Flight Winners &amp; Runners-Up</em>.</p>
+      <p style="margin-top:10px;">The <strong>Day Money</strong> and <strong>Overall Payouts</strong> below are contested across the two <strong>big flights</strong> &mdash; <strong>Flights 1&ndash;5</strong> as one pool and <strong>Flights 6&ndash;9</strong> as another &mdash; on total points. They are <em>not</em> awarded flight by flight. Each of the nine individual flights pays its own winner and runner-up separately; see <em>Flight Winners &amp; Runners-Up</em>.</p>
 
       <h4 style="margin-top:30px;">Day Money</h4>
       <div class="grid g2">
@@ -905,7 +907,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
 
       <div class="panel" style="margin-top:22px;text-align:center;">
         <h3 style="margin-bottom:6px;">Something to Play For, All Weekend</h3>
-        <p class="lead center" style="margin:0 auto;">Closest-to-the-pin, flight money, tournament sweeps, and the Horserace purse &mdash; there's cash on the line from the first tee shot Friday to the final chip-off Saturday.</p>
+        <p class="lead center" style="margin:0 auto;">Closest-to-the-pin, flight money, big-flight money, and the Horserace purse &mdash; there's cash on the line from the first tee shot Friday to the final chip-off Saturday.</p>
       </div>
     </div>
   </section>
