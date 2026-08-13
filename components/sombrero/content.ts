@@ -846,7 +846,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
       </div>
 
       <p class="fine" style="margin-top:14px;">All payouts below are <strong>per team</strong>, paid in cash.</p>
-      <p style="margin-top:10px;">The <strong>Day Money</strong> and <strong>Overall Payouts</strong> below are contested across the two <strong>big flights</strong> &mdash; <strong>Flights 1&ndash;5</strong> as one pool and <strong>Flights 6&ndash;9</strong> as another &mdash; on total points. They are <em>not</em> awarded flight by flight. Each of the nine individual flights pays its own winner and runner-up separately; see <em>Flight Winners &amp; Runners-Up</em>.</p>
+      <p style="margin-top:10px;">Money is paid on two levels. <strong>Your flight</strong> &mdash; the four teams you play against &mdash; pays its own winner and runner-up. <strong>Your big flight</strong> &mdash; Flights 1&ndash;5 or Flights 6&ndash;9 &mdash; decides the <strong>Day Money</strong> and <strong>Overall Payouts</strong> below, on total points against every team in that half of the field.</p>
 
       <h4 style="margin-top:30px;">Day Money</h4>
       <div class="grid g2">
