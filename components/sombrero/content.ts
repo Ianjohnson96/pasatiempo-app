@@ -712,7 +712,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
 
 <!-- ============================ ALTERNATE SHOT ============================ -->
 <section class="view" id="altshot" role="tabpanel">
-  <div class="band"><div class="bg" style="background-image:url('/sombrero/img/img6.avif')"></div><div class="veil"></div>
+  <div class="band"><div class="bg" style="background-image:url('/sombrero/img/img4.avif')"></div><div class="veil"></div>
     <div class="inner"><div class="eyebrow">Friday Afternoon</div><h2>Alternate Shot</h2></div></div>
   <section class="block">
     <div class="wrap">
