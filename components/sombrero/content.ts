@@ -280,7 +280,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
 <!-- ============================ HOME ============================ -->
 <section class="view" id="home" role="tabpanel">
   <div class="hero">
-    <div class="bg" style="background-image:url('/sombrero/img/home-hero.jpg');background-position:center 52%;"></div>
+    <div class="bg" style="background-image:url('/sombrero/img/img2.avif')"></div>
     <div class="veil"></div>
     <div class="inner">
       <div class="eyebrow">Pasatiempo Men's Club &middot; Member-Member</div>
@@ -349,8 +349,8 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
           <p>The club was commissioned by <strong>Marion Hollins</strong>, the 1921 U.S. Women's Amateur champion who brought MacKenzie to Santa Cruz and named it <em>Pasatiempo</em> &mdash; Spanish for &ldquo;pastime.&rdquo;</p>
         </div>
         <div class="histphoto">
-          <img src="/sombrero/img/course-green.jpg" alt="Terraced MacKenzie bunkering guarding a green at Pasatiempo" loading="lazy">
-          <span class="cap">Terraced bunkers guarding a MacKenzie green</span>
+          <img src="/sombrero/img/course-green.jpg" alt="Restored MacKenzie bunkers surrounding a green at Pasatiempo" loading="lazy">
+          <span class="cap">MacKenzie's bunkering, restored to its original scale</span>
         </div>
       </div>
 
