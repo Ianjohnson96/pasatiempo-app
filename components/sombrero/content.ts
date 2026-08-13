@@ -316,7 +316,7 @@ footer.site .fine{color:#9fac8c;margin-top:24px;font-size:13px;}
     <div class="bg" style="background-image:url('/sombrero/img/img3.avif')"></div>
     <div class="veil"></div>
     <div class="inner">
-      <div class="q">&ldquo;Nine flights, eleven horses, one hole nine finish &mdash; that's El Sombrero.&rdquo;</div>
+      <div class="q">&ldquo;Nine flights, eleven horses, and Pasatiempo &mdash; that's El Sombrero.&rdquo;</div>
       <div class="a">El Sombrero &middot; Pasatiempo Men's Club</div>
     </div>
   </div>
