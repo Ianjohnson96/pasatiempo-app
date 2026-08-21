@@ -12,6 +12,7 @@ import {
   registrationsFor,
 } from "@/lib/events/data";
 import { formatSlot, formatWhen, rosterName, TYPE_LABEL } from "@/lib/events/format";
+import { publicEvent } from "@/lib/events/map";
 
 export const dynamic = "force-dynamic";
 
@@ -305,12 +306,12 @@ export default async function PublicEventPage({
               </div>
             )}
             <div style={{ marginTop: 14 }}>
-              <RegistrationForm event={event} seats={seats} />
+              <RegistrationForm event={publicEvent(event)} seats={seats} />
             </div>
           </section>
         )}
 
-        {open && <ManageRegistration event={event} />}
+        {open && <ManageRegistration event={publicEvent(event)} />}
 
         {event.showRoster && !isSlots && (
           <section className="pub-section reveal">

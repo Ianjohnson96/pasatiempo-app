@@ -1,4 +1,5 @@
 import type { EventRec, Registration } from "./types";
+import type { EventFinance, PrizePurchase } from "./finance-types";
 
 // Maps between snake_case DB rows and the camelCase domain types.
 // JSON columns (slots, custom_fields, photos, allowlist, managers, guest_names,
@@ -95,6 +96,58 @@ export function rowToReg(r: any): Registration {
     slotIds: r.slot_ids ?? [],
     answers: r.answers ?? {},
     status: r.status,
+    createdAt: r.created_at,
+    paid: r.paid ?? false,
+    feeCents: r.fee_cents ?? null,
+    tender: r.tender ?? null,
+    paidOn: r.paid_on ?? null,
+    paymentNote: r.payment_note ?? "",
+  };
+}
+
+// ---- Public-safe event ----------------------------------------------------
+
+// The public event page hands the event object to client components, so it gets
+// serialised into the page and is readable by anyone. Strip the fields that are
+// nobody else's business: the invite allowlist is a list of members' email
+// addresses, and managers/createdBy are staff addresses. Invite-only access is
+// enforced server-side in actions.ts, so nothing depends on the client seeing it.
+export function publicEvent(e: EventRec): EventRec {
+  return { ...e, allowlist: [], managers: [], createdBy: null };
+}
+
+// ---- Financials (admin-only) ---------------------------------------------
+
+export function rowToFinance(r: any): EventFinance {
+  return {
+    eventId: r.event_id,
+    feeCents: r.fee_cents ?? 0,
+    organizerName: r.organizer_name ?? "",
+    organizerCutCents: r.organizer_cut_cents ?? 0,
+    instructors: r.instructors ?? [],
+    presence: r.presence ?? {},
+  };
+}
+
+export function financeToRow(f: Partial<EventFinance>): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  if (f.eventId !== undefined) row.event_id = f.eventId;
+  if (f.feeCents !== undefined) row.fee_cents = f.feeCents;
+  if (f.organizerName !== undefined) row.organizer_name = f.organizerName;
+  if (f.organizerCutCents !== undefined)
+    row.organizer_cut_cents = f.organizerCutCents;
+  if (f.instructors !== undefined) row.instructors = f.instructors;
+  if (f.presence !== undefined) row.presence = f.presence;
+  return row;
+}
+
+export function rowToPrize(r: any): PrizePurchase {
+  return {
+    id: r.id,
+    eventId: r.event_id,
+    purchasedOn: r.purchased_on ?? null,
+    description: r.description ?? "",
+    amountCents: r.amount_cents ?? 0,
     createdAt: r.created_at,
   };
 }

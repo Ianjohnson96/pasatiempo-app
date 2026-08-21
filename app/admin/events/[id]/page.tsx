@@ -30,6 +30,16 @@ export default async function ManageEventPage({
             ← All events
           </Link>
         </div>
+        {viewer.isGlobalAdmin && (
+          <div style={{ marginBottom: 14 }}>
+            <Link
+              href={`/admin/events/${event.id}/financials`}
+              className="btn secondary small"
+            >
+              Financials →
+            </Link>
+          </div>
+        )}
         <EventManager event={event} registrations={registrations} />
         <div style={{ height: 18 }} />
         <PhotoManager

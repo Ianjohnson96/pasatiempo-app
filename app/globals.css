@@ -1594,3 +1594,227 @@ textarea {
   border-color: var(--green);
   color: #fff;
 }
+
+/* =========================================================================
+   Mobile form fit — stack rows instead of squeezing them two-up.
+
+   `.row > *` and `.builder-row > *` carry min-widths (160px / 120px) that were
+   fine on a laptop but collide inside a phone's ~315px of usable card width:
+   two fields sit shoulder to shoulder at ~150px each, and rows with several
+   controls (the slot builder, the email lookup) wrap into a scramble. Below
+   560px everything goes single-column.
+   ========================================================================= */
+@media (max-width: 560px) {
+  .row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .row > * {
+    min-width: 0;
+    width: 100%;
+  }
+  .builder-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .builder-row > input,
+  .builder-row > select {
+    min-width: 0;
+    width: 100%;
+    /* several of these carry inline max-widths (90px, 100px) for the desktop
+       layout, which would keep them stub-narrow in a stacked column. */
+    max-width: none !important;
+  }
+  /* the heading block would otherwise refuse to shrink and crush the
+     Close / action button sitting next to it */
+  .page-head {
+    flex-wrap: wrap;
+  }
+  .page-head > div,
+  .page-head .ph-text {
+    min-width: 0;
+  }
+  /* iOS zooms the whole page in when a focused field is under 16px */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* =========================================================================
+   Clinic financials (admin only)
+   ========================================================================= */
+.fin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.fin-stat {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #fff;
+  min-width: 0;
+}
+.fin-stat.strong {
+  background: var(--green-tint);
+  border-color: var(--green);
+}
+.fin-stat .n {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--green);
+  line-height: 1.2;
+}
+.fin-stat .l {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.fin-cardhead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.fin-cardhead .section-title {
+  min-width: 0;
+}
+.fin-filter {
+  font-size: 14px;
+  margin-left: auto;
+}
+
+/* one person's payment */
+.fin-pay {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+.fin-pay.on {
+  border-color: var(--green);
+  background: var(--green-tint);
+}
+.fin-pay .fp-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fin-pay .fp-name {
+  font-weight: 600;
+  font-size: 16px;
+}
+.fin-pay .fp-contact {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 2px 0 10px 28px;
+  overflow-wrap: anywhere;
+}
+.fp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0 12px;
+}
+.fp-grid .field {
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+/* line-item lists: prize purchases, payouts */
+.fin-lines {
+  display: grid;
+  gap: 0;
+}
+.fin-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+.fin-line:first-child {
+  border-top: 0;
+}
+.fin-line.total {
+  border-top: 2px solid var(--line);
+}
+.fin-line .fl-main {
+  flex: 1;
+  min-width: 0;
+}
+.fin-line .fl-desc {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.fin-line .fl-date {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.fin-line .fl-amt {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.fin-line .fl-spacer {
+  width: 30px;
+  flex: 0 0 auto;
+}
+
+/* which pro worked which date */
+.fin-dates {
+  display: grid;
+  gap: 10px;
+}
+.fin-date {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+.fin-date .fd-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.fin-date .fd-when {
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+}
+.fin-date .fd-share {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.fd-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fd-chip {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  /* 44px tall: a real thumb target, not a 28px desktop chip */
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+}
+.fd-chip.on {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}

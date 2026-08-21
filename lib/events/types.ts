@@ -2,6 +2,8 @@
 // Kept storage-agnostic so the file-backed prototype store (lib/db.ts) can later
 // be swapped for Supabase without touching the UI or server actions.
 
+import type { Tender } from "./finance-types";
+
 export type EventType = "dinner" | "clinic" | "general";
 export type EventStatus = "draft" | "open" | "closed";
 export type RegStatus = "confirmed" | "waitlist" | "cancelled";
@@ -108,6 +110,14 @@ export interface Registration {
   answers: Record<string, string>; // keyed by CustomField.id
   status: RegStatus;
   createdAt: string;
+
+  // Payment (admin-only — see lib/events/finance-types.ts). Never surfaced on
+  // the public page or in the attendee self-service flow.
+  paid: boolean;
+  feeCents: number | null; // null = charge the event's default fee
+  tender: Tender | null;
+  paidOn: string | null; // "yyyy-mm-dd"
+  paymentNote: string;
 }
 
 export interface DB {
