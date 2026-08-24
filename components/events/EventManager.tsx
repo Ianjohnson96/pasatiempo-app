@@ -294,7 +294,10 @@ export default function EventManager({
   return (
     <div className="stack">
       <div className="card">
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+        <div
+          className="ev-header"
+          style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}
+        >
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <h2 style={{ margin: 0, fontSize: 22 }}>{event.title}</h2>
@@ -313,7 +316,7 @@ export default function EventManager({
               )}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          <div className="ev-actions" style={{ display: "flex", gap: 8, flexShrink: 0 }}>
             <a
               href={`/events/e/${event.slug}`}
               target="_blank"

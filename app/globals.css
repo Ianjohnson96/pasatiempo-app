@@ -242,6 +242,11 @@ input[type="tel"],
 input[type="number"],
 input[type="datetime-local"],
 input[type="date"],
+/* an <input> with no type attribute at all renders as text too (that's the
+   HTML default), but the attribute selectors above only match an EXPLICIT
+   type="text" — this catches ones left untyped, so a missing attribute can't
+   silently opt a field out of width:100% / box-sizing again. */
+input:not([type]),
 textarea,
 select {
   width: 100%;
@@ -1640,6 +1645,21 @@ textarea {
   textarea {
     font-size: 16px;
   }
+
+  /* Event admin header: the title (flex:1, min-width:0) shrinks to make room
+     for the action buttons (flex-shrink:0) rather than the whole row wrapping,
+     so the buttons end up floating across the wrapped title instead of
+     dropping below it. Stack them instead. */
+  .ev-header {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+  .ev-actions {
+    flex-wrap: wrap;
+  }
+  .ev-actions > * {
+    flex: 1 1 auto;
+  }
 }
 
 /* =========================================================================
@@ -1724,6 +1744,13 @@ textarea {
 .fp-grid .field {
   margin-bottom: 12px;
   min-width: 0;
+}
+@media (max-width: 560px) {
+  /* auto-fit packs 2 columns at this width, fine for a 2-field row but
+     crowds a 4-field one (Amount/Paid with/Date/Note) — go single-column. */
+  .fp-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* line-item lists: prize purchases, payouts */

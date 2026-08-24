@@ -271,6 +271,7 @@ function PaymentRow({
         <div className="field">
           <label>Amount</label>
           <input
+            type="text"
             inputMode="decimal"
             value={fee}
             onChange={(e) => {
@@ -310,6 +311,7 @@ function PaymentRow({
         <div className="field">
           <label>Note</label>
           <input
+            type="text"
             value={note}
             placeholder="optional"
             onChange={(e) => {
@@ -418,6 +420,7 @@ function PrizesCard({
         <div className="field">
           <label>What was it</label>
           <input
+            type="text"
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
             placeholder="e.g. gift cards"
@@ -426,6 +429,7 @@ function PrizesCard({
         <div className="field">
           <label>Amount</label>
           <input
+            type="text"
             inputMode="decimal"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
@@ -487,6 +491,7 @@ function ClinicHelpCard({
           {names.map((i, idx) => (
             <div className="builder-row" key={i.id}>
               <input
+                type="text"
                 value={i.name}
                 onChange={(e) => {
                   const next = [...names];
@@ -665,6 +670,7 @@ function SettingsCard({
         <div className="field">
           <label>Fee per person</label>
           <input
+            type="text"
             inputMode="decimal"
             value={fee}
             onChange={(e) => setFee(e.target.value)}
@@ -676,6 +682,7 @@ function SettingsCard({
         <div className="field">
           <label>Organizer cut</label>
           <input
+            type="text"
             inputMode="decimal"
             value={cut}
             onChange={(e) => setCut(e.target.value)}
