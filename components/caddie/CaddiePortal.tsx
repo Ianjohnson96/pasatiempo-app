@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { caddieSignOut, respondToMyOffer } from "@/lib/caddie/actions";
 import type {
@@ -103,6 +104,14 @@ export default function CaddiePortal({
           {note.text}
         </p>
       )}
+
+      <Link
+        href="/caddie/availability"
+        className="btn secondary"
+        style={{ display: "block", textAlign: "center", marginTop: 18 }}
+      >
+        Set your availability →
+      </Link>
 
       {/* ---- Offers waiting on an answer -------------------------------- */}
       <h2 className="section-title" style={{ marginTop: 28 }}>

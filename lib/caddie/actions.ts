@@ -343,6 +343,65 @@ export async function respondToMyOffer(
   }
 }
 
+/**
+ * What the caddie can say about a day. "Off" is a deliberate no, which is not
+ * the same as saying nothing — the dispatch board shows the difference.
+ */
+export type AvailabilityChoice = "AM" | "PM" | "All Day" | "Off" | "Clear";
+
+/**
+ * Record one day of availability for the signed-in caddie.
+ *
+ * Exactly one row per caddie per day: the old rows for that date are cleared
+ * first, so switching from AM to All Day cannot leave a stale AM row behind to
+ * be found by the dispatch query.
+ *
+ * The caddie comes from the cookie, never from an argument — otherwise anyone
+ * could post availability for anyone.
+ */
+export async function setAvailability(
+  date: string,
+  choice: AvailabilityChoice,
+): Promise<Result> {
+  try {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return { ok: false, error: "That is not a real date." };
+    }
+
+    const caddie = await getCaddieSession();
+    if (!caddie) {
+      return {
+        ok: false,
+        error: "You are signed out. Ask the shop for a new link.",
+      };
+    }
+
+    const supa = createAdminClient("caddie");
+    const { error: clearErr } = await supa
+      .from("availability")
+      .delete()
+      .eq("caddie_id", caddie.id)
+      .eq("date", date);
+    if (clearErr) throw clearErr;
+
+    if (choice !== "Clear") {
+      const { error } = await supa.from("availability").insert({
+        caddie_id: caddie.id,
+        date,
+        time_slot: choice === "Off" ? "All Day" : choice,
+        status: choice === "Off" ? "Unavailable" : "Available",
+      });
+      if (error) throw error;
+    }
+
+    revalidatePath("/caddie/availability");
+    revalidatePath(BOARD_PATH);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not save that day.");
+  }
+}
+
 /** Sign the caddie out on this device, from the portal. */
 export async function caddieSignOut(): Promise<Result> {
   try {

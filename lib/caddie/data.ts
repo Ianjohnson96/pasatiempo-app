@@ -173,10 +173,22 @@ export async function listCaddies(): Promise<CaddieRec[]> {
   return (data ?? []).map(rowToCaddie);
 }
 
-/** Availability submissions for one course-local day, keyed by caddie id. */
+/** What one caddie said about one day. */
+export interface DayAvailability {
+  slot: TimeSlot;
+  status: AvailabilityStatus;
+}
+
+/**
+ * Availability submissions for one course-local day, keyed by caddie id.
+ *
+ * The calendar writes exactly one row per caddie per day, so there is nothing
+ * to merge. Older rows from before that rule, or any written by hand, are
+ * resolved by letting a definite answer beat a Pending one.
+ */
 export async function availabilityFor(
   day: string,
-): Promise<Map<string, AvailabilityStatus>> {
+): Promise<Map<string, DayAvailability>> {
   const supa = createAdminClient("caddie");
   const { data, error } = await supa
     .from("availability")
@@ -184,15 +196,54 @@ export async function availabilityFor(
     .eq("date", day);
   if (error) throw error;
 
-  const byCaddie = new Map<string, AvailabilityStatus>();
+  const byCaddie = new Map<string, DayAvailability>();
   for (const row of data ?? []) {
     const id = String(row.caddie_id);
-    const status = row.status as AvailabilityStatus;
-    // A definite answer beats a Pending one; otherwise first writer wins.
+    const entry: DayAvailability = {
+      slot: row.time_slot as TimeSlot,
+      status: row.status as AvailabilityStatus,
+    };
     const existing = byCaddie.get(id);
-    if (!existing || existing === "Pending") byCaddie.set(id, status);
+    if (!existing || existing.status === "Pending") byCaddie.set(id, entry);
   }
   return byCaddie;
+}
+
+/**
+ * Does what the caddie told us cover a loop teeing off in `slot`?
+ *
+ * "All Day" covers both. Saying you are free in the morning is not an offer to
+ * work the afternoon, so an AM submission does not cover a PM tee time — the
+ * ranking treats that the same as being unavailable.
+ */
+export function coversSlot(entry: DayAvailability, slot: TimeSlot): boolean {
+  if (entry.status !== "Available") return false;
+  return entry.slot === "All Day" || entry.slot === slot;
+}
+
+/** One caddie's own submissions across a date range, keyed by "yyyy-mm-dd". */
+export async function availabilityForRange(
+  caddieId: string,
+  from: string,
+  to: string,
+): Promise<Map<string, DayAvailability>> {
+  const supa = createAdminClient("caddie");
+  const { data, error } = await supa
+    .from("availability")
+    .select("date, time_slot, status")
+    .eq("caddie_id", caddieId)
+    .gte("date", from)
+    .lte("date", to);
+  if (error) throw error;
+
+  const byDay = new Map<string, DayAvailability>();
+  for (const row of data ?? []) {
+    byDay.set(String(row.date), {
+      slot: row.time_slot as TimeSlot,
+      status: row.status as AvailabilityStatus,
+    });
+  }
+  return byDay;
 }
 
 // ---------------------------------------------------------------------------
@@ -307,9 +358,23 @@ export async function openWorkFor(caddieId: string): Promise<OpenWork[]> {
 // Dispatch ranking
 // ---------------------------------------------------------------------------
 
+/**
+ * The candidate's standing for THIS loop's half of the day: null when they
+ * never answered, "Available" only when what they said covers this tee time.
+ * An AM-only caddie reads as unavailable for an afternoon loop.
+ */
+function verdict(
+  entry: DayAvailability | undefined,
+  slot: TimeSlot,
+): AvailabilityStatus | null {
+  if (!entry) return null;
+  if (entry.status === "Pending") return "Pending";
+  return coversSlot(entry, slot) ? "Available" : "Unavailable";
+}
+
 export interface Candidate {
   caddie: CaddieRec;
-  /** What they told us about this day, or null if they never answered. */
+  /** Their standing for this loop's tee time, or null if they never answered. */
   availability: AvailabilityStatus | null;
   /** Already offered this loop (any outcome). */
   alreadyOffered: boolean;
@@ -331,11 +396,12 @@ export function rankCandidates(
   loop: LoopRec,
   caddies: CaddieRec[],
   dayLoops: LoopWithCrew[],
-  availability: Map<string, AvailabilityStatus>,
+  availability: Map<string, DayAvailability>,
   overlapGuardHours: number,
 ): Candidate[] {
   const teeMs = new Date(loop.teeTime).getTime();
   const guardMs = overlapGuardHours * 3_600_000;
+  const loopSlot = slotForTee(loop.teeTime);
 
   const offeredHere = new Set(
     (dayLoops.find((d) => d.loop.id === loop.id)?.crew ?? []).map(
@@ -357,7 +423,7 @@ export function rankCandidates(
     .filter((c) => c.status === "Active")
     .map<Candidate>((caddie) => ({
       caddie,
-      availability: availability.get(caddie.id) ?? null,
+      availability: verdict(availability.get(caddie.id), loopSlot),
       alreadyOffered: offeredHere.has(caddie.id),
       conflict: conflicted.has(caddie.id),
       requested: loop.requestedCaddieId === caddie.id,
