@@ -8,6 +8,7 @@ import DispatchBoard, {
 import {
   availabilityFor,
   courseToday,
+  expireStaleOffers,
   formatDay,
   formatTee,
   getSettings,
@@ -36,6 +37,11 @@ export default async function CaddieDispatchPage({
   const day = /^\d{4}-\d{2}-\d{2}$/.test(requested ?? "")
     ? (requested as string)
     : today;
+
+  // Close offers whose window has passed before drawing the board, so nothing
+  // here claims to be waiting on a caddie who can no longer accept. The nightly
+  // cron does the same, but once a day is no use against a 20-minute window.
+  await expireStaleOffers();
 
   const [loops, caddies, availability] = await Promise.all([
     loopsForDay(day, tz),

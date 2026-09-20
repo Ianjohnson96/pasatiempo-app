@@ -306,6 +306,89 @@ export async function getLoop(id: string): Promise<LoopRec | null> {
   return data ? rowToLoop(data) : null;
 }
 
+/**
+ * Flip offers whose window has closed from Pending to Expired.
+ *
+ * Called when the dispatch board loads, not only from the nightly cron: a
+ * Vercel Hobby plan allows one cron a day, and an offer window is twenty
+ * minutes. The database already refuses a late acceptance, so nothing is at
+ * risk either way — but a board showing "waiting on an answer" for an offer
+ * that died an hour ago is actively misleading about who still needs ringing.
+ *
+ * Returns how many it closed. Cheap and idempotent: one indexed UPDATE that
+ * matches nothing on the common path.
+ */
+export async function expireStaleOffers(): Promise<number> {
+  const supa = createAdminClient("caddie");
+  const { data, error } = await supa.rpc("expire_stale_offers");
+  if (error) throw error;
+  return Number(data ?? 0);
+}
+
+/**
+ * Loops posted to the open job board that this caddie could still take.
+ *
+ * Excludes anything they have already been offered or turned down, so the
+ * board is only things they can act on.
+ */
+export async function openBoardLoops(caddieId: string): Promise<LoopRec[]> {
+  const supa = createAdminClient("caddie");
+
+  const { data: rows, error } = await supa
+    .from("loops")
+    .select("*")
+    .eq("open_board", true)
+    .in("status", ["Unassigned", "Partially Assigned"])
+    .gte("tee_time", new Date().toISOString())
+    .order("tee_time", { ascending: true });
+  if (error) throw error;
+
+  const loops = (rows ?? []).map(rowToLoop);
+  if (loops.length === 0) return [];
+
+  const { data: mine, error: mineErr } = await supa
+    .from("assignments")
+    .select("loop_id")
+    .eq("caddie_id", caddieId)
+    .in(
+      "loop_id",
+      loops.map((l) => l.id),
+    );
+  if (mineErr) throw mineErr;
+
+  const seen = new Set((mine ?? []).map((r) => String(r.loop_id)));
+  return loops.filter((l) => !seen.has(l.id));
+}
+
+/**
+ * Every caddie's submissions across a date range, for the Pro Shop's week view.
+ * Keyed caddie id -> "yyyy-mm-dd".
+ */
+export async function availabilityBetween(
+  from: string,
+  to: string,
+): Promise<Map<string, Map<string, DayAvailability>>> {
+  const supa = createAdminClient("caddie");
+  const { data, error } = await supa
+    .from("availability")
+    .select("caddie_id, date, time_slot, status")
+    .gte("date", from)
+    .lte("date", to);
+  if (error) throw error;
+
+  const grid = new Map<string, Map<string, DayAvailability>>();
+  for (const row of data ?? []) {
+    const id = String(row.caddie_id);
+    const byDay = grid.get(id) ?? new Map<string, DayAvailability>();
+    byDay.set(String(row.date), {
+      slot: row.time_slot as TimeSlot,
+      status: row.status as AvailabilityStatus,
+    });
+    grid.set(id, byDay);
+  }
+  return grid;
+}
+
 /** An offer or booking the caddie still has a stake in. */
 export interface OpenWork {
   assignment: AssignmentRec;

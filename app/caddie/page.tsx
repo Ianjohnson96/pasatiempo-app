@@ -1,8 +1,14 @@
 import "@/app/globals.css";
 import CaddiePortal, {
+  type OpenLoop,
   type PortalLoop,
 } from "@/components/caddie/CaddiePortal";
-import { formatTee, getSettings, openWorkFor } from "@/lib/caddie/data";
+import {
+  formatTee,
+  getSettings,
+  openBoardLoops,
+  openWorkFor,
+} from "@/lib/caddie/data";
 import { getCaddieSession } from "@/lib/caddie/session";
 import { rateFor } from "@/lib/caddie/types";
 
@@ -53,7 +59,10 @@ export default async function CaddiePortalHome({
 
   const settings = await getSettings();
   const tz = settings.courseTimezone;
-  const work = await openWorkFor(caddie.id);
+  const [work, posted] = await Promise.all([
+    openWorkFor(caddie.id),
+    openBoardLoops(caddie.id),
+  ]);
 
   const dayLabel = new Intl.DateTimeFormat("en-US", {
     timeZone: tz,
@@ -76,5 +85,16 @@ export default async function CaddiePortalHome({
     rateCents: rateFor(settings.rates, loop.loopType, loop.holes),
   }));
 
-  return <CaddiePortal caddie={caddie} items={items} />;
+  const open: OpenLoop[] = posted.map((loop) => ({
+    loopId: loop.id,
+    teeLabel: formatTee(loop.teeTime, tz),
+    dayLabel: dayLabel.format(new Date(loop.teeTime)),
+    playerName: loop.playerName,
+    loopType: loop.loopType,
+    holes: loop.holes,
+    notes: loop.notes,
+    rateCents: rateFor(settings.rates, loop.loopType, loop.holes),
+  }));
+
+  return <CaddiePortal caddie={caddie} items={items} open={open} />;
 }

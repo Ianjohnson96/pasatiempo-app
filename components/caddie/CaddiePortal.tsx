@@ -3,7 +3,11 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { caddieSignOut, respondToMyOffer } from "@/lib/caddie/actions";
+import {
+  caddieSignOut,
+  claimOpenLoop,
+  respondToMyOffer,
+} from "@/lib/caddie/actions";
 import type {
   CaddieRec,
   ConfirmationStatus,
@@ -28,12 +32,26 @@ export interface PortalLoop {
   rateCents: number | null;
 }
 
+/** A loop the shop posted to the job board that this caddie could take. */
+export interface OpenLoop {
+  loopId: string;
+  teeLabel: string;
+  dayLabel: string;
+  playerName: string;
+  loopType: LoopType;
+  holes: number;
+  notes: string;
+  rateCents: number | null;
+}
+
 export default function CaddiePortal({
   caddie,
   items,
+  open,
 }: {
   caddie: CaddieRec;
   items: PortalLoop[];
+  open: OpenLoop[];
 }) {
   const router = useRouter();
   const [busy, start] = useTransition();
@@ -157,6 +175,73 @@ export default function CaddiePortal({
           </LoopCard>
         ))}
       </div>
+
+      {/* ---- The open job board ------------------------------------------ */}
+      {open.length > 0 && (
+        <>
+          <h2 className="section-title" style={{ marginTop: 32 }}>
+            Up for grabs
+          </h2>
+          <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+            Posted by the Pro Shop. First to claim gets it.
+          </p>
+
+          <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+            {open.map((o) => (
+              <div className="card" key={o.loopId}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    alignItems: "baseline",
+                  }}
+                >
+                  <div style={{ fontSize: 22, fontWeight: 600 }}>
+                    {o.teeLabel}
+                  </div>
+                  <div className="muted">{o.dayLabel}</div>
+                </div>
+
+                <div style={{ fontSize: 17, marginTop: 6 }}>{o.playerName}</div>
+
+                <div className="ev-meta" style={{ marginTop: 6 }}>
+                  <span>{o.loopType}</span>
+                  <span>{o.holes} holes</span>
+                  {o.rateCents != null && (
+                    <span>${(o.rateCents / 100).toFixed(0)}</span>
+                  )}
+                </div>
+
+                {o.notes && (
+                  <div style={{ marginTop: 8, fontSize: 14 }}>{o.notes}</div>
+                )}
+
+                <button
+                  className="btn"
+                  style={{ width: "100%", marginTop: 14 }}
+                  disabled={busy}
+                  onClick={() =>
+                    start(async () => {
+                      setNote(null);
+                      const res = await claimOpenLoop(o.loopId);
+                      if (res.ok) {
+                        setNote({ kind: "ok", text: "You're on the loop." });
+                        router.refresh();
+                      } else {
+                        setNote({ kind: "err", text: res.error });
+                        router.refresh();
+                      }
+                    })
+                  }
+                >
+                  Claim this loop
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* ---- Confirmed loops --------------------------------------------- */}
       <h2 className="section-title" style={{ marginTop: 32 }}>

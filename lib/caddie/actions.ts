@@ -344,6 +344,73 @@ export async function respondToMyOffer(
 }
 
 /**
+ * A caddie taking a loop straight off the open job board.
+ *
+ * No offer exists here, so this inserts the assignment already Accepted and
+ * leans on the guard trigger, which locks the loop row before checking
+ * capacity, the overlap window and the caddie's status. Two caddies tapping
+ * Claim at the same instant therefore serialise: one gets the loop, the other
+ * gets told it went.
+ */
+export async function claimOpenLoop(loopId: string): Promise<Result> {
+  try {
+    const caddie = await getCaddieSession();
+    if (!caddie) {
+      return {
+        ok: false,
+        error: "You are signed out. Ask the shop for a new link.",
+      };
+    }
+
+    const supa = createAdminClient("caddie");
+
+    // Only loops the shop actually posted can be claimed this way; without
+    // this check the loop id alone would be enough to jump onto any job.
+    const { data: loop, error: loopErr } = await supa
+      .from("loops")
+      .select("id, open_board, status")
+      .eq("id", loopId)
+      .maybeSingle();
+    if (loopErr) throw loopErr;
+    if (!loop || !loop.open_board) {
+      return { ok: false, error: "That loop is no longer on the job board." };
+    }
+
+    const { error } = await supa.from("assignments").insert({
+      loop_id: loopId,
+      caddie_id: caddie.id,
+      offer_kind: "broadcast",
+      confirmation_status: "Accepted",
+      responded_at: new Date().toISOString(),
+      response_channel: "web",
+    });
+
+    if (error) {
+      const msg = error.message ?? "";
+      if (msg.includes("already filled")) {
+        return { ok: false, error: "Another caddie took that one first." };
+      }
+      if (msg.includes("within")) {
+        return {
+          ok: false,
+          error: "You already have a loop too close to that tee time.",
+        };
+      }
+      if (error.code === "23505") {
+        return { ok: false, error: "You are already on that loop." };
+      }
+      throw error;
+    }
+
+    revalidatePath("/caddie");
+    revalidatePath(BOARD_PATH);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not claim that loop.");
+  }
+}
+
+/**
  * What the caddie can say about a day. "Off" is a deliberate no, which is not
  * the same as saying nothing — the dispatch board shows the difference.
  */
