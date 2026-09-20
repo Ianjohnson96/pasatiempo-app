@@ -22,7 +22,7 @@ create schema if not exists caddie;
 -- Shared helpers
 -- ---------------------------------------------------------------------------
 create or replace function caddie.set_updated_at()
-returns trigger language plpgsql as $fn$
+returns trigger language plpgsql set search_path = caddie, pg_temp as $fn$
 begin
   new.updated_at := now();
   return new;
@@ -64,7 +64,7 @@ values (1, jsonb_build_object(
 on conflict (id) do nothing;
 
 create or replace function caddie.setting(p_key text)
-returns jsonb language sql stable as $fn$
+returns jsonb language sql stable set search_path = caddie, pg_temp as $fn$
   select data -> p_key from caddie.settings where id = 1;
 $fn$;
 
@@ -297,7 +297,7 @@ create index if not exists inbound_from_idx
 -- Loop status is always DERIVED from accepted assignments. Nothing sets it by
 -- hand except an admin marking Completed or Cancelled.
 create or replace function caddie.refresh_loop_status(p_loop_id uuid)
-returns void language plpgsql as $fn$
+returns void language plpgsql set search_path = caddie, pg_temp as $fn$
 declare
   v_required int;
   v_accepted int;
@@ -326,7 +326,7 @@ end;
 $fn$;
 
 create or replace function caddie.guard_assignment()
-returns trigger language plpgsql as $fn$
+returns trigger language plpgsql set search_path = caddie, pg_temp as $fn$
 declare
   v_loop     caddie.loops%rowtype;
   v_accepted int;
@@ -387,7 +387,7 @@ create trigger assignments_guard before insert or update on caddie.assignments
   for each row execute function caddie.guard_assignment();
 
 create or replace function caddie.sync_after_assignment()
-returns trigger language plpgsql as $fn$
+returns trigger language plpgsql set search_path = caddie, pg_temp as $fn$
 begin
   perform caddie.refresh_loop_status(coalesce(new.loop_id, old.loop_id));
 
@@ -425,7 +425,7 @@ create or replace function caddie.respond_to_offer(
   p_accept        boolean,
   p_channel       text default 'web'
 )
-returns jsonb language plpgsql as $fn$
+returns jsonb language plpgsql set search_path = caddie, pg_temp as $fn$
 declare
   v_loop_id  uuid;
   v_asg      caddie.assignments%rowtype;
@@ -483,7 +483,7 @@ $fn$;
 -- recent still-open offer for that number.
 create or replace function caddie.find_pending_offer_by_phone(p_phone text)
 returns table (assignment_id uuid, caddie_id uuid, loop_id uuid, tee_time timestamptz)
-language sql stable as $fn$
+language sql stable set search_path = caddie, pg_temp as $fn$
   select a.id, a.caddie_id, a.loop_id, l.tee_time
     from caddie.assignments a
     join caddie.caddies c on c.id = a.caddie_id
@@ -498,7 +498,7 @@ $fn$;
 
 -- Housekeeping, for a Vercel cron route.
 create or replace function caddie.expire_stale_offers()
-returns integer language plpgsql as $fn$
+returns integer language plpgsql set search_path = caddie, pg_temp as $fn$
 declare v_count integer;
 begin
   with expired as (
@@ -515,7 +515,7 @@ end;
 $fn$;
 
 create or replace function caddie.purge_expired_sessions()
-returns integer language plpgsql as $fn$
+returns integer language plpgsql set search_path = caddie, pg_temp as $fn$
 declare v_count integer;
 begin
   with gone as (
