@@ -120,6 +120,8 @@ export interface CaddieSettings {
   reminderHoursBefore: number;
   overlapGuardHours: number;
   sessionDays: number;
+  /** How long a handed-over sign-in link stays good. */
+  inviteDays: number;
   emailEnabled: boolean;
   smsEnabled: boolean;
   rates: RateCard;

@@ -4,6 +4,7 @@ import {
   rowToAssignment,
   rowToCaddie,
   rowToLoop,
+  type AssignmentRec,
   type AvailabilityStatus,
   type CaddieRec,
   type CaddieSettings,
@@ -151,6 +152,7 @@ export async function getSettings(): Promise<CaddieSettings> {
     reminderHoursBefore: Number(d.reminder_hours_before ?? 12),
     overlapGuardHours: Number(d.overlap_guard_hours ?? 4),
     sessionDays: Number(d.session_days ?? 90),
+    inviteDays: Number(d.invite_days ?? 7),
     emailEnabled: Boolean(d.email_enabled ?? true),
     smsEnabled: Boolean(d.sms_enabled ?? false),
     rates: (d.rates ?? {}) as RateCard,
@@ -251,6 +253,54 @@ export async function getLoop(id: string): Promise<LoopRec | null> {
     .maybeSingle();
   if (error) throw error;
   return data ? rowToLoop(data) : null;
+}
+
+/** An offer or booking the caddie still has a stake in. */
+export interface OpenWork {
+  assignment: AssignmentRec;
+  loop: LoopRec;
+}
+
+/**
+ * Everything one caddie is currently on the hook for: offers awaiting an answer
+ * and loops they have accepted.
+ *
+ * A loop stays on the list until six hours past its tee time, so a caddie can
+ * still check what they are on during the round.
+ */
+export async function openWorkFor(caddieId: string): Promise<OpenWork[]> {
+  const supa = createAdminClient("caddie");
+
+  const { data: rows, error } = await supa
+    .from("assignments")
+    .select("*")
+    .eq("caddie_id", caddieId)
+    .in("confirmation_status", ["Pending", "Accepted"])
+    .order("offered_at", { ascending: false });
+  if (error) throw error;
+
+  const assignments = (rows ?? []).map(rowToAssignment);
+  const loopIds = [...new Set(assignments.map((a) => a.loopId))];
+  if (loopIds.length === 0) return [];
+
+  const cutoff = new Date(Date.now() - 6 * 3_600_000).toISOString();
+  const { data: loopRows, error: loopErr } = await supa
+    .from("loops")
+    .select("*")
+    .in("id", loopIds)
+    .neq("status", "Cancelled")
+    .gte("tee_time", cutoff)
+    .order("tee_time", { ascending: true });
+  if (loopErr) throw loopErr;
+
+  const loopsById = new Map(
+    (loopRows ?? []).map((r) => [String(r.id), rowToLoop(r)]),
+  );
+
+  return assignments
+    .filter((a) => loopsById.has(a.loopId))
+    .map((a) => ({ assignment: a, loop: loopsById.get(a.loopId)! }))
+    .sort((x, y) => x.loop.teeTime.localeCompare(y.loop.teeTime));
 }
 
 // ---------------------------------------------------------------------------

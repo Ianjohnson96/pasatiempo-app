@@ -1,9 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import QRCode from "qrcode";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getSettings } from "./data";
+import { getCaddieSession, mintInvite, signOutCaddie } from "./session";
 import {
   rowToCaddie,
   rowToLoop,
@@ -291,6 +294,66 @@ export async function respondForCaddie(
   }
 }
 
+/**
+ * The caddie answering their own offer from the portal.
+ *
+ * Ownership is checked here against the cookie session — the assignment id is
+ * in the page, so without this a caddie could accept someone else's loop by
+ * replaying an id. Same locking function as every other path.
+ */
+export async function respondToMyOffer(
+  assignmentId: string,
+  accept: boolean,
+): Promise<Result<string>> {
+  try {
+    const caddie = await getCaddieSession();
+    if (!caddie) {
+      return { ok: false, error: "You are signed out. Ask the shop for a new link." };
+    }
+
+    const supa = createAdminClient("caddie");
+    const { data: owned, error: readErr } = await supa
+      .from("assignments")
+      .select("id")
+      .eq("id", assignmentId)
+      .eq("caddie_id", caddie.id)
+      .maybeSingle();
+    if (readErr) throw readErr;
+    if (!owned) return { ok: false, error: "That offer is not yours." };
+
+    const { data, error } = await supa.rpc("respond_to_offer", {
+      p_assignment_id: assignmentId,
+      p_accept: accept,
+      p_channel: "web",
+    });
+    if (error) throw error;
+
+    const res = (data ?? {}) as {
+      ok?: boolean;
+      reason?: string;
+      result?: string;
+    };
+    revalidatePath("/caddie");
+    revalidatePath(BOARD_PATH);
+
+    if (!res.ok) return { ok: false, error: explainRefusal(res.reason) };
+    return { ok: true, value: String(res.result) };
+  } catch (e) {
+    return fail(e, "Could not record your answer.");
+  }
+}
+
+/** Sign the caddie out on this device, from the portal. */
+export async function caddieSignOut(): Promise<Result> {
+  try {
+    await signOutCaddie();
+    revalidatePath("/caddie");
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not sign out.");
+  }
+}
+
 function explainRefusal(reason: string | undefined): string {
   switch (reason) {
     case "already_filled":
@@ -442,6 +505,57 @@ export async function deleteCaddie(caddieId: string): Promise<Result> {
   } catch (e) {
     return fail(e, "Could not remove the caddie.");
   }
+}
+
+export interface InviteHandout {
+  url: string;
+  /** Inline SVG for the QR code — rendered on the server, no client library. */
+  qrSvg: string;
+  expiresAt: string;
+}
+
+/**
+ * Mint a sign-in link for one caddie, as a URL and a QR code.
+ *
+ * This app sends no email and no SMS, so the link is handed over in person:
+ * the shop shows the QR on the counter screen and the caddie scans it. Single
+ * use, and minting a new one kills any unused link the caddie still holds.
+ */
+export async function createInvite(
+  caddieId: string,
+): Promise<Result<InviteHandout>> {
+  try {
+    const settings = await getSettings();
+    const origin = await siteOrigin();
+    const invite = await mintInvite(
+      caddieId,
+      origin,
+      await currentEmail(),
+      settings.inviteDays,
+    );
+    const qrSvg = await QRCode.toString(invite.url, {
+      type: "svg",
+      margin: 1,
+      errorCorrectionLevel: "M",
+    });
+    revalidatePath(ROSTER_PATH);
+    return { ok: true, value: { ...invite, qrSvg } };
+  } catch (e) {
+    return fail(e, "Could not create the sign-in link.");
+  }
+}
+
+// The origin to build the invite URL from. NEXT_PUBLIC_SITE_URL wins when set;
+// otherwise the request's own host, so a link minted on a phone on the club
+// wifi still points somewhere that phone can reach.
+async function siteOrigin(): Promise<string> {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, "");
+
+  const h = await headers();
+  const host = h.get("host") ?? "localhost:3000";
+  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
 }
 
 /**

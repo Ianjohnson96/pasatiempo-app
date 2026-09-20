@@ -3,10 +3,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  createInvite,
   deleteCaddie,
   saveCaddie,
   setCaddieStatus,
   type CaddieInput,
+  type InviteHandout,
 } from "@/lib/caddie/actions";
 import {
   CADDIE_STATUSES,
@@ -46,6 +48,9 @@ export default function RosterManager({ caddies }: Props) {
   const [busy, start] = useTransition();
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  const [invite, setInvite] = useState<
+    { caddie: CaddieRec; handout: InviteHandout } | null
+  >(null);
   const [note, setNote] = useState<{ kind: "ok" | "err"; text: string } | null>(
     null,
   );
@@ -92,6 +97,14 @@ export default function RosterManager({ caddies }: Props) {
         <p className={note.kind === "ok" ? "notice ok" : "notice err"}>
           {note.text}
         </p>
+      )}
+
+      {invite && (
+        <InvitePanel
+          caddieName={invite.caddie.fullName}
+          handout={invite.handout}
+          onClose={() => setInvite(null)}
+        />
       )}
 
       {adding && (
@@ -152,6 +165,22 @@ export default function RosterManager({ caddies }: Props) {
                 </div>
 
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  {c.status === "Active" && (
+                    <button
+                      className="btn small"
+                      disabled={busy}
+                      onClick={() =>
+                        start(async () => {
+                          setNote(null);
+                          const res = await createInvite(c.id);
+                          if (res.ok) setInvite({ caddie: c, handout: res.value });
+                          else setNote({ kind: "err", text: res.error });
+                        })
+                      }
+                    >
+                      Sign-in link
+                    </button>
+                  )}
                   <button
                     className="btn secondary small"
                     onClick={() => {
@@ -234,6 +263,97 @@ export default function RosterManager({ caddies }: Props) {
         </div>
       )}
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The handout. Shown on the counter screen for the caddie to scan.
+// ---------------------------------------------------------------------------
+
+function InvitePanel({
+  caddieName,
+  handout,
+  onClose,
+}: {
+  caddieName: string;
+  handout: InviteHandout;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 24,
+          flexWrap: "wrap",
+          alignItems: "flex-start",
+        }}
+      >
+        <div
+          style={{
+            width: 190,
+            height: 190,
+            background: "#fff",
+            borderRadius: 10,
+            padding: 8,
+            flex: "0 0 auto",
+          }}
+          // Machine-generated vector data, not user content: the qrcode
+          // package emits <path> elements on the server from a URL this app
+          // builds itself. The encoded text never reaches the DOM as markup,
+          // so there is nothing here for an injection to ride in on.
+          dangerouslySetInnerHTML={{ __html: handout.qrSvg }}
+        />
+
+        <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+          <div className="ev-title" style={{ fontSize: 18 }}>
+            Sign-in link for {caddieName}
+          </div>
+          <p className="muted" style={{ marginTop: 6 }}>
+            Have them scan this with their phone camera. It signs them in for
+            90 days, works once, and expires{" "}
+            {new Date(handout.expiresAt).toLocaleDateString()}. Creating a new
+            link cancels this one.
+          </p>
+
+          <div
+            style={{
+              marginTop: 10,
+              padding: "8px 10px",
+              border: "1px solid var(--line)",
+              borderRadius: 8,
+              background: "var(--panel)",
+              fontSize: 12,
+              wordBreak: "break-all",
+            }}
+          >
+            {handout.url}
+          </div>
+
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button
+              className="btn secondary small"
+              onClick={() => {
+                navigator.clipboard?.writeText(handout.url).then(
+                  () => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  },
+                  () => setCopied(false),
+                );
+              }}
+            >
+              {copied ? "Copied" : "Copy link"}
+            </button>
+            <button className="btn ghost small" onClick={onClose}>
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
