@@ -33,11 +33,34 @@ async function mhiStats() {
   }
 }
 
+async function caddieStats() {
+  try {
+    const s = createAdminClient("caddie");
+    const [{ count: caddies }, { count: open }] = await Promise.all([
+      s
+        .from("caddies")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "Active"),
+      s
+        .from("loops")
+        .select("*", { count: "exact", head: true })
+        .in("status", ["Unassigned", "Partially Assigned"]),
+    ]);
+    return { caddies: caddies ?? 0, open: open ?? 0, ok: true };
+  } catch {
+    return { caddies: 0, open: 0, ok: false };
+  }
+}
+
 export default async function AdminHome() {
   const viewer = await getViewer();
   if (!viewer) redirect("/login");
 
-  const [ev, mhi] = await Promise.all([eventsStats(), mhiStats()]);
+  const [ev, mhi, cad] = await Promise.all([
+    eventsStats(),
+    mhiStats(),
+    caddieStats(),
+  ]);
 
   return (
     <>
@@ -119,6 +142,32 @@ export default async function AdminHome() {
             >
               View site ↗
             </a>
+          </div>
+
+          {/* Caddie Program */}
+          <div className="evrow">
+            <div className="ev-main">
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <span className="ev-title">Caddie Program</span>
+                <span className="badge draft">building</span>
+              </div>
+              <div className="ev-meta">
+                <span>schema: caddie</span>
+                <span>loops entered by hand</span>
+                {!cad.ok && <span style={{ color: "var(--danger)" }}>⚠︎ unreachable</span>}
+              </div>
+            </div>
+            <div className="ev-count">
+              <div className="num">{cad.caddies}</div>
+              <div className="lbl">caddies</div>
+            </div>
+            <div className="ev-count">
+              <div className="num">{cad.open}</div>
+              <div className="lbl">open loops</div>
+            </div>
+            <Link href="/admin/caddie" className="btn secondary small">
+              Manage
+            </Link>
           </div>
 
           {/* El Sombrero (static info page — nothing to manage) */}
