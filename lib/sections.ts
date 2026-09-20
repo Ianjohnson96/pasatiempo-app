@@ -8,14 +8,18 @@
 //
 // To add a new section later: add one entry here, create its schema in the hub
 // project, add a route folder at app/<prefix>, and point its domain at the
-// deployment. Nothing else needs to change.
+// deployment. That is all a PUBLIC section needs.
+//
+// A section with its own signed-in users needs one more thing: a gate in
+// proxy.ts. The gate there knows about staff only (Supabase Auth), so "caddie"
+// carries its own cookie check — see lib/caddie/session.ts.
 //
 // TODO(domains): replace the "*.example.com" placeholders with your real
 // custom domains. The "*.local" and localhost entries make dev work without
 // touching your hosts file.
 // ===========================================================================
 
-export type SectionKey = "events" | "mhi" | "sombrero";
+export type SectionKey = "events" | "mhi" | "sombrero" | "caddie";
 
 export interface Section {
   key: SectionKey;
@@ -64,6 +68,19 @@ export const SECTIONS: Section[] = [
       "el-sombrero.example.com", // TODO: real El Sombrero domain
       "sombrero.local",
       "sombrero.local:3000",
+    ],
+  },
+  {
+    key: "caddie",
+    label: "Caddie Program",
+    schema: "caddie",
+    // The CADDIE-FACING portal (availability, offers, my schedule). The Pro
+    // Shop's dispatch board lives at /admin/caddie with the rest of staff.
+    pathPrefix: "/caddie",
+    hosts: [
+      "caddie.example.com", // TODO: real caddie domain
+      "caddie.local",
+      "caddie.local:3000",
     ],
   },
 ];

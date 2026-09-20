@@ -25,6 +25,20 @@ function isAdminPath(p: string): boolean {
   return p === "/admin" || p.startsWith("/admin/");
 }
 
+// The caddie portal. Caddies are not Supabase Auth users — they carry their own
+// cookie (see lib/caddie/session.ts), so the staff gate below does not apply to
+// them. This is only a cheap presence check to save a pointless render; the
+// pages themselves verify the session against the database.
+function isCaddiePath(p: string): boolean {
+  return p === "/caddie" || p.startsWith("/caddie/");
+}
+
+// Public inside the portal: the QR landing page, and the portal's own front
+// door, which explains how to get a link when you arrive without one.
+function isCaddiePublicPath(p: string): boolean {
+  return p === "/caddie" || p.startsWith("/caddie/join/");
+}
+
 // A static-HTML section (e.g. El Sombrero) served straight from /public — either
 // because the request came in on that section's domain, or by path prefix.
 function staticSectionFor(host: string | null, path: string) {
@@ -67,6 +81,15 @@ export async function proxy(request: NextRequest) {
       needsRewrite = true;
     }
     // Otherwise (localhost / umbrella .vercel.app / unknown): path as-is.
+  }
+
+  // --- 1a) Caddie portal: its own cookie, not Supabase Auth ----------------
+  if (isCaddiePath(internalPath) && !isCaddiePublicPath(internalPath)) {
+    if (!request.cookies.get("caddie_session")) {
+      const redirect = url.clone();
+      redirect.pathname = "/caddie";
+      return NextResponse.redirect(redirect);
+    }
   }
 
   // --- 2) Refresh the Supabase auth session --------------------------------
