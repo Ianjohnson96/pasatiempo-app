@@ -76,12 +76,13 @@ export const SECTIONS: Section[] = [
     schema: "caddie",
     // The CADDIE-FACING portal (availability, offers, my schedule). The Pro
     // Shop's dispatch board lives at /admin/caddie with the rest of staff.
+    //
+    // Served by path, not on its own domain: caddies arrive by scanning a QR
+    // code that carries the whole URL, so there is no address for anyone to
+    // type and nothing to gain from a vanity host. Adding one later is one
+    // entry here plus DNS — nothing else changes.
     pathPrefix: "/caddie",
-    hosts: [
-      "caddie.example.com", // TODO: real caddie domain
-      "caddie.local",
-      "caddie.local:3000",
-    ],
+    hosts: ["caddie.local", "caddie.local:3000"],
   },
 ];
 
