@@ -43,6 +43,18 @@ export const LOOP_TYPES: LoopType[] = [
 
 export const RANKS: CaddieRank[] = ["Honor", "A", "B"];
 
+export const CADDIE_STATUSES: CaddieStatus[] = [
+  "Active",
+  "Inactive",
+  "Suspended",
+];
+
+export const CONTACT_METHODS: ContactMethod[] = ["SMS", "Email", "Both"];
+
+// Every hole count the loops table allows. The rate card covers all of them so
+// a 27-hole loop never falls through to a blank rate.
+export const HOLE_OPTIONS = [18, 9, 27, 36] as const;
+
 export interface CaddieRec {
   id: string;
   fullName: string;

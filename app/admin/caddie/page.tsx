@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/events/auth";
+import CaddieHeader from "@/components/caddie/CaddieHeader";
 import DispatchBoard, {
   type BoardCandidate,
 } from "@/components/caddie/DispatchBoard";
@@ -65,20 +66,7 @@ export default async function CaddieDispatchPage({
 
   return (
     <>
-      <div className="appbar">
-        <div className="appbar-inner">
-          <Link href="/admin" className="brand">
-            <span className="mark">P</span> Pasatiempo Admin
-          </Link>
-          <span className="spacer" />
-          <span className="navlink">{viewer.email}</span>
-          <form action="/auth/signout" method="post" style={{ margin: 0 }}>
-            <button className="btn secondary small" type="submit">
-              Sign out
-            </button>
-          </form>
-        </div>
-      </div>
+      <CaddieHeader email={viewer.email} active="dispatch" />
 
       <main className="container">
         <DispatchBoard
@@ -96,7 +84,8 @@ export default async function CaddieDispatchPage({
         {caddies.length === 0 && (
           <p className="notice warn" style={{ marginTop: 18 }}>
             The caddie roster is empty, so there is no one to offer a loop to
-            yet. Loops can still be entered.
+            yet. Loops can still be entered.{" "}
+            <Link href="/admin/caddie/roster">Add caddies →</Link>
           </p>
         )}
       </main>

@@ -4,7 +4,16 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getSettings } from "./data";
-import { rowToLoop, type CaddieRank, type LoopRec, type LoopType } from "./types";
+import {
+  rowToCaddie,
+  rowToLoop,
+  type CaddieRank,
+  type CaddieRec,
+  type CaddieStatus,
+  type ContactMethod,
+  type LoopRec,
+  type LoopType,
+} from "./types";
 
 // Write-side. Every mutation the Pro Shop makes goes through here.
 //
@@ -14,6 +23,8 @@ import { rowToLoop, type CaddieRank, type LoopRec, type LoopType } from "./types
 // caddie's own tap and the inbound SMS webhook, so all three paths agree.
 
 const BOARD_PATH = "/admin/caddie";
+const ROSTER_PATH = "/admin/caddie/roster";
+const RATES_PATH = "/admin/caddie/rates";
 
 export type Result<T = void> =
   | { ok: true; value: T }
@@ -296,6 +307,167 @@ function explainRefusal(reason: string | undefined): string {
 }
 
 // ---------------------------------------------------------------------------
+// Roster
+// ---------------------------------------------------------------------------
+
+export interface CaddieInput {
+  id?: string;
+  fullName: string;
+  phone: string; // as typed; normalised to E.164 here
+  email: string;
+  rank: CaddieRank;
+  status: CaddieStatus;
+  preferredContactMethod: ContactMethod;
+  notes: string;
+}
+
+export async function saveCaddie(input: CaddieInput): Promise<Result<CaddieRec>> {
+  try {
+    const fullName = input.fullName.trim();
+    if (!fullName) return { ok: false, error: "A caddie needs a name." };
+
+    const phone = normalisePhone(input.phone);
+    if (input.phone.trim() && !phone) {
+      return {
+        ok: false,
+        error: "That phone number does not look right. Use 10 digits, e.g. 831 459 9155.",
+      };
+    }
+    const email = input.email.trim().toLowerCase() || null;
+
+    // Mirrors caddies_reachable_chk. Checked here so the caddie sees a sentence
+    // rather than a constraint name.
+    const reachable =
+      input.preferredContactMethod === "SMS"
+        ? !!phone
+        : input.preferredContactMethod === "Email"
+          ? !!email
+          : !!phone || !!email;
+    if (!reachable) {
+      return {
+        ok: false,
+        error:
+          input.preferredContactMethod === "SMS"
+            ? "A caddie contacted by SMS needs a phone number."
+            : input.preferredContactMethod === "Email"
+              ? "A caddie contacted by email needs an email address."
+              : "Add a phone number or an email address.",
+      };
+    }
+
+    const supa = createAdminClient("caddie");
+    const fields = {
+      full_name: fullName,
+      phone,
+      email,
+      rank: input.rank,
+      status: input.status,
+      preferred_contact_method: input.preferredContactMethod,
+      notes: input.notes.trim(),
+    };
+
+    const q = input.id
+      ? supa.from("caddies").update(fields).eq("id", input.id).select("*").single()
+      : supa.from("caddies").insert(fields).select("*").single();
+
+    const { data, error } = await q;
+    if (error) {
+      if (error.code === "23505") {
+        return {
+          ok: false,
+          error: error.message.includes("phone")
+            ? "Another caddie already has that phone number."
+            : "Another caddie already has that email address.",
+        };
+      }
+      throw error;
+    }
+
+    revalidatePath(ROSTER_PATH);
+    revalidatePath(BOARD_PATH);
+    return { ok: true, value: rowToCaddie(data) };
+  } catch (e) {
+    return fail(e, "Could not save the caddie.");
+  }
+}
+
+export async function setCaddieStatus(
+  caddieId: string,
+  status: CaddieStatus,
+): Promise<Result> {
+  try {
+    const supa = createAdminClient("caddie");
+    const { error } = await supa
+      .from("caddies")
+      .update({ status })
+      .eq("id", caddieId);
+    if (error) throw error;
+    revalidatePath(ROSTER_PATH);
+    revalidatePath(BOARD_PATH);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not change the caddie's status.");
+  }
+}
+
+/**
+ * Remove a caddie outright.
+ *
+ * Refused once they have any loop history — assignments cascade, so deleting
+ * would silently erase who worked what. Setting them Inactive is almost always
+ * what the shop actually means.
+ */
+export async function deleteCaddie(caddieId: string): Promise<Result> {
+  try {
+    const supa = createAdminClient("caddie");
+    const { count, error: countErr } = await supa
+      .from("assignments")
+      .select("*", { count: "exact", head: true })
+      .eq("caddie_id", caddieId);
+    if (countErr) throw countErr;
+
+    if ((count ?? 0) > 0) {
+      return {
+        ok: false,
+        error:
+          "This caddie has loop history. Set them Inactive instead — deleting would erase the record of loops they worked.",
+      };
+    }
+
+    const { error } = await supa.from("caddies").delete().eq("id", caddieId);
+    if (error) throw error;
+    revalidatePath(ROSTER_PATH);
+    revalidatePath(BOARD_PATH);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not remove the caddie.");
+  }
+}
+
+/**
+ * US-centric phone normalisation to E.164, which is what the check constraint
+ * and Twilio both want. Ten digits get +1; anything already international is
+ * kept as typed. Returns null for empty input, and null for anything that
+ * cannot be made into a valid number so the caller can complain properly.
+ */
+function normalisePhone(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const hadPlus = trimmed.startsWith("+");
+  const digits = trimmed.replace(/\D/g, "");
+  if (!digits) return null;
+
+  let e164: string;
+  if (hadPlus) e164 = `+${digits}`;
+  else if (digits.length === 10) e164 = `+1${digits}`;
+  else if (digits.length === 11 && digits.startsWith("1")) e164 = `+${digits}`;
+  else return null;
+
+  return /^\+[1-9][0-9]{7,14}$/.test(e164) ? e164 : null;
+}
+
+// ---------------------------------------------------------------------------
 // Rates
 // ---------------------------------------------------------------------------
 
@@ -334,6 +506,7 @@ export async function saveRates(
       .eq("id", 1);
     if (error) throw error;
 
+    revalidatePath(RATES_PATH);
     revalidatePath(BOARD_PATH);
     return { ok: true, value: undefined };
   } catch (e) {
