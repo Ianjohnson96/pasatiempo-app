@@ -9,6 +9,7 @@ import {
   duplicateDay,
   offerLoop,
   offerToTiers,
+  nudgePending,
   respondForCaddie,
   createGroupBooking,
   setLoopStatus,
@@ -355,6 +356,33 @@ export default function DispatchBoard({
                       }
                     >
                       Call all{coverage.reachable > 0 && ` (${coverage.reachable})`}
+                    </button>
+                  )}
+                  {waiting > 0 && !isPast && (
+                    <button
+                      className="btn secondary small"
+                      disabled={pending}
+                      title={`Push the offer again at the ${waiting} still deciding`}
+                      onClick={() =>
+                        start(async () => {
+                          setNote(null);
+                          const res = await nudgePending(loop.id);
+                          setNote(
+                            res.ok
+                              ? {
+                                  kind: res.value > 0 ? "ok" : "err",
+                                  text:
+                                    res.value > 0
+                                      ? `Nudged ${res.value} ${res.value === 1 ? "phone" : "phones"}.`
+                                      : "Nobody waiting has job alerts turned on.",
+                                }
+                              : { kind: "err", text: res.error },
+                          );
+                          router.refresh();
+                        })
+                      }
+                    >
+                      Nudge ({waiting})
                     </button>
                   )}
                   <button

@@ -584,6 +584,57 @@ async function offerAlert(loopId: string, broadcast: boolean) {
   };
 }
 
+/**
+ * Push an offer again at whoever has not answered yet.
+ *
+ * The shop's alternative is ringing them, which is the thing this app exists
+ * to stop. Only caddies still sitting on Pending are nudged — anyone who has
+ * already said no is left alone, because re-asking a decline is how a tool
+ * turns into a nuisance.
+ */
+export async function nudgePending(loopId: string): Promise<Result<number>> {
+  try {
+    const supa = createAdminClient("caddie");
+
+    const { data: loopRow, error: loopErr } = await supa
+      .from("loops")
+      .select("tee_time, status")
+      .eq("id", loopId)
+      .maybeSingle();
+    if (loopErr) throw loopErr;
+    if (!loopRow) return { ok: false, error: "That loop no longer exists." };
+    if (new Date(String(loopRow.tee_time)).getTime() < Date.now()) {
+      return { ok: false, error: "That loop has already teed off." };
+    }
+
+    const { data, error } = await supa
+      .from("assignments")
+      .select("caddie_id")
+      .eq("loop_id", loopId)
+      .eq("confirmation_status", "Pending");
+    if (error) throw error;
+
+    const ids = (data ?? []).map((r) => String(r.caddie_id));
+    if (ids.length === 0) {
+      return { ok: false, error: "Nobody is still deciding on this loop." };
+    }
+
+    const alert = await offerAlert(loopId, false);
+    const push = await notifyCaddies(ids, {
+      ...alert,
+      title: "Still waiting on you",
+      // A distinct tag so the nudge lands as a new notification rather than
+      // silently replacing the original offer the caddie has not opened.
+      tag: `nudge-${loopId}-${Date.now()}`,
+    });
+
+    revalidatePath(BOARD_PATH);
+    return { ok: true, value: push.sent };
+  } catch (e) {
+    return fail(e, "Could not send the nudge.");
+  }
+}
+
 /** Pull an offer back before the caddie answers. */
 export async function withdrawOffer(assignmentId: string): Promise<Result> {
   try {
