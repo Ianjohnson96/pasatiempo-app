@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSettings } from "./data";
 import { getCaddieSession, mintInvite, signOutCaddie } from "./session";
 import {
+  DEFAULT_HOLES,
   rowToCaddie,
   rowToLoop,
   type CaddieRank,
@@ -67,7 +68,8 @@ export interface LoopInput {
   playerName: string;
   loopType: LoopType;
   caddiesRequired: number;
-  holes: number;
+  /** Pasatiempo plays 18; the form does not ask. Kept for the odd 9-holer. */
+  holes?: number;
   notes: string;
   requestedRank: CaddieRank | null;
   requestedCaddieId: string | null;
@@ -93,7 +95,10 @@ export async function saveLoop(input: LoopInput): Promise<Result<LoopRec>> {
       player_name: input.playerName.trim() || "Unnamed",
       loop_type: input.loopType,
       caddies_required: clamp(input.caddiesRequired, 1, 8),
-      holes: [9, 18, 27, 36].includes(input.holes) ? input.holes : 18,
+      holes:
+        input.holes && [9, 18, 27, 36].includes(input.holes)
+          ? input.holes
+          : DEFAULT_HOLES,
       notes: input.notes.trim(),
       requested_rank: input.requestedRank,
       requested_caddie_id: input.requestedCaddieId,
@@ -580,6 +585,32 @@ export async function saveCaddie(input: CaddieInput): Promise<Result<CaddieRec>>
   }
 }
 
+/**
+ * Move a caddie between tiers.
+ *
+ * Its own action rather than a saveCaddie round trip: promoting someone is a
+ * one-tap job the shop does often, and it should not mean opening an edit form
+ * and re-submitting every other field alongside it.
+ */
+export async function setCaddieRank(
+  caddieId: string,
+  rank: CaddieRank,
+): Promise<Result> {
+  try {
+    const supa = createAdminClient("caddie");
+    const { error } = await supa
+      .from("caddies")
+      .update({ rank })
+      .eq("id", caddieId);
+    if (error) throw error;
+    revalidatePath(ROSTER_PATH);
+    revalidatePath(BOARD_PATH);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not change the caddie's tier.");
+  }
+}
+
 export async function setCaddieStatus(
   caddieId: string,
   status: CaddieStatus,
@@ -718,18 +749,13 @@ function normalisePhone(raw: string): string | null {
  * figures exist so both sides see the same number before the loop goes out, so
  * they are stored in cents and only the Pro Shop can change them.
  */
-export async function saveRates(
-  rates: Record<string, Record<string, number>>,
-): Promise<Result> {
+export async function saveRates(rates: Record<string, number>): Promise<Result> {
   try {
     const supa = createAdminClient("caddie");
 
-    const clean: Record<string, Record<string, number>> = {};
-    for (const [type, byHoles] of Object.entries(rates)) {
-      clean[type] = {};
-      for (const [holes, cents] of Object.entries(byHoles)) {
-        clean[type][holes] = Math.max(0, Math.round(Number(cents) || 0));
-      }
+    const clean: Record<string, number> = {};
+    for (const [type, cents] of Object.entries(rates)) {
+      clean[type] = Math.max(0, Math.round(Number(cents) || 0));
     }
 
     const { data, error: readErr } = await supa

@@ -6,6 +6,7 @@ import {
   createInvite,
   deleteCaddie,
   saveCaddie,
+  setCaddieRank,
   setCaddieStatus,
   type CaddieInput,
   type InviteHandout,
@@ -148,8 +149,32 @@ export default function RosterManager({ caddies }: Props) {
                     }}
                   >
                     <span className="ev-title">{c.fullName}</span>
-                    <span className="badge gray">{c.rank}</span>
                     <span className={STATUS_BADGE[c.status]}>{c.status}</span>
+
+                    {/* Tier, changed in place. Promoting a caddie is something
+                        the shop does often and should not need a form. */}
+                    <span style={{ display: "inline-flex", gap: 4 }}>
+                      {RANKS.map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          disabled={busy || c.rank === r}
+                          aria-pressed={c.rank === r}
+                          title={`Move ${c.fullName} to ${r}`}
+                          className={
+                            c.rank === r ? "btn small" : "btn ghost small"
+                          }
+                          onClick={() =>
+                            run(
+                              () => setCaddieRank(c.id, r),
+                              `${c.fullName} is now ${r}.`,
+                            )
+                          }
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </span>
                   </div>
                   <div className="ev-meta">
                     {c.phone && <span>{formatPhone(c.phone)}</span>}

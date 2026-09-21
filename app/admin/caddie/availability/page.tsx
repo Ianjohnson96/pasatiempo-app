@@ -31,6 +31,45 @@ const CELL: Record<string, { label: string; cls: string }> = {
   Off: { label: "Off", cls: "badge closed" },
 };
 
+function TodayLine({
+  label,
+  people,
+  muted,
+}: {
+  label: string;
+  people: { id: string; fullName: string; rank: string }[];
+  muted?: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+      <span
+        className="muted"
+        style={{ fontSize: 13, minWidth: 74, flex: "0 0 auto" }}
+      >
+        {label}
+      </span>
+      {people.length === 0 ? (
+        <span className="muted">nobody yet</span>
+      ) : (
+        <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {people.map((p) => (
+            <span
+              key={p.id}
+              className="pill"
+              style={{ opacity: muted ? 0.6 : 1 }}
+            >
+              <span className="badge gray" style={{ marginRight: 6 }}>
+                {p.rank}
+              </span>
+              {p.fullName}
+            </span>
+          ))}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default async function AdminAvailabilityPage({
   searchParams,
 }: {
@@ -102,6 +141,25 @@ export default async function AdminAvailabilityPage({
     dates.some((d) => grid.get(c.id)?.has(d)),
   ).length;
 
+  // Today, spelled out by name. The grid answers "this week"; the question the
+  // shop actually asks at 6am is "who have I got right now", and counting
+  // badges across a row to work that out is not an answer.
+  const todayAm: typeof roster = [];
+  const todayPm: typeof roster = [];
+  const todayOff: typeof roster = [];
+  for (const c of roster) {
+    const entry = grid.get(c.id)?.get(today);
+    if (!entry) continue;
+    if (entry.status === "Unavailable") {
+      todayOff.push(c);
+      continue;
+    }
+    if (entry.slot === "All Day" || entry.slot === "AM") todayAm.push(c);
+    if (entry.slot === "All Day" || entry.slot === "PM") todayPm.push(c);
+  }
+  const todayInRange = dates.includes(today);
+  const todaySilent = roster.length - todayAm.length - todayOff.length;
+
   return (
     <>
       <CaddieHeader email={viewer.email} active="availability" />
@@ -139,6 +197,27 @@ export default async function AdminAvailabilityPage({
             </Link>
           </div>
         </div>
+
+        {roster.length > 0 && todayInRange && (
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="ev-title" style={{ fontSize: 17 }}>
+              Today
+            </div>
+            <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+              <TodayLine label="Morning" people={todayAm} />
+              <TodayLine label="Afternoon" people={todayPm} />
+              {todayOff.length > 0 && (
+                <TodayLine label="Off" people={todayOff} muted />
+              )}
+            </div>
+            {todaySilent > 0 && (
+              <p className="muted" style={{ fontSize: 13, marginBottom: 0, marginTop: 12 }}>
+                {todaySilent} {todaySilent === 1 ? "caddie has" : "caddies have"}{" "}
+                not answered for today.
+              </p>
+            )}
+          </div>
+        )}
 
         {roster.length === 0 ? (
           <div className="empty">

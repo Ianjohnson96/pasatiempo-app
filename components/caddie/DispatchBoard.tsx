@@ -159,7 +159,7 @@ export default function DispatchBoard({
           {loops.map(({ loop, crew }) => {
             const accepted = acceptedCount(crew);
             const waiting = pendingCount(crew);
-            const rate = rateFor(rates, loop.loopType, loop.holes);
+            const rate = rateFor(rates, loop.loopType);
             const isOpen = openLoop === loop.id;
             const needs = loop.caddiesRequired - accepted;
 
@@ -187,7 +187,6 @@ export default function DispatchBoard({
                   </div>
                   <div className="ev-meta">
                     <span>{loop.loopType}</span>
-                    <span>{loop.holes} holes</span>
                     <span>
                       {accepted}/{loop.caddiesRequired} confirmed
                       {waiting > 0 && ` · ${waiting} waiting`}
@@ -472,11 +471,13 @@ function QuickAdd({
   busy: boolean;
 }) {
   const router = useRouter();
+  // The date defaults to whatever day is on screen, but is editable, so a
+  // Saturday loop can be posted on a Tuesday without navigating there first.
+  const [date, setDate] = useState(day);
   const [time, setTime] = useState("07:00");
   const [playerName, setPlayerName] = useState("");
-  const [loopType, setLoopType] = useState<LoopType>("Single Caddie");
+  const [loopType, setLoopType] = useState<LoopType>("Single Bag");
   const [caddiesRequired, setCaddiesRequired] = useState(1);
-  const [holes, setHoles] = useState(18);
   const [notes, setNotes] = useState("");
   const [requestedRank, setRequestedRank] = useState<CaddieRank | "">("");
   const [requestedCaddieId, setRequestedCaddieId] = useState("");
@@ -493,12 +494,11 @@ function QuickAdd({
     setErr(null);
     start(async () => {
       const res = await saveLoop({
-        day,
+        day: date,
         time,
         playerName,
         loopType,
         caddiesRequired,
-        holes,
         notes,
         requestedRank: requestedRank || null,
         requestedCaddieId: requestedCaddieId || null,
@@ -507,14 +507,18 @@ function QuickAdd({
         setErr(res.error);
         return;
       }
-      // Entering a sheet means many loops in a row: keep the settings, clear
-      // the name, and roll the clock forward one interval so the next row is
-      // already close to right.
+      // Entering a sheet means many loops in a row: keep the settings and the
+      // date, clear the name, and roll the clock forward one interval so the
+      // next row starts close to right.
       setPlayerName("");
       setNotes("");
       setRequestedCaddieId("");
       setTime(bumpTime(time, 10));
-      router.refresh();
+
+      // Posted somewhere other than the day on screen? Go there, otherwise the
+      // loop vanishes into a date the user cannot see and looks like a failure.
+      if (date !== day) router.push(`/admin/caddie?day=${date}`);
+      else router.refresh();
     });
   }
 
@@ -528,6 +532,15 @@ function QuickAdd({
           alignItems: "flex-end",
         }}
       >
+        <Field label="Date">
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => e.target.value && setDate(e.target.value)}
+            required
+            style={{ ...inputStyle, width: 150 }}
+          />
+        </Field>
         <Field label="Tee time">
           <input
             type="time"
@@ -568,18 +581,6 @@ function QuickAdd({
             onChange={(e) => setCaddiesRequired(Number(e.target.value))}
             style={{ ...inputStyle, width: 72 }}
           />
-        </Field>
-        <Field label="Holes">
-          <select
-            value={holes}
-            onChange={(e) => setHoles(Number(e.target.value))}
-            style={{ ...inputStyle, width: 84 }}
-          >
-            <option value={18}>18</option>
-            <option value={9}>9</option>
-            <option value={27}>27</option>
-            <option value={36}>36</option>
-          </select>
         </Field>
         <Field label="Wants rank">
           <select

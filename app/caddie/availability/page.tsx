@@ -12,8 +12,9 @@ import {
 } from "@/lib/caddie/data";
 import { getCaddieSession } from "@/lib/caddie/session";
 
-// Two weeks ahead, which is as far as the tee sheet is worth guessing at.
-const HORIZON_DAYS = 14;
+// A month out, in whole weeks so the list groups cleanly. Caddies plan around
+// weekends, and a fortnight was not far enough to reach the one they care about.
+const HORIZON_DAYS = 35;
 
 export const dynamic = "force-dynamic";
 

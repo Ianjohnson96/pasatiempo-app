@@ -82,7 +82,7 @@ export default async function CaddiePortalHome({
     loopType: loop.loopType,
     holes: loop.holes,
     notes: loop.notes,
-    rateCents: rateFor(settings.rates, loop.loopType, loop.holes),
+    rateCents: rateFor(settings.rates, loop.loopType),
   }));
 
   const open: OpenLoop[] = posted.map((loop) => ({
@@ -93,7 +93,7 @@ export default async function CaddiePortalHome({
     loopType: loop.loopType,
     holes: loop.holes,
     notes: loop.notes,
-    rateCents: rateFor(settings.rates, loop.loopType, loop.holes),
+    rateCents: rateFor(settings.rates, loop.loopType),
   }));
 
   return <CaddiePortal caddie={caddie} items={items} open={open} />;

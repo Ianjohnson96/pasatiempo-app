@@ -207,7 +207,6 @@ export default function CaddiePortal({
 
                 <div className="ev-meta" style={{ marginTop: 6 }}>
                   <span>{o.loopType}</span>
-                  <span>{o.holes} holes</span>
                   {o.rateCents != null && (
                     <span>${(o.rateCents / 100).toFixed(0)}</span>
                   )}
@@ -300,7 +299,6 @@ function LoopCard({
 
       <div className="ev-meta" style={{ marginTop: 6 }}>
         <span>{loop.loopType}</span>
-        <span>{loop.holes} holes</span>
         {loop.rateCents != null && (
           <span>${(loop.rateCents / 100).toFixed(0)}</span>
         )}

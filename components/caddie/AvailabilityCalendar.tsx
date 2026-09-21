@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { setAvailability, type AvailabilityChoice } from "@/lib/caddie/actions";
@@ -83,11 +83,27 @@ export default function AvailabilityCalendar({
       )}
 
       <div style={{ display: "grid", gap: 8, marginTop: 18 }}>
-        {days.map((day) => {
+        {days.map((day, i) => {
           const rowBusy = saving && pendingDate === day.date;
           return (
+            <Fragment key={day.date}>
+            {/* A month of rows reads as one wall without a break in it. */}
+            {i > 0 && i % 7 === 0 && (
+              <div
+                className="muted"
+                style={{
+                  fontSize: 12,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                  marginTop: 12,
+                  paddingTop: 12,
+                  borderTop: "1px solid var(--line)",
+                }}
+              >
+                {i === 7 ? "Next week" : `In ${i / 7} weeks`}
+              </div>
+            )}
             <div
-              key={day.date}
               className="card"
               style={{
                 padding: "10px 12px",
@@ -136,6 +152,7 @@ export default function AvailabilityCalendar({
                 })}
               </div>
             </div>
+            </Fragment>
           );
         })}
       </div>

@@ -40,7 +40,7 @@ function loop(teeTime: string, over: Partial<LoopRec> = {}): LoopRec {
     id: "loop-1",
     teeTime,
     playerName: "Member",
-    loopType: "Single Caddie",
+    loopType: "Single Bag",
     caddiesRequired: 1,
     holes: 18,
     notes: "",

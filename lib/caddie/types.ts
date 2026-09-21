@@ -10,7 +10,11 @@ export type CaddieStatus = "Active" | "Inactive" | "Suspended";
 export type ContactMethod = "SMS" | "Email" | "Both";
 export type TimeSlot = "AM" | "PM" | "All Day";
 export type AvailabilityStatus = "Available" | "Unavailable" | "Pending";
-export type LoopType = "Single Caddie" | "Double Bag" | "Forecaddie";
+export type LoopType =
+  | "Single Bag"
+  | "Double Bag"
+  | "Forecaddie 1-2"
+  | "Forecaddie 3-4";
 export type OfferKind = "direct" | "broadcast";
 export type ResponseChannel = "sms" | "email" | "web" | "admin";
 
@@ -36,9 +40,10 @@ export const RANK_ORDER: Record<CaddieRank, number> = {
 };
 
 export const LOOP_TYPES: LoopType[] = [
-  "Single Caddie",
+  "Single Bag",
   "Double Bag",
-  "Forecaddie",
+  "Forecaddie 1-2",
+  "Forecaddie 3-4",
 ];
 
 export const RANKS: CaddieRank[] = ["Honor", "A", "B"];
@@ -51,9 +56,10 @@ export const CADDIE_STATUSES: CaddieStatus[] = [
 
 export const CONTACT_METHODS: ContactMethod[] = ["SMS", "Email", "Both"];
 
-// Every hole count the loops table allows. The rate card covers all of them so
-// a 27-hole loop never falls through to a blank rate.
-export const HOLE_OPTIONS = [18, 9, 27, 36] as const;
+// Pasatiempo plays 18. The loops table still carries a holes column and still
+// allows 9/18/27/36, but nothing in the UI asks — so there is no hole dimension
+// on the rate card either.
+export const DEFAULT_HOLES = 18;
 
 export interface CaddieRec {
   id: string;
@@ -108,10 +114,10 @@ export interface LoopWithCrew {
   crew: CrewMember[];
 }
 
-// The rate card, in CENTS, keyed by loop type then hole count. Money never
-// moves through this app — the player pays the caddie directly. These figures
-// exist so both sides see the same number before the loop goes out.
-export type RateCard = Record<string, Record<string, number>>;
+// The rate card: one figure per loop type, in CENTS. Money never moves through
+// this app — the player pays the caddie directly. These figures exist so both
+// sides see the same number before the loop goes out.
+export type RateCard = Record<string, number>;
 
 export interface CaddieSettings {
   courseTimezone: string;
@@ -129,12 +135,8 @@ export interface CaddieSettings {
 
 // Rate for a loop, in cents. Returns null when the Pro Shop has not set one —
 // the UI must show "not set" rather than an invented number.
-export function rateFor(
-  rates: RateCard,
-  loopType: LoopType,
-  holes: number,
-): number | null {
-  const cents = rates?.[loopType]?.[String(holes)];
+export function rateFor(rates: RateCard, loopType: LoopType): number | null {
+  const cents = rates?.[loopType];
   return typeof cents === "number" && cents > 0 ? cents : null;
 }
 

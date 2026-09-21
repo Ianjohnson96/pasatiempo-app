@@ -389,6 +389,63 @@ export async function availabilityBetween(
   return grid;
 }
 
+/** What a single day looks like on the job calendar. */
+export interface DayLoopCounts {
+  total: number;
+  /** Still needs caddies: Unassigned or Partially Assigned. */
+  open: number;
+  assigned: number;
+  cancelled: number;
+}
+
+/**
+ * Loop counts per course-local day across a range, for the month calendar.
+ *
+ * Grouped in JS rather than SQL because the bucket is a course-local date and
+ * the column is an instant — letting Postgres group by tee_time::date would
+ * bucket by UTC and quietly file every early-morning loop under the day before.
+ */
+export async function loopCountsBetween(
+  from: string,
+  to: string,
+  tz: string = DEFAULT_TZ,
+): Promise<Map<string, DayLoopCounts>> {
+  const supa = createAdminClient("caddie");
+
+  const { data, error } = await supa
+    .from("loops")
+    .select("tee_time, status")
+    .gte("tee_time", zonedMidnight(from, tz).toISOString())
+    .lt("tee_time", zonedMidnight(addDays(to, 1), tz).toISOString());
+  if (error) throw error;
+
+  const asCourseDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const out = new Map<string, DayLoopCounts>();
+  for (const row of data ?? []) {
+    const date = asCourseDate.format(new Date(String(row.tee_time)));
+    const c = out.get(date) ?? { total: 0, open: 0, assigned: 0, cancelled: 0 };
+    const status = String(row.status);
+    if (status === "Cancelled") {
+      c.cancelled += 1;
+    } else {
+      c.total += 1;
+      if (status === "Unassigned" || status === "Partially Assigned") {
+        c.open += 1;
+      } else if (status === "Assigned") {
+        c.assigned += 1;
+      }
+    }
+    out.set(date, c);
+  }
+  return out;
+}
+
 /** An offer or booking the caddie still has a stake in. */
 export interface OpenWork {
   assignment: AssignmentRec;

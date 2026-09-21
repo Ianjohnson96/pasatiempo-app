@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveRates } from "@/lib/caddie/actions";
-import { HOLE_OPTIONS, LOOP_TYPES, type RateCard } from "@/lib/caddie/types";
+import { LOOP_TYPES, type RateCard } from "@/lib/caddie/types";
 
 // The caddie rate card.
 //
@@ -19,17 +19,14 @@ interface Props {
   rates: RateCard;
 }
 
-type Draft = Record<string, Record<string, string>>;
+type Draft = Record<string, string>;
 
 function toDraft(rates: RateCard): Draft {
   const d: Draft = {};
   for (const type of LOOP_TYPES) {
-    d[type] = {};
-    for (const holes of HOLE_OPTIONS) {
-      const cents = rates?.[type]?.[String(holes)];
-      d[type][String(holes)] =
-        typeof cents === "number" && cents > 0 ? (cents / 100).toFixed(0) : "";
-    }
+    const cents = rates?.[type];
+    d[type] =
+      typeof cents === "number" && cents > 0 ? (cents / 100).toFixed(0) : "";
   }
   return d;
 }
@@ -42,8 +39,8 @@ export default function RatesEditor({ rates }: Props) {
   );
   const [saving, start] = useTransition();
 
-  const set = (type: string, holes: string, value: string) =>
-    setDraft((d) => ({ ...d, [type]: { ...d[type], [holes]: value } }));
+  const set = (type: string, value: string) =>
+    setDraft((d) => ({ ...d, [type]: value }));
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(toDraft(rates));
 
@@ -51,14 +48,11 @@ export default function RatesEditor({ rates }: Props) {
     e.preventDefault();
     setNote(null);
     start(async () => {
-      const cents: Record<string, Record<string, number>> = {};
-      for (const [type, byHoles] of Object.entries(draft)) {
-        cents[type] = {};
-        for (const [holes, dollars] of Object.entries(byHoles)) {
-          const n = Number(dollars);
-          cents[type][holes] =
-            dollars.trim() === "" || Number.isNaN(n) ? 0 : Math.round(n * 100);
-        }
+      const cents: Record<string, number> = {};
+      for (const [type, dollars] of Object.entries(draft)) {
+        const n = Number(dollars);
+        cents[type] =
+          dollars.trim() === "" || Number.isNaN(n) ? 0 : Math.round(n * 100);
       }
       const res = await saveRates(cents);
       if (res.ok) {
@@ -70,7 +64,7 @@ export default function RatesEditor({ rates }: Props) {
     });
   }
 
-  const unset = LOOP_TYPES.filter((t) => !draft[t]?.["18"]?.trim()).length;
+  const unset = LOOP_TYPES.filter((t) => !draft[t]?.trim()).length;
 
   return (
     <form onSubmit={submit}>
@@ -86,61 +80,50 @@ export default function RatesEditor({ rates }: Props) {
             ? "No rates are set yet, so the dispatch board shows a dash instead of a figure."
             : `${unset} loop ${
                 unset === 1 ? "type has" : "types have"
-              } no 18-hole rate set.`}
+              } no rate set.`}
         </p>
       )}
 
       <div className="card">
-        <table className="table" style={{ width: "100%" }}>
-          <thead>
-            <tr>
-              <th style={{ textAlign: "left" }}>Loop type</th>
-              {HOLE_OPTIONS.map((h) => (
-                <th key={h} style={{ textAlign: "left", width: 120 }}>
-                  {h} holes
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {LOOP_TYPES.map((type) => (
-              <tr key={type}>
-                <td style={{ whiteSpace: "nowrap" }}>{type}</td>
-                {HOLE_OPTIONS.map((h) => (
-                  <td key={h}>
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                      }}
-                    >
-                      <span className="muted">$</span>
-                      <input
-                        type="number"
-                        min={0}
-                        step={5}
-                        inputMode="numeric"
-                        value={draft[type]?.[String(h)] ?? ""}
-                        onChange={(e) => set(type, String(h), e.target.value)}
-                        placeholder="—"
-                        style={inputStyle}
-                      />
-                    </span>
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div style={{ display: "grid", gap: 12 }}>
+          {LOOP_TYPES.map((type) => (
+            <label
+              key={type}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                justifyContent: "space-between",
+                maxWidth: 420,
+              }}
+            >
+              <span style={{ fontSize: 16 }}>{type}</span>
+              <span
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                <span className="muted">$</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={5}
+                  inputMode="numeric"
+                  value={draft[type] ?? ""}
+                  onChange={(e) => set(type, e.target.value)}
+                  placeholder="—"
+                  style={inputStyle}
+                />
+              </span>
+            </label>
+          ))}
+        </div>
 
         <p
           className="muted"
-          style={{ fontSize: 13, marginTop: 14, marginBottom: 0 }}
+          style={{ fontSize: 13, marginTop: 18, marginBottom: 0 }}
         >
-          Paid in person, player to caddie. The app never handles the money — it
-          just makes sure both sides are looking at the same number. A blank cell
-          shows as a dash on the board.
+          Per loop, 18 holes. Paid in person, player to caddie — the app never
+          handles the money, it just makes sure both sides are looking at the
+          same number. A blank shows as a dash on the board.
         </p>
       </div>
 
