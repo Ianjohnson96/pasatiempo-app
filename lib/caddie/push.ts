@@ -158,12 +158,28 @@ export async function remindUpcomingLoops(): Promise<{
   const due = data ?? [];
   if (due.length === 0) return { reminded: 0, devices: 0 };
 
-  const when = new Intl.DateTimeFormat("en-US", {
+  // "You're on tomorrow" is the message, but only when it is actually
+  // tomorrow. Run the sweep by hand at nine in the morning and a loop that
+  // afternoon is today, not tomorrow, and saying otherwise sends someone to
+  // the first tee on the wrong day.
+  const courseDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const weekday = new Intl.DateTimeFormat("en-US", {
     timeZone: tz,
     weekday: "long",
+  });
+  const clock = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
     hour: "numeric",
     minute: "2-digit",
   });
+
+  const todayStr = courseDate.format(new Date());
+  const tomorrowStr = courseDate.format(new Date(Date.now() + 86_400_000));
 
   let devices = 0;
   for (const row of due) {
@@ -174,9 +190,18 @@ export async function remindUpcomingLoops(): Promise<{
       loop_type: string;
     };
 
+    const teeAt = new Date(loop.tee_time);
+    const on = courseDate.format(teeAt);
+    const whenWord =
+      on === tomorrowStr
+        ? "tomorrow"
+        : on === todayStr
+          ? "today"
+          : weekday.format(teeAt);
+
     const result = await notifyCaddies([String(row.caddie_id)], {
-      title: "Loop tomorrow",
-      body: `${when.format(new Date(loop.tee_time))} · ${loop.loop_type}\n${loop.player_name}`,
+      title: `You're on ${whenWord}`,
+      body: `${clock.format(teeAt)} · ${loop.loop_type}\n${loop.player_name}`,
       url: "/caddie",
       tag: `reminder-${loop.id}`,
       loopId: loop.id,
