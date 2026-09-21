@@ -157,6 +157,30 @@ export interface LoopWithCrew {
 // sides see the same number before the loop goes out.
 export type RateCard = Record<string, number>;
 
+/**
+ * How a tier offer widens when nobody in that tier takes it.
+ *
+ * Banded by how soon the loop is: urgency should compress seniority, not
+ * override it. Every number is the shop's to set.
+ */
+export interface Waterfall {
+  enabled: boolean;
+  /** Tees off within this many hours counts as urgent. */
+  urgentWithinHours: number;
+  urgentMinutes: number;
+  soonWithinHours: number;
+  soonMinutes: number;
+  /** Everything beyond the "soon" band. */
+  laterMinutes: number;
+}
+
+/** Minutes a tier gets before this loop widens, given how far off it is. */
+export function tierWindowMinutes(w: Waterfall, hoursUntilTee: number): number {
+  if (hoursUntilTee <= w.urgentWithinHours) return w.urgentMinutes;
+  if (hoursUntilTee <= w.soonWithinHours) return w.soonMinutes;
+  return w.laterMinutes;
+}
+
 export interface CaddieSettings {
   courseTimezone: string;
   offerExpiryMinutes: number;
@@ -171,6 +195,7 @@ export interface CaddieSettings {
   emailEnabled: boolean;
   smsEnabled: boolean;
   rates: RateCard;
+  waterfall: Waterfall;
 }
 
 // Rate for a loop, in cents. Returns null when the Pro Shop has not set one —

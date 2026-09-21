@@ -18,6 +18,7 @@ import {
   type LoopType,
   type LoopWithCrew,
   type TierRec,
+  type Waterfall,
   type RateCard,
   type TimeSlot,
 } from "./types";
@@ -164,6 +165,20 @@ export async function getSettings(): Promise<CaddieSettings> {
     emailEnabled: Boolean(d.email_enabled ?? true),
     smsEnabled: Boolean(d.sms_enabled ?? false),
     rates: (d.rates ?? {}) as RateCard,
+    waterfall: readWaterfall(d.waterfall),
+  };
+}
+
+/** Defaults matter here: a half-written settings row must not escalate. */
+function readWaterfall(raw: unknown): Waterfall {
+  const w = (raw ?? {}) as Record<string, unknown>;
+  return {
+    enabled: Boolean(w.enabled),
+    urgentWithinHours: Number(w.urgentWithinHours ?? 12),
+    urgentMinutes: Number(w.urgentMinutes ?? 10),
+    soonWithinHours: Number(w.soonWithinHours ?? 48),
+    soonMinutes: Number(w.soonMinutes ?? 30),
+    laterMinutes: Number(w.laterMinutes ?? 120),
   };
 }
 

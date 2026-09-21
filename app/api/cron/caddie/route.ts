@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { remindUpcomingLoops } from "@/lib/caddie/push";
+import { escalateTierOffers, remindUpcomingLoops } from "@/lib/caddie/push";
 
 // Housekeeping for the caddie section, run by Vercel Cron (see vercel.json).
 //
@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
     // Reminders last: the purges above clear out dead endpoints first, so the
     // send is not wasted against phones that are already gone.
     const reminders = await remindUpcomingLoops();
+    const escalated = await escalateTierOffers();
 
     return NextResponse.json({
       completedLoops,
@@ -76,6 +77,8 @@ export async function GET(request: NextRequest) {
       purgedDevices,
       remindedLoops: reminders.reminded,
       reminderDevices: reminders.devices,
+      widenedLoops: escalated.widened,
+      widenedDevices: escalated.notified,
       ranAt: new Date().toISOString(),
     });
   } catch (e) {

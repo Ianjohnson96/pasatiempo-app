@@ -221,6 +221,135 @@ export async function remindUpcomingLoops(): Promise<{
 }
 
 /**
+ * Widen tier offers that nobody has taken.
+ *
+ * A loop offered to the senior tier and left sitting is the case this exists
+ * for: rather than the shop watching a clock, the offer reaches down the
+ * ladder one tier at a time until somebody takes it.
+ *
+ * Two rules keep it fair. It only ever widens by ONE tier per run, so a loop
+ * cannot fall from the top to the bottom in a single sweep. And it never
+ * widens a loop somebody has already accepted, nor one that has teed off.
+ *
+ * Entirely driven by the shop's settings; off unless they turn it on.
+ */
+export async function escalateTierOffers(): Promise<{
+  widened: number;
+  notified: number;
+}> {
+  const out = { widened: 0, notified: 0 };
+  if (!ready()) return out;
+
+  const supa = createAdminClient("caddie");
+
+  const { data: settingsRow } = await supa
+    .from("settings")
+    .select("data")
+    .eq("id", 1)
+    .maybeSingle();
+  const w = (((settingsRow?.data ?? {}) as Record<string, unknown>).waterfall ??
+    {}) as Record<string, unknown>;
+  if (!w.enabled) return out;
+
+  const bands = {
+    urgentWithinHours: Number(w.urgentWithinHours ?? 12),
+    urgentMinutes: Number(w.urgentMinutes ?? 10),
+    soonWithinHours: Number(w.soonWithinHours ?? 48),
+    soonMinutes: Number(w.soonMinutes ?? 30),
+    laterMinutes: Number(w.laterMinutes ?? 120),
+  };
+
+  const [{ data: tierRows }, { data: loopRows }] = await Promise.all([
+    supa.from("tiers").select("id, name, sort_order").order("sort_order"),
+    supa
+      .from("loops")
+      .select("id, tee_time, status")
+      .in("status", ["Unassigned", "Partially Assigned"])
+      .gte("tee_time", new Date().toISOString()),
+  ]);
+
+  const tiers = tierRows ?? [];
+  if (tiers.length < 2) return out; // nothing to widen into
+
+  for (const loop of loopRows ?? []) {
+    const { data: asgs } = await supa
+      .from("assignments")
+      .select("caddie_id, confirmation_status, offered_at, caddies!inner(tier_id)")
+      .eq("loop_id", loop.id);
+
+    const rows = asgs ?? [];
+    if (rows.length === 0) continue; // never offered; not the waterfall's job
+    if (rows.some((a) => a.confirmation_status === "Accepted")) continue;
+
+    // The furthest down the ladder this loop has already reached.
+    const offeredTierIds = new Set(
+      rows
+        .map((a) => (a.caddies as unknown as { tier_id: string | null })?.tier_id)
+        .filter(Boolean) as string[],
+    );
+    const deepest = tiers.reduce(
+      (acc, t, i) => (offeredTierIds.has(String(t.id)) ? i : acc),
+      -1,
+    );
+    if (deepest === -1 || deepest >= tiers.length - 1) continue;
+
+    // Has the current tier had its turn?
+    const lastOfferedAt = rows
+      .map((a) => new Date(String(a.offered_at)).getTime())
+      .reduce((a, b) => Math.max(a, b), 0);
+    const hoursUntilTee =
+      (new Date(String(loop.tee_time)).getTime() - Date.now()) / 3_600_000;
+    const windowMins =
+      hoursUntilTee <= bands.urgentWithinHours
+        ? bands.urgentMinutes
+        : hoursUntilTee <= bands.soonWithinHours
+          ? bands.soonMinutes
+          : bands.laterMinutes;
+
+    if (Date.now() - lastOfferedAt < windowMins * 60_000) continue;
+
+    const nextTier = tiers[deepest + 1];
+    const { data: nextCaddies } = await supa
+      .from("caddies")
+      .select("id")
+      .eq("status", "Active")
+      .eq("tier_id", nextTier.id);
+
+    const already = new Set(rows.map((a) => String(a.caddie_id)));
+    const ids = (nextCaddies ?? [])
+      .map((c) => String(c.id))
+      .filter((id) => !already.has(id));
+    if (ids.length === 0) continue;
+
+    const expires = new Date(Date.now() + windowMins * 60_000).toISOString();
+    let inserted = 0;
+    for (const caddieId of ids) {
+      const { error } = await supa.from("assignments").insert({
+        loop_id: loop.id,
+        caddie_id: caddieId,
+        offer_kind: "broadcast",
+        offer_expires_at: expires,
+      });
+      if (!error) inserted += 1;
+    }
+    if (inserted === 0) continue;
+
+    const push = await notifyCaddies(ids, {
+      title: "Loop offered — first to answer",
+      body: `Now open to ${nextTier.name}. Tap to accept or decline.`,
+      url: "/caddie",
+      tag: `offer-${loop.id}`,
+      loopId: String(loop.id),
+    });
+
+    out.widened += 1;
+    out.notified += push.sent;
+  }
+
+  return out;
+}
+
+/**
  * Notify specific caddies rather than the whole roster.
  *
  * A reminder is addressed to the person who accepted the loop; blasting it to

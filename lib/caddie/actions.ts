@@ -24,6 +24,7 @@ import {
   type DefaultSlot,
   type LoopRec,
   type LoopType,
+  type Waterfall,
 } from "./types";
 
 // Write-side. Every mutation the Pro Shop makes goes through here.
@@ -1258,6 +1259,47 @@ export async function deleteTier(tierId: string): Promise<Result> {
     return { ok: true, value: undefined };
   } catch (e) {
     return fail(e, "Could not delete the tier.");
+  }
+}
+
+/**
+ * Save the tier escalation rules.
+ *
+ * Clamped rather than trusted: a zero-minute window would widen a loop to the
+ * whole roster on the first sweep, which is the opposite of a seniority ladder.
+ */
+export async function saveWaterfall(input: Waterfall): Promise<Result> {
+  try {
+    const supa = createAdminClient("caddie");
+
+    const clean = {
+      enabled: Boolean(input.enabled),
+      urgentWithinHours: clamp(input.urgentWithinHours, 1, 72),
+      urgentMinutes: clamp(input.urgentMinutes, 1, 600),
+      soonWithinHours: clamp(input.soonWithinHours, 1, 336),
+      soonMinutes: clamp(input.soonMinutes, 1, 1440),
+      laterMinutes: clamp(input.laterMinutes, 1, 4320),
+    };
+
+    const { data, error: readErr } = await supa
+      .from("settings")
+      .select("data")
+      .eq("id", 1)
+      .maybeSingle();
+    if (readErr) throw readErr;
+
+    const next = { ...((data?.data ?? {}) as object), waterfall: clean };
+    const { error } = await supa
+      .from("settings")
+      .update({ data: next, updated_at: new Date().toISOString() })
+      .eq("id", 1);
+    if (error) throw error;
+
+    revalidatePath(TIERS_PATH);
+    revalidatePath(BOARD_PATH);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not save the escalation rules.");
   }
 }
 
