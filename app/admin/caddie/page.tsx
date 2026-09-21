@@ -16,6 +16,7 @@ import {
   formatTee,
   getSettings,
   listCaddies,
+  listTiers,
   loopsForDay,
   pastLoopIds,
   rankCandidates,
@@ -54,6 +55,7 @@ export default async function CaddieDispatchPage({
     availabilityFor(day),
     caddieReach(),
   ]);
+  const tiers = await listTiers();
 
   const coverage = alertCoverage(reach);
 
@@ -98,6 +100,7 @@ export default async function CaddieDispatchPage({
           pastLoopIds={past}
           groupNames={Object.fromEntries(groups)}
           coverage={coverage}
+          tiers={tiers}
           rates={settings.rates}
           notifyReady={pushConfigured()}
         />

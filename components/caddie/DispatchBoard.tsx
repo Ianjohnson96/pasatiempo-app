@@ -8,6 +8,7 @@ import {
   cancelDay,
   duplicateDay,
   offerLoop,
+  offerToTiers,
   respondForCaddie,
   createGroupBooking,
   setLoopStatus,
@@ -25,6 +26,7 @@ import {
   type LoopType,
   type LoopWithCrew,
   type RateCard,
+  type TierRec,
 } from "@/lib/caddie/types";
 
 // What the server hands down per loop. Mirrors the Candidate in
@@ -50,8 +52,39 @@ interface Props {
   groupNames: Record<string, string>;
   /** How many active caddies a post would actually notify. */
   coverage: { reachable: number; total: number };
+  /** Tiers, in dispatch order, for offering to a whole tier at once. */
+  tiers: TierRec[];
   rates: RateCard;
   notifyReady: boolean;
+}
+
+/**
+ * Offered and notified are different numbers, and the gap is the whole point:
+ * a caddie with no alerts on has an offer sitting in a portal they will not
+ * open. Saying so is what stops the shop assuming the message landed.
+ */
+function describeOffer(v: {
+  offered: number;
+  notified: number;
+  skipped: { reason: string }[];
+}): { kind: "ok" | "err"; text: string } {
+  const parts = [
+    `Offered to ${v.offered} ${v.offered === 1 ? "caddie" : "caddies"}`,
+  ];
+  if (v.notified < v.offered) {
+    parts.push(
+      `${v.notified} alerted — the rest have no job alerts turned on`,
+    );
+  } else {
+    parts.push("all alerted");
+  }
+  if (v.skipped.length > 0) {
+    parts.push(`${v.skipped.length} skipped: ${v.skipped.map((s) => s.reason).join("; ")}`);
+  }
+  return {
+    kind: v.skipped.length > 0 || v.notified === 0 ? "err" : "ok",
+    text: parts.join(" · ") + ".",
+  };
 }
 
 const STATUS_BADGE: Record<LoopStatus, string> = {
@@ -72,6 +105,7 @@ export default function DispatchBoard({
   pastLoopIds,
   groupNames,
   coverage,
+  tiers,
   rates,
   notifyReady,
 }: Props) {
@@ -351,27 +385,51 @@ export default function DispatchBoard({
                 {isOpen && (
                   <OfferPanel
                     candidates={candidatesByLoop[loop.id] ?? []}
+                    tiers={tiers}
                     needs={needs}
                     busy={pending}
-                    onSend={(ids) =>
+                    onOfferCaddies={(ids) =>
                       start(async () => {
+                        setNote(null);
                         const res = await offerLoop(loop.id, ids);
                         if (!res.ok) {
                           setNote({ kind: "err", text: res.error });
                           return;
                         }
-                        const { offered, skipped } = res.value;
+                        setNote(describeOffer(res.value));
+                        setOpenLoop(null);
+                        router.refresh();
+                      })
+                    }
+                    onOfferTiers={(tierIds) =>
+                      start(async () => {
+                        setNote(null);
+                        const res = await offerToTiers(loop.id, tierIds);
+                        if (!res.ok) {
+                          setNote({ kind: "err", text: res.error });
+                          return;
+                        }
+                        setNote(describeOffer(res.value));
+                        setOpenLoop(null);
+                        router.refresh();
+                      })
+                    }
+                    onCallAll={() =>
+                      start(async () => {
+                        setNote(null);
+                        const res = await callAllCaddies(loop.id);
+                        if (!res.ok) {
+                          setNote({ kind: "err", text: res.error });
+                          return;
+                        }
                         setNote({
-                          kind: skipped.length ? "err" : "ok",
+                          kind: res.value > 0 ? "ok" : "err",
                           text:
-                            `Offered to ${offered} ${
-                              offered === 1 ? "caddie" : "caddies"
-                            }.` +
-                            (skipped.length
-                              ? ` ${skipped.length} skipped: ${skipped
-                                  .map((s) => s.reason)
-                                  .join("; ")}`
-                              : ""),
+                            res.value > 0
+                              ? `Posted and alerted ${res.value} ${
+                                  res.value === 1 ? "caddie" : "caddies"
+                                }. First to claim gets it.`
+                              : "Posted, but no caddie has job alerts turned on yet.",
                         });
                         setOpenLoop(null);
                         router.refresh();
@@ -611,18 +669,32 @@ function CrewChip({
 
 function OfferPanel({
   candidates,
+  tiers,
   needs,
   busy,
-  onSend,
+  onOfferCaddies,
+  onOfferTiers,
+  onCallAll,
 }: {
   candidates: BoardCandidate[];
+  tiers: TierRec[];
   needs: number;
   busy: boolean;
-  onSend: (ids: string[]) => void;
+  onOfferCaddies: (ids: string[]) => void;
+  onOfferTiers: (tierIds: string[]) => void;
+  onCallAll: () => void;
 }) {
+  const [mode, setMode] = useState<"tier" | "pick" | "all">("tier");
   const [picked, setPicked] = useState<string[]>([]);
-  const toggle = (id: string) =>
-    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const [pickedTiers, setPickedTiers] = useState<string[]>([]);
+
+  const toggle = (id: string, set: typeof setPicked) =>
+    set((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+
+  // How many active caddies sit in the tiers currently ticked.
+  const inTiers = candidates.filter(
+    (c) => c.caddie.tierId && pickedTiers.includes(c.caddie.tierId),
+  ).length;
 
   return (
     <div
@@ -634,73 +706,159 @@ function OfferPanel({
         borderTop: "1px solid var(--line)",
       }}
     >
-      <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
-        {candidates.length === 0
-          ? "No active caddies on the roster yet."
-          : `Best first — availability, then rank, then who has waited longest. Needs ${needs}.`}
-      </div>
-
-      <div
-        style={{ display: "grid", gap: 6, maxHeight: 280, overflowY: "auto" }}
-      >
-        {candidates.map((c) => (
-          <label
-            key={c.caddie.id}
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-              opacity: c.conflict || c.alreadyOffered ? 0.5 : 1,
-              cursor: "pointer",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={picked.includes(c.caddie.id)}
-              onChange={() => toggle(c.caddie.id)}
-            />
-            <span className="badge gray">{c.caddie.tierName ?? "—"}</span>
-            <span style={{ flex: 1 }}>{c.caddie.fullName}</span>
-            {c.availability === "Available" && (
-              <span className="badge open">available</span>
-            )}
-            {c.availability === "Unavailable" && (
-              <span className="badge closed">off</span>
-            )}
-            {c.availability == null && (
-              <span className="muted" style={{ fontSize: 12 }}>
-                no answer
-              </span>
-            )}
-            {c.conflict && <span className="badge closed">conflict</span>}
-            {c.alreadyOffered && <span className="badge gray">asked</span>}
-            <span className="muted" style={{ fontSize: 12 }}>
-              {c.caddie.lastWorkedOn
-                ? `last ${c.caddie.lastWorkedOn}`
-                : "never worked"}
-            </span>
-          </label>
-        ))}
-      </div>
-
-      <div
-        style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}
-      >
+      <div className="seg" style={{ marginBottom: 12 }}>
         <button
-          className="btn small"
-          disabled={busy || picked.length === 0}
-          onClick={() => onSend(picked)}
+          className={mode === "tier" ? "segbtn on" : "segbtn"}
+          onClick={() => setMode("tier")}
         >
-          {picked.length > 1
-            ? `Broadcast to ${picked.length} — first to answer wins`
-            : "Send offer"}
+          By tier
         </button>
-        {picked.length > 0 && (
-          <button className="btn ghost small" onClick={() => setPicked([])}>
-            Clear
-          </button>
-        )}
+        <button
+          className={mode === "pick" ? "segbtn on" : "segbtn"}
+          onClick={() => setMode("pick")}
+        >
+          Pick caddies
+        </button>
+        <button
+          className={mode === "all" ? "segbtn on" : "segbtn"}
+          onClick={() => setMode("all")}
+        >
+          Everyone
+        </button>
       </div>
+
+      {mode === "tier" && (
+        <>
+          <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+            Offer to whole tiers, seniority first. Only these caddies can take
+            it — widen to the next tier if nobody bites.
+          </p>
+          <div style={{ display: "grid", gap: 6 }}>
+            {tiers.map((t, i) => {
+              const count = candidates.filter(
+                (c) => c.caddie.tierId === t.id,
+              ).length;
+              return (
+                <label
+                  key={t.id}
+                  style={{ display: "flex", gap: 10, alignItems: "center" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={pickedTiers.includes(t.id)}
+                    onChange={() => toggle(t.id, setPickedTiers)}
+                  />
+                  <span style={{ flex: 1 }}>{t.name}</span>
+                  {i === 0 && <span className="badge open">most senior</span>}
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    {count} active
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button
+              className="btn small"
+              disabled={busy || pickedTiers.length === 0 || inTiers === 0}
+              onClick={() => onOfferTiers(pickedTiers)}
+            >
+              Offer to {inTiers} {inTiers === 1 ? "caddie" : "caddies"}
+            </button>
+            {pickedTiers.length > 0 && (
+              <button
+                className="btn ghost small"
+                onClick={() => setPickedTiers([])}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {mode === "pick" && (
+        <>
+          <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+            Best first — availability, then tier, then who has waited longest.
+            Needs {needs}.
+          </p>
+          <div
+            style={{ display: "grid", gap: 6, maxHeight: 280, overflowY: "auto" }}
+          >
+            {candidates.length === 0 && (
+              <span className="muted">No active caddies on the roster yet.</span>
+            )}
+            {candidates.map((c) => (
+              <label
+                key={c.caddie.id}
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "center",
+                  opacity: c.conflict || c.alreadyOffered ? 0.5 : 1,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={picked.includes(c.caddie.id)}
+                  onChange={() => toggle(c.caddie.id, setPicked)}
+                />
+                <span className="badge gray">{c.caddie.tierName ?? "—"}</span>
+                <span style={{ flex: 1 }}>{c.caddie.fullName}</span>
+                {c.availability === "Available" && (
+                  <span className="badge open">available</span>
+                )}
+                {c.availability === "Unavailable" && (
+                  <span className="badge closed">off</span>
+                )}
+                {c.availability == null && (
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    no answer
+                  </span>
+                )}
+                {c.conflict && <span className="badge closed">conflict</span>}
+                {c.alreadyOffered && <span className="badge gray">asked</span>}
+                <span className="muted" style={{ fontSize: 12 }}>
+                  {c.caddie.lastWorkedOn
+                    ? `last ${c.caddie.lastWorkedOn}`
+                    : "never worked"}
+                </span>
+              </label>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button
+              className="btn small"
+              disabled={busy || picked.length === 0}
+              onClick={() => onOfferCaddies(picked)}
+            >
+              {picked.length > 1
+                ? `Offer to ${picked.length} — first to answer wins`
+                : "Send offer"}
+            </button>
+            {picked.length > 0 && (
+              <button className="btn ghost small" onClick={() => setPicked([])}>
+                Clear
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {mode === "all" && (
+        <>
+          <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+            Posts the loop to the job board and alerts every active caddie.
+            Unlike a tier offer, anyone can claim it — use this when you need it
+            filled more than you need it fair.
+          </p>
+          <button className="btn small" disabled={busy} onClick={onCallAll}>
+            Call all caddies
+          </button>
+        </>
+      )}
     </div>
   );
 }

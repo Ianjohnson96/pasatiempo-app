@@ -9,6 +9,7 @@ import { dayRange, getSettings } from "./data";
 import { getCaddieSession, mintInvite, signOutCaddie } from "./session";
 import {
   notifyActiveCaddies,
+  notifyCaddies,
   removePushSubscription,
   savePushSubscription,
 } from "./push";
@@ -416,6 +417,8 @@ function shiftInstantByDays(iso: string, days: number, tz: string): string {
 export interface OfferOutcome {
   offered: number;
   skipped: { caddieId: string; reason: string }[];
+  /** Devices actually reached. Offered but not notified means no alerts on. */
+  notified: number;
 }
 
 /**
@@ -481,11 +484,104 @@ export async function offerLoop(
       }
     }
 
+    // Tell the people we just offered it to.
+    //
+    // This used to do nothing at all: the offer rows appeared on the board and
+    // the caddies were never told, so a targeted offer only worked if someone
+    // happened to open the portal. Only "Call all" ever notified anybody.
+    let notified = 0;
+    if (offered > 0) {
+      const offeredIds = caddieIds.filter(
+        (id) => !skipped.some((s) => s.caddieId === id),
+      );
+      const push = await notifyCaddies(
+        offeredIds,
+        await offerAlert(loopId, broadcast),
+      );
+      notified = push.sent;
+    }
+
     revalidatePath(BOARD_PATH);
-    return { ok: true, value: { offered, skipped } };
+    revalidatePath("/caddie");
+    return { ok: true, value: { offered, skipped, notified } };
   } catch (e) {
     return fail(e, "Could not send the offer.");
   }
+}
+
+/**
+ * Offer a loop to whole tiers at once.
+ *
+ * What the seniority ladder is actually for. Offering to the top tier and
+ * widening only if nobody bites is how a caddie programme stays fair without
+ * the shop having to remember who is owed a loop — and unlike a job-board
+ * post, nobody outside those tiers can take it.
+ */
+export async function offerToTiers(
+  loopId: string,
+  tierIds: string[],
+): Promise<Result<OfferOutcome>> {
+  try {
+    if (tierIds.length === 0) {
+      return { ok: false, error: "Pick at least one tier." };
+    }
+
+    const supa = createAdminClient("caddie");
+    const { data, error } = await supa
+      .from("caddies")
+      .select("id")
+      .eq("status", "Active")
+      .in("tier_id", tierIds);
+    if (error) throw error;
+
+    const ids = (data ?? []).map((r) => String(r.id));
+    if (ids.length === 0) {
+      return { ok: false, error: "No active caddies are in those tiers." };
+    }
+
+    return await offerLoop(loopId, ids);
+  } catch (e) {
+    return fail(e, "Could not offer to those tiers.");
+  }
+}
+
+/** The wording a caddie sees when they are offered a loop directly. */
+async function offerAlert(loopId: string, broadcast: boolean) {
+  const supa = createAdminClient("caddie");
+  const settings = await getSettings();
+
+  const { data } = await supa
+    .from("loops")
+    .select("*")
+    .eq("id", loopId)
+    .maybeSingle();
+
+  const loop = data ? rowToLoop(data) : null;
+  const when = loop
+    ? new Intl.DateTimeFormat("en-US", {
+        timeZone: settings.courseTimezone,
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(loop.teeTime))
+    : "";
+  const rate = loop ? rateFor(settings.rates, loop.loopType) : null;
+
+  return {
+    title: broadcast
+      ? "Loop offered — first to answer"
+      : "You've been offered a loop",
+    body: loop
+      ? `${when} · ${loop.loopType}` +
+        (rate ? ` · $${Math.round(rate / 100)}` : "") +
+        `\n${loop.playerName}. Tap to accept or decline.`
+      : "Tap to accept or decline.",
+    url: "/caddie",
+    tag: `offer-${loopId}`,
+    loopId,
+  };
 }
 
 /** Pull an offer back before the caddie answers. */
