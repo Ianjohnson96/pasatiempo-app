@@ -6,8 +6,10 @@ import DispatchBoard, {
   type BoardCandidate,
 } from "@/components/caddie/DispatchBoard";
 import {
+  alertCoverage,
   availabilityFor,
   bookingNames,
+  caddieReach,
   courseToday,
   expireStaleOffers,
   formatDay,
@@ -45,11 +47,14 @@ export default async function CaddieDispatchPage({
   // cron does the same, but once a day is no use against a 20-minute window.
   await expireStaleOffers();
 
-  const [loops, caddies, availability] = await Promise.all([
+  const [loops, caddies, availability, reach] = await Promise.all([
     loopsForDay(day, tz),
     listCaddies(),
     availabilityFor(day),
+    caddieReach(),
   ]);
+
+  const coverage = alertCoverage(reach);
 
   // Ranking runs here rather than in the browser: it reads every caddie's work
   // history and the whole day's accepted loops, none of which the client needs.
@@ -88,6 +93,7 @@ export default async function CaddieDispatchPage({
           candidatesByLoop={candidatesByLoop}
           teeLabels={teeLabels}
           groupNames={Object.fromEntries(groups)}
+          coverage={coverage}
           rates={settings.rates}
           notifyReady={pushConfigured()}
         />

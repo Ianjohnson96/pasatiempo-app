@@ -224,6 +224,75 @@ export async function caddieCountByTier(): Promise<Map<string, number>> {
   return counts;
 }
 
+/**
+ * Whether we can actually reach a caddie, and how.
+ *
+ * The number that decides whether "Call all" is a tool or a formality. A blast
+ * that reaches five of eighteen is worse than none, because the shop rings the
+ * other thirteen anyway and then stops trusting the button entirely.
+ */
+export interface CaddieReach {
+  /** Phones signed up for job alerts. Zero means a post never reaches them. */
+  devices: number;
+  hasPhone: boolean;
+  hasEmail: boolean;
+  /** Last time they opened the portal, or null if they never have. */
+  lastSeenAt: string | null;
+}
+
+export async function caddieReach(): Promise<Map<string, CaddieReach>> {
+  const supa = createAdminClient("caddie");
+
+  const [caddies, subs, sessions] = await Promise.all([
+    supa.from("caddies").select("id, phone, email").eq("status", "Active"),
+    supa.from("push_subscriptions").select("caddie_id"),
+    supa
+      .from("sessions")
+      .select("caddie_id, last_seen_at")
+      .is("revoked_at", null),
+  ]);
+  for (const r of [caddies, subs, sessions]) {
+    if (r.error) throw r.error;
+  }
+
+  const deviceCount = new Map<string, number>();
+  for (const row of subs.data ?? []) {
+    const id = String(row.caddie_id);
+    deviceCount.set(id, (deviceCount.get(id) ?? 0) + 1);
+  }
+
+  const lastSeen = new Map<string, string>();
+  for (const row of sessions.data ?? []) {
+    const id = String(row.caddie_id);
+    const at = row.last_seen_at ? String(row.last_seen_at) : null;
+    if (!at) continue;
+    const best = lastSeen.get(id);
+    if (!best || at > best) lastSeen.set(id, at);
+  }
+
+  const out = new Map<string, CaddieReach>();
+  for (const row of caddies.data ?? []) {
+    const id = String(row.id);
+    out.set(id, {
+      devices: deviceCount.get(id) ?? 0,
+      hasPhone: Boolean(row.phone),
+      hasEmail: Boolean(row.email),
+      lastSeenAt: lastSeen.get(id) ?? null,
+    });
+  }
+  return out;
+}
+
+/** How many active caddies a posted loop would actually notify. */
+export function alertCoverage(reach: Map<string, CaddieReach>): {
+  reachable: number;
+  total: number;
+} {
+  let reachable = 0;
+  for (const r of reach.values()) if (r.devices > 0) reachable += 1;
+  return { reachable, total: reach.size };
+}
+
 /** What one caddie said about one day. */
 export interface DayAvailability {
   slot: TimeSlot;

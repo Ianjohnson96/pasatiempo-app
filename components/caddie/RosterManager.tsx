@@ -26,6 +26,11 @@ import {
 interface Props {
   caddies: CaddieRec[];
   tiers: TierRec[];
+  /** Active caddie id -> whether we can actually reach them. */
+  reach: Record<
+    string,
+    { devices: number; hasPhone: boolean; hasEmail: boolean; lastSeenAt: string | null }
+  >;
 }
 
 const STATUS_BADGE: Record<CaddieStatus, string> = {
@@ -44,7 +49,7 @@ const BLANK: CaddieInput = {
   notes: "",
 };
 
-export default function RosterManager({ caddies, tiers }: Props) {
+export default function RosterManager({ caddies, tiers, reach }: Props) {
   const router = useRouter();
   const [busy, start] = useTransition();
   const [adding, setAdding] = useState(false);
@@ -56,7 +61,11 @@ export default function RosterManager({ caddies, tiers }: Props) {
     null,
   );
 
-  const active = caddies.filter((c) => c.status === "Active").length;
+  const activeList = caddies.filter((c) => c.status === "Active");
+  const active = activeList.length;
+  const onAlerts = activeList.filter(
+    (c) => (reach[c.id]?.devices ?? 0) > 0,
+  ).length;
 
   function run(
     fn: () => Promise<{ ok: boolean; error?: string }>,
@@ -79,7 +88,8 @@ export default function RosterManager({ caddies, tiers }: Props) {
         <div>
           <h1>Caddie Roster</h1>
           <div className="sub">
-            {caddies.length} on the roster · {active} active
+            {caddies.length} on the roster · {active} active · {onAlerts} with
+            job alerts on
           </div>
         </div>
         <button
@@ -178,6 +188,30 @@ export default function RosterManager({ caddies, tiers }: Props) {
                     </span>
                   </div>
                   <div className="ev-meta">
+                    {c.status === "Active" && (
+                      <span
+                        className={
+                          (reach[c.id]?.devices ?? 0) > 0
+                            ? "badge open"
+                            : "badge closed"
+                        }
+                        title={
+                          (reach[c.id]?.devices ?? 0) > 0
+                            ? `Job alerts on (${reach[c.id]?.devices} device${
+                                reach[c.id]?.devices === 1 ? "" : "s"
+                              })`
+                            : reach[c.id]?.lastSeenAt
+                              ? "Has opened the portal but not turned alerts on"
+                              : "Has never opened the portal"
+                        }
+                      >
+                        {(reach[c.id]?.devices ?? 0) > 0
+                          ? "alerts on"
+                          : reach[c.id]?.lastSeenAt
+                            ? "no alerts"
+                            : "never signed in"}
+                      </span>
+                    )}
                     {c.phone && <span>{formatPhone(c.phone)}</span>}
                     {c.email && <span>{c.email}</span>}
                     <span>contact by {c.preferredContactMethod}</span>
@@ -338,12 +372,38 @@ function InvitePanel({
           <div className="ev-title" style={{ fontSize: 18 }}>
             Sign-in link for {caddieName}
           </div>
-          <p className="muted" style={{ marginTop: 6 }}>
+          <p className="muted no-print" style={{ marginTop: 6 }}>
             Have them scan this with their phone camera. It signs them in for
             90 days, works once, and expires{" "}
             {new Date(handout.expiresAt).toLocaleDateString()}. Creating a new
             link cancels this one.
           </p>
+
+          {/* The steps that matter on paper. An iPhone will not deliver job
+              alerts until the portal is on the home screen, and telling each
+              caddie that by hand eighteen times is how it gets skipped. */}
+          <ol
+            style={{
+              margin: "12px 0 0",
+              paddingLeft: 20,
+              fontSize: 14,
+              lineHeight: 1.7,
+            }}
+          >
+            <li>Scan the square above with your phone camera.</li>
+            <li>
+              <strong>iPhone:</strong> tap the Share button, then{" "}
+              <strong>Add to Home Screen</strong>. Open Caddies from your home
+              screen.
+            </li>
+            <li>
+              Tap <strong>Turn on alerts</strong> and allow notifications.
+            </li>
+            <li>
+              You&apos;ll get a notification the moment a loop is posted. First
+              to claim it gets it.
+            </li>
+          </ol>
 
           <div
             style={{
@@ -359,7 +419,13 @@ function InvitePanel({
             {handout.url}
           </div>
 
-          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <div className="no-print" style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button
+              className="btn secondary small"
+              onClick={() => window.print()}
+            >
+              Print handout
+            </button>
             <button
               className="btn secondary small"
               onClick={() => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   callAllCaddies,
@@ -45,6 +46,8 @@ interface Props {
   teeLabels: Record<string, string>; // loop id -> "7:42 AM"
   /** Booking id -> party name, for loops that go out together. */
   groupNames: Record<string, string>;
+  /** How many active caddies a post would actually notify. */
+  coverage: { reachable: number; total: number };
   rates: RateCard;
   notifyReady: boolean;
 }
@@ -65,6 +68,7 @@ export default function DispatchBoard({
   candidatesByLoop,
   teeLabels,
   groupNames,
+  coverage,
   rates,
   notifyReady,
 }: Props) {
@@ -138,11 +142,28 @@ export default function DispatchBoard({
 
       <DayTools day={day} hasLoops={loops.length > 0} busy={pending} onNote={setNote} />
 
-      {!notifyReady && (
+      {!notifyReady ? (
         <p className="notice warn">
           Job alerts are not configured, so posting a loop tells nobody. Ring the
           caddie, then mark their answer here.
         </p>
+      ) : (
+        coverage.reachable < coverage.total && (
+          // Said before the button is pressed, not after. Finding out that a
+          // blast reached five of eighteen once it has already gone is how the
+          // shop learns to ring everybody anyway.
+          <p
+            className={coverage.reachable === 0 ? "notice err" : "notice warn"}
+          >
+            Job alerts reach <strong>{coverage.reachable} of{" "}
+            {coverage.total}</strong> active{" "}
+            {coverage.total === 1 ? "caddie" : "caddies"}.{" "}
+            {coverage.total - coverage.reachable}{" "}
+            {coverage.total - coverage.reachable === 1 ? "has" : "have"} not
+            turned alerts on and will not hear about a posted loop.{" "}
+            <Link href="/admin/caddie/roster">See who →</Link>
+          </p>
+        )
       )}
 
       {note && (
@@ -291,7 +312,7 @@ export default function DispatchBoard({
                         })
                       }
                     >
-                      Call all
+                      Call all{coverage.reachable > 0 && ` (${coverage.reachable})`}
                     </button>
                   )}
                   <button
