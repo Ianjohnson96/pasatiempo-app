@@ -791,6 +791,20 @@ export async function bookingNames(
   return new Map((data ?? []).map((r) => [String(r.id), String(r.name)]));
 }
 
+/**
+ * Which of these loops have already teed off.
+ *
+ * Lives here rather than in the page because reading the clock inside a
+ * component body is impure, and React's lint rules are right to say so even
+ * when the component only ever renders on the server.
+ */
+export function pastLoopIds(loops: LoopWithCrew[]): string[] {
+  const now = Date.now();
+  return loops
+    .filter(({ loop }) => new Date(loop.teeTime).getTime() < now)
+    .map(({ loop }) => loop.id);
+}
+
 /** An offer or booking the caddie still has a stake in. */
 export interface OpenWork {
   assignment: AssignmentRec;

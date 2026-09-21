@@ -17,6 +17,7 @@ import {
   getSettings,
   listCaddies,
   loopsForDay,
+  pastLoopIds,
   rankCandidates,
 } from "@/lib/caddie/data";
 import { pushConfigured } from "@/lib/caddie/push";
@@ -56,6 +57,8 @@ export default async function CaddieDispatchPage({
 
   const coverage = alertCoverage(reach);
 
+  const past = pastLoopIds(loops);
+
   // Ranking runs here rather than in the browser: it reads every caddie's work
   // history and the whole day's accepted loops, none of which the client needs.
   const groups = await bookingNames(
@@ -92,9 +95,7 @@ export default async function CaddieDispatchPage({
           loops={loops}
           candidatesByLoop={candidatesByLoop}
           teeLabels={teeLabels}
-          pastLoopIds={loops
-            .filter(({ loop }) => new Date(loop.teeTime).getTime() < Date.now())
-            .map(({ loop }) => loop.id)}
+          pastLoopIds={past}
           groupNames={Object.fromEntries(groups)}
           coverage={coverage}
           rates={settings.rates}
