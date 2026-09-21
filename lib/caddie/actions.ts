@@ -439,6 +439,17 @@ export async function offerLoop(
     const settings = await getSettings();
     const by = await currentEmail();
 
+    const { data: loopRow, error: loopErr } = await supa
+      .from("loops")
+      .select("tee_time, status")
+      .eq("id", loopId)
+      .maybeSingle();
+    if (loopErr) throw loopErr;
+    if (!loopRow) return { ok: false, error: "That loop no longer exists." };
+    if (new Date(String(loopRow.tee_time)).getTime() < Date.now()) {
+      return { ok: false, error: "That loop has already teed off." };
+    }
+
     const broadcast = caddieIds.length > 1;
     const minutes = broadcast
       ? settings.broadcastExpiryMinutes
@@ -702,6 +713,12 @@ export async function callAllCaddies(loopId: string): Promise<Result<number>> {
     const loop = rowToLoop(row);
     if (loop.status === "Cancelled") {
       return { ok: false, error: "That loop is cancelled." };
+    }
+    // The board hides the button on past loops, but the action is the thing
+    // that must refuse: a stale tab from this morning would otherwise buzz
+    // every caddie about a round that has already been played.
+    if (new Date(loop.teeTime).getTime() < Date.now()) {
+      return { ok: false, error: "That loop has already teed off." };
     }
 
     // Posting to the board is what makes it claimable; the alert only tells

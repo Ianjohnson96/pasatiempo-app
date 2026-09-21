@@ -92,6 +92,9 @@ export default async function CaddieDispatchPage({
           loops={loops}
           candidatesByLoop={candidatesByLoop}
           teeLabels={teeLabels}
+          pastLoopIds={loops
+            .filter(({ loop }) => new Date(loop.teeTime).getTime() < Date.now())
+            .map(({ loop }) => loop.id)}
           groupNames={Object.fromEntries(groups)}
           coverage={coverage}
           rates={settings.rates}

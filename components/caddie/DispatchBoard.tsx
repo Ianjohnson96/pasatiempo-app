@@ -44,6 +44,8 @@ interface Props {
   loops: LoopWithCrew[];
   candidatesByLoop: Record<string, BoardCandidate[]>;
   teeLabels: Record<string, string>; // loop id -> "7:42 AM"
+  /** Loop ids whose tee time has already passed. */
+  pastLoopIds: string[];
   /** Booking id -> party name, for loops that go out together. */
   groupNames: Record<string, string>;
   /** How many active caddies a post would actually notify. */
@@ -67,6 +69,7 @@ export default function DispatchBoard({
   loops,
   candidatesByLoop,
   teeLabels,
+  pastLoopIds,
   groupNames,
   coverage,
   rates,
@@ -78,6 +81,8 @@ export default function DispatchBoard({
   const [note, setNote] = useState<{ kind: "ok" | "err"; text: string } | null>(
     null,
   );
+
+  const past = new Set(pastLoopIds);
 
   const go = (d: string) => router.push(`/admin/caddie?day=${d}`);
 
@@ -186,6 +191,9 @@ export default function DispatchBoard({
             const rate = rateFor(rates, loop.loopType);
             const isOpen = openLoop === loop.id;
             const needs = loop.caddiesRequired - accepted;
+            // Offering a loop that has already been played is never right,
+            // whatever its status says.
+            const isPast = past.has(loop.id);
             const groupName = loop.bookingId
               ? groupNames[loop.bookingId]
               : undefined;
@@ -273,7 +281,7 @@ export default function DispatchBoard({
                   className="no-print"
                   style={{ display: "flex", gap: 8, alignItems: "center" }}
                 >
-                  {needs > 0 && loop.status !== "Cancelled" && (
+                  {needs > 0 && !isPast && loop.status !== "Cancelled" && (
                     <button
                       className="btn small"
                       onClick={() => setOpenLoop(isOpen ? null : loop.id)}
@@ -283,7 +291,7 @@ export default function DispatchBoard({
                   )}
                   {/* The whole point of the app: one button instead of
                       texting the roster one at a time. */}
-                  {needs > 0 && loop.status !== "Cancelled" && (
+                  {needs > 0 && !isPast && loop.status !== "Cancelled" && (
                     <button
                       className="btn small"
                       disabled={pending}

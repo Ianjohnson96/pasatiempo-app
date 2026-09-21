@@ -37,9 +37,12 @@ export async function GET(request: NextRequest) {
   // at the edge, and it can land a moment ahead of PostgREST's clock. Every
   // call after it succeeded. A daily job that gives up on a blip is a job that
   // quietly stops running.
-  async function sweep(fn: string): Promise<number> {
+  async function sweep(
+    fn: string,
+    args?: Record<string, unknown>,
+  ): Promise<number> {
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const { data, error } = await supa.rpc(fn);
+      const { data, error } = await supa.rpc(fn, args);
       if (!error) return Number(data ?? 0);
       if (attempt === 0) {
         await new Promise((r) => setTimeout(r, 1500));
@@ -53,6 +56,9 @@ export async function GET(request: NextRequest) {
   try {
     // Sequential rather than parallel: three concurrent cold connections are
     // what provoked the failure, and nothing here is time-critical.
+    // Close out played loops first: a completed loop is no longer live, so
+    // nothing below should treat it as if it were.
+    const completedLoops = await sweep("complete_past_loops");
     const expiredOffers = await sweep("expire_stale_offers");
     const purgedSessions = await sweep("purge_expired_sessions");
     const purgedInvites = await sweep("purge_expired_invites");
@@ -63,6 +69,7 @@ export async function GET(request: NextRequest) {
     const reminders = await remindUpcomingLoops();
 
     return NextResponse.json({
+      completedLoops,
       expiredOffers,
       purgedSessions,
       purgedInvites,
