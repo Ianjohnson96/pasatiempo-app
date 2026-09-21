@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import QRCode from "qrcode";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { getSettings } from "./data";
+import { dayRange, getSettings } from "./data";
 import { getCaddieSession, mintInvite, signOutCaddie } from "./session";
 import {
   DEFAULT_HOLES,
@@ -175,6 +175,159 @@ export async function setOpenBoard(
   } catch (e) {
     return fail(e, "Could not update the job board.");
   }
+}
+
+// ---------------------------------------------------------------------------
+// Whole-day operations
+// ---------------------------------------------------------------------------
+
+/**
+ * Call the day off — weather, usually.
+ *
+ * Rain does not cancel one loop, it cancels the sheet, and doing that a row at
+ * a time while the phone rings is not a workflow. Completed loops are left
+ * alone: they already happened. Pending offers are withdrawn in the same pass
+ * so nobody accepts a loop that is no longer on.
+ */
+export async function cancelDay(day: string): Promise<Result<number>> {
+  try {
+    const supa = createAdminClient("caddie");
+    const { courseTimezone } = await getSettings();
+    const { from, to } = dayRange(day, courseTimezone);
+
+    const { data: affected, error: readErr } = await supa
+      .from("loops")
+      .select("id")
+      .gte("tee_time", from)
+      .lt("tee_time", to)
+      .not("status", "in", '("Completed","Cancelled")');
+    if (readErr) throw readErr;
+
+    const ids = (affected ?? []).map((r) => String(r.id));
+    if (ids.length === 0) return { ok: true, value: 0 };
+
+    // Offers first: a caddie accepting between these two statements would be
+    // accepting a loop that is about to be cancelled anyway, and this way the
+    // board never shows a pending offer against a cancelled loop.
+    const { error: offerErr } = await supa
+      .from("assignments")
+      .update({
+        confirmation_status: "Withdrawn",
+        responded_at: new Date().toISOString(),
+        response_channel: "admin",
+      })
+      .in("loop_id", ids)
+      .eq("confirmation_status", "Pending");
+    if (offerErr) throw offerErr;
+
+    const { error } = await supa
+      .from("loops")
+      .update({ status: "Cancelled", open_board: false })
+      .in("id", ids);
+    if (error) throw error;
+
+    revalidatePath(BOARD_PATH);
+    return { ok: true, value: ids.length };
+  } catch (e) {
+    return fail(e, "Could not cancel the day.");
+  }
+}
+
+/**
+ * Copy one day's loops onto another date.
+ *
+ * Most Saturdays look like the last Saturday, and retyping the sheet is the
+ * kind of chore that stops people using the tool at all. Copies the jobs only —
+ * never the caddies — because who worked last Saturday is a fact about last
+ * Saturday, not a booking for the next one.
+ */
+export async function duplicateDay(
+  fromDay: string,
+  toDay: string,
+): Promise<Result<number>> {
+  try {
+    if (fromDay === toDay) {
+      return { ok: false, error: "Pick a different date to copy to." };
+    }
+
+    const supa = createAdminClient("caddie");
+    const { courseTimezone } = await getSettings();
+    const { from, to } = dayRange(fromDay, courseTimezone);
+
+    const { data: rows, error: readErr } = await supa
+      .from("loops")
+      .select("*")
+      .gte("tee_time", from)
+      .lt("tee_time", to)
+      .neq("status", "Cancelled")
+      .order("tee_time", { ascending: true });
+    if (readErr) throw readErr;
+
+    const source = (rows ?? []).map(rowToLoop);
+    if (source.length === 0) {
+      return { ok: false, error: "That day has no loops to copy." };
+    }
+
+    const by = await currentEmail();
+    const offsetDays = daysBetween(fromDay, toDay);
+
+    const copies = source.map((l) => ({
+      // Shift by whole days so the tee time lands at the same wall clock even
+      // across a daylight-saving boundary.
+      tee_time: shiftInstantByDays(l.teeTime, offsetDays, courseTimezone),
+      player_name: l.playerName,
+      loop_type: l.loopType,
+      caddies_required: l.caddiesRequired,
+      holes: l.holes,
+      notes: l.notes,
+      requested_rank: l.requestedRank,
+      requested_caddie_id: l.requestedCaddieId,
+      created_by: by,
+    }));
+
+    const { error } = await supa.from("loops").insert(copies);
+    if (error) throw error;
+
+    revalidatePath(BOARD_PATH);
+    return { ok: true, value: copies.length };
+  } catch (e) {
+    return fail(e, "Could not copy the day.");
+  }
+}
+
+function daysBetween(a: string, b: string): number {
+  const ms =
+    new Date(`${b}T00:00:00Z`).getTime() - new Date(`${a}T00:00:00Z`).getTime();
+  return Math.round(ms / 86_400_000);
+}
+
+/**
+ * Move an instant forward N calendar days, keeping the course-local wall clock.
+ *
+ * Adding N*24h would drift by an hour across a daylight-saving change and put
+ * a 7:40 tee time out at 6:40 or 8:40.
+ */
+function shiftInstantByDays(iso: string, days: number, tz: string): string {
+  const local = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const get = (t: string) => local.find((p) => p.type === t)?.value ?? "00";
+
+  const day = `${get("year")}-${get("month")}-${get("day")}`;
+  const time = `${get("hour") === "24" ? "00" : get("hour")}:${get("minute")}`;
+  const shifted = new Date(`${day}T00:00:00Z`);
+  shifted.setUTCDate(shifted.getUTCDate() + days);
+
+  return (
+    localToInstant(shifted.toISOString().slice(0, 10), time, tz) ??
+    new Date(iso).toISOString()
+  );
 }
 
 // ---------------------------------------------------------------------------

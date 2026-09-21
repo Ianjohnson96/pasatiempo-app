@@ -3,6 +3,8 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  cancelDay,
+  duplicateDay,
   offerLoop,
   respondForCaddie,
   saveLoop,
@@ -135,6 +137,8 @@ export default function DispatchBoard({
         </div>
       </div>
 
+      <DayTools day={day} hasLoops={loops.length > 0} busy={pending} onNote={setNote} />
+
       {!notifyReady && (
         <p className="notice warn">
           Offers are recorded but nothing is sent yet — no email or SMS is wired
@@ -228,7 +232,10 @@ export default function DispatchBoard({
                   )}
                 </div>
 
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div
+                  className="no-print"
+                  style={{ display: "flex", gap: 8, alignItems: "center" }}
+                >
                   {needs > 0 && loop.status !== "Cancelled" && (
                     <button
                       className="btn small"
@@ -299,6 +306,166 @@ export default function DispatchBoard({
         </div>
       )}
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Whole-day actions: print the sheet, call the day off, copy it forward
+// ---------------------------------------------------------------------------
+
+function DayTools({
+  day,
+  hasLoops,
+  busy,
+  onNote,
+}: {
+  day: string;
+  hasLoops: boolean;
+  busy: boolean;
+  onNote: (n: { kind: "ok" | "err"; text: string } | null) => void;
+}) {
+  const router = useRouter();
+  const [working, start] = useTransition();
+  const [copyTo, setCopyTo] = useState(shift(day, 7));
+  const [showCopy, setShowCopy] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+
+  const disabled = busy || working || !hasLoops;
+
+  return (
+    <div
+      className="no-print"
+      style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}
+    >
+      <button
+        className="btn secondary small"
+        disabled={!hasLoops}
+        onClick={() => window.print()}
+      >
+        Print sheet
+      </button>
+
+      <button
+        className="btn secondary small"
+        disabled={disabled}
+        onClick={() => setShowCopy((s) => !s)}
+      >
+        Copy day →
+      </button>
+
+      {/* Two-step rather than a native confirm(): the browser dialog blocks the
+          page, looks nothing like the rest of the app, and cannot be styled to
+          say what is actually about to happen. */}
+      {confirmCancel ? (
+        <span
+          style={{
+            display: "inline-flex",
+            gap: 8,
+            alignItems: "center",
+            padding: "4px 8px",
+            border: "1px solid var(--danger)",
+            borderRadius: 8,
+          }}
+        >
+          <span style={{ fontSize: 13 }}>
+            Cancel every loop on this day? Offers waiting on an answer are
+            withdrawn.
+          </span>
+          <button
+            className="btn danger small"
+            disabled={working}
+            onClick={() =>
+              start(async () => {
+                const res = await cancelDay(day);
+                setConfirmCancel(false);
+                if (res.ok) {
+                  onNote({
+                    kind: "ok",
+                    text: `Cancelled ${res.value} ${
+                      res.value === 1 ? "loop" : "loops"
+                    }. Individual loops can be restored.`,
+                  });
+                  router.refresh();
+                } else {
+                  onNote({ kind: "err", text: res.error });
+                }
+              })
+            }
+          >
+            {working ? "Cancelling…" : "Yes, cancel them"}
+          </button>
+          <button
+            className="btn ghost small"
+            onClick={() => setConfirmCancel(false)}
+          >
+            Keep them
+          </button>
+        </span>
+      ) : (
+        <button
+          className="btn ghost small"
+          disabled={disabled}
+          onClick={() => {
+            setShowCopy(false);
+            setConfirmCancel(true);
+          }}
+        >
+          Cancel the day
+        </button>
+      )}
+
+      {showCopy && (
+        <span
+          style={{
+            display: "inline-flex",
+            gap: 8,
+            alignItems: "center",
+            padding: "4px 8px",
+            border: "1px solid var(--line)",
+            borderRadius: 8,
+          }}
+        >
+          <span className="muted" style={{ fontSize: 13 }}>
+            Copy these loops to
+          </span>
+          <input
+            type="date"
+            value={copyTo}
+            onChange={(e) => e.target.value && setCopyTo(e.target.value)}
+            style={{
+              padding: "6px 8px",
+              borderRadius: 8,
+              border: "1px solid var(--line)",
+              background: "var(--panel)",
+              color: "var(--ink)",
+            }}
+          />
+          <button
+            className="btn small"
+            disabled={working}
+            onClick={() =>
+              start(async () => {
+                const res = await duplicateDay(day, copyTo);
+                if (res.ok) {
+                  onNote({
+                    kind: "ok",
+                    text: `Copied ${res.value} ${
+                      res.value === 1 ? "loop" : "loops"
+                    } to ${copyTo}. Caddies were not copied.`,
+                  });
+                  setShowCopy(false);
+                  router.push(`/admin/caddie?day=${copyTo}`);
+                } else {
+                  onNote({ kind: "err", text: res.error });
+                }
+              })
+            }
+          >
+            {working ? "Copying…" : "Copy"}
+          </button>
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -378,6 +545,7 @@ function OfferPanel({
 
   return (
     <div
+      className="no-print"
       style={{
         flexBasis: "100%",
         marginTop: 12,
@@ -523,7 +691,7 @@ function QuickAdd({
   }
 
   return (
-    <form onSubmit={submit} className="card" style={{ marginTop: 16 }}>
+    <form onSubmit={submit} className="card no-print" style={{ marginTop: 16 }}>
       <div
         style={{
           display: "flex",
