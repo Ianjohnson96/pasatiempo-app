@@ -12,6 +12,7 @@ const TABS = [
     label: "Who's free",
   },
   { href: "/admin/caddie/roster", key: "roster", label: "Roster" },
+  { href: "/admin/caddie/tiers", key: "tiers", label: "Tiers" },
   { href: "/admin/caddie/rates", key: "rates", label: "Rates" },
 ] as const;
 

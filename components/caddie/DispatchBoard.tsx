@@ -8,18 +8,16 @@ import {
   duplicateDay,
   offerLoop,
   respondForCaddie,
-  saveLoop,
+  createGroupBooking,
   setLoopStatus,
   setOpenBoard,
   withdrawOffer,
 } from "@/lib/caddie/actions";
 import {
   LOOP_TYPES,
-  RANKS,
   acceptedCount,
   pendingCount,
   rateFor,
-  type CaddieRank,
   type CaddieRec,
   type CrewMember,
   type LoopStatus,
@@ -36,7 +34,6 @@ export interface BoardCandidate {
   availability: "Available" | "Unavailable" | "Pending" | null;
   alreadyOffered: boolean;
   conflict: boolean;
-  requested: boolean;
 }
 
 interface Props {
@@ -47,6 +44,8 @@ interface Props {
   caddies: CaddieRec[];
   candidatesByLoop: Record<string, BoardCandidate[]>;
   teeLabels: Record<string, string>; // loop id -> "7:42 AM"
+  /** Booking id -> party name, for loops that go out together. */
+  groupNames: Record<string, string>;
   rates: RateCard;
   notifyReady: boolean;
 }
@@ -67,6 +66,7 @@ export default function DispatchBoard({
   caddies,
   candidatesByLoop,
   teeLabels,
+  groupNames,
   rates,
   notifyReady,
 }: Props) {
@@ -153,7 +153,7 @@ export default function DispatchBoard({
         </p>
       )}
 
-      <QuickAdd day={day} caddies={caddies} busy={pending} />
+      <QuickAdd day={day} busy={pending} />
 
       {loops.length === 0 ? (
         <div className="empty" style={{ marginTop: 18 }}>
@@ -167,9 +167,24 @@ export default function DispatchBoard({
             const rate = rateFor(rates, loop.loopType);
             const isOpen = openLoop === loop.id;
             const needs = loop.caddiesRequired - accepted;
+            const groupName = loop.bookingId
+              ? groupNames[loop.bookingId]
+              : undefined;
 
             return (
-              <div key={loop.id} className="evrow" style={{ flexWrap: "wrap" }}>
+              <div
+                  key={loop.id}
+                  className="evrow"
+                  style={{
+                    flexWrap: "wrap",
+                    // A shared left rule reads as "these go out together"
+                    // faster than repeating the party name on every row.
+                    borderLeft: groupName
+                      ? "3px solid var(--accent)"
+                      : undefined,
+                    paddingLeft: groupName ? 10 : undefined,
+                  }}
+                >
                 <div className="ev-main" style={{ minWidth: 0 }}>
                   <div
                     style={{
@@ -189,6 +204,11 @@ export default function DispatchBoard({
                     {loop.openBoard && (
                       <span className="badge gray">job board</span>
                     )}
+                    {groupName && (
+                      <span className="badge gray" title={`Part of ${groupName}`}>
+                        {groupName}
+                      </span>
+                    )}
                   </div>
                   <div className="ev-meta">
                     <span>{loop.loopType}</span>
@@ -198,9 +218,6 @@ export default function DispatchBoard({
                     </span>
                     {rate != null && (
                       <span>${(rate / 100).toFixed(0)} a caddie</span>
-                    )}
-                    {loop.requestedRank && (
-                      <span>wants {loop.requestedRank}-rank</span>
                     )}
                     {loop.notes && <span>{loop.notes}</span>}
                   </div>
@@ -529,7 +546,9 @@ function CrewChip({
       className="pill"
       style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
     >
-      <span className={`badge ${tone}`}>{member.caddie.rank}</span>
+      <span className={`badge ${tone}`}>
+        {member.caddie.tierName ?? "—"}
+      </span>
       <span>{member.caddie.fullName}</span>
       <span className="muted" style={{ fontSize: 12 }}>
         {s.toLowerCase()}
@@ -613,9 +632,8 @@ function OfferPanel({
               checked={picked.includes(c.caddie.id)}
               onChange={() => toggle(c.caddie.id)}
             />
-            <span className="badge gray">{c.caddie.rank}</span>
+            <span className="badge gray">{c.caddie.tierName ?? "—"}</span>
             <span style={{ flex: 1 }}>{c.caddie.fullName}</span>
-            {c.requested && <span className="badge open">requested</span>}
             {c.availability === "Available" && (
               <span className="badge open">available</span>
             )}
@@ -666,64 +684,68 @@ function OfferPanel({
 
 function QuickAdd({
   day,
-  caddies,
   busy,
 }: {
   day: string;
-  caddies: CaddieRec[];
   busy: boolean;
 }) {
   const router = useRouter();
-  // The date defaults to whatever day is on screen, but is editable, so a
-  // Saturday loop can be posted on a Tuesday without navigating there first.
+  // Defaults to the day on screen but editable, so a Saturday party can be
+  // booked on a Tuesday without navigating there first.
   const [date, setDate] = useState(day);
   const [time, setTime] = useState("07:00");
-  const [playerName, setPlayerName] = useState("");
+  const [name, setName] = useState("");
   const [loopType, setLoopType] = useState<LoopType>("Single Bag");
-  const [caddiesRequired, setCaddiesRequired] = useState(1);
+  const [caddiesPerGroup, setCaddiesPerGroup] = useState(1);
+  const [groups, setGroups] = useState(1);
+  const [intervalMinutes, setIntervalMinutes] = useState(10);
   const [notes, setNotes] = useState("");
-  const [requestedRank, setRequestedRank] = useState<CaddieRank | "">("");
-  const [requestedCaddieId, setRequestedCaddieId] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [saving, start] = useTransition();
 
-  const activeCaddies = useMemo(
-    () => caddies.filter((c) => c.status === "Active"),
-    [caddies],
-  );
+  // Show the shop exactly which tee times it is about to create, so a party of
+  // twelve across three groups is checkable before it is booked, not after.
+  const preview = useMemo(() => {
+    const [h, m] = time.split(":").map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return [];
+    return Array.from({ length: Math.max(1, Math.min(groups, 20)) }, (_, i) => {
+      const total = h * 60 + m + i * intervalMinutes;
+      const hh = Math.floor(total / 60) % 24;
+      const mm = total % 60;
+      const ampm = hh < 12 ? "a" : "p";
+      const h12 = hh % 12 === 0 ? 12 : hh % 12;
+      return `${h12}:${String(mm).padStart(2, "0")}${ampm}`;
+    });
+  }, [time, groups, intervalMinutes]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
     start(async () => {
-      const res = await saveLoop({
+      const res = await createGroupBooking({
         day: date,
         time,
-        playerName,
+        name,
         loopType,
-        caddiesRequired,
+        caddiesPerGroup,
+        groups,
+        intervalMinutes,
         notes,
-        requestedRank: requestedRank || null,
-        requestedCaddieId: requestedCaddieId || null,
       });
       if (!res.ok) {
         setErr(res.error);
         return;
       }
-      // Entering a sheet means many loops in a row: keep the settings and the
-      // date, clear the name, and roll the clock forward one interval so the
-      // next row starts close to right.
-      setPlayerName("");
+      setName("");
       setNotes("");
-      setRequestedCaddieId("");
-      setTime(bumpTime(time, 10));
-
-      // Posted somewhere other than the day on screen? Go there, otherwise the
-      // loop vanishes into a date the user cannot see and looks like a failure.
+      setGroups(1);
+      setTime(bumpTime(time, intervalMinutes * Math.max(1, groups)));
       if (date !== day) router.push(`/admin/caddie?day=${date}`);
       else router.refresh();
     });
   }
+
+  const totalCaddies = caddiesPerGroup * Math.max(1, groups);
 
   return (
     <form onSubmit={submit} className="card no-print" style={{ marginTop: 16 }}>
@@ -744,7 +766,7 @@ function QuickAdd({
             style={{ ...inputStyle, width: 150 }}
           />
         </Field>
-        <Field label="Tee time">
+        <Field label="First tee">
           <input
             type="time"
             value={time}
@@ -753,11 +775,11 @@ function QuickAdd({
             style={{ ...inputStyle, width: 120 }}
           />
         </Field>
-        <Field label="Player" grow>
+        <Field label="Group / party" grow>
           <input
-            value={playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-            placeholder="Member name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Member or party name"
             required
             style={{ ...inputStyle, minWidth: 180, width: "100%" }}
           />
@@ -775,43 +797,38 @@ function QuickAdd({
             ))}
           </select>
         </Field>
-        <Field label="Caddies">
+        <Field label="Tee times">
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={groups}
+            onChange={(e) => setGroups(Number(e.target.value))}
+            style={{ ...inputStyle, width: 80 }}
+          />
+        </Field>
+        <Field label="Apart">
+          <select
+            value={intervalMinutes}
+            onChange={(e) => setIntervalMinutes(Number(e.target.value))}
+            style={{ ...inputStyle, width: 92 }}
+          >
+            {[8, 9, 10, 11, 12, 15, 20].map((m) => (
+              <option key={m} value={m}>
+                {m} min
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Caddies each">
           <input
             type="number"
             min={1}
             max={8}
-            value={caddiesRequired}
-            onChange={(e) => setCaddiesRequired(Number(e.target.value))}
-            style={{ ...inputStyle, width: 72 }}
+            value={caddiesPerGroup}
+            onChange={(e) => setCaddiesPerGroup(Number(e.target.value))}
+            style={{ ...inputStyle, width: 90 }}
           />
-        </Field>
-        <Field label="Wants rank">
-          <select
-            value={requestedRank}
-            onChange={(e) => setRequestedRank(e.target.value as CaddieRank | "")}
-            style={{ ...inputStyle, width: 100 }}
-          >
-            <option value="">Any</option>
-            {RANKS.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Wants caddie">
-          <select
-            value={requestedCaddieId}
-            onChange={(e) => setRequestedCaddieId(e.target.value)}
-            style={{ ...inputStyle, minWidth: 140 }}
-          >
-            <option value="">Anyone</option>
-            {activeCaddies.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.fullName}
-              </option>
-            ))}
-          </select>
         </Field>
         <Field label="Note" grow>
           <input
@@ -822,9 +839,18 @@ function QuickAdd({
           />
         </Field>
         <button className="btn" type="submit" disabled={saving || busy}>
-          {saving ? "Adding…" : "Add loop"}
+          {saving ? "Booking…" : groups > 1 ? `Book ${groups} tee times` : "Add loop"}
         </button>
       </div>
+
+      {groups > 1 && (
+        <p className="muted" style={{ fontSize: 13, marginTop: 10, marginBottom: 0 }}>
+          {preview.join(" · ")} — {totalCaddies}{" "}
+          {totalCaddies === 1 ? "caddie" : "caddies"} in total, kept together as
+          one group.
+        </p>
+      )}
+
       {err && (
         <p className="notice err" style={{ marginBottom: 0 }}>
           {err}

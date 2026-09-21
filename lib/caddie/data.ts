@@ -1,9 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  RANK_ORDER,
   rowToAssignment,
   rowToCaddie,
   rowToLoop,
+  rowToTier,
   type AssignmentRec,
   type AvailabilityStatus,
   type CaddieRec,
@@ -13,6 +13,7 @@ import {
   type LoopStatus,
   type LoopType,
   type LoopWithCrew,
+  type TierRec,
   type RateCard,
   type TimeSlot,
 } from "./types";
@@ -169,10 +170,53 @@ export async function listCaddies(): Promise<CaddieRec[]> {
   const supa = createAdminClient("caddie");
   const { data, error } = await supa
     .from("caddies")
-    .select("*")
+    .select("*, tiers(name, sort_order)")
     .order("full_name", { ascending: true });
   if (error) throw error;
-  return (data ?? []).map(rowToCaddie);
+  return (data ?? []).map(flattenCaddie);
+}
+
+/**
+ * Fold the joined tier onto the caddie row.
+ *
+ * PostgREST nests an embedded table under its own key; the mapper wants flat
+ * snake_case, and every caller wants the tier name without a second lookup.
+ */
+function flattenCaddie(row: Record<string, unknown>): CaddieRec {
+  const tier = row.tiers as { name?: string; sort_order?: number } | null;
+  return rowToCaddie({
+    ...row,
+    tier_name: tier?.name ?? null,
+    tier_order: typeof tier?.sort_order === "number" ? tier.sort_order : 9999,
+  });
+}
+
+/** Every tier, in dispatch order. */
+export async function listTiers(): Promise<TierRec[]> {
+  const supa = createAdminClient("caddie");
+  const { data, error } = await supa
+    .from("tiers")
+    .select("*")
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(rowToTier);
+}
+
+/** How many caddies sit in each tier, for the tiers page. */
+export async function caddieCountByTier(): Promise<Map<string, number>> {
+  const supa = createAdminClient("caddie");
+  const { data, error } = await supa
+    .from("caddies")
+    .select("tier_id")
+    .eq("status", "Active");
+  if (error) throw error;
+
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    const id = row.tier_id ? String(row.tier_id) : "none";
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
 }
 
 /** What one caddie said about one day. */
@@ -472,6 +516,23 @@ export async function loopsBetweenByDay(
   return out;
 }
 
+/** Booking id -> party name, for showing which loops belong together. */
+export async function bookingNames(
+  ids: string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return new Map();
+
+  const supa = createAdminClient("caddie");
+  const { data, error } = await supa
+    .from("bookings")
+    .select("id, name")
+    .in("id", unique);
+  if (error) throw error;
+
+  return new Map((data ?? []).map((r) => [String(r.id), String(r.name)]));
+}
+
 /** An offer or booking the caddie still has a stake in. */
 export interface OpenWork {
   assignment: AssignmentRec;
@@ -546,17 +607,15 @@ export interface Candidate {
   alreadyOffered: boolean;
   /** Holds an accepted loop close enough to collide with this tee time. */
   conflict: boolean;
-  /** The member asked for this caddie by name. */
-  requested: boolean;
 }
 
 /**
  * Who to offer a loop to, best first.
  *
- * Order: the requested caddie, then caddies who said they are Available, then
- * by rank (Honor first), then by who has waited longest for work. Conflicts and
- * caddies already asked sink to the bottom rather than disappearing — the shop
- * should be able to see them and override.
+ * Order: caddies who said they are Available, then by seniority tier, then by
+ * who has waited longest for work. Conflicts and caddies already asked sink to
+ * the bottom rather than disappearing — the shop should be able to see them and
+ * override.
  */
 export function rankCandidates(
   loop: LoopRec,
@@ -592,10 +651,8 @@ export function rankCandidates(
       availability: verdict(availability.get(caddie.id), loopSlot),
       alreadyOffered: offeredHere.has(caddie.id),
       conflict: conflicted.has(caddie.id),
-      requested: loop.requestedCaddieId === caddie.id,
     }))
     .sort((a, b) => {
-      if (a.requested !== b.requested) return a.requested ? -1 : 1;
       if (a.alreadyOffered !== b.alreadyOffered) return a.alreadyOffered ? 1 : -1;
       if (a.conflict !== b.conflict) return a.conflict ? 1 : -1;
 
@@ -603,8 +660,8 @@ export function rankCandidates(
         c.availability === "Available" ? 0 : c.availability == null ? 1 : 2;
       if (av(a) !== av(b)) return av(a) - av(b);
 
-      const rank = RANK_ORDER[a.caddie.rank] - RANK_ORDER[b.caddie.rank];
-      if (rank !== 0) return rank;
+      const tier = a.caddie.tierOrder - b.caddie.tierOrder;
+      if (tier !== 0) return tier;
 
       // Never worked sorts first, then longest since their last loop.
       return (a.caddie.lastWorkedOn ?? "").localeCompare(

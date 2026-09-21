@@ -25,7 +25,9 @@ function caddie(id: string, over: Partial<CaddieRec> = {}): CaddieRec {
     fullName: id,
     phone: null,
     email: null,
-    rank: "B",
+    tierId: null,
+    tierName: null,
+    tierOrder: 9999,
     status: "Active",
     preferredContactMethod: "Both",
     smsOptIn: false,
@@ -44,8 +46,7 @@ function loop(teeTime: string, over: Partial<LoopRec> = {}): LoopRec {
     caddiesRequired: 1,
     holes: 18,
     notes: "",
-    requestedRank: null,
-    requestedCaddieId: null,
+    bookingId: null,
     status: "Unassigned",
     openBoard: false,
     createdBy: null,
@@ -121,23 +122,39 @@ describe("rankCandidates and the half of the day", () => {
 });
 
 describe("rankCandidates ordering rules", () => {
-  it("floats the requested caddie to the top regardless of rank", () => {
-    const honor = caddie("honor", { rank: "Honor" });
-    const asked = caddie("asked", { rank: "B" });
-    const l = loop(AM_LOOP_UTC, { requestedCaddieId: asked.id });
+  it("offers the senior tier first", () => {
+    const shop = caddie("shop-guy", { tierName: "Shop", tierOrder: 10 });
+    const rookie = caddie("rookie", { tierName: "Rookie", tierOrder: 30 });
+    const l = loop(AM_LOOP_UTC);
 
     const order = rankCandidates(
       l,
-      [honor, asked],
+      [rookie, shop],
       [{ loop: l, crew: [] }],
       new Map(),
       4,
     ).map((c) => c.caddie.id);
 
-    expect(order[0]).toBe(asked.id);
+    expect(order).toEqual([shop.id, rookie.id]);
   });
 
-  it("prefers the caddie who has waited longest at equal rank", () => {
+  it("sorts a caddie with no tier below everyone who has one", () => {
+    const tiered = caddie("tiered", { tierName: "Veteran", tierOrder: 20 });
+    const untiered = caddie("untiered");
+    const l = loop(AM_LOOP_UTC);
+
+    const order = rankCandidates(
+      l,
+      [untiered, tiered],
+      [{ loop: l, crew: [] }],
+      new Map(),
+      4,
+    ).map((c) => c.caddie.id);
+
+    expect(order).toEqual([tiered.id, untiered.id]);
+  });
+
+  it("prefers the caddie who has waited longest within a tier", () => {
     const recent = caddie("recent", { lastWorkedOn: "2026-09-19" });
     const stale = caddie("stale", { lastWorkedOn: "2026-08-01" });
     const never = caddie("never");

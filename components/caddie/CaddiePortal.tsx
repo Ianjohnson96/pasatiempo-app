@@ -100,7 +100,7 @@ export default function CaddiePortal({
           </p>
           <h1 style={{ fontSize: 26, margin: 0 }}>{caddie.fullName}</h1>
           <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
-            {caddie.rank} rank
+            {caddie.tierName ?? "Caddie"}
           </div>
         </div>
         <button

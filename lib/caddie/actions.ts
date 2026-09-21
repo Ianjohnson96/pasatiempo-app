@@ -17,7 +17,6 @@ import {
   rateFor,
   rowToCaddie,
   rowToLoop,
-  type CaddieRank,
   type CaddieRec,
   type CaddieStatus,
   type ContactMethod,
@@ -77,8 +76,7 @@ export interface LoopInput {
   /** Pasatiempo plays 18; the form does not ask. Kept for the odd 9-holer. */
   holes?: number;
   notes: string;
-  requestedRank: CaddieRank | null;
-  requestedCaddieId: string | null;
+  bookingId?: string | null;
 }
 
 /**
@@ -106,8 +104,7 @@ export async function saveLoop(input: LoopInput): Promise<Result<LoopRec>> {
           ? input.holes
           : DEFAULT_HOLES,
       notes: input.notes.trim(),
-      requested_rank: input.requestedRank,
-      requested_caddie_id: input.requestedCaddieId,
+      booking_id: input.bookingId ?? null,
     };
 
     if (input.id) {
@@ -132,6 +129,82 @@ export async function saveLoop(input: LoopInput): Promise<Result<LoopRec>> {
     return { ok: true, value: rowToLoop(data) };
   } catch (e) {
     return fail(e, "Could not save the loop.");
+  }
+}
+
+export interface GroupInput {
+  /** Course-local day, "yyyy-mm-dd". */
+  day: string;
+  /** Course-local time of the FIRST tee time, "HH:mm" (24h). */
+  time: string;
+  /** The party — "Whitmore foursome", a member name, an outing. */
+  name: string;
+  loopType: LoopType;
+  /** Caddies needed per tee time. */
+  caddiesPerGroup: number;
+  /** How many tee times the party occupies. */
+  groups: number;
+  /** Minutes between tee times. */
+  intervalMinutes: number;
+  notes: string;
+}
+
+/**
+ * Book a party across several consecutive tee times in one go.
+ *
+ * Twelve players wanting forecaddies off the 12:00, 12:10 and 12:20 is one
+ * phone call, so it should be one entry — not three trips through the form
+ * getting the interval right by hand. The loops share a booking, which is what
+ * lets the board show them as the single job they actually are.
+ */
+export async function createGroupBooking(
+  input: GroupInput,
+): Promise<Result<{ bookingId: string; created: number }>> {
+  try {
+    const name = input.name.trim();
+    if (!name) return { ok: false, error: "The group needs a name." };
+
+    const groups = clamp(input.groups, 1, 20);
+    const interval = clamp(input.intervalMinutes, 1, 60);
+
+    const supa = createAdminClient("caddie");
+    const { courseTimezone } = await getSettings();
+    const by = await currentEmail();
+
+    const first = localToInstant(input.day, input.time, courseTimezone);
+    if (!first) return { ok: false, error: "That tee time is not a real date." };
+
+    const { data: booking, error: bookingErr } = await supa
+      .from("bookings")
+      .insert({ name, notes: input.notes.trim(), created_by: by })
+      .select("id")
+      .single();
+    if (bookingErr) throw bookingErr;
+
+    const startMs = new Date(first).getTime();
+    const rows = Array.from({ length: groups }, (_, i) => ({
+      // Minutes, so this is safe to add to the instant directly: a daylight
+      // saving change never lands inside a single morning's tee sheet.
+      tee_time: new Date(startMs + i * interval * 60_000).toISOString(),
+      player_name: groups > 1 ? `${name} (${i + 1} of ${groups})` : name,
+      loop_type: input.loopType,
+      caddies_required: clamp(input.caddiesPerGroup, 1, 8),
+      holes: DEFAULT_HOLES,
+      notes: input.notes.trim(),
+      booking_id: String(booking.id),
+      created_by: by,
+    }));
+
+    const { error } = await supa.from("loops").insert(rows);
+    if (error) throw error;
+
+    revalidatePath(BOARD_PATH);
+    return {
+      ok: true,
+      value: { bookingId: String(booking.id), created: rows.length },
+    };
+  } catch (e) {
+    return fail(e, "Could not book the group.");
   }
 }
 
@@ -286,8 +359,7 @@ export async function duplicateDay(
       caddies_required: l.caddiesRequired,
       holes: l.holes,
       notes: l.notes,
-      requested_rank: l.requestedRank,
-      requested_caddie_id: l.requestedCaddieId,
+      booking_id: l.bookingId,
       created_by: by,
     }));
 
@@ -767,6 +839,152 @@ function explainRefusal(reason: string | undefined): string {
 }
 
 // ---------------------------------------------------------------------------
+// Tiers
+// ---------------------------------------------------------------------------
+
+const TIERS_PATH = "/admin/caddie/tiers";
+
+export interface TierInput {
+  id?: string;
+  name: string;
+  description: string;
+}
+
+/**
+ * Create or rename a tier.
+ *
+ * New tiers land at the bottom of the ladder; order is changed with the arrows
+ * on the tiers page rather than by typing a number, because the only thing that
+ * matters is which tier is above which.
+ */
+export async function saveTier(input: TierInput): Promise<Result> {
+  try {
+    const name = input.name.trim();
+    if (!name) return { ok: false, error: "A tier needs a name." };
+
+    const supa = createAdminClient("caddie");
+
+    if (input.id) {
+      const { error } = await supa
+        .from("tiers")
+        .update({ name, description: input.description.trim() })
+        .eq("id", input.id);
+      if (error) {
+        if (error.code === "23505") {
+          return { ok: false, error: `There is already a tier called ${name}.` };
+        }
+        throw error;
+      }
+    } else {
+      const { data: last } = await supa
+        .from("tiers")
+        .select("sort_order")
+        .order("sort_order", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const { error } = await supa.from("tiers").insert({
+        name,
+        description: input.description.trim(),
+        sort_order: Number(last?.sort_order ?? 0) + 10,
+      });
+      if (error) {
+        if (error.code === "23505") {
+          return { ok: false, error: `There is already a tier called ${name}.` };
+        }
+        throw error;
+      }
+    }
+
+    revalidatePath(TIERS_PATH);
+    revalidatePath(ROSTER_PATH);
+    revalidatePath(BOARD_PATH);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not save the tier.");
+  }
+}
+
+/**
+ * Move a tier one place up or down the ladder.
+ *
+ * Swaps sort_order with its neighbour rather than renumbering the table, so
+ * the operation touches two rows however long the list gets.
+ */
+export async function moveTier(
+  tierId: string,
+  direction: "up" | "down",
+): Promise<Result> {
+  try {
+    const supa = createAdminClient("caddie");
+
+    const { data: rows, error: readErr } = await supa
+      .from("tiers")
+      .select("id, sort_order")
+      .order("sort_order", { ascending: true });
+    if (readErr) throw readErr;
+
+    const list = rows ?? [];
+    const i = list.findIndex((t) => String(t.id) === tierId);
+    if (i === -1) return { ok: false, error: "That tier no longer exists." };
+
+    const j = direction === "up" ? i - 1 : i + 1;
+    if (j < 0 || j >= list.length) return { ok: true, value: undefined };
+
+    const a = list[i];
+    const b = list[j];
+    const { error } = await supa.from("tiers").upsert([
+      { id: a.id, sort_order: b.sort_order },
+      { id: b.id, sort_order: a.sort_order },
+    ]);
+    if (error) throw error;
+
+    revalidatePath(TIERS_PATH);
+    revalidatePath(BOARD_PATH);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not reorder the tiers.");
+  }
+}
+
+/**
+ * Delete a tier.
+ *
+ * Refused while caddies are still in it: the FK would quietly null their tier
+ * and drop them to the bottom of every dispatch list without anyone noticing.
+ * Move them first.
+ */
+export async function deleteTier(tierId: string): Promise<Result> {
+  try {
+    const supa = createAdminClient("caddie");
+
+    const { count, error: countErr } = await supa
+      .from("caddies")
+      .select("*", { count: "exact", head: true })
+      .eq("tier_id", tierId);
+    if (countErr) throw countErr;
+
+    if ((count ?? 0) > 0) {
+      return {
+        ok: false,
+        error: `${count} ${
+          count === 1 ? "caddie is" : "caddies are"
+        } still in this tier. Move them to another tier first.`,
+      };
+    }
+
+    const { error } = await supa.from("tiers").delete().eq("id", tierId);
+    if (error) throw error;
+
+    revalidatePath(TIERS_PATH);
+    revalidatePath(ROSTER_PATH);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not delete the tier.");
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Roster
 // ---------------------------------------------------------------------------
 
@@ -775,7 +993,7 @@ export interface CaddieInput {
   fullName: string;
   phone: string; // as typed; normalised to E.164 here
   email: string;
-  rank: CaddieRank;
+  tierId: string | null;
   status: CaddieStatus;
   preferredContactMethod: ContactMethod;
   notes: string;
@@ -820,7 +1038,7 @@ export async function saveCaddie(input: CaddieInput): Promise<Result<CaddieRec>>
       full_name: fullName,
       phone,
       email,
-      rank: input.rank,
+      tier_id: input.tierId,
       status: input.status,
       preferred_contact_method: input.preferredContactMethod,
       notes: input.notes.trim(),
@@ -858,15 +1076,15 @@ export async function saveCaddie(input: CaddieInput): Promise<Result<CaddieRec>>
  * one-tap job the shop does often, and it should not mean opening an edit form
  * and re-submitting every other field alongside it.
  */
-export async function setCaddieRank(
+export async function setCaddieTier(
   caddieId: string,
-  rank: CaddieRank,
+  tierId: string,
 ): Promise<Result> {
   try {
     const supa = createAdminClient("caddie");
     const { error } = await supa
       .from("caddies")
-      .update({ rank })
+      .update({ tier_id: tierId })
       .eq("id", caddieId);
     if (error) throw error;
     revalidatePath(ROSTER_PATH);

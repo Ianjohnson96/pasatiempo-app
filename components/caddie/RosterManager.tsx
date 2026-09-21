@@ -6,7 +6,7 @@ import {
   createInvite,
   deleteCaddie,
   saveCaddie,
-  setCaddieRank,
+  setCaddieTier,
   setCaddieStatus,
   type CaddieInput,
   type InviteHandout,
@@ -14,11 +14,10 @@ import {
 import {
   CADDIE_STATUSES,
   CONTACT_METHODS,
-  RANKS,
-  type CaddieRank,
   type CaddieRec,
   type CaddieStatus,
   type ContactMethod,
+  type TierRec,
 } from "@/lib/caddie/types";
 
 // The caddie roster. Nothing else in the section works until this has rows in
@@ -26,6 +25,7 @@ import {
 
 interface Props {
   caddies: CaddieRec[];
+  tiers: TierRec[];
 }
 
 const STATUS_BADGE: Record<CaddieStatus, string> = {
@@ -38,13 +38,13 @@ const BLANK: CaddieInput = {
   fullName: "",
   phone: "",
   email: "",
-  rank: "B",
+  tierId: null,
   status: "Active",
   preferredContactMethod: "Both",
   notes: "",
 };
 
-export default function RosterManager({ caddies }: Props) {
+export default function RosterManager({ caddies, tiers }: Props) {
   const router = useRouter();
   const [busy, start] = useTransition();
   const [adding, setAdding] = useState(false);
@@ -111,6 +111,7 @@ export default function RosterManager({ caddies }: Props) {
       {adding && (
         <CaddieForm
           initial={BLANK}
+          tiers={tiers}
           busy={busy}
           submitLabel="Add caddie"
           onCancel={() => setAdding(false)}
@@ -153,25 +154,25 @@ export default function RosterManager({ caddies }: Props) {
 
                     {/* Tier, changed in place. Promoting a caddie is something
                         the shop does often and should not need a form. */}
-                    <span style={{ display: "inline-flex", gap: 4 }}>
-                      {RANKS.map((r) => (
+                    <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap" }}>
+                      {tiers.map((t) => (
                         <button
-                          key={r}
+                          key={t.id}
                           type="button"
-                          disabled={busy || c.rank === r}
-                          aria-pressed={c.rank === r}
-                          title={`Move ${c.fullName} to ${r}`}
+                          disabled={busy || c.tierId === t.id}
+                          aria-pressed={c.tierId === t.id}
+                          aria-label={`Move ${c.fullName} to ${t.name}`}
                           className={
-                            c.rank === r ? "btn small" : "btn ghost small"
+                            c.tierId === t.id ? "btn small" : "btn ghost small"
                           }
                           onClick={() =>
                             run(
-                              () => setCaddieRank(c.id, r),
-                              `${c.fullName} is now ${r}.`,
+                              () => setCaddieTier(c.id, t.id),
+                              `${c.fullName} is now ${t.name}.`,
                             )
                           }
                         >
-                          {r}
+                          {t.name}
                         </button>
                       ))}
                     </span>
@@ -248,12 +249,13 @@ export default function RosterManager({ caddies }: Props) {
                 {isEditing && (
                   <div style={{ flexBasis: "100%" }}>
                     <CaddieForm
+                      tiers={tiers}
                       initial={{
                         id: c.id,
                         fullName: c.fullName,
                         phone: c.phone ?? "",
                         email: c.email ?? "",
-                        rank: c.rank,
+                        tierId: c.tierId,
                         status: c.status,
                         preferredContactMethod: c.preferredContactMethod,
                         notes: c.notes,
@@ -386,6 +388,7 @@ function InvitePanel({
 
 function CaddieForm({
   initial,
+  tiers,
   busy,
   submitLabel,
   onSubmit,
@@ -393,6 +396,7 @@ function CaddieForm({
   onDelete,
 }: {
   initial: CaddieInput;
+  tiers: TierRec[];
   busy: boolean;
   submitLabel: string;
   onSubmit: (input: CaddieInput) => void;
@@ -447,15 +451,16 @@ function CaddieForm({
             style={{ ...inputStyle, minWidth: 180, width: "100%" }}
           />
         </Field>
-        <Field label="Rank">
+        <Field label="Tier">
           <select
-            value={form.rank}
-            onChange={(e) => set("rank", e.target.value as CaddieRank)}
-            style={{ ...inputStyle, width: 100 }}
+            value={form.tierId ?? ""}
+            onChange={(e) => set("tierId", e.target.value || null)}
+            style={{ ...inputStyle, width: 150 }}
           >
-            {RANKS.map((r) => (
-              <option key={r} value={r}>
-                {r}
+            <option value="">No tier</option>
+            {tiers.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
               </option>
             ))}
           </select>

@@ -10,7 +10,6 @@ import {
   listCaddies,
   zonedMidnight,
 } from "@/lib/caddie/data";
-import { RANK_ORDER } from "@/lib/caddie/types";
 
 // Who is around this week.
 //
@@ -37,7 +36,7 @@ function TodayLine({
   muted,
 }: {
   label: string;
-  people: { id: string; fullName: string; rank: string }[];
+  people: { id: string; fullName: string; tierName: string | null }[];
   muted?: boolean;
 }) {
   return (
@@ -58,9 +57,11 @@ function TodayLine({
               className="pill"
               style={{ opacity: muted ? 0.6 : 1 }}
             >
-              <span className="badge gray" style={{ marginRight: 6 }}>
-                {p.rank}
-              </span>
+              {p.tierName && (
+                <span className="badge gray" style={{ marginRight: 6 }}>
+                  {p.tierName}
+                </span>
+              )}
               {p.fullName}
             </span>
           ))}
@@ -97,8 +98,7 @@ export default async function AdminAvailabilityPage({
     .filter((c) => c.status === "Active")
     .sort(
       (a, b) =>
-        RANK_ORDER[a.rank] - RANK_ORDER[b.rank] ||
-        a.fullName.localeCompare(b.fullName),
+        a.tierOrder - b.tierOrder || a.fullName.localeCompare(b.fullName),
     );
 
   const dates = Array.from({ length: DAYS }, (_, i) => addDays(from, i));
@@ -247,9 +247,11 @@ export default async function AdminAvailabilityPage({
                 {roster.map((c) => (
                   <tr key={c.id}>
                     <td style={{ whiteSpace: "nowrap" }}>
-                      <span className="badge gray" style={{ marginRight: 8 }}>
-                        {c.rank}
-                      </span>
+                      {c.tierName && (
+                        <span className="badge gray" style={{ marginRight: 8 }}>
+                          {c.tierName}
+                        </span>
+                      )}
                       {c.fullName}
                     </td>
                     {dates.map((d) => {

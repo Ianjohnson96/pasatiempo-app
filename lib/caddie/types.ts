@@ -5,7 +5,6 @@
 // the only place the allowed values are written down for TypeScript — keep them
 // in step with the check constraints.
 
-export type CaddieRank = "Honor" | "A" | "B";
 export type CaddieStatus = "Active" | "Inactive" | "Suspended";
 export type ContactMethod = "SMS" | "Email" | "Both";
 export type TimeSlot = "AM" | "PM" | "All Day";
@@ -32,12 +31,13 @@ export type ConfirmationStatus =
   | "Expired"
   | "Withdrawn";
 
-// Rank order for dispatch: Honor caddies are offered first.
-export const RANK_ORDER: Record<CaddieRank, number> = {
-  Honor: 0,
-  A: 1,
-  B: 2,
-};
+/** A seniority tier, defined by the Pro Shop. Lower sortOrder goes out first. */
+export interface TierRec {
+  id: string;
+  name: string;
+  sortOrder: number;
+  description: string;
+}
 
 export const LOOP_TYPES: LoopType[] = [
   "Single Bag",
@@ -45,8 +45,6 @@ export const LOOP_TYPES: LoopType[] = [
   "Forecaddie 1-2",
   "Forecaddie 3-4",
 ];
-
-export const RANKS: CaddieRank[] = ["Honor", "A", "B"];
 
 export const CADDIE_STATUSES: CaddieStatus[] = [
   "Active",
@@ -66,7 +64,10 @@ export interface CaddieRec {
   fullName: string;
   phone: string | null;
   email: string | null;
-  rank: CaddieRank;
+  tierId: string | null;
+  /** Denormalised for display; null when no tier is set. */
+  tierName: string | null;
+  tierOrder: number;
   status: CaddieStatus;
   preferredContactMethod: ContactMethod;
   smsOptIn: boolean;
@@ -82,8 +83,7 @@ export interface LoopRec {
   caddiesRequired: number;
   holes: number;
   notes: string;
-  requestedRank: CaddieRank | null;
-  requestedCaddieId: string | null;
+  bookingId: string | null;
   status: LoopStatus;
   openBoard: boolean;
   createdBy: string | null;
@@ -153,7 +153,10 @@ export function rowToCaddie(r: Row): CaddieRec {
     fullName: String(r.full_name ?? ""),
     phone: (r.phone as string | null) ?? null,
     email: (r.email as string | null) ?? null,
-    rank: (r.rank as CaddieRank) ?? "B",
+    tierId: (r.tier_id as string | null) ?? null,
+    tierName: (r.tier_name as string | null) ?? null,
+    // Untiered caddies sort last rather than first.
+    tierOrder: typeof r.tier_order === "number" ? r.tier_order : 9999,
     status: (r.status as CaddieStatus) ?? "Active",
     preferredContactMethod:
       (r.preferred_contact_method as ContactMethod) ?? "Both",
@@ -168,12 +171,11 @@ export function rowToLoop(r: Row): LoopRec {
     id: String(r.id),
     teeTime: String(r.tee_time),
     playerName: String(r.player_name ?? ""),
-    loopType: (r.loop_type as LoopType) ?? "Single Caddie",
+    loopType: (r.loop_type as LoopType) ?? "Single Bag",
     caddiesRequired: Number(r.caddies_required ?? 1),
     holes: Number(r.holes ?? 18),
     notes: String(r.notes ?? ""),
-    requestedRank: (r.requested_rank as CaddieRank | null) ?? null,
-    requestedCaddieId: (r.requested_caddie_id as string | null) ?? null,
+    bookingId: (r.booking_id as string | null) ?? null,
     status: (r.status as LoopStatus) ?? "Unassigned",
     openBoard: Boolean(r.open_board),
     createdBy: (r.created_by as string | null) ?? null,
@@ -211,4 +213,28 @@ export function liveCrew(crew: CrewMember[]): CrewMember[] {
     (c) =>
       c.confirmationStatus === "Accepted" || c.confirmationStatus === "Pending",
   );
+}
+
+export function rowToTier(r: Record<string, unknown>): TierRec {
+  return {
+    id: String(r.id),
+    name: String(r.name ?? ""),
+    sortOrder: Number(r.sort_order ?? 0),
+    description: String(r.description ?? ""),
+  };
+}
+
+/** A party of players whose tee times go out together. */
+export interface BookingRec {
+  id: string;
+  name: string;
+  notes: string;
+}
+
+export function rowToBooking(r: Record<string, unknown>): BookingRec {
+  return {
+    id: String(r.id),
+    name: String(r.name ?? ""),
+    notes: String(r.notes ?? ""),
+  };
 }

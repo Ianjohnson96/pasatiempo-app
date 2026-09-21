@@ -7,6 +7,7 @@ import DispatchBoard, {
 } from "@/components/caddie/DispatchBoard";
 import {
   availabilityFor,
+  bookingNames,
   courseToday,
   expireStaleOffers,
   formatDay,
@@ -52,6 +53,10 @@ export default async function CaddieDispatchPage({
 
   // Ranking runs here rather than in the browser: it reads every caddie's work
   // history and the whole day's accepted loops, none of which the client needs.
+  const groups = await bookingNames(
+    loops.map(({ loop }) => loop.bookingId).filter((id): id is string => !!id),
+  );
+
   const candidatesByLoop: Record<string, BoardCandidate[]> = {};
   const teeLabels: Record<string, string> = {};
   for (const { loop } of loops) {
@@ -67,7 +72,6 @@ export default async function CaddieDispatchPage({
       availability: c.availability,
       alreadyOffered: c.alreadyOffered,
       conflict: c.conflict,
-      requested: c.requested,
     }));
   }
 
@@ -84,6 +88,7 @@ export default async function CaddieDispatchPage({
           caddies={caddies}
           candidatesByLoop={candidatesByLoop}
           teeLabels={teeLabels}
+          groupNames={Object.fromEntries(groups)}
           rates={settings.rates}
           notifyReady={pushConfigured()}
         />
