@@ -6,7 +6,7 @@ import {
   addDays,
   courseToday,
   getSettings,
-  loopCountsBetween,
+  loopsBetweenByDay,
 } from "@/lib/caddie/data";
 
 // The month at a glance: where the open jobs are.
@@ -22,6 +22,14 @@ function monthStart(month: string | undefined, today: string): string {
   return /^\d{4}-\d{2}$/.test(month ?? "")
     ? `${month}-01`
     : `${today.slice(0, 7)}-01`;
+}
+
+/** "7:00 AM" -> "7a", "2:10 PM" -> "2:10p". A month cell has no room for more. */
+function compactTime(label: string): string {
+  return label
+    .replace(/:00/, "")
+    .replace(/\s?AM/i, "a")
+    .replace(/\s?PM/i, "p");
 }
 
 function shiftMonth(firstOfMonth: string, delta: number): string {
@@ -52,10 +60,13 @@ export default async function CaddieCalendarPage({
   const CELLS = 42; // six weeks covers every possible month layout
   const gridEnd = addDays(gridStart, CELLS - 1);
 
-  const counts = await loopCountsBetween(gridStart, gridEnd, tz);
+  const byDay = await loopsBetweenByDay(gridStart, gridEnd, tz);
 
   const cells = Array.from({ length: CELLS }, (_, i) => addDays(gridStart, i));
   const inMonth = (d: string) => d.slice(0, 7) === thisMonth;
+
+  const isShort = (l: { accepted: number; required: number; status: string }) =>
+    l.status !== "Cancelled" && l.accepted < l.required;
 
   const monthLabel = new Intl.DateTimeFormat("en-US", {
     timeZone: "UTC",
@@ -66,10 +77,13 @@ export default async function CaddieCalendarPage({
   // Totals for the month itself, not the padding days either side.
   let monthOpen = 0;
   let monthTotal = 0;
-  for (const [date, c] of counts) {
+  for (const [date, loops] of byDay) {
     if (!inMonth(date)) continue;
-    monthOpen += c.open;
-    monthTotal += c.total;
+    for (const l of loops) {
+      if (l.status === "Cancelled") continue;
+      monthTotal += 1;
+      if (isShort(l)) monthOpen += 1;
+    }
   }
 
   return (
@@ -125,10 +139,20 @@ export default async function CaddieCalendarPage({
             ))}
 
             {cells.map((date) => {
-              const c = counts.get(date);
+              const loops = (byDay.get(date) ?? []).filter(
+                (l) => l.status !== "Cancelled",
+              );
               const isToday = date === today;
               const dim = !inMonth(date);
               const past = date < today;
+              const short = loops.filter(isShort).length;
+
+              // Times only, as chips that wrap. A month cell is about 100px
+              // wide: a player name truncates to "ZZ P..." there, which tells
+              // you nothing, while the tee times tell you where the day's load
+              // sits. Names are on the tooltip and one click away on the sheet.
+              const SHOWN = 6;
+              const visible = loops.slice(0, SHOWN);
 
               return (
                 <Link
@@ -137,8 +161,8 @@ export default async function CaddieCalendarPage({
                   title={`Open the sheet for ${date}`}
                   style={{
                     display: "block",
-                    minHeight: 74,
-                    padding: "6px 8px",
+                    minHeight: 96,
+                    padding: "6px 7px",
                     borderRadius: 8,
                     border: `1px solid ${
                       isToday ? "var(--accent)" : "var(--line)"
@@ -146,33 +170,77 @@ export default async function CaddieCalendarPage({
                     background: "var(--panel)",
                     color: "inherit",
                     textDecoration: "none",
-                    opacity: dim ? 0.38 : past ? 0.7 : 1,
+                    opacity: dim ? 0.38 : past ? 0.72 : 1,
                   }}
                 >
                   <div
                     style={{
-                      fontWeight: isToday ? 700 : 500,
-                      fontSize: 13,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "baseline",
                       marginBottom: 4,
                     }}
                   >
-                    {Number(date.slice(8, 10))}
+                    <span style={{ fontWeight: isToday ? 700 : 500, fontSize: 13 }}>
+                      {Number(date.slice(8, 10))}
+                    </span>
+                    {short > 0 && (
+                      <span
+                        title={`${short} still short of caddies`}
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: "var(--danger)",
+                        }}
+                      >
+                        {short} short
+                      </span>
+                    )}
                   </div>
 
-                  {c && c.total > 0 ? (
-                    <div style={{ display: "grid", gap: 3 }}>
-                      {c.open > 0 && (
-                        <span className="badge draft">{c.open} open</span>
-                      )}
-                      {c.assigned > 0 && (
-                        <span className="badge open">{c.assigned} set</span>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="muted" style={{ fontSize: 11 }}>
-                      {dim ? "" : "—"}
-                    </span>
-                  )}
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 3,
+                      alignContent: "flex-start",
+                    }}
+                  >
+                    {visible.map((l) => {
+                      const filled = !isShort(l);
+                      return (
+                        <span
+                          key={l.id}
+                          title={`${l.teeLabel} · ${l.playerName} · ${l.loopType} · ${l.accepted}/${l.required} confirmed`}
+                          style={{
+                            fontSize: 10.5,
+                            fontWeight: 600,
+                            lineHeight: 1.6,
+                            padding: "0 5px",
+                            borderRadius: 4,
+                            whiteSpace: "nowrap",
+                            color: filled ? "#0f5132" : "#7a1f1f",
+                            background: filled ? "#d6efe0" : "#fadcdc",
+                            border: `1px solid ${filled ? "#aedcc4" : "#f0b8b8"}`,
+                          }}
+                        >
+                          {compactTime(l.teeLabel)}
+                        </span>
+                      );
+                    })}
+
+                    {loops.length > SHOWN && (
+                      <span className="muted" style={{ fontSize: 10, lineHeight: 1.7 }}>
+                        +{loops.length - SHOWN}
+                      </span>
+                    )}
+
+                    {loops.length === 0 && !dim && (
+                      <span className="muted" style={{ fontSize: 11 }}>
+                        —
+                      </span>
+                    )}
+                  </div>
                 </Link>
               );
             })}
@@ -180,8 +248,10 @@ export default async function CaddieCalendarPage({
         </div>
 
         <p className="muted" style={{ fontSize: 13, marginTop: 16 }}>
-          Click any day to open its sheet and add loops. Amber still needs
-          caddies; green is covered. Cancelled loops are not counted.
+          Every job on the month, filled and unfilled — one chip per tee time.
+          Red is still short of caddies, green is covered. Hover a chip for the
+          player and loop type; click any day to open its sheet and add loops.
+          Cancelled loops are not shown.
         </p>
       </main>
     </>
