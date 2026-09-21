@@ -77,12 +77,13 @@ export const SECTIONS: Section[] = [
     // The CADDIE-FACING portal (availability, offers, my schedule). The Pro
     // Shop's dispatch board lives at /admin/caddie with the rest of staff.
     //
-    // Served by path, not on its own domain: caddies arrive by scanning a QR
-    // code that carries the whole URL, so there is no address for anyone to
-    // type and nothing to gain from a vanity host. Adding one later is one
-    // entry here plus DNS — nothing else changes.
+    // On its own subdomain because the sign-in QR codes bake the origin in
+    // permanently: a link handed to a caddie today has to keep working, so the
+    // address it points at should be one the club owns rather than a Vercel
+    // deployment name. The umbrella host keeps serving /caddie by path as
+    // well, so links issued before the domain existed do not break.
     pathPrefix: "/caddie",
-    hosts: ["caddie.local", "caddie.local:3000"],
+    hosts: ["caddie.pasatiempo.com", "caddie.local", "caddie.local:3000"],
   },
 ];
 
