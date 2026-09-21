@@ -131,8 +131,9 @@ export default function WaterfallEditor({
           className="muted"
           style={{ fontSize: 13, marginTop: 16, marginBottom: 0 }}
         >
-          Widening happens on the housekeeping run, so the real delay is at most
-          one run longer than the number set here.
+          Widening happens on the housekeeping sweep, which runs every ten
+          minutes, so the real delay can be up to ten minutes longer than the
+          number set here.
         </p>
       </div>
 
