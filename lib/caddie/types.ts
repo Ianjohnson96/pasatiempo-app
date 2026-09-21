@@ -31,6 +31,44 @@ export type ConfirmationStatus =
   | "Expired"
   | "Withdrawn";
 
+/** What a caddie normally does on a given weekday. "Off" is a standing no. */
+export type DefaultSlot = TimeSlot | "Off";
+
+/** A stretch of days a caddie is gone. Both ends inclusive. */
+export interface AwayPeriod {
+  id: string;
+  caddieId: string;
+  startsOn: string; // "yyyy-mm-dd"
+  endsOn: string;   // "yyyy-mm-dd", inclusive
+  reason: string;
+}
+
+export function rowToAway(r: Record<string, unknown>): AwayPeriod {
+  return {
+    id: String(r.id),
+    caddieId: String(r.caddie_id),
+    startsOn: String(r.starts_on),
+    endsOn: String(r.ends_on),
+    reason: String(r.reason ?? ""),
+  };
+}
+
+/**
+ * Where a day's answer came from. The shop needs the difference between "he
+ * said no", "he is in Mexico" and "he never told us" — they are three
+ * different phone calls.
+ */
+export type AvailabilitySource = "away" | "day" | "usual" | "none";
+
+export interface ResolvedDay {
+  /** What they can work, or null when unavailable or unknown. */
+  slot: TimeSlot | null;
+  status: AvailabilityStatus | "Unknown";
+  source: AvailabilitySource;
+  /** Set when source is "away". */
+  reason?: string;
+}
+
 /** A seniority tier, defined by the Pro Shop. Lower sortOrder goes out first. */
 export interface TierRec {
   id: string;
@@ -128,6 +166,8 @@ export interface CaddieSettings {
   sessionDays: number;
   /** How long a handed-over sign-in link stays good. */
   inviteDays: number;
+  /** How far ahead the caddie availability planner runs. */
+  availabilityMonths: number;
   emailEnabled: boolean;
   smsEnabled: boolean;
   rates: RateCard;

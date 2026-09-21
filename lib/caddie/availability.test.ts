@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { coversSlot, rankCandidates, type DayAvailability } from "./data";
+import {
+  rankCandidates,
+  resolveDay,
+  resolvedCovers,
+  weekdayOf,
+  type UsualWeek,
+} from "./data";
 import type {
   AvailabilityStatus,
+  AwayPeriod,
   CaddieRec,
   LoopRec,
   LoopWithCrew,
+  ResolvedDay,
+  TimeSlot,
 } from "./types";
 
 // Availability is only useful if it is read for the right half of the day.
@@ -55,27 +64,99 @@ function loop(teeTime: string, over: Partial<LoopRec> = {}): LoopRec {
 }
 
 function said(
-  slot: DayAvailability["slot"],
+  slot: TimeSlot,
   status: AvailabilityStatus = "Available",
-): DayAvailability {
-  return { slot, status };
+): ResolvedDay {
+  return status === "Available"
+    ? { slot, status, source: "day" }
+    : { slot: null, status, source: "day" };
 }
 
-describe("coversSlot", () => {
+describe("resolvedCovers", () => {
   it("treats All Day as covering both halves", () => {
-    expect(coversSlot(said("All Day"), "AM")).toBe(true);
-    expect(coversSlot(said("All Day"), "PM")).toBe(true);
+    expect(resolvedCovers(said("All Day"), "AM")).toBe(true);
+    expect(resolvedCovers(said("All Day"), "PM")).toBe(true);
   });
 
   it("does not stretch a morning answer over the afternoon", () => {
-    expect(coversSlot(said("AM"), "AM")).toBe(true);
-    expect(coversSlot(said("AM"), "PM")).toBe(false);
-    expect(coversSlot(said("PM"), "AM")).toBe(false);
+    expect(resolvedCovers(said("AM"), "AM")).toBe(true);
+    expect(resolvedCovers(said("AM"), "PM")).toBe(false);
+    expect(resolvedCovers(said("PM"), "AM")).toBe(false);
   });
 
   it("ignores the slot when the answer was no", () => {
-    expect(coversSlot(said("All Day", "Unavailable"), "AM")).toBe(false);
-    expect(coversSlot(said("AM", "Unavailable"), "AM")).toBe(false);
+    expect(resolvedCovers(said("All Day", "Unavailable"), "AM")).toBe(false);
+  });
+});
+
+// The precedence between an away period, a specific day and the usual week is
+// the whole point of asking caddies months ahead. Getting it wrong sends
+// someone a loop while they are on a plane.
+describe("resolveDay precedence", () => {
+  const away = (startsOn: string, endsOn: string, reason = ""): AwayPeriod => ({
+    id: "a1",
+    caddieId: "c1",
+    startsOn,
+    endsOn,
+    reason,
+  });
+
+  const usual: UsualWeek = new Map([
+    [0, "All Day"], // Sunday
+    [6, "AM"], // Saturday
+    [2, "Off"], // Tuesday
+  ]);
+
+  it("knows nothing when nothing has been said", () => {
+    const r = resolveDay("2026-10-07", {});
+    expect(r.status).toBe("Unknown");
+    expect(r.source).toBe("none");
+  });
+
+  it("falls back to the usual week", () => {
+    // 2026-10-03 is a Saturday.
+    expect(weekdayOf("2026-10-03")).toBe(6);
+    const r = resolveDay("2026-10-03", { usual });
+    expect(r).toMatchObject({ slot: "AM", status: "Available", source: "usual" });
+  });
+
+  it("treats a standing Off as a deliberate no, not unknown", () => {
+    // 2026-10-06 is a Tuesday.
+    const r = resolveDay("2026-10-06", { usual });
+    expect(r).toMatchObject({ status: "Unavailable", source: "usual" });
+  });
+
+  it("lets a specific day override the usual week", () => {
+    const r = resolveDay("2026-10-03", {
+      usual,
+      override: { slot: "PM", status: "Available" },
+    });
+    expect(r).toMatchObject({ slot: "PM", source: "day" });
+  });
+
+  it("lets an away period beat both", () => {
+    const r = resolveDay("2026-10-03", {
+      usual,
+      override: { slot: "All Day", status: "Available" },
+      away: [away("2026-10-01", "2026-10-14", "Mexico")],
+    });
+    expect(r).toMatchObject({
+      status: "Unavailable",
+      source: "away",
+      reason: "Mexico",
+    });
+  });
+
+  it("includes both ends of an away period", () => {
+    const period = [away("2026-10-01", "2026-10-03")];
+    expect(resolveDay("2026-10-01", { away: period }).source).toBe("away");
+    expect(resolveDay("2026-10-03", { away: period }).source).toBe("away");
+    expect(resolveDay("2026-10-04", { away: period }).source).toBe("none");
+  });
+
+  it("labels an away period with no reason rather than leaving it blank", () => {
+    const r = resolveDay("2026-10-02", { away: [away("2026-10-01", "2026-10-03")] });
+    expect(r.reason).toBe("Away");
   });
 });
 
@@ -85,7 +166,7 @@ describe("rankCandidates and the half of the day", () => {
   const silent = caddie("never-answered");
   const roster = [morning, allDay, silent];
 
-  const availability = new Map<string, DayAvailability>([
+  const availability = new Map<string, ResolvedDay>([
     [morning.id, said("AM")],
     [allDay.id, said("All Day")],
   ]);

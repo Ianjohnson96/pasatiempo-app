@@ -1,41 +1,44 @@
-import "@/app/globals.css";
 import { redirect } from "next/navigation";
-import AvailabilityCalendar, {
-  type CalendarDay,
-} from "@/components/caddie/AvailabilityCalendar";
+import AvailabilityPlanner, {
+  type PlannerDay,
+} from "@/components/caddie/AvailabilityPlanner";
 import {
   addDays,
   availabilityForRange,
+  awayPeriodsFor,
   courseToday,
   getSettings,
   openWorkFor,
+  resolveDay,
+  usualWeekFor,
 } from "@/lib/caddie/data";
 import { getCaddieSession } from "@/lib/caddie/session";
-
-// A month out, in whole weeks so the list groups cleanly. Caddies plan around
-// weekends, and a fortnight was not far enough to reach the one they care about.
-const HORIZON_DAYS = 35;
+import type { DefaultSlot } from "@/lib/caddie/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function CaddieAvailabilityPage() {
   const caddie = await getCaddieSession();
-  // The proxy already bounces a missing cookie; this covers a cookie whose
-  // session has been revoked or whose caddie is no longer active.
+  // The proxy bounces a missing cookie; this covers one that has been revoked
+  // or whose caddie is no longer active.
   if (!caddie) redirect("/caddie");
 
   const settings = await getSettings();
   const tz = settings.courseTimezone;
   const today = courseToday(tz);
-  const last = addDays(today, HORIZON_DAYS - 1);
 
-  const [submitted, work] = await Promise.all([
+  // Months rather than a fortnight — a caddie booking a trip in November needs
+  // November to exist on the page.
+  const horizon = Math.max(1, settings.availabilityMonths) * 31;
+  const last = addDays(today, horizon - 1);
+
+  const [overrides, usual, away, work] = await Promise.all([
     availabilityForRange(caddie.id, today, last),
+    usualWeekFor(caddie.id),
+    awayPeriodsFor(caddie.id, today),
     openWorkFor(caddie.id),
   ]);
 
-  // Days they are already committed to, so the calendar can flag a clash
-  // before they mark themselves off.
   const courseDate = new Intl.DateTimeFormat("en-CA", {
     timeZone: tz,
     year: "numeric",
@@ -48,36 +51,55 @@ export default async function CaddieAvailabilityPage() {
       .map((w) => courseDate.format(new Date(w.loop.teeTime))),
   );
 
-  const weekday = new Intl.DateTimeFormat("en-US", {
+  const monthName = new Intl.DateTimeFormat("en-US", {
     timeZone: "UTC",
-    weekday: "short",
-  });
-  const dayLabel = new Intl.DateTimeFormat("en-US", {
-    timeZone: "UTC",
-    month: "short",
-    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 
-  const days: CalendarDay[] = Array.from({ length: HORIZON_DAYS }, (_, i) => {
+  const days: PlannerDay[] = Array.from({ length: horizon }, (_, i) => {
     const date = addDays(today, i);
     // Formatted in UTC from a UTC-midnight instant: the label must be the
     // calendar date itself, not that date shifted into another zone.
     const at = new Date(`${date}T00:00:00Z`);
-    const entry = submitted.get(date);
+    const resolved = resolveDay(date, {
+      away,
+      override: overrides.get(date),
+      usual,
+    });
+
+    // Compared against the previous day rather than carried in a mutable
+    // variable, so the label falls out of the date alone.
+    const prev = i === 0 ? null : addDays(today, i - 1);
+    const monthLabel =
+      !prev || prev.slice(0, 7) !== date.slice(0, 7)
+        ? monthName.format(at)
+        : "";
 
     return {
       date,
-      weekday: weekday.format(at),
-      dayLabel: dayLabel.format(at),
+      weekday: at.getUTCDay(),
+      dayNumber: at.getUTCDate(),
+      monthLabel,
       isToday: date === today,
-      choice: entry
-        ? entry.status === "Unavailable"
-          ? "Off"
-          : entry.slot
-        : null,
+      isPast: date < today,
+      slot: resolved.slot,
+      status: resolved.status,
+      source: resolved.source,
+      reason: resolved.reason,
       booked: bookedDays.has(date),
     };
   });
 
-  return <AvailabilityCalendar days={days} caddieName={caddie.fullName} />;
+  const usualRecord = Object.fromEntries(usual) as Record<number, DefaultSlot>;
+
+  return (
+    <AvailabilityPlanner
+      caddieName={caddie.fullName}
+      usual={usualRecord}
+      away={away}
+      days={days}
+      today={today}
+    />
+  );
 }

@@ -1,12 +1,16 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   rowToAssignment,
+  rowToAway,
   rowToCaddie,
   rowToLoop,
   rowToTier,
   type AssignmentRec,
   type AvailabilityStatus,
+  type AwayPeriod,
   type CaddieRec,
+  type DefaultSlot,
+  type ResolvedDay,
   type CaddieSettings,
   type CrewMember,
   type LoopRec,
@@ -156,6 +160,7 @@ export async function getSettings(): Promise<CaddieSettings> {
     overlapGuardHours: Number(d.overlap_guard_hours ?? 4),
     sessionDays: Number(d.session_days ?? 90),
     inviteDays: Number(d.invite_days ?? 7),
+    availabilityMonths: Number(d.availability_months ?? 3),
     emailEnabled: Boolean(d.email_enabled ?? true),
     smsEnabled: Boolean(d.sms_enabled ?? false),
     rates: (d.rates ?? {}) as RateCard,
@@ -225,46 +230,180 @@ export interface DayAvailability {
   status: AvailabilityStatus;
 }
 
+// ---------------------------------------------------------------------------
+// Resolving availability
+//
+// Three layers, most specific first: an away period beats a day override,
+// which beats the usual week, and nothing at all means genuinely unknown.
+// Kept pure so the precedence can be tested rather than trusted.
+// ---------------------------------------------------------------------------
+
+/** One caddie's standing pattern, keyed by weekday (0 = Sunday). */
+export type UsualWeek = Map<number, DefaultSlot>;
+
+/** Weekday of a "yyyy-mm-dd" date, read as a plain calendar date. */
+export function weekdayOf(date: string): number {
+  return new Date(`${date}T00:00:00Z`).getUTCDay();
+}
+
+export function resolveDay(
+  date: string,
+  opts: {
+    away?: AwayPeriod[];
+    override?: DayAvailability;
+    usual?: UsualWeek;
+  },
+): ResolvedDay {
+  // 1. Away wins outright. Someone in Mexico is not available because their
+  //    usual week says Saturdays.
+  const away = (opts.away ?? []).find(
+    (a) => date >= a.startsOn && date <= a.endsOn,
+  );
+  if (away) {
+    return {
+      slot: null,
+      status: "Unavailable",
+      source: "away",
+      reason: away.reason || "Away",
+    };
+  }
+
+  // 2. Something they said about this specific day.
+  const day = opts.override;
+  if (day) {
+    return day.status === "Available"
+      ? { slot: day.slot, status: "Available", source: "day" }
+      : { slot: null, status: day.status, source: "day" };
+  }
+
+  // 3. Their usual week.
+  const usual = opts.usual?.get(weekdayOf(date));
+  if (usual) {
+    return usual === "Off"
+      ? { slot: null, status: "Unavailable", source: "usual" }
+      : { slot: usual, status: "Available", source: "usual" };
+  }
+
+  return { slot: null, status: "Unknown", source: "none" };
+}
+
+/** Does a resolved day cover a loop teeing off in `slot`? */
+export function resolvedCovers(day: ResolvedDay, slot: TimeSlot): boolean {
+  if (day.status !== "Available" || !day.slot) return false;
+  return day.slot === "All Day" || day.slot === slot;
+}
+
 /**
- * Availability submissions for one course-local day, keyed by caddie id.
+ * Everyone's resolved availability for one course-local day.
  *
- * The calendar writes exactly one row per caddie per day, so there is nothing
- * to merge. Older rows from before that rule, or any written by hand, are
- * resolved by letting a definite answer beat a Pending one.
+ * Reads all three layers and folds them, so callers get a single answer per
+ * caddie and never have to remember that an away period outranks a pattern.
  */
 export async function availabilityFor(
   day: string,
-): Promise<Map<string, DayAvailability>> {
+): Promise<Map<string, ResolvedDay>> {
   const supa = createAdminClient("caddie");
-  const { data, error } = await supa
-    .from("availability")
-    .select("caddie_id, time_slot, status")
-    .eq("date", day);
-  if (error) throw error;
 
-  const byCaddie = new Map<string, DayAvailability>();
-  for (const row of data ?? []) {
+  const [overrides, defaults, aways] = await Promise.all([
+    supa
+      .from("availability")
+      .select("caddie_id, time_slot, status")
+      .eq("date", day),
+    supa
+      .from("availability_defaults")
+      .select("caddie_id, weekday, slot")
+      .eq("weekday", weekdayOf(day)),
+    supa
+      .from("away_periods")
+      .select("*")
+      .lte("starts_on", day)
+      .gte("ends_on", day),
+  ]);
+
+  for (const r of [overrides, defaults, aways]) {
+    if (r.error) throw r.error;
+  }
+
+  const byCaddieOverride = new Map<string, DayAvailability>();
+  for (const row of overrides.data ?? []) {
     const id = String(row.caddie_id);
     const entry: DayAvailability = {
       slot: row.time_slot as TimeSlot,
       status: row.status as AvailabilityStatus,
     };
-    const existing = byCaddie.get(id);
-    if (!existing || existing.status === "Pending") byCaddie.set(id, entry);
+    const existing = byCaddieOverride.get(id);
+    if (!existing || existing.status === "Pending") {
+      byCaddieOverride.set(id, entry);
+    }
   }
-  return byCaddie;
+
+  const usualByCaddie = new Map<string, UsualWeek>();
+  for (const row of defaults.data ?? []) {
+    const id = String(row.caddie_id);
+    const week = usualByCaddie.get(id) ?? new Map<number, DefaultSlot>();
+    week.set(Number(row.weekday), row.slot as DefaultSlot);
+    usualByCaddie.set(id, week);
+  }
+
+  const awayByCaddie = new Map<string, AwayPeriod[]>();
+  for (const row of aways.data ?? []) {
+    const a = rowToAway(row);
+    awayByCaddie.set(a.caddieId, [...(awayByCaddie.get(a.caddieId) ?? []), a]);
+  }
+
+  // Union of everyone who has said anything at all about this day.
+  const ids = new Set([
+    ...byCaddieOverride.keys(),
+    ...usualByCaddie.keys(),
+    ...awayByCaddie.keys(),
+  ]);
+
+  const out = new Map<string, ResolvedDay>();
+  for (const id of ids) {
+    out.set(
+      id,
+      resolveDay(day, {
+        away: awayByCaddie.get(id),
+        override: byCaddieOverride.get(id),
+        usual: usualByCaddie.get(id),
+      }),
+    );
+  }
+  return out;
 }
 
-/**
- * Does what the caddie told us cover a loop teeing off in `slot`?
- *
- * "All Day" covers both. Saying you are free in the morning is not an offer to
- * work the afternoon, so an AM submission does not cover a PM tee time — the
- * ranking treats that the same as being unavailable.
- */
-export function coversSlot(entry: DayAvailability, slot: TimeSlot): boolean {
-  if (entry.status !== "Available") return false;
-  return entry.slot === "All Day" || entry.slot === slot;
+/** One caddie's standing weekly pattern. */
+export async function usualWeekFor(caddieId: string): Promise<UsualWeek> {
+  const supa = createAdminClient("caddie");
+  const { data, error } = await supa
+    .from("availability_defaults")
+    .select("weekday, slot")
+    .eq("caddie_id", caddieId);
+  if (error) throw error;
+
+  const week: UsualWeek = new Map();
+  for (const row of data ?? []) {
+    week.set(Number(row.weekday), row.slot as DefaultSlot);
+  }
+  return week;
+}
+
+/** One caddie's away periods that touch a range, soonest first. */
+export async function awayPeriodsFor(
+  caddieId: string,
+  from?: string,
+): Promise<AwayPeriod[]> {
+  const supa = createAdminClient("caddie");
+  let q = supa
+    .from("away_periods")
+    .select("*")
+    .eq("caddie_id", caddieId)
+    .order("starts_on", { ascending: true });
+  if (from) q = q.gte("ends_on", from);
+
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []).map(rowToAway);
 }
 
 /** One caddie's own submissions across a date range, keyed by "yyyy-mm-dd". */
@@ -413,24 +552,74 @@ export async function openBoardLoops(caddieId: string): Promise<LoopRec[]> {
 export async function availabilityBetween(
   from: string,
   to: string,
-): Promise<Map<string, Map<string, DayAvailability>>> {
+): Promise<Map<string, Map<string, ResolvedDay>>> {
   const supa = createAdminClient("caddie");
-  const { data, error } = await supa
-    .from("availability")
-    .select("caddie_id, date, time_slot, status")
-    .gte("date", from)
-    .lte("date", to);
-  if (error) throw error;
 
-  const grid = new Map<string, Map<string, DayAvailability>>();
-  for (const row of data ?? []) {
+  const [overrides, defaults, aways] = await Promise.all([
+    supa
+      .from("availability")
+      .select("caddie_id, date, time_slot, status")
+      .gte("date", from)
+      .lte("date", to),
+    supa.from("availability_defaults").select("caddie_id, weekday, slot"),
+    supa
+      .from("away_periods")
+      .select("*")
+      .lte("starts_on", to)
+      .gte("ends_on", from),
+  ]);
+  for (const r of [overrides, defaults, aways]) {
+    if (r.error) throw r.error;
+  }
+
+  const overrideBy = new Map<string, Map<string, DayAvailability>>();
+  for (const row of overrides.data ?? []) {
     const id = String(row.caddie_id);
-    const byDay = grid.get(id) ?? new Map<string, DayAvailability>();
+    const byDay = overrideBy.get(id) ?? new Map<string, DayAvailability>();
     byDay.set(String(row.date), {
       slot: row.time_slot as TimeSlot,
       status: row.status as AvailabilityStatus,
     });
-    grid.set(id, byDay);
+    overrideBy.set(id, byDay);
+  }
+
+  const usualBy = new Map<string, UsualWeek>();
+  for (const row of defaults.data ?? []) {
+    const id = String(row.caddie_id);
+    const week = usualBy.get(id) ?? new Map<number, DefaultSlot>();
+    week.set(Number(row.weekday), row.slot as DefaultSlot);
+    usualBy.set(id, week);
+  }
+
+  const awayBy = new Map<string, AwayPeriod[]>();
+  for (const row of aways.data ?? []) {
+    const a = rowToAway(row);
+    awayBy.set(a.caddieId, [...(awayBy.get(a.caddieId) ?? []), a]);
+  }
+
+  const ids = new Set([
+    ...overrideBy.keys(),
+    ...usualBy.keys(),
+    ...awayBy.keys(),
+  ]);
+
+  // Walk the range once per caddie so the grid shows the same answer the
+  // dispatch board would give, patterns and holidays included.
+  const dates: string[] = [];
+  for (let d = from; d <= to; d = addDays(d, 1)) dates.push(d);
+
+  const grid = new Map<string, Map<string, ResolvedDay>>();
+  for (const id of ids) {
+    const byDay = new Map<string, ResolvedDay>();
+    for (const date of dates) {
+      const r = resolveDay(date, {
+        away: awayBy.get(id),
+        override: overrideBy.get(id)?.get(date),
+        usual: usualBy.get(id),
+      });
+      if (r.source !== "none") byDay.set(date, r);
+    }
+    if (byDay.size > 0) grid.set(id, byDay);
   }
   return grid;
 }
@@ -591,12 +780,14 @@ export async function openWorkFor(caddieId: string): Promise<OpenWork[]> {
  * An AM-only caddie reads as unavailable for an afternoon loop.
  */
 function verdict(
-  entry: DayAvailability | undefined,
+  entry: ResolvedDay | undefined,
   slot: TimeSlot,
 ): AvailabilityStatus | null {
-  if (!entry) return null;
+  // No row at all and an explicit "Unknown" are the same thing to the board:
+  // nobody has told us anything.
+  if (!entry || entry.status === "Unknown") return null;
   if (entry.status === "Pending") return "Pending";
-  return coversSlot(entry, slot) ? "Available" : "Unavailable";
+  return resolvedCovers(entry, slot) ? "Available" : "Unavailable";
 }
 
 export interface Candidate {
@@ -621,7 +812,7 @@ export function rankCandidates(
   loop: LoopRec,
   caddies: CaddieRec[],
   dayLoops: LoopWithCrew[],
-  availability: Map<string, DayAvailability>,
+  availability: Map<string, ResolvedDay>,
   overlapGuardHours: number,
 ): Candidate[] {
   const teeMs = new Date(loop.teeTime).getTime();

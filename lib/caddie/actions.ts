@@ -20,6 +20,7 @@ import {
   type CaddieRec,
   type CaddieStatus,
   type ContactMethod,
+  type DefaultSlot,
   type LoopRec,
   type LoopType,
 } from "./types";
@@ -809,6 +810,118 @@ export async function setAvailability(
     return { ok: true, value: undefined };
   } catch (e) {
     return fail(e, "Could not save that day.");
+  }
+}
+
+/**
+ * Set the caddie's standing pattern for one weekday.
+ *
+ * "I work Saturdays" said once, rather than ticked forty times. Passing null
+ * clears the weekday back to unknown, which the shop reads differently from a
+ * standing Off.
+ */
+export async function setUsualDay(
+  weekday: number,
+  slot: DefaultSlot | null,
+): Promise<Result> {
+  try {
+    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) {
+      return { ok: false, error: "That is not a day of the week." };
+    }
+    const caddie = await getCaddieSession();
+    if (!caddie) return { ok: false, error: "You are signed out." };
+
+    const supa = createAdminClient("caddie");
+
+    if (slot === null) {
+      const { error } = await supa
+        .from("availability_defaults")
+        .delete()
+        .eq("caddie_id", caddie.id)
+        .eq("weekday", weekday);
+      if (error) throw error;
+    } else {
+      const { error } = await supa.from("availability_defaults").upsert(
+        {
+          caddie_id: caddie.id,
+          weekday,
+          slot,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "caddie_id,weekday" },
+      );
+      if (error) throw error;
+    }
+
+    revalidatePath("/caddie/availability");
+    revalidatePath(BOARD_PATH);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not save your usual week.");
+  }
+}
+
+/**
+ * Book a stretch of days off — a holiday, a trip, surgery.
+ *
+ * One entry instead of a fortnight of taps, and it outranks everything else,
+ * so a caddie who is away does not get offered loops because their usual week
+ * says Saturdays.
+ */
+export async function addAwayPeriod(input: {
+  startsOn: string;
+  endsOn: string;
+  reason: string;
+}): Promise<Result> {
+  try {
+    const iso = /^\d{4}-\d{2}-\d{2}$/;
+    if (!iso.test(input.startsOn) || !iso.test(input.endsOn)) {
+      return { ok: false, error: "Pick a start and end date." };
+    }
+    if (input.endsOn < input.startsOn) {
+      return { ok: false, error: "The end date is before the start date." };
+    }
+
+    const caddie = await getCaddieSession();
+    if (!caddie) return { ok: false, error: "You are signed out." };
+
+    const supa = createAdminClient("caddie");
+    const { error } = await supa.from("away_periods").insert({
+      caddie_id: caddie.id,
+      starts_on: input.startsOn,
+      ends_on: input.endsOn,
+      reason: input.reason.trim(),
+    });
+    if (error) throw error;
+
+    revalidatePath("/caddie/availability");
+    revalidatePath(BOARD_PATH);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not save that time away.");
+  }
+}
+
+export async function removeAwayPeriod(id: string): Promise<Result> {
+  try {
+    const caddie = await getCaddieSession();
+    if (!caddie) return { ok: false, error: "You are signed out." };
+
+    const supa = createAdminClient("caddie");
+    // Scoped to the session's own caddie: the id comes from the page, so
+    // without this anyone could delete someone else's time off.
+    const { error } = await supa
+      .from("away_periods")
+      .delete()
+      .eq("id", id)
+      .eq("caddie_id", caddie.id);
+    if (error) throw error;
+
+    revalidatePath("/caddie/availability");
+    revalidatePath(BOARD_PATH);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not remove that time away.");
   }
 }
 

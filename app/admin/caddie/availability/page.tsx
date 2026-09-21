@@ -28,6 +28,7 @@ const CELL: Record<string, { label: string; cls: string }> = {
   AM: { label: "AM", cls: "badge open" },
   PM: { label: "PM", cls: "badge open" },
   Off: { label: "Off", cls: "badge closed" },
+  Away: { label: "Away", cls: "badge closed" },
 };
 
 function TodayLine({
@@ -121,7 +122,11 @@ export default async function AdminAvailabilityPage({
   const cellFor = (caddieId: string, date: string) => {
     const entry = grid.get(caddieId)?.get(date);
     if (!entry) return null;
-    return entry.status === "Unavailable" ? CELL.Off : CELL[entry.slot];
+    // Away reads differently from a plain "off": the shop wants to know the
+    // caddie is gone, not just unavailable that day.
+    if (entry.source === "away") return CELL.Away;
+    if (entry.status !== "Available" || !entry.slot) return CELL.Off;
+    return CELL[entry.slot];
   };
 
   // Per-day tallies, counting each half separately — "All day" answers both.
