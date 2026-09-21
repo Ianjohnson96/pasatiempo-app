@@ -96,5 +96,12 @@ export default async function CaddiePortalHome({
     rateCents: rateFor(settings.rates, loop.loopType),
   }));
 
-  return <CaddiePortal caddie={caddie} items={items} open={open} />;
+  return (
+    <CaddiePortal
+      caddie={caddie}
+      items={items}
+      open={open}
+      vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
+    />
+  );
 }

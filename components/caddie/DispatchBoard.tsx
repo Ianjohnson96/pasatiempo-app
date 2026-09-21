@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  callAllCaddies,
   cancelDay,
   duplicateDay,
   offerLoop,
@@ -141,8 +142,8 @@ export default function DispatchBoard({
 
       {!notifyReady && (
         <p className="notice warn">
-          Offers are recorded but nothing is sent yet — no email or SMS is wired
-          up. Ring the caddie, then mark their answer here.
+          Job alerts are not configured, so posting a loop tells nobody. Ring the
+          caddie, then mark their answer here.
         </p>
       )}
 
@@ -242,6 +243,40 @@ export default function DispatchBoard({
                       onClick={() => setOpenLoop(isOpen ? null : loop.id)}
                     >
                       {isOpen ? "Close" : `Offer (${needs})`}
+                    </button>
+                  )}
+                  {/* The whole point of the app: one button instead of
+                      texting the roster one at a time. */}
+                  {needs > 0 && loop.status !== "Cancelled" && (
+                    <button
+                      className="btn small"
+                      disabled={pending}
+                      // The accessible name must contain the visible text,
+                      // or a screen reader announces the tooltip instead of
+                      // the label the sighted user is being told to press.
+                      aria-label="Call all caddies: post this loop and alert everyone active"
+                      onClick={() =>
+                        start(async () => {
+                          setNote(null);
+                          const res = await callAllCaddies(loop.id);
+                          if (res.ok) {
+                            setNote({
+                              kind: "ok",
+                              text:
+                                res.value > 0
+                                  ? `Alerted ${res.value} ${
+                                      res.value === 1 ? "caddie" : "caddies"
+                                    }. First to claim gets it.`
+                                  : "Posted, but no caddie has job alerts turned on yet.",
+                            });
+                            router.refresh();
+                          } else {
+                            setNote({ kind: "err", text: res.error });
+                          }
+                        })
+                      }
+                    >
+                      Call all
                     </button>
                   )}
                   <button

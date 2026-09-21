@@ -55,11 +55,13 @@ export async function GET(request: NextRequest) {
     const expiredOffers = await sweep("expire_stale_offers");
     const purgedSessions = await sweep("purge_expired_sessions");
     const purgedInvites = await sweep("purge_expired_invites");
+    const purgedDevices = await sweep("purge_dead_push_subscriptions");
 
     return NextResponse.json({
       expiredOffers,
       purgedSessions,
       purgedInvites,
+      purgedDevices,
       ranAt: new Date().toISOString(),
     });
   } catch (e) {

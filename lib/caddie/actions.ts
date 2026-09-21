@@ -8,7 +8,13 @@ import { createClient } from "@/lib/supabase/server";
 import { dayRange, getSettings } from "./data";
 import { getCaddieSession, mintInvite, signOutCaddie } from "./session";
 import {
+  notifyActiveCaddies,
+  removePushSubscription,
+  savePushSubscription,
+} from "./push";
+import {
   DEFAULT_HOLES,
+  rateFor,
   rowToCaddie,
   rowToLoop,
   type CaddieRank,
@@ -565,6 +571,113 @@ export async function claimOpenLoop(loopId: string): Promise<Result> {
     return { ok: true, value: undefined };
   } catch (e) {
     return fail(e, "Could not claim that loop.");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Job alerts
+// ---------------------------------------------------------------------------
+
+/** Register this device for job alerts. */
+export async function subscribeToPush(keys: {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}): Promise<Result> {
+  try {
+    const caddie = await getCaddieSession();
+    if (!caddie) {
+      return { ok: false, error: "You are signed out." };
+    }
+    const ua = (await headers()).get("user-agent");
+    await savePushSubscription(caddie.id, keys, ua);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not turn on job alerts.");
+  }
+}
+
+export async function unsubscribeFromPush(endpoint: string): Promise<Result> {
+  try {
+    await removePushSubscription(endpoint);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not turn off job alerts.");
+  }
+}
+
+/**
+ * Post a loop to every active caddie at once.
+ *
+ * This is the job the app exists to do. A member rings wanting a caddie on
+ * Saturday; instead of texting the roster one at a time, the shop presses this
+ * and every phone buzzes. First to claim takes it.
+ */
+export async function callAllCaddies(loopId: string): Promise<Result<number>> {
+  try {
+    const supa = createAdminClient("caddie");
+    const settings = await getSettings();
+
+    const { data: row, error } = await supa
+      .from("loops")
+      .select("*")
+      .eq("id", loopId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) return { ok: false, error: "That loop no longer exists." };
+
+    const loop = rowToLoop(row);
+    if (loop.status === "Cancelled") {
+      return { ok: false, error: "That loop is cancelled." };
+    }
+
+    // Posting to the board is what makes it claimable; the alert only tells
+    // people to go and look.
+    const { error: postErr } = await supa
+      .from("loops")
+      .update({ open_board: true })
+      .eq("id", loopId);
+    if (postErr) throw postErr;
+
+    const when = new Intl.DateTimeFormat("en-US", {
+      timeZone: settings.courseTimezone,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(loop.teeTime));
+
+    const rate = rateFor(settings.rates, loop.loopType);
+
+    // Caddies already on this loop do not need telling about it.
+    const { data: already } = await supa
+      .from("assignments")
+      .select("caddie_id")
+      .eq("loop_id", loopId)
+      .in("confirmation_status", ["Pending", "Accepted"]);
+
+    const result = await notifyActiveCaddies(
+      {
+        title: "Loop available",
+        body:
+          `${when} · ${loop.loopType}` +
+          (rate ? ` · $${Math.round(rate / 100)}` : "") +
+          `\n${loop.playerName}. First to claim gets it.`,
+        url: "/caddie",
+        tag: `loop-${loopId}`,
+        loopId,
+      },
+      {
+        excludeCaddieIds: (already ?? []).map((r) => String(r.caddie_id)),
+      },
+    );
+
+    revalidatePath(BOARD_PATH);
+    revalidatePath("/caddie");
+    return { ok: true, value: result.sent };
+  } catch (e) {
+    return fail(e, "Could not send the caddie call.");
   }
 }
 

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import PushOptIn from "./PushOptIn";
 import {
   caddieSignOut,
   claimOpenLoop,
@@ -48,10 +49,12 @@ export default function CaddiePortal({
   caddie,
   items,
   open,
+  vapidKey,
 }: {
   caddie: CaddieRec;
   items: PortalLoop[];
   open: OpenLoop[];
+  vapidKey: string | null;
 }) {
   const router = useRouter();
   const [busy, start] = useTransition();
@@ -122,6 +125,8 @@ export default function CaddiePortal({
           {note.text}
         </p>
       )}
+
+      <PushOptIn vapidKey={vapidKey} />
 
       <Link
         href="/caddie/availability"

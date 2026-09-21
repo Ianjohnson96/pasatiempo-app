@@ -16,6 +16,7 @@ import {
   loopsForDay,
   rankCandidates,
 } from "@/lib/caddie/data";
+import { pushConfigured } from "@/lib/caddie/push";
 
 // The Pro Shop's dispatch board. Access is gated by the proxy (signed-in
 // Supabase user) and re-checked here, the same as every other /admin route.
@@ -84,7 +85,7 @@ export default async function CaddieDispatchPage({
           candidatesByLoop={candidatesByLoop}
           teeLabels={teeLabels}
           rates={settings.rates}
-          notifyReady={false}
+          notifyReady={pushConfigured()}
         />
 
         {caddies.length === 0 && (
