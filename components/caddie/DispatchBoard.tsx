@@ -41,7 +41,6 @@ interface Props {
   dayLabel: string;
   today: string;
   loops: LoopWithCrew[];
-  caddies: CaddieRec[];
   candidatesByLoop: Record<string, BoardCandidate[]>;
   teeLabels: Record<string, string>; // loop id -> "7:42 AM"
   /** Booking id -> party name, for loops that go out together. */
@@ -63,7 +62,6 @@ export default function DispatchBoard({
   dayLabel,
   today,
   loops,
-  caddies,
   candidatesByLoop,
   teeLabels,
   groupNames,

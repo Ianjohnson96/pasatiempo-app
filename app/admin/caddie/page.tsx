@@ -85,7 +85,6 @@ export default async function CaddieDispatchPage({
           dayLabel={formatDay(day, tz)}
           today={today}
           loops={loops}
-          caddies={caddies}
           candidatesByLoop={candidatesByLoop}
           teeLabels={teeLabels}
           groupNames={Object.fromEntries(groups)}
