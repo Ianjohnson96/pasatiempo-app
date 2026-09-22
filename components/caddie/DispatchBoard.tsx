@@ -928,6 +928,7 @@ function QuickAdd({
     [{ loopType: "Single Bag", count: 1 }],
   ]);
   const [notes, setNotes] = useState("");
+  const [announce, setAnnounce] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [saving, start] = useTransition();
 
@@ -978,6 +979,31 @@ function QuickAdd({
     0,
   );
 
+  // What the shop can read back down the phone before committing. The form
+  // shows the parts; this is the sentence — "so that's two double bags and a
+  // forecaddie off the 12:00" — which is how the call is actually confirmed.
+  const readBack = useMemo(() => {
+    if (totalCaddies === 0) return "";
+    const tally = new Map<LoopType, number>();
+    for (const g of groups) {
+      for (const n of g) tally.set(n.loopType, (tally.get(n.loopType) ?? 0) + n.count);
+    }
+    const what = [...tally]
+      .map(([t, n]) => `${n} × ${t}`)
+      .join(", ");
+    const withCaddies = groups.filter((g) => g.length > 0).length;
+    const where =
+      groups.length === 1
+        ? `off the ${preview[0] ?? "first tee"}`
+        : withCaddies === groups.length
+          ? `across ${groups.length} tee times, ${preview[0]}–${preview[preview.length - 1]}`
+          : `on ${withCaddies} of ${groups.length} tee times (${groups
+              .map((g, i) => (g.length ? preview[i] : null))
+              .filter(Boolean)
+              .join(", ")})`;
+    return `${what} — ${where}.`;
+  }, [groups, preview, totalCaddies]);
+
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
@@ -988,6 +1014,7 @@ function QuickAdd({
         name,
         groups,
         notes,
+        announce,
       });
       if (!res.ok) {
         setErr(res.error);
@@ -1050,6 +1077,33 @@ function QuickAdd({
         </Field>
       </div>
 
+      {/* The calls that come in most often, in one tap. Everything below is
+          still editable afterwards — this only saves the shop from building
+          the common case by hand every time. */}
+      <div
+        style={{
+          display: "flex",
+          gap: 6,
+          marginTop: 12,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <span className="muted" style={{ fontSize: 12, marginRight: 2 }}>
+          Common jobs
+        </span>
+        {PRESETS.map((p) => (
+          <button
+            key={p.label}
+            type="button"
+            className="btn ghost small"
+            onClick={() => setGroups(p.build())}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
       {/* One row per tee time, ten minutes apart, each saying what it wants.
           A group is rarely one thing — two double bags, or a double and a
           single, or a double and a forecaddie for the other two — and a
@@ -1108,21 +1162,29 @@ function QuickAdd({
               </span>
             ))}
 
-            <select
-              value=""
-              aria-label={`Add a caddie to group ${i + 1}`}
-              onChange={(e) => {
-                if (e.target.value) addNeed(i, e.target.value as LoopType);
+            {/* Buttons rather than a dropdown: a dropdown is three taps
+                (open, scan, choose) for something the shop does constantly,
+                and it hides the options behind a closed lid. */}
+            <span
+              style={{
+                display: "flex",
+                gap: 4,
+                marginLeft: "auto",
+                flexWrap: "wrap",
               }}
-              style={{ ...inputStyle, width: 148, marginLeft: "auto" }}
             >
-              <option value="">+ Add caddie</option>
               {LOOP_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
+                <button
+                  key={t}
+                  type="button"
+                  className="btn secondary small"
+                  aria-label={`Add ${t} to group ${i + 1}`}
+                  onClick={() => addNeed(i, t)}
+                >
+                  + {SHORT_TYPE[t] ?? t}
+                </button>
               ))}
-            </select>
+            </span>
 
             {i === 0 && groups.length > 1 && (
               <button
@@ -1186,16 +1248,44 @@ function QuickAdd({
         </button>
       </div>
 
-      {groups.length > 1 && (
-        <p
-          className="muted"
-          style={{ fontSize: 13, marginTop: 10, marginBottom: 0 }}
-        >
-          {preview.join(" · ")} — {totalCaddies}{" "}
-          {totalCaddies === 1 ? "caddie" : "caddies"} across {groups.length} tee
-          times, kept together as one group.
+      {/* Say it out loud before booking it. */}
+      {readBack && (
+        <p style={{ fontSize: 14, marginTop: 10, marginBottom: 0 }}>
+          <strong>{name.trim() || "This party"}:</strong> {readBack}
+          {totalCaddies > 0 && (
+            <span className="muted">
+              {" "}
+              {totalCaddies} {totalCaddies === 1 ? "caddie" : "caddies"} in
+              total.
+            </span>
+          )}
         </p>
       )}
+
+      <label
+        style={{
+          display: "flex",
+          gap: 8,
+          alignItems: "flex-start",
+          marginTop: 12,
+          fontSize: 14,
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={announce}
+          onChange={(e) => setAnnounce(e.target.checked)}
+          style={{ marginTop: 3 }}
+        />
+        <span>
+          Put it on the job board and alert every caddie now.
+          <span className="muted">
+            {" "}
+            One notification for the whole booking, not one per loop. Leave this
+            off when you are typing up a sheet in advance.
+          </span>
+        </span>
+      </label>
 
       {err && (
         <p className="notice err" style={{ marginBottom: 0 }}>
@@ -1205,6 +1295,72 @@ function QuickAdd({
     </form>
   );
 }
+
+/** Short labels, so four type buttons fit on one row of a shop screen. */
+const SHORT_TYPE: Partial<Record<LoopType, string>> = {
+  "Single Bag": "Single",
+  "Double Bag": "Double",
+  "Forecaddie 1-2": "Fore 1-2",
+  "Forecaddie 3-4": "Fore 3-4",
+};
+
+/**
+ * The calls that come in most often, as one tap each.
+ *
+ * Taken from how the phone call actually sounds — "a caddie for one",
+ * "two guys want a double", "we've got twelve and want a forecaddie in each
+ * group" — rather than from the shape of the database.
+ */
+const PRESETS: { label: string; build: () => GroupNeed[][] }[] = [
+  {
+    label: "1 single",
+    build: () => [[{ loopType: "Single Bag", count: 1 }]],
+  },
+  {
+    label: "1 double",
+    build: () => [[{ loopType: "Double Bag", count: 1 }]],
+  },
+  {
+    label: "2 doubles",
+    build: () => [[{ loopType: "Double Bag", count: 2 }]],
+  },
+  {
+    label: "Double + single",
+    build: () => [
+      [
+        { loopType: "Double Bag", count: 1 },
+        { loopType: "Single Bag", count: 1 },
+      ],
+    ],
+  },
+  {
+    label: "Double + forecaddie",
+    build: () => [
+      [
+        { loopType: "Double Bag", count: 1 },
+        { loopType: "Forecaddie 1-2", count: 1 },
+      ],
+    ],
+  },
+  {
+    label: "Foursome, forecaddie",
+    build: () => [[{ loopType: "Forecaddie 3-4", count: 1 }]],
+  },
+  {
+    label: "12 players, 3 groups",
+    build: () =>
+      Array.from({ length: 3 }, () => [
+        { loopType: "Forecaddie 3-4" as LoopType, count: 1 },
+      ]),
+  },
+  {
+    label: "16 players, 4 groups",
+    build: () =>
+      Array.from({ length: 4 }, () => [
+        { loopType: "Forecaddie 3-4" as LoopType, count: 1 },
+      ]),
+  },
+];
 
 /**
  * Delete a loop, with a second tap to mean it.

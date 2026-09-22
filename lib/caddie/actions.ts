@@ -6,7 +6,7 @@ import QRCode from "qrcode";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { planBooking } from "./booking";
-import { dayRange, getSettings } from "./data";
+import { dayRange, formatTee, getSettings } from "./data";
 import { resolveOrigin } from "./origin";
 import { getCaddieSession, mintInvite, signOutCaddie } from "./session";
 import {
@@ -157,6 +157,15 @@ export interface GroupInput {
   notes: string;
   /** Minutes between tee times. Defaults to the course's ten. */
   intervalMinutes?: number;
+  /**
+   * Put the loops straight on the job board and tell every active caddie.
+   *
+   * The whole point of this app is not ringing eighteen people one at a time,
+   * and booking then hunting for a Post button is two steps where the shop
+   * only ever meant one. Off by default, because entering tomorrow's sheet in
+   * bulk should not set off a phone in every pocket.
+   */
+  announce?: boolean;
 }
 
 /**
@@ -229,12 +238,33 @@ export async function createGroupBooking(
       notes: input.notes.trim(),
       booking_id: String(booking.id),
       created_by: by,
+      open_board: input.announce === true,
     }));
 
-    const { error } = await supa.from("loops").insert(rows);
+    const { data: inserted, error } = await supa
+      .from("loops")
+      .insert(rows)
+      .select("id, tee_time");
     if (error) throw error;
 
+    // One alert for the booking, not one per loop. Four pushes for a party
+    // that occupies four tee times is how a roster learns to ignore the
+    // notification, which is the single failure this channel cannot recover
+    // from.
+    if (input.announce && (inserted?.length ?? 0) > 0) {
+      const when = formatTee(String(inserted![0].tee_time), courseTimezone);
+      const n = inserted!.length;
+      await notifyActiveCaddies({
+        title: n === 1 ? "Loop available" : `${n} loops available`,
+        body: `${name} — first tee ${when}. Tap to claim.`,
+        url: "/caddie",
+        tag: `booking-${booking.id}`,
+        loopId: String(inserted![0].id),
+      });
+    }
+
     revalidatePath(BOARD_PATH);
+    revalidatePath("/caddie");
     return {
       ok: true,
       value: { bookingId: String(booking.id), created: rows.length },
