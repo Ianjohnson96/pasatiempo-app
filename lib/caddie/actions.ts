@@ -6,6 +6,7 @@ import QRCode from "qrcode";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { dayRange, getSettings } from "./data";
+import { resolveOrigin } from "./origin";
 import { getCaddieSession, mintInvite, signOutCaddie } from "./session";
 import {
   notifyActiveCaddies,
@@ -1505,17 +1506,20 @@ export async function createInvite(
   }
 }
 
-// The origin to build the invite URL from. NEXT_PUBLIC_SITE_URL wins when set;
-// otherwise the request's own host, so a link minted on a phone on the club
-// wifi still points somewhere that phone can reach.
+// The origin to build the invite URL from. NEXT_PUBLIC_SITE_URL wins when set
+// and plausible; otherwise the request's own host, so a link minted on a phone
+// on the club wifi still points somewhere that phone can reach.
+//
+// "Plausible" is doing real work here — see resolveOrigin. A localhost value
+// left in a production environment used to win outright, and every invite it
+// minted was dead on arrival.
 async function siteOrigin(): Promise<string> {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (configured) return configured.replace(/\/+$/, "");
-
   const h = await headers();
-  const host = h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  return `${proto}://${host}`;
+  return resolveOrigin({
+    configured: process.env.NEXT_PUBLIC_SITE_URL,
+    host: h.get("host"),
+    proto: h.get("x-forwarded-proto"),
+  });
 }
 
 /**
