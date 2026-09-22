@@ -374,9 +374,12 @@ function InvitePanel({
           </div>
           <p className="muted no-print" style={{ marginTop: 6 }}>
             Have them scan this with their phone camera. It signs them in for
-            90 days, works once, and expires{" "}
-            {new Date(handout.expiresAt).toLocaleDateString()}. Creating a new
-            link cancels this one.
+            90 days and can be scanned more than once, but only until{" "}
+            {new Date(handout.expiresAt).toLocaleTimeString([], {
+              hour: "numeric",
+              minute: "2-digit",
+            })}{" "}
+            — about an hour. Creating a new link cancels this one.
           </p>
 
           {/* The steps that matter on paper. An iPhone will not deliver job

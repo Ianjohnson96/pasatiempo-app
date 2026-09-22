@@ -24,7 +24,6 @@ export const dynamic = "force-dynamic";
 const REASONS: Record<string, string> = {
   invalid: "That link was not valid. Ask the Pro Shop for a new one.",
   expired: "That link had expired. Ask the Pro Shop to show you a new one.",
-  used: "That link had already been used. Each one works once — ask for another.",
   inactive: "This account is not active. Check with the Pro Shop.",
 };
 

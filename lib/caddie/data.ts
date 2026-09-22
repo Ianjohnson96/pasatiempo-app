@@ -160,7 +160,7 @@ export async function getSettings(): Promise<CaddieSettings> {
     reminderHoursBefore: Number(d.reminder_hours_before ?? 12),
     overlapGuardHours: Number(d.overlap_guard_hours ?? 4),
     sessionDays: Number(d.session_days ?? 90),
-    inviteDays: Number(d.invite_days ?? 7),
+    inviteMinutes: Number(d.invite_minutes ?? 60),
     availabilityMonths: Number(d.availability_months ?? 3),
     emailEnabled: Boolean(d.email_enabled ?? true),
     smsEnabled: Boolean(d.sms_enabled ?? false),

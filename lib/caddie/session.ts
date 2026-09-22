@@ -46,18 +46,16 @@ export async function mintInvite(
   caddieId: string,
   origin: string,
   createdBy: string | null,
-  days: number,
+  minutes: number,
 ): Promise<Invite> {
   const supa = createAdminClient("caddie");
 
-  await supa
-    .from("invites")
-    .delete()
-    .eq("caddie_id", caddieId)
-    .is("used_at", null);
+  // Every earlier link for this caddie, spent or not. A caddie has exactly one
+  // live invite, so a new one always supersedes whatever came before.
+  await supa.from("invites").delete().eq("caddie_id", caddieId);
 
   const token = newToken();
-  const expiresAt = new Date(Date.now() + days * 86_400_000).toISOString();
+  const expiresAt = new Date(Date.now() + minutes * 60_000).toISOString();
 
   const { error } = await supa.from("invites").insert({
     token_hash: hash(token),
@@ -76,12 +74,13 @@ export async function mintInvite(
 
 export type ClaimResult =
   | { ok: true; caddie: CaddieRec }
-  | { ok: false; reason: "invalid" | "expired" | "used" | "inactive" };
+  | { ok: false; reason: "invalid" | "expired" | "inactive" };
 
 /**
  * Trade an invite token for a session cookie.
  *
- * The invite is burned on use. A caddie who clears their cookies needs a fresh
+ * The invite works as often as needed until it expires, which is soon. A caddie
+ * who clears their cookies after that needs a fresh
  * link from the shop, which is the right trade for a token that was handed over
  * in the open.
  */
@@ -99,7 +98,6 @@ export async function claimInvite(
     .maybeSingle();
 
   if (!invite) return { ok: false, reason: "invalid" };
-  if (invite.used_at) return { ok: false, reason: "used" };
   if (new Date(invite.expires_at).getTime() < Date.now()) {
     return { ok: false, reason: "expired" };
   }
@@ -114,16 +112,20 @@ export async function claimInvite(
   const caddie = rowToCaddie(caddieRow);
   if (caddie.status !== "Active") return { ok: false, reason: "inactive" };
 
-  // Burn the invite before issuing anything, so a double-scan cannot mint two
-  // sessions from one link.
-  const { data: burned } = await supa
-    .from("invites")
-    .update({ used_at: new Date().toISOString() })
-    .eq("token_hash", invite.token_hash)
-    .is("used_at", null)
-    .select("token_hash")
-    .maybeSingle();
-  if (!burned) return { ok: false, reason: "used" };
+  // Stamp the first claim for the record, but never refuse a later one. The
+  // link is not burned: a QR scanned by a camera app often opens in that app's
+  // own browser, which keeps its own cookies, so the caddie's first scan
+  // signed in a throwaway window and a single-use link would leave them locked
+  // out with no way to tell why. Reuse costs little here — the link names one
+  // caddie, so a second claim only ever mints another session for that same
+  // person, and it stops mattering an hour after the shop showed it.
+  if (!invite.used_at) {
+    await supa
+      .from("invites")
+      .update({ used_at: new Date().toISOString() })
+      .eq("token_hash", invite.token_hash)
+      .is("used_at", null);
+  }
 
   await issueSession(caddie.id, sessionDays, userAgent);
   return { ok: true, caddie };

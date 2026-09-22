@@ -189,7 +189,7 @@ export interface CaddieSettings {
   overlapGuardHours: number;
   sessionDays: number;
   /** How long a handed-over sign-in link stays good. */
-  inviteDays: number;
+  inviteMinutes: number;
   /** How far ahead the caddie availability planner runs. */
   availabilityMonths: number;
   emailEnabled: boolean;
