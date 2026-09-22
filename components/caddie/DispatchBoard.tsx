@@ -1173,14 +1173,16 @@ function QuickAdd({
         <button
           className="btn"
           type="submit"
-          disabled={saving || busy}
+          disabled={saving || busy || totalLoops === 0}
           style={{ marginLeft: "auto" }}
         >
           {saving
             ? "Booking…"
-            : totalLoops === 1
-              ? "Add loop"
-              : `Book ${totalLoops} loops`}
+            : totalLoops === 0
+              ? "Add a caddie first"
+              : totalLoops === 1
+                ? "Add loop"
+                : `Book ${totalLoops} loops`}
         </button>
       </div>
 
