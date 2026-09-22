@@ -59,6 +59,9 @@ function loop(teeTime: string, over: Partial<LoopRec> = {}): LoopRec {
     status: "Unassigned",
     openBoard: false,
     createdBy: null,
+    createdAt: null,
+    cancelledBy: null,
+    cancelledAt: null,
     ...over,
   };
 }

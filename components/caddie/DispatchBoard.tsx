@@ -12,17 +12,21 @@ import {
   nudgePending,
   respondForCaddie,
   createGroupBooking,
+  deleteLoop,
   setLoopStatus,
   setOpenBoard,
   withdrawOffer,
 } from "@/lib/caddie/actions";
 import {
   LOOP_TYPES,
+  TEE_INTERVAL_MINUTES,
   acceptedCount,
   pendingCount,
   rateFor,
   type CaddieRec,
   type CrewMember,
+  type GroupNeed,
+  type LoopRec,
   type LoopStatus,
   type LoopType,
   type LoopWithCrew,
@@ -408,7 +412,17 @@ export default function DispatchBoard({
                   >
                     {loop.status === "Cancelled" ? "Restore" : "Cancel"}
                   </button>
+                  <DeleteLoopButton
+                    loop={loop}
+                    disabled={pending}
+                    onDone={() => router.refresh()}
+                  />
                 </div>
+
+                {/* Who put this on the sheet and who took it off. A loop that
+                    vanishes is an argument waiting to happen, and the caddie
+                    who was on it deserves a better answer than "the system". */}
+                <LoopAudit loop={loop} />
 
                 {isOpen && (
                   <OfferPanel
@@ -908,10 +922,11 @@ function QuickAdd({
   const [date, setDate] = useState(day);
   const [time, setTime] = useState("07:00");
   const [name, setName] = useState("");
-  const [loopType, setLoopType] = useState<LoopType>("Single Bag");
-  const [caddiesPerGroup, setCaddiesPerGroup] = useState(1);
-  const [groups, setGroups] = useState(1);
-  const [intervalMinutes, setIntervalMinutes] = useState(10);
+  // One entry per tee time. A group with no needs is a group playing without
+  // a caddie, which is a thing the shop has to be able to say.
+  const [groups, setGroups] = useState<GroupNeed[][]>([
+    [{ loopType: "Single Bag", count: 1 }],
+  ]);
   const [notes, setNotes] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [saving, start] = useTransition();
@@ -921,15 +936,47 @@ function QuickAdd({
   const preview = useMemo(() => {
     const [h, m] = time.split(":").map(Number);
     if (Number.isNaN(h) || Number.isNaN(m)) return [];
-    return Array.from({ length: Math.max(1, Math.min(groups, 20)) }, (_, i) => {
-      const total = h * 60 + m + i * intervalMinutes;
+    return groups.map((_, i) => {
+      const total = h * 60 + m + i * TEE_INTERVAL_MINUTES;
       const hh = Math.floor(total / 60) % 24;
       const mm = total % 60;
       const ampm = hh < 12 ? "a" : "p";
       const h12 = hh % 12 === 0 ? 12 : hh % 12;
       return `${h12}:${String(mm).padStart(2, "0")}${ampm}`;
     });
-  }, [time, groups, intervalMinutes]);
+  }, [time, groups]);
+
+  // Mutating one group without disturbing the rest.
+  const editGroup = (i: number, fn: (needs: GroupNeed[]) => GroupNeed[]) =>
+    setGroups((gs) => gs.map((g, k) => (k === i ? fn(g) : g)));
+
+  const addNeed = (i: number, loopType: LoopType) =>
+    editGroup(i, (needs) =>
+      needs.some((n) => n.loopType === loopType)
+        ? needs.map((n) =>
+            n.loopType === loopType
+              ? { ...n, count: Math.min(8, n.count + 1) }
+              : n,
+          )
+        : [...needs, { loopType, count: 1 }],
+    );
+
+  const dropNeed = (i: number, loopType: LoopType) =>
+    editGroup(i, (needs) =>
+      needs.flatMap((n) =>
+        n.loopType !== loopType
+          ? [n]
+          : n.count > 1
+            ? [{ ...n, count: n.count - 1 }]
+            : [],
+      ),
+    );
+
+  const totalLoops = groups.reduce((n, g) => n + g.length, 0);
+  const totalCaddies = groups.reduce(
+    (n, g) => n + g.reduce((s, x) => s + x.count, 0),
+    0,
+  );
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -939,10 +986,7 @@ function QuickAdd({
         day: date,
         time,
         name,
-        loopType,
-        caddiesPerGroup,
         groups,
-        intervalMinutes,
         notes,
       });
       if (!res.ok) {
@@ -951,14 +995,13 @@ function QuickAdd({
       }
       setName("");
       setNotes("");
-      setGroups(1);
-      setTime(bumpTime(time, intervalMinutes * Math.max(1, groups)));
+      setGroups([[{ loopType: "Single Bag", count: 1 }]]);
+      setTime(bumpTime(time, TEE_INTERVAL_MINUTES * groups.length));
       if (date !== day) router.push(`/admin/caddie?day=${date}`);
       else router.refresh();
     });
   }
 
-  const totalCaddies = caddiesPerGroup * Math.max(1, groups);
 
   return (
     <form onSubmit={submit} className="card no-print" style={{ marginTop: 16 }}>
@@ -997,52 +1040,6 @@ function QuickAdd({
             style={{ ...inputStyle, minWidth: 180, width: "100%" }}
           />
         </Field>
-        <Field label="Type">
-          <select
-            value={loopType}
-            onChange={(e) => setLoopType(e.target.value as LoopType)}
-            style={inputStyle}
-          >
-            {LOOP_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Tee times">
-          <input
-            type="number"
-            min={1}
-            max={20}
-            value={groups}
-            onChange={(e) => setGroups(Number(e.target.value))}
-            style={{ ...inputStyle, width: 80 }}
-          />
-        </Field>
-        <Field label="Apart">
-          <select
-            value={intervalMinutes}
-            onChange={(e) => setIntervalMinutes(Number(e.target.value))}
-            style={{ ...inputStyle, width: 92 }}
-          >
-            {[8, 9, 10, 11, 12, 15, 20].map((m) => (
-              <option key={m} value={m}>
-                {m} min
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Caddies each">
-          <input
-            type="number"
-            min={1}
-            max={8}
-            value={caddiesPerGroup}
-            onChange={(e) => setCaddiesPerGroup(Number(e.target.value))}
-            style={{ ...inputStyle, width: 90 }}
-          />
-        </Field>
         <Field label="Note" grow>
           <input
             value={notes}
@@ -1051,16 +1048,150 @@ function QuickAdd({
             style={{ ...inputStyle, minWidth: 140, width: "100%" }}
           />
         </Field>
-        <button className="btn" type="submit" disabled={saving || busy}>
-          {saving ? "Booking…" : groups > 1 ? `Book ${groups} tee times` : "Add loop"}
+      </div>
+
+      {/* One row per tee time, ten minutes apart, each saying what it wants.
+          A group is rarely one thing — two double bags, or a double and a
+          single, or a double and a forecaddie for the other two — and a
+          sixteen-player outing where only the first and fourth groups want a
+          caddie is still one booking. */}
+      <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
+        {groups.map((needs, i) => (
+          <div
+            key={i}
+            className="card"
+            style={{
+              padding: "8px 10px",
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <strong style={{ minWidth: 64, fontSize: 15 }}>
+              {preview[i] ?? "—"}
+            </strong>
+            <span className="muted" style={{ fontSize: 12, minWidth: 54 }}>
+              {groups.length > 1 ? `${i + 1} of ${groups.length}` : "group"}
+            </span>
+
+            {needs.length === 0 && (
+              <span className="muted" style={{ fontSize: 13 }}>
+                No caddie — just playing
+              </span>
+            )}
+
+            {needs.map((n) => (
+              <span
+                key={n.loopType}
+                className="badge gray"
+                style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
+              >
+                {n.count > 1 ? `${n.count} × ` : ""}
+                {n.loopType}
+                <button
+                  type="button"
+                  aria-label={`Remove one ${n.loopType} from group ${i + 1}`}
+                  onClick={() => dropNeed(i, n.loopType)}
+                  style={{
+                    border: 0,
+                    background: "none",
+                    cursor: "pointer",
+                    color: "inherit",
+                    fontSize: 15,
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+
+            <select
+              value=""
+              aria-label={`Add a caddie to group ${i + 1}`}
+              onChange={(e) => {
+                if (e.target.value) addNeed(i, e.target.value as LoopType);
+              }}
+              style={{ ...inputStyle, width: 148, marginLeft: "auto" }}
+            >
+              <option value="">+ Add caddie</option>
+              {LOOP_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+
+            {i === 0 && groups.length > 1 && (
+              <button
+                type="button"
+                className="btn ghost small"
+                onClick={() => setGroups((gs) => gs.map(() => [...needs]))}
+              >
+                Same for all
+              </button>
+            )}
+            {groups.length > 1 && (
+              <button
+                type="button"
+                className="btn ghost small"
+                aria-label={`Remove the ${preview[i] ?? ""} tee time`}
+                onClick={() => setGroups((gs) => gs.filter((_, k) => k !== i))}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          marginTop: 12,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <button
+          type="button"
+          className="btn secondary small"
+          disabled={groups.length >= 20}
+          onClick={() =>
+            setGroups((gs) => [...gs, gs.length ? [...gs[gs.length - 1]] : []])
+          }
+        >
+          + Another tee time
+        </button>
+        <span className="muted" style={{ fontSize: 13 }}>
+          {TEE_INTERVAL_MINUTES} minutes apart
+        </span>
+
+        <button
+          className="btn"
+          type="submit"
+          disabled={saving || busy}
+          style={{ marginLeft: "auto" }}
+        >
+          {saving
+            ? "Booking…"
+            : totalLoops === 1
+              ? "Add loop"
+              : `Book ${totalLoops} loops`}
         </button>
       </div>
 
-      {groups > 1 && (
-        <p className="muted" style={{ fontSize: 13, marginTop: 10, marginBottom: 0 }}>
+      {groups.length > 1 && (
+        <p
+          className="muted"
+          style={{ fontSize: 13, marginTop: 10, marginBottom: 0 }}
+        >
           {preview.join(" · ")} — {totalCaddies}{" "}
-          {totalCaddies === 1 ? "caddie" : "caddies"} in total, kept together as
-          one group.
+          {totalCaddies === 1 ? "caddie" : "caddies"} across {groups.length} tee
+          times, kept together as one group.
         </p>
       )}
 
@@ -1070,6 +1201,113 @@ function QuickAdd({
         </p>
       )}
     </form>
+  );
+}
+
+/**
+ * Delete a loop, with a second tap to mean it.
+ *
+ * Two-step rather than a native confirm(): the browser dialog blocks the
+ * render thread and cannot be driven by anything that tests this page, so a
+ * confirm() here reads as "it worked" while nothing happened at all.
+ *
+ * Deleting is not cancelling. Cancel keeps the row, the history and the
+ * caddie's record of having been on it; delete is for a job that should never
+ * have been posted, so it says so plainly before doing it.
+ */
+function DeleteLoopButton({
+  loop,
+  disabled,
+  onDone,
+}: {
+  loop: LoopRec;
+  disabled: boolean;
+  onDone: () => void;
+}) {
+  const [armed, setArmed] = useState(false);
+  const [working, start] = useTransition();
+
+  if (!armed) {
+    return (
+      <button
+        className="btn ghost small"
+        disabled={disabled}
+        aria-label={`Delete the ${loop.playerName} loop`}
+        onClick={() => setArmed(true)}
+      >
+        Delete
+      </button>
+    );
+  }
+
+  return (
+    <span
+      style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
+      role="group"
+      aria-label="Confirm delete"
+    >
+      <span className="muted" style={{ fontSize: 13 }}>
+        Delete for good?
+      </span>
+      <button
+        className="btn danger small"
+        disabled={working}
+        onClick={() =>
+          start(async () => {
+            const res = await deleteLoop(loop.id);
+            setArmed(false);
+            if (res.ok) onDone();
+          })
+        }
+      >
+        {working ? "Deleting…" : "Yes, delete"}
+      </button>
+      <button
+        className="btn ghost small"
+        disabled={working}
+        onClick={() => setArmed(false)}
+      >
+        Keep it
+      </button>
+    </span>
+  );
+}
+
+/** The paper trail: who posted it, and who called it off. */
+function LoopAudit({ loop }: { loop: LoopRec }) {
+  const when = (iso: string | null) =>
+    iso
+      ? new Date(iso).toLocaleString([], {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : null;
+
+  const posted = when(loop.createdAt);
+  const cancelled = when(loop.cancelledAt);
+  if (!posted && !cancelled) return null;
+
+  return (
+    <p
+      className="muted no-print"
+      style={{ fontSize: 12, margin: "6px 0 0" }}
+    >
+      {posted && (
+        <>
+          Posted {posted}
+          {loop.createdBy ? ` by ${loop.createdBy}` : ""}
+        </>
+      )}
+      {posted && cancelled && " · "}
+      {cancelled && (
+        <>
+          Cancelled {cancelled}
+          {loop.cancelledBy ? ` by ${loop.cancelledBy}` : ""}
+        </>
+      )}
+    </p>
   );
 }
 

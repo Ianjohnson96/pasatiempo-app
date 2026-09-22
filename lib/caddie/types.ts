@@ -124,8 +124,35 @@ export interface LoopRec {
   bookingId: string | null;
   status: LoopStatus;
   openBoard: boolean;
+  // Who put this on the sheet, and who took it off. A loop that disappears is
+  // an argument waiting to happen, and "the system did it" is not an answer.
   createdBy: string | null;
+  createdAt: string | null;
+  cancelledBy: string | null;
+  cancelledAt: string | null;
 }
+
+/**
+ * One line of what a tee time needs: a type of loop, and how many of them.
+ *
+ * A group is not always one thing. Two players might take a double bag each,
+ * or a foursome might want one double and one single, or a double and a
+ * forecaddie between the other two. The old shape could only say "this group
+ * wants N of one type", which was never how the phone call goes.
+ */
+export interface GroupNeed {
+  loopType: LoopType;
+  count: number;
+}
+
+/**
+ * Tee times at Pasatiempo go out every ten minutes.
+ *
+ * Lives here rather than beside the booking action because "use server"
+ * modules may only export async functions — a plain const there fails the
+ * build, and the shop should not have to retype the interval either way.
+ */
+export const TEE_INTERVAL_MINUTES = 10;
 
 export interface AssignmentRec {
   id: string;
@@ -244,6 +271,9 @@ export function rowToLoop(r: Row): LoopRec {
     status: (r.status as LoopStatus) ?? "Unassigned",
     openBoard: Boolean(r.open_board),
     createdBy: (r.created_by as string | null) ?? null,
+    createdAt: r.created_at ? String(r.created_at) : null,
+    cancelledBy: (r.cancelled_by as string | null) ?? null,
+    cancelledAt: r.cancelled_at ? String(r.cancelled_at) : null,
   };
 }
 

@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import QRCode from "qrcode";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { planBooking } from "./booking";
 import { dayRange, getSettings } from "./data";
 import { resolveOrigin } from "./origin";
 import { getCaddieSession, mintInvite, signOutCaddie } from "./session";
@@ -16,6 +17,7 @@ import {
 } from "./push";
 import {
   DEFAULT_HOLES,
+  TEE_INTERVAL_MINUTES,
   rateFor,
   rowToCaddie,
   rowToLoop,
@@ -23,6 +25,7 @@ import {
   type CaddieStatus,
   type ContactMethod,
   type DefaultSlot,
+  type GroupNeed,
   type LoopRec,
   type LoopType,
   type Waterfall,
@@ -143,23 +146,32 @@ export interface GroupInput {
   time: string;
   /** The party — "Whitmore foursome", a member name, an outing. */
   name: string;
-  loopType: LoopType;
-  /** Caddies needed per tee time. */
-  caddiesPerGroup: number;
-  /** How many tee times the party occupies. */
-  groups: number;
-  /** Minutes between tee times. */
-  intervalMinutes: number;
+  /**
+   * What each tee time needs, in order, one entry per group.
+   *
+   * An empty list means that group is playing without a caddie — which is the
+   * point: a party of sixteen where only the first and fourth groups want one
+   * is a single booking, not two bookings with a gap nobody can see.
+   */
+  groups: GroupNeed[][];
   notes: string;
+  /** Minutes between tee times. Defaults to the course's ten. */
+  intervalMinutes?: number;
 }
 
 /**
- * Book a party across several consecutive tee times in one go.
+ * Book a party across consecutive tee times in one go.
  *
  * Twelve players wanting forecaddies off the 12:00, 12:10 and 12:20 is one
- * phone call, so it should be one entry — not three trips through the form
- * getting the interval right by hand. The loops share a booking, which is what
- * lets the board show them as the single job they actually are.
+ * phone call, so it should be one entry — not three trips through the form.
+ * The loops share a booking, which is what lets the board show them as the
+ * single job they actually are.
+ *
+ * Each group carries its own list of needs, because a group is rarely one
+ * thing: two double bags, or a double and a single, or a double and a
+ * forecaddie for the other two. Every need becomes its own loop, so each can
+ * be offered, accepted and paid independently, which is how the work is
+ * actually done.
  */
 export async function createGroupBooking(
   input: GroupInput,
@@ -168,8 +180,26 @@ export async function createGroupBooking(
     const name = input.name.trim();
     if (!name) return { ok: false, error: "The group needs a name." };
 
-    const groups = clamp(input.groups, 1, 20);
-    const interval = clamp(input.intervalMinutes, 1, 60);
+    const groups = (input.groups ?? []).slice(0, 20);
+    if (groups.length === 0) {
+      return { ok: false, error: "Add at least one tee time." };
+    }
+    // A booking where nobody wants a caddie is a tee sheet entry, not a job.
+    const totalNeeds = groups.reduce(
+      (n, g) => n + g.filter((x) => x.count > 0).length,
+      0,
+    );
+    if (totalNeeds === 0) {
+      return {
+        ok: false,
+        error: "No group wants a caddie. Add at least one before booking.",
+      };
+    }
+    const interval = clamp(
+      input.intervalMinutes ?? TEE_INTERVAL_MINUTES,
+      1,
+      60,
+    );
 
     const supa = createAdminClient("caddie");
     const { courseTimezone } = await getSettings();
@@ -185,14 +215,16 @@ export async function createGroupBooking(
       .single();
     if (bookingErr) throw bookingErr;
 
-    const startMs = new Date(first).getTime();
-    const rows = Array.from({ length: groups }, (_, i) => ({
-      // Minutes, so this is safe to add to the instant directly: a daylight
-      // saving change never lands inside a single morning's tee sheet.
-      tee_time: new Date(startMs + i * interval * 60_000).toISOString(),
-      player_name: groups > 1 ? `${name} (${i + 1} of ${groups})` : name,
-      loop_type: input.loopType,
-      caddies_required: clamp(input.caddiesPerGroup, 1, 8),
+    const rows = planBooking({
+      startMs: new Date(first).getTime(),
+      name,
+      groups,
+      intervalMinutes: interval,
+    }).map((p) => ({
+      tee_time: p.teeTime,
+      player_name: p.playerName,
+      loop_type: p.loopType,
+      caddies_required: p.caddiesRequired,
       holes: DEFAULT_HOLES,
       notes: input.notes.trim(),
       booking_id: String(booking.id),
@@ -218,9 +250,17 @@ export async function setLoopStatus(
 ): Promise<Result> {
   try {
     const supa = createAdminClient("caddie");
+
+    // Cancelling is signed; restoring clears the signature rather than leaving
+    // a stale one behind claiming someone cancelled a live loop.
+    const audit =
+      status === "Cancelled"
+        ? { cancelled_at: new Date().toISOString(), cancelled_by: await currentEmail() }
+        : { cancelled_at: null, cancelled_by: null };
+
     const { error } = await supa
       .from("loops")
-      .update({ status })
+      .update({ status, ...audit })
       .eq("id", loopId);
     if (error) throw error;
     revalidatePath(BOARD_PATH);
@@ -305,7 +345,12 @@ export async function cancelDay(day: string): Promise<Result<number>> {
 
     const { error } = await supa
       .from("loops")
-      .update({ status: "Cancelled", open_board: false })
+      .update({
+        status: "Cancelled",
+        open_board: false,
+        cancelled_at: new Date().toISOString(),
+        cancelled_by: await currentEmail(),
+      })
       .in("id", ids);
     if (error) throw error;
 
