@@ -178,30 +178,36 @@ export async function getCaddieSession(): Promise<CaddieRec | null> {
   const supa = createAdminClient("caddie");
   const tokenHash = hash(token);
 
+  // One round trip, not two. This runs on every caddie page render and every
+  // caddie action, so each extra sequential hop to Supabase is about 100ms
+  // added to everything a caddie does — measured, not guessed.
   const { data: session } = await supa
     .from("sessions")
-    .select("caddie_id, expires_at, revoked_at")
+    .select("expires_at, revoked_at, last_seen_at, caddies!inner(*)")
     .eq("token_hash", tokenHash)
     .maybeSingle();
 
   if (!session || session.revoked_at) return null;
   if (new Date(session.expires_at).getTime() < Date.now()) return null;
 
-  const { data: row } = await supa
-    .from("caddies")
-    .select("*")
-    .eq("id", session.caddie_id)
-    .maybeSingle();
-  if (!row) return null;
-
-  const caddie = rowToCaddie(row);
+  const caddie = rowToCaddie(
+    session.caddies as unknown as Record<string, unknown>,
+  );
   if (caddie.status !== "Active") return null;
 
-  // Best-effort activity stamp; never block the page on it.
-  await supa
-    .from("sessions")
-    .update({ last_seen_at: new Date().toISOString() })
-    .eq("token_hash", tokenHash);
+  // Stamp activity at most once a quarter of an hour. Which minute a caddie
+  // opened the portal is worth nothing to anyone, and writing it on every
+  // render made a third round trip on the hot path — while the comment here
+  // claimed the write never blocked the page, which it plainly did.
+  const seenAt = session.last_seen_at
+    ? new Date(String(session.last_seen_at)).getTime()
+    : 0;
+  if (Date.now() - seenAt > 900_000) {
+    await supa
+      .from("sessions")
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq("token_hash", tokenHash);
+  }
 
   return caddie;
 }
