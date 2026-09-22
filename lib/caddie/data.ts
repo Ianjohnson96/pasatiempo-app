@@ -160,7 +160,9 @@ export async function getSettings(): Promise<CaddieSettings> {
     reminderHoursBefore: Number(d.reminder_hours_before ?? 12),
     overlapGuardHours: Number(d.overlap_guard_hours ?? 4),
     sessionDays: Number(d.session_days ?? 90),
-    inviteMinutes: Number(d.invite_minutes ?? 60),
+    // A week. The handout gets printed and handed over, so the link has to
+    // outlive the walk to the car park.
+    inviteMinutes: Number(d.invite_minutes ?? 10080),
     availabilityMonths: Number(d.availability_months ?? 3),
     emailEnabled: Boolean(d.email_enabled ?? true),
     smsEnabled: Boolean(d.sms_enabled ?? false),

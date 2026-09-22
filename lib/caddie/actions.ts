@@ -1524,9 +1524,11 @@ export interface InviteHandout {
  * Mint a sign-in link for one caddie, as a URL and a QR code.
  *
  * This app sends no email and no SMS, so the link is handed over in person:
- * the shop shows the QR on the counter screen and the caddie scans it. Good for
- * an hour and reusable within it, so a scan that lands in a camera app's own
- * browser does not strand the caddie. Minting a new one kills the old link.
+ * the shop shows the QR on the counter screen, or prints the handout and gives
+ * it to the caddie. Reusable until it expires, because a scan that lands in a
+ * camera app's own browser would otherwise burn the link and strand them — and
+ * long-lived, because paper outlives the conversation. Minting a new one kills
+ * the old link.
  */
 export async function createInvite(
   caddieId: string,
