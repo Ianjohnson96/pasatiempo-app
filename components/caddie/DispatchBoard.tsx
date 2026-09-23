@@ -729,9 +729,28 @@ function OfferPanel({
   const [mode, setMode] = useState<"tier" | "pick" | "all">("tier");
   const [picked, setPicked] = useState<string[]>([]);
   const [pickedTiers, setPickedTiers] = useState<string[]>([]);
+  const [filter, setFilter] = useState("");
 
   const toggle = (id: string, set: typeof setPicked) =>
     set((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+
+  // Bulk-add never picks someone already on another loop at that time, or
+  // someone already asked about this one. Both are still tickable by hand —
+  // the shop sometimes knows something the sheet does not.
+  const pickable = candidates.filter((c) => !c.conflict && !c.alreadyOffered);
+  const freeCount = pickable.filter(
+    (c) => c.availability === "Available",
+  ).length;
+
+  const addToPick = (ids: string[]) =>
+    setPicked((p) => [...new Set([...p, ...ids])]);
+
+  const needle = filter.trim().toLowerCase();
+  const shown = needle
+    ? candidates.filter((c) =>
+        c.caddie.fullName.toLowerCase().includes(needle),
+      )
+    : candidates;
 
   // How many active caddies sit in the tiers currently ticked.
   const inTiers = candidates.filter(
@@ -825,13 +844,82 @@ function OfferPanel({
             Best first — availability, then tier, then who has waited longest.
             Needs {needs}.
           </p>
+
+          {/* Start from a group, then adjust. Ticking eighteen boxes one at a
+              time is the thing this app exists to stop, and a batch is almost
+              always "that tier, minus two" or "whoever said they are free". */}
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              flexWrap: "wrap",
+              alignItems: "center",
+              marginBottom: 10,
+            }}
+          >
+            <span className="muted" style={{ fontSize: 12 }}>
+              Add
+            </span>
+            <button
+              type="button"
+              className="btn ghost small"
+              onClick={() => addToPick(pickable.map((c) => c.caddie.id))}
+            >
+              Everyone ({pickable.length})
+            </button>
+            <button
+              type="button"
+              className="btn ghost small"
+              disabled={freeCount === 0}
+              onClick={() =>
+                addToPick(
+                  pickable
+                    .filter((c) => c.availability === "Available")
+                    .map((c) => c.caddie.id),
+                )
+              }
+            >
+              Free today ({freeCount})
+            </button>
+            {tiers.map((t) => {
+              const n = pickable.filter((c) => c.caddie.tierId === t.id).length;
+              if (n === 0) return null;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  className="btn ghost small"
+                  onClick={() =>
+                    addToPick(
+                      pickable
+                        .filter((c) => c.caddie.tierId === t.id)
+                        .map((c) => c.caddie.id),
+                    )
+                  }
+                >
+                  {t.name} ({n})
+                </button>
+              );
+            })}
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Find a name"
+              aria-label="Filter caddies by name"
+              style={{ ...inputStyle, width: 130, marginLeft: "auto" }}
+            />
+          </div>
+
           <div
             style={{ display: "grid", gap: 6, maxHeight: 280, overflowY: "auto" }}
           >
             {candidates.length === 0 && (
               <span className="muted">No active caddies on the roster yet.</span>
             )}
-            {candidates.map((c) => (
+            {candidates.length > 0 && shown.length === 0 && (
+              <span className="muted">Nobody matches “{filter.trim()}”.</span>
+            )}
+            {shown.map((c) => (
               <label
                 key={c.caddie.id}
                 style={{
