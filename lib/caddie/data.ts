@@ -1,5 +1,10 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  summariseLedger,
+  type LedgerEvent,
+  type LedgerRow,
+} from "./ledger";
+import {
   rowToAssignment,
   rowToAway,
   rowToCaddie,
@@ -959,4 +964,50 @@ export function rankCandidates(
         b.caddie.lastWorkedOn ?? "",
       );
     });
+}
+
+// ---------------------------------------------------------------------------
+// The fairness ledger
+// ---------------------------------------------------------------------------
+
+/**
+ * Every assignment in the window, folded into one row per caddie.
+ *
+ * Read by the ledger screen, which is the caddie master's rather than the
+ * counter's — the page carries that gate. The window rolls because a
+ * season-long total tells you nothing useful in March: what matters is who has
+ * been short lately.
+ */
+export async function caddieLedger(days = 60): Promise<Map<string, LedgerRow>> {
+  const supa = createAdminClient("caddie");
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+
+  const [{ data: rows, error }, settings] = await Promise.all([
+    supa
+      .from("assignments")
+      .select(
+        "caddie_id, confirmation_status, dropped_at, loops!inner(tee_time, loop_type, status)",
+      )
+      .gte("loops.tee_time", since),
+    getSettings(),
+  ]);
+  if (error) throw error;
+
+  const events: LedgerEvent[] = (rows ?? []).map((r) => {
+    const loop = r.loops as unknown as {
+      tee_time: string;
+      loop_type: LoopType;
+      status: string;
+    };
+    return {
+      caddieId: String(r.caddie_id),
+      status: String(r.confirmation_status),
+      loopType: loop.loop_type,
+      teeTime: String(loop.tee_time),
+      loopStatus: String(loop.status),
+      droppedAt: r.dropped_at ? String(r.dropped_at) : null,
+    };
+  });
+
+  return summariseLedger(events, settings.rates);
 }

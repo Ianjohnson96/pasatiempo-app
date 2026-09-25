@@ -14,6 +14,11 @@ const TABS = [
   { href: "/admin/caddie/roster", key: "roster", label: "Roster" },
   { href: "/admin/caddie/tiers", key: "tiers", label: "Tiers" },
   { href: "/admin/caddie/rates", key: "rates", label: "Rates" },
+  // What each caddie has had, and how they have behaved getting it. The
+  // counter does not see this: it is one caddie's earnings next to another's,
+  // which is the caddie master's business. The page enforces it as well —
+  // hiding a tab is not a permission.
+  { href: "/admin/caddie/ledger", key: "ledger", label: "Fair share" },
 ] as const;
 
 export type CaddieTab = (typeof TABS)[number]["key"];
@@ -21,10 +26,13 @@ export type CaddieTab = (typeof TABS)[number]["key"];
 export default function CaddieHeader({
   email,
   active,
+  isGlobalAdmin = false,
 }: {
   email: string;
   active: CaddieTab;
+  isGlobalAdmin?: boolean;
 }) {
+  const tabs = TABS.filter((t) => t.key !== "ledger" || isGlobalAdmin);
   return (
     <>
       <div className="appbar">
@@ -44,7 +52,7 @@ export default function CaddieHeader({
 
       <div className="container" style={{ paddingBottom: 0 }}>
         <div className="seg" style={{ marginTop: 18 }}>
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <Link
               key={t.key}
               href={t.href}
