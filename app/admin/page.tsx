@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createAdminClient, createHubClient } from "@/lib/supabase/admin";
 import { getPerson, hasApp, isAppAdmin, roleIn, signedInEmail } from "@/lib/hub/access";
 import { APPS, type AppKey, type SiteKey } from "@/lib/hub/apps";
@@ -74,6 +75,8 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
   const { denied } = await searchParams;
   const person = await getPerson();
   const email = person?.email ?? (await signedInEmail());
+  // The proxy already sends signed-out visitors to /login; this keeps the page safe on its own.
+  if (!email) redirect("/login");
   const see = (app: AppKey) => hasApp(person, app);
   const isSuper = !!person?.isSuper;
   const managesPeople = !!person && (isSuper || (Object.keys(APPS) as AppKey[]).some((a) => isAppAdmin(person, a)));
