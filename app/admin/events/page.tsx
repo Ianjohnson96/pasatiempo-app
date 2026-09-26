@@ -1,16 +1,14 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import AppBar from "@/components/events/AppBar";
 import CopyLink from "@/components/events/CopyLink";
 import { listEvents, registrationsFor, takenSeats } from "@/lib/events/data";
-import { canManageEvent, getViewer } from "@/lib/events/auth";
+import { canManageEvent, requireEventsViewer } from "@/lib/events/auth";
 import { formatWhen, TYPE_LABEL } from "@/lib/events/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminHome() {
-  const viewer = await getViewer();
-  if (!viewer) redirect("/login");
+  const viewer = await requireEventsViewer();
   const all = await listEvents();
   const events = all.filter((e) => canManageEvent(viewer, e));
   const withCounts = await Promise.all(

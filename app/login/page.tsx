@@ -4,8 +4,10 @@ import "@/app/globals.css";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { safeNext } from "@/lib/hub/next";
 
-// Admin login. Signs in via Supabase Auth; the proxy guards the admin area.
+// Staff sign-in for every Pasatiempo app. Signs in via Supabase Auth; each app
+// then checks what this person may do there (lib/hub/access.ts).
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -27,14 +29,14 @@ export default function LoginPage() {
       setError(error.message);
       return;
     }
-    router.push("/admin");
+    router.push(safeNext(new URLSearchParams(window.location.search).get("next")) ?? "/admin");
     router.refresh();
   }
 
   return (
     <main className="wrap" style={{ maxWidth: 420 }}>
       <p className="eyebrow">Pasatiempo</p>
-      <h1>Admin sign in</h1>
+      <h1>Staff sign in</h1>
       <form onSubmit={onSubmit} style={{ marginTop: 24 }}>
         <label style={{ display: "block", marginBottom: 12 }}>
           <div style={{ color: "var(--muted)", marginBottom: 6 }}>Email</div>

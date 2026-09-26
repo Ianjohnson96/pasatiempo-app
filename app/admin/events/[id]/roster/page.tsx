@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getEvent, registrationsFor } from "@/lib/events/data";
-import { canManageEvent, getViewer } from "@/lib/events/auth";
+import { canManageEvent, requireEventsViewer } from "@/lib/events/auth";
 import { formatSlot, formatSlotShort, formatWhen } from "@/lib/events/format";
 import type { Registration } from "@/lib/events/types";
 import PrintButton from "@/components/events/PrintButton";
@@ -17,8 +17,7 @@ export default async function RosterPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ slot?: string }>;
 }) {
-  const viewer = await getViewer();
-  if (!viewer) redirect("/login");
+  const viewer = await requireEventsViewer();
   const { id } = await params;
   const { slot: slotFilter } = await searchParams;
   const event = await getEvent(id);

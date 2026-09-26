@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getViewer } from "@/lib/events/auth";
+import { requireCaddieStaff } from "@/lib/caddie/auth";
 import CaddieHeader from "@/components/caddie/CaddieHeader";
 import DispatchBoard, {
   type BoardCandidate,
@@ -32,8 +31,7 @@ export default async function CaddieDispatchPage({
 }: {
   searchParams: Promise<{ day?: string }>;
 }) {
-  const viewer = await getViewer();
-  if (!viewer) redirect("/login");
+  const viewer = await requireCaddieStaff();
 
   const settings = await getSettings();
   const tz = settings.courseTimezone;

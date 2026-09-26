@@ -252,7 +252,7 @@ document.addEventListener('change', e => {
 /* ---------- start ---------- */
 if (window.MERCH_HOST){
   const H = window.MERCH_HOST, pop = $('#morePop');
-  pop.insertAdjacentHTML('beforeend', `<hr>${H.me.role === 'owner' ? `<a href="${esc(H.base)}/admin">People &amp; data</a>` : ''}<a href="${esc(H.base)}/account">Change your password</a>
+  pop.insertAdjacentHTML('beforeend', `<hr>${H.base ? '<a href="/admin">All Pasatiempo apps</a>' : ''}${H.me.role === 'owner' ? `<a href="${esc(H.base)}/admin">Load month-end data</a>` : ''}<a href="${esc(H.base)}/account">Change your password</a>
     <form method="post" action="${esc(H.base)}/signout"><button type="submit">Sign out (${esc(H.me.name || H.me.email)})</button></form>`);
 }
 render(); applyMode();
