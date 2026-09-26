@@ -21,7 +21,17 @@ export default function PeopleManager({ me, isSuper, apps, rows }: { me: string;
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pwFor, setPwFor] = useState<string | null>(null);
   const [pw, setPw] = useState("");
-  const [form, setForm] = useState({ name: "", email: "", password: "", app: apps[0] as AppKey, role: "" });
+  const blank = { name: "", email: "", password: "", grants: {} as Partial<Record<AppKey, string>> };
+  const [form, setForm] = useState(blank);
+  // Ticking an app starts at its everyday role (manager / staff); the top role is a deliberate choice.
+  const startRole = (a: AppKey) => APPS[a].roles[1] ?? APPS[a].roles[0];
+  const setGrant = (a: AppKey, role: string | null) => {
+    const grants = { ...form.grants };
+    if (role) grants[a] = role;
+    else delete grants[a];
+    setForm({ ...form, grants });
+  };
+  const chosen = apps.filter((a) => form.grants[a]);
 
   function run(p: Promise<Result>, ok: string, after?: () => void) {
     start(async () => {
@@ -147,10 +157,11 @@ export default function PeopleManager({ me, isSuper, apps, rows }: { me: string;
         style={{ marginTop: 18 }}
         onSubmit={(e) => {
           e.preventDefault();
+          const names = chosen.map((a) => APPS[a].label);
           run(
-            addPerson({ ...form, app: form.role ? form.app : undefined, role: form.role || undefined }),
-            `${form.name || form.email} is added. Give them the web address, their email and the password you set.`,
-            () => setForm({ name: "", email: "", password: "", app: apps[0], role: "" }),
+            addPerson(form),
+            `${form.name || form.email} is added${names.length ? ` with ${names.join(", ").replace(/, ([^,]*)$/, " and $1")}` : ""}. Give them the web address, their email and the password you set.`,
+            () => setForm(blank),
           );
         }}
       >
@@ -169,28 +180,35 @@ export default function PeopleManager({ me, isSuper, apps, rows }: { me: string;
             <input type="text" minLength={8} value={form.password} placeholder="8+ characters" onChange={(e) => setForm({ ...form, password: e.target.value })} />
             <div className="hint">Leave blank if they already sign in to a Pasatiempo app.</div>
           </div>
-          <div className="field">
-            <label>App</label>
-            <select value={form.app} onChange={(e) => setForm({ ...form, app: e.target.value as AppKey, role: "" })}>
-              {apps.map((a) => (
-                <option key={a} value={a}>
-                  {APPS[a].label}
-                </option>
-              ))}
-            </select>
+        </div>
+        <div className="field">
+          <label>Apps they can open</label>
+          <div style={{ display: "grid", gap: 8 }}>
+            {apps.map((a) => {
+              const role = form.grants[a];
+              return (
+                <div key={a} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 12px" }}>
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 8, minWidth: 190, margin: 0, fontWeight: 600 }}>
+                    <input type="checkbox" checked={!!role} onChange={(e) => setGrant(a, e.target.checked ? startRole(a) : null)} />
+                    {APPS[a].label}
+                  </label>
+                  {role && (
+                    <>
+                      <select value={role} aria-label={`Role in the ${APPS[a].label}`} onChange={(e) => setGrant(a, e.target.value)} style={{ width: "auto" }}>
+                        {APPS[a].roles.map((r) => (
+                          <option key={r} value={r}>
+                            {cap(r)}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="hint" style={{ margin: 0 }}>{(APPS[a].roleHelp as Record<string, string>)[role]}</span>
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
-          <div className="field">
-            <label>Role</label>
-            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-              <option value="">No access yet</option>
-              {APPS[form.app].roles.map((role) => (
-                <option key={role} value={role}>
-                  {cap(role)}
-                </option>
-              ))}
-            </select>
-            {form.role && <div className="hint">{(APPS[form.app].roleHelp as Record<string, string>)[form.role]}</div>}
-          </div>
+          <div className="hint">Tick every app they use. Leave them all blank to add the person now and give access later.</div>
         </div>
         <button className="btn" type="submit" disabled={pending}>
           Add
