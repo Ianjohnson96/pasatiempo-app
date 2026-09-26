@@ -14,6 +14,8 @@ export interface PersonRow {
 }
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+// Ticking an app starts at its everyday role (manager / staff); the top role is a deliberate choice.
+const startRole = (a: AppKey) => APPS[a].roles[1] ?? APPS[a].roles[0];
 
 export default function PeopleManager({ me, isSuper, apps, rows }: { me: string; isSuper: boolean; apps: AppKey[]; rows: PersonRow[] }) {
   const router = useRouter();
@@ -23,8 +25,6 @@ export default function PeopleManager({ me, isSuper, apps, rows }: { me: string;
   const [pw, setPw] = useState("");
   const blank = { name: "", email: "", password: "", grants: {} as Partial<Record<AppKey, string>> };
   const [form, setForm] = useState(blank);
-  // Ticking an app starts at its everyday role (manager / staff); the top role is a deliberate choice.
-  const startRole = (a: AppKey) => APPS[a].roles[1] ?? APPS[a].roles[0];
   const setGrant = (a: AppKey, role: string | null) => {
     const grants = { ...form.grants };
     if (role) grants[a] = role;
@@ -78,22 +78,38 @@ export default function PeopleManager({ me, isSuper, apps, rows }: { me: string;
                     {r.isSuper ? (
                       <span className="muted" style={{ fontSize: 13 }}>all (super admin)</span>
                     ) : (
-                      <select
-                        value={r.grants[a] ?? ""}
-                        disabled={pending || !r.active || (r.email === me && !isSuper)}
-                        aria-label={`${label(r)} — ${APPS[a].label}`}
-                        onChange={(e) => {
-                          const role = e.target.value || null;
-                          run(setAccess(r.email, a, role), role ? `${label(r)} is now ${role} in the ${APPS[a].label}.` : `${label(r)} no longer has the ${APPS[a].label}.`);
-                        }}
-                      >
-                        <option value="">No access</option>
-                        {APPS[a].roles.map((role) => (
-                          <option key={role} value={role}>
-                            {cap(role)}
-                          </option>
-                        ))}
-                      </select>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <input
+                          type="checkbox"
+                          checked={!!r.grants[a]}
+                          disabled={pending || !r.active || (r.email === me && !isSuper)}
+                          aria-label={`${label(r)} can open the ${APPS[a].label}`}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              const role = startRole(a);
+                              run(setAccess(r.email, a, role), `${label(r)} can now open the ${APPS[a].label} (${role}).`);
+                            } else {
+                              if (!confirm(`Take ${label(r)} out of the ${APPS[a].label}?`)) return;
+                              run(setAccess(r.email, a, null), `${label(r)} no longer has the ${APPS[a].label}.`);
+                            }
+                          }}
+                        />
+                        {r.grants[a] && (
+                          <select
+                            value={r.grants[a]}
+                            disabled={pending || !r.active || (r.email === me && !isSuper)}
+                            aria-label={`${label(r)}'s role in the ${APPS[a].label}`}
+                            style={{ width: "auto" }}
+                            onChange={(e) => run(setAccess(r.email, a, e.target.value), `${label(r)} is now ${e.target.value} in the ${APPS[a].label}.`)}
+                          >
+                            {APPS[a].roles.map((role) => (
+                              <option key={role} value={role}>
+                                {cap(role)}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
                     )}
                   </td>
                 ))}

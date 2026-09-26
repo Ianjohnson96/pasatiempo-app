@@ -58,7 +58,7 @@ export default async function PeoplePage() {
             <h1>People &amp; access</h1>
             <div className="sub">
               {me.isSuper
-                ? "Everyone signs in once. Give each person a role in the apps they use; leave the rest blank."
+                ? "Everyone signs in once. Tick the apps each person uses and pick their role; changes save as you click."
                 : "Add people to the apps you run and set their role."}
             </div>
           </div>
