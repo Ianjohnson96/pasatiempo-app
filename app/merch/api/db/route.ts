@@ -15,29 +15,29 @@ interface DocRow {
   rev: number;
 }
 
-// GET ?since=REV — every document changed after REV (all live documents when
-// REV is 0), plus tombstones for deletes, and the highest rev seen.
+// GET ?since=REV — every document changed after REV (everything when REV is
+// 0), with tombstones for deletes, and the highest rev seen.
 export async function GET(request: NextRequest) {
   const viewer = await getMerchViewer();
   if (!viewer) return NextResponse.json({ error: "signed_out" }, { status: 401 });
   const since = Math.max(0, Number(request.nextUrl.searchParams.get("since")) || 0);
   const supa = createAdminClient("merch");
+  // Page by rev, not offset: a write during the read moves a document to a
+  // higher rev, which a later page (or the next poll) still picks up.
   const docs: DocRow[] = [];
-  for (let from = 0; ; from += PAGE) {
-    let q = supa.from("docs").select("path, data, deleted, version, rev").gt("rev", since).order("rev").range(from, from + PAGE - 1);
-    if (since === 0) q = q.eq("deleted", false);
-    const { data, error } = await q;
+  for (let after = since; ; ) {
+    // Tombstones are included even on the first load: one written mid-read
+    // must still reach the browser, or it would keep the deleted document.
+    const { data, error } = await supa.from("docs").select("path, data, deleted, version, rev").gt("rev", after).order("rev").limit(PAGE);
     if (error) return NextResponse.json({ error: "unavailable" }, { status: 503 });
-    docs.push(...(data as DocRow[]));
-    if (!data || data.length < PAGE) break;
+    const page = (data ?? []) as DocRow[];
+    docs.push(...page);
+    if (page.length < PAGE) break;
+    after = Number(page[page.length - 1].rev);
   }
   const out = docs.filter((d) => !NOT_LOADED.has(topCollection(d.path)));
   let rev = since;
   for (const d of docs) rev = Math.max(rev, Number(d.rev));
-  if (since === 0 && !docs.length) {
-    const { data } = await supa.from("docs").select("rev").order("rev", { ascending: false }).limit(1);
-    rev = Number(data?.[0]?.rev ?? 0);
-  }
   return NextResponse.json(
     { rev, docs: out.map((d) => ({ path: d.path, data: d.deleted ? null : d.data, version: d.version })) },
     { headers: { "Cache-Control": "no-store" } },

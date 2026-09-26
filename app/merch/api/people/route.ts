@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import type { User } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getMerchViewer, listMembers } from "@/lib/merch/auth";
 import type { MerchRole } from "@/lib/merch/rules";
@@ -19,13 +20,13 @@ export async function GET() {
 }
 
 // Finds the Supabase Auth user for an email (the org is small; one page is enough).
-async function authUserId(email: string): Promise<string | null> {
+async function authUser(email: string): Promise<User | null> {
   const admin = createAdminClient("merch").auth.admin;
   for (let page = 1; page <= 10; page++) {
     const { data, error } = await admin.listUsers({ page, perPage: 1000 });
     if (error) return null;
     const hit = data.users.find((u) => u.email?.toLowerCase() === email);
-    if (hit) return hit.id;
+    if (hit) return hit;
     if (data.users.length < 1000) return null;
   }
   return null;
@@ -33,7 +34,7 @@ async function authUserId(email: string): Promise<string | null> {
 
 // POST {email, name, role, active, password?}
 //   Adds or updates a member. A password creates their sign-in if they don't
-//   have one yet, or replaces it if they do (for "forgot my password").
+//   have one yet, or replaces one this program created (for "forgot my password").
 export async function POST(request: NextRequest) {
   const me = await owner();
   if (!me) return NextResponse.json({ error: "not_allowed" }, { status: 403 });
@@ -56,9 +57,13 @@ export async function POST(request: NextRequest) {
 
   const supa = createAdminClient("merch");
   if (password) {
-    const id = await authUserId(email);
-    const res = id
-      ? await supa.auth.admin.updateUserById(id, { password })
+    const user = await authUser(email);
+    // Only sign-ins this program created can be reset here. Anyone else (an
+    // events admin, say) keeps their password unless they change it themselves.
+    if (user && !user.app_metadata?.merch_only)
+      return NextResponse.json({ error: "This person already signs in to another Pasatiempo app. They keep their existing password." }, { status: 400 });
+    const res = user
+      ? await supa.auth.admin.updateUserById(user.id, { password })
       : await supa.auth.admin.createUser({ email, password, email_confirm: true, app_metadata: { merch_only: true } });
     if (res.error) return NextResponse.json({ error: "The sign-in couldn't be saved: " + res.error.message }, { status: 400 });
   }
