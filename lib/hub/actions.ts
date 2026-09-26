@@ -26,7 +26,8 @@ async function target(email: string) {
     hub.from("people").select("email, name, super_admin, active").eq("email", email).maybeSingle(),
     hub.from("access").select("app, role").eq("email", email),
   ]);
-  return { person, apps: (access ?? []).map((a) => a.app as AppKey) };
+  const roles = Object.fromEntries((access ?? []).map((a) => [a.app, a.role])) as Partial<Record<AppKey, string>>;
+  return { person, apps: Object.keys(roles) as AppKey[], roles };
 }
 
 /** May the actor manage this person's sign-in (password)? Only if every app they use is one the actor runs. */
@@ -63,18 +64,28 @@ function done(): Result {
   return { ok: true };
 }
 
-/** Add someone (or update their name). Optionally sets their password and first app role. */
-export async function addPerson(input: { email: string; name: string; password?: string; app?: AppKey; role?: string }): Promise<Result> {
+/** Add someone (or update their name). Optionally sets their password and their role in any of the apps the caller manages. */
+export async function addPerson(input: {
+  email: string;
+  name: string;
+  password?: string;
+  grants?: Partial<Record<AppKey, string>>;
+}): Promise<Result> {
   const actor = await getPerson();
   if (!actor || (!actor.isSuper && !adminApps(actor).length)) return deny();
   const email = input.email.trim().toLowerCase();
   const name = input.name.trim().slice(0, 80);
   if (!EMAIL.test(email)) return deny("Enter a valid email address.");
-  if (input.app && (!isRole(input.app, input.role) || !isAppAdmin(actor, input.app))) return deny("Pick a role in an app you manage.");
+  const grants = Object.entries(input.grants ?? {}).filter(([, role]) => role) as [AppKey, string][];
+  for (const [app, role] of grants)
+    if (!(app in APPS) || !isRole(app, role) || !isAppAdmin(actor, app)) return deny("Pick a role in an app you manage.");
+  if (grants.length && email === actor.email && !actor.isSuper) return deny("You can't change your own access. Ask the super admin.");
   if (input.password && input.password.length < 8) return deny("Passwords need at least 8 characters.");
   const hub = createHubClient();
-  const existing = (await target(email)).person;
+  const t = await target(email);
+  const existing = t.person;
   if (existing && !existing.active && !actor.isSuper) return deny("This person was removed. Ask the super admin to restore them.");
+  if (grants.length && existing?.super_admin && !actor.isSuper) return deny("Only the super admin can change a super admin's access.");
   if (input.password && existing && !(await mayManageLogin(actor, email)))
     return deny("Only the super admin can change this person's password.");
   if (!existing) {
@@ -89,10 +100,17 @@ export async function addPerson(input: { email: string; name: string; password?:
     if (err) return deny("The sign-in couldn't be saved: " + err);
     await logActivity({ actor: actor.email, app: "hub", action: "password.set", target: email });
   }
-  if (input.app && input.role) {
-    const { error } = await hub.from("access").upsert({ email, app: input.app, role: input.role, granted_by: actor.email, granted_at: new Date().toISOString() }, { onConflict: "email,app" });
+  if (grants.length) {
+    const at = new Date().toISOString();
+    const { error } = await hub
+      .from("access")
+      .upsert(grants.map(([app, role]) => ({ email, app, role, granted_by: actor.email, granted_at: at })), { onConflict: "email,app" });
     if (error) return deny("That didn't save. Try again.");
-    await logActivity({ actor: actor.email, app: input.app, action: "access.grant", target: email, detail: { role: input.role } });
+    for (const [app, role] of grants) {
+      const from = t.roles[app] ?? null;
+      if (from !== role)
+        await logActivity({ actor: actor.email, app, action: from ? "access.change" : "access.grant", target: email, detail: { role, from } });
+    }
   }
   return done();
 }
