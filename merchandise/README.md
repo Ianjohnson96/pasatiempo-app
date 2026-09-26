@@ -1,11 +1,31 @@
 # Pro Shop Merchandise Program
 
-The Pro Shop's forecast, open-to-buy (OTB), order book and brand scorecard. It is published as one self-contained page (a claude.ai artifact). All data lives in that page's database: orders, vendors, counts, budget changes, brand calls and the month-end documents. This folder holds only code. POS reports and generated data are git-ignored.
+The Pro Shop's forecast, open-to-buy (OTB), order book and brand scorecard. It runs as a section of this club app: `/merch`, or its own domain from `lib/sections.ts`. Staff sign in with an email and password the owner sets. Nobody needs a Claude account.
 
 ```
-pipeline/   POS report PDFs  ->  database documents (Python)
-app/        the single-file page: src/*.js + src/shell.html, assembled by build.py
+pipeline/     POS report PDFs  ->  month-end documents and a loadable data file (Python)
+app/src/      the program page: plain HTML/JS, one file per area
+app/host/     club-shim.js: backs the page's database and user with the club app
+app/build.py  optional standalone single-file build of the page, with data embedded
 ```
+
+The page is served by `app/merch/route.ts`. It assembles `app/src` with the shim at request time (see `lib/merch/page.ts`). All data lives in the hub Supabase project's `merch` schema (`supabase/migration-merch-schema.sql`): one row per JSON document, addressed by path, e.g. `pos/{id}`, `vendors/{id}` or `base/current`. The browser reads and writes documents only through `/merch/api/db`. It polls every 15 seconds and again when the tab comes back into view. Every write is checked against the rules in `lib/merch/rules.ts`. POS reports and generated data are git-ignored.
+
+## Who can do what
+
+| Role | Can |
+|---|---|
+| owner | everything, including the forecast (`plan/…`), budget changes, brand calls, month-end data, and **People & data** (`/merch/admin`) |
+| staff | orders, receipts, vendors, subcategories, counts, to-do states, month-end checklist |
+| viewer | read only |
+
+People are managed on `/merch/admin`, stored in `merch.members`. Adding someone with a password creates their Supabase Auth login, flagged `app_metadata.merch_only`. The proxy and `lib/events/auth.ts` keep those accounts out of the events admin area.
+
+## Setup (once)
+
+1. Run `supabase/migration-merch-schema.sql` in the hub project. Then add `merch` under Settings → API → Exposed schemas.
+2. Add the section's domain (`pasatiempo-merch.vercel.app`, or a custom one) to the Vercel project. List it in `lib/sections.ts`.
+3. Sign in at that address. Open **More → People & data** and load the latest data file.
 
 ## Pages
 
@@ -37,17 +57,14 @@ Fiscal year: May 1 – Apr 30. Sales are at retail. Stock and budgets are at cos
 ## Month-end refresh
 
 1. Pull the five month-end reports (see the Month-end page): SKU Analysis, Daily Sales Report by Item, Sales by Category (FYTD), Sales by Item (FYTD), BEST 100 cost & margin (FYTD). Also pull the Yearly Rounds Summary when it's available.
-2. Read last month's documents from the artifact database into a prior folder: `base/current` → `base.json`; `skuhist/FY*`, `skuhist/meta` → `skuhist_FY2027.json`, `skuhist_meta.json`, …; and `plan/assumptions` → `assumptions.json` if it exists.
+2. Export last month's documents from `merch.docs` into a prior folder: `base/current` → `base.json`; `skuhist/FY…`, `skuhist/meta` → `skuhist_FY2027.json`, `skuhist_meta.json`, …; and `plan/assumptions` → `assumptions.json` if it exists.
 3. Run:
    ```
    pip install -r pipeline/requirements.txt
    python pipeline/refresh.py data/reports data/out --prior data/prior --note "October close"
    ```
    The report type is detected from each PDF's text, so file names don't matter. On a first build with no prior folder, include the full-year Sales by Category, Sales by Item and April SKU Analysis for last fiscal year.
-4. Write `data/out/*.json` back to the database: `base/current`, `inventory/current`, `insights/current`, `brands/current`, `refreshes/{asOf}`, `skuhist/{FY…, meta}`. Items marked done or dismissed stay that way, because `istate` is keyed by item id.
-5. Rebuild the page only if code changed: `python app/build.py data/out` writes `dist/merchandise-program.html` with the new data embedded as the offline fallback.
-
-Database access rules: `plan`, `inventory`, `insights`, `base`, `brands`, `brandCalls`, `refreshes` and `skuhist` are readable by viewers and writable only by the owner. Orders, vendors, subcategories, counts, item states and the checklist are writable by anyone who can use the page.
+4. Load `data/out/Merchandise_Program_Data_<asOf>.json` on **People & data → Load month-end data**. A data file can only replace `base`, `inventory`, `insights`, `brands`, `refreshes` and `skuhist`. Orders, vendors, counts, budget changes and brand calls are never touched. Items marked done or dismissed stay that way, because `istate` is keyed by item id.
 
 ## Planning constants
 

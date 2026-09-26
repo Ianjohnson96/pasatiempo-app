@@ -100,6 +100,16 @@ def main():
     for n, d in docs.items():
         json.dump(d, open(os.path.join(a.out, n + '.json'), 'w'), separators=(',', ':'))
         print(f'  wrote {n:<16} {len(json.dumps(d, separators=(",", ":"))) / 1024:6.1f} KB')
+    # One data file for the club app's People & data page (Load month-end data).
+    paths = {'base': 'base/current', 'inventory': 'inventory/current', 'insights': 'insights/current', 'brands': 'brands/current',
+             'refresh': f"refreshes/{base['asOf']}"}
+    paths.update({f'skuhist_{k}': f'skuhist/{k}' for k in built['skuhist']})
+    bundle = dict(kind='pasatiempo-merch-bundle', version=1,
+                  note=f"Month-end data as of {base['asOf']}" + (': ' + '; '.join(a.note) if a.note else ''),
+                  docs={paths[n]: d for n, d in docs.items()})
+    bpath = os.path.join(a.out, f"Merchandise_Program_Data_{base['asOf']}.json")
+    json.dump(bundle, open(bpath, 'w'), separators=(',', ':'))
+    print(f'  data file        {bpath}')
     print(f"\nAs of {base['asOf']}  actuals through {base['actualThrough']}  partial {base['partial']}")
     print(f"FY{base['fy'][2:]} open-to-buy remaining (ex Special Orders): ${engine.totals(r, ex, r['m27']):,.0f}")
     print(f"FY{int(base['fy'][2:]) + 1} open-to-buy (ex Special Orders):          ${engine.totals(r, ex, r['m28']):,.0f}")

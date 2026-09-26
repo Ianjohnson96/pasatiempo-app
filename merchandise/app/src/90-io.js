@@ -112,6 +112,11 @@ function closeOverlay(){ $('#overlay').innerHTML = ''; D = null; DX = null; }
 /* ---------- render + mode ---------- */
 const PAGES = {overview: renderOverview, forecast: renderForecast, otb: renderOTB, orders: renderOrders, brands: renderBrands, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, help: renderHelp};
 function render(){
+  if (!BASE && !LEGACY_PLAN){
+    $('.monthbar').hidden = true; $('#summary').hidden = true; $('#kpis').hidden = true; $('#tabs').innerHTML = '';
+    $('#pane').innerHTML = `<section class="panel"><div class="note" style="font-size:14px">${dbState === 'connecting' ? 'Loading the program…' : 'The forecast and budgets appear after the first month-end data is loaded.'}</div></section>`;
+    return;
+  }
   derive();
   if (!PAGES[TAB]) TAB = 'overview';
   const S = stats(), bar = TAB === 'overview' || TAB === 'orders';
@@ -132,7 +137,7 @@ function applyMode(){
   const live = canAct();
   $('#btnNew').hidden = !live; $('#btnMore').parentElement.hidden = dbState !== 'live';
   const b = $('#banner');
-  if (dbState === 'unavailable'){ b.hidden = false; b.textContent = 'Orders can\'t be loaded in this view, so you are seeing the plan with nothing committed. Open this page on claude.ai to record and see orders.'; }
+  if (dbState === 'unavailable'){ b.hidden = false; b.textContent = 'Orders can\'t be loaded right now, so you are seeing the plan with nothing committed. Check your connection and reload the page.'; }
   else if (dbState === 'live' && readOnly){ b.hidden = false; b.textContent = 'You can look but not change anything. Ask the owner to make you a Contributor to log orders.'; }
   else if (dbState === 'connecting'){ b.hidden = false; b.textContent = 'Loading orders…'; }
   else b.hidden = true;
@@ -245,6 +250,11 @@ document.addEventListener('change', e => {
 });
 
 /* ---------- start ---------- */
+if (window.MERCH_HOST){
+  const H = window.MERCH_HOST, pop = $('#morePop');
+  pop.insertAdjacentHTML('beforeend', `<hr>${H.me.role === 'owner' ? `<a href="${esc(H.base)}/admin">People &amp; data</a>` : ''}<a href="${esc(H.base)}/account">Change your password</a>
+    <form method="post" action="${esc(H.base)}/signout"><button type="submit">Sign out (${esc(H.me.name || H.me.email)})</button></form>`);
+}
 render(); applyMode();
 (async () => {
   const c = window.claude;
@@ -256,22 +266,22 @@ render(); applyMode();
   if (!d){ dbState = 'unavailable'; applyMode(); return; }
   db = d;
   const live = () => { if (dbState !== 'live'){ dbState = 'live'; applyMode(); } else schedule(); };
-  const onErr = name => err => { if (err.code === 'revoked'){ readOnly = true; } if (err.code === 'unavailable'){ setTimeout(() => subs[name](), 2000); return; } if (dbState !== 'live'){ dbState = 'unavailable'; } applyMode(); };
-  const coll = (path, set) => db.collection(path).onSnapshot(s => { set(s.docs.map(x => ({id: x.id, ...x.data()}))); live(); }, onErr(path));
+  const onErr = name => err => { if (err.code === 'revoked'){ readOnly = true; } if (err.code === 'unavailable'){ setTimeout(() => subs[name] && subs[name](), 2000); return; } if (dbState !== 'live'){ dbState = 'unavailable'; } applyMode(); };
+  const coll = (path, set, name) => db.collection(path).onSnapshot(s => { set(s.docs.map(x => ({id: x.id, ...x.data()}))); live(); }, onErr(name));
   const subs = {
-    pos: () => coll('pos', v => POS = v),
-    vendors: () => coll('vendors', v => VENDORS = v),
-    subcats: () => coll('subcats', v => SUBCATS = v),
-    counts: () => coll('counts', v => COUNTS = v),
-    istate: () => coll('istate', v => ISTATE = Object.fromEntries(v.map(x => [x.id, x]))),
-    adj27: () => coll('plan/fy27/adjustments', v => ADJS.fy27 = v),
-    adj28: () => coll('plan/fy28/adjustments', v => ADJS.fy28 = v),
+    pos: () => coll('pos', v => POS = v, 'pos'),
+    vendors: () => coll('vendors', v => VENDORS = v, 'vendors'),
+    subcats: () => coll('subcats', v => SUBCATS = v, 'subcats'),
+    counts: () => coll('counts', v => COUNTS = v, 'counts'),
+    istate: () => coll('istate', v => ISTATE = Object.fromEntries(v.map(x => [x.id, x])), 'istate'),
+    adj27: () => coll('plan/fy27/adjustments', v => ADJS.fy27 = v, 'adj27'),
+    adj28: () => coll('plan/fy28/adjustments', v => ADJS.fy28 = v, 'adj28'),
     assume: () => db.doc('plan/assumptions').onSnapshot(s => { SAVED = s.exists ? s.data() : null; live(); }, onErr('assume')),
     base: () => db.doc('base/current').onSnapshot(s => { if (s.exists) BASE = s.data(); live(); }, onErr('base')),
     brands: () => db.doc('brands/current').onSnapshot(s => { if (s.exists) BRANDS = s.data(); live(); }, onErr('brands')),
-    bcalls: () => coll('brandCalls', v => BCALLS = Object.fromEntries(v.map(x => [x.id, x]))),
-    refreshes: () => coll('refreshes', v => REFRESHES = v),
-    checks: () => coll('checklist', v => CHECKS = Object.fromEntries(v.map(x => [x.id, x]))),
+    bcalls: () => coll('brandCalls', v => BCALLS = Object.fromEntries(v.map(x => [x.id, x])), 'bcalls'),
+    refreshes: () => coll('refreshes', v => REFRESHES = v, 'refreshes'),
+    checks: () => coll('checklist', v => CHECKS = Object.fromEntries(v.map(x => [x.id, x])), 'checks'),
     inv: () => db.doc('inventory/current').onSnapshot(s => { if (s.exists) INV = s.data(); live(); }, onErr('inv')),
     ins: () => db.doc('insights/current').onSnapshot(s => { if (s.exists) INS = s.data(); live(); }, onErr('ins'))
   };

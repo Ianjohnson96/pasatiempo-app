@@ -15,7 +15,7 @@
 // touching your hosts file.
 // ===========================================================================
 
-export type SectionKey = "events" | "mhi" | "sombrero";
+export type SectionKey = "events" | "mhi" | "sombrero" | "merch";
 
 export interface Section {
   key: SectionKey;
@@ -53,6 +53,18 @@ export const SECTIONS: Section[] = [
       // TODO: add a custom domain here too, e.g. "marionhollinsinvitational.com"
       "mhi.local",
       "mhi.local:3000",
+    ],
+  },
+  {
+    key: "merch",
+    label: "Pro Shop Merchandise Program",
+    schema: "merch",
+    pathPrefix: "/merch",
+    hosts: [
+      "pasatiempo-merch.vercel.app", // add this domain to the Vercel project
+      // TODO: add a custom domain here too, e.g. "merch.pasatiempo.com"
+      "merch.local",
+      "merch.local:3000",
     ],
   },
   {
