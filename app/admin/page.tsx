@@ -104,6 +104,14 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
               People &amp; access
             </Link>
           )}
+          {isSuper && (
+            <Link href="/admin/activity" className="navlink">
+              Activity
+            </Link>
+          )}
+          <Link href="/account/password" className="navlink">
+            Password
+          </Link>
           <span className="navlink">{email}</span>
           <form action="/auth/signout" method="post" style={{ margin: 0 }}>
             <button className="btn secondary small" type="submit">

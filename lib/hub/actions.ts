@@ -5,6 +5,7 @@ import { createHubClient } from "@/lib/supabase/admin";
 import { APPS, isRole, SITES, type AppKey, type SiteKey } from "./apps";
 import { getPerson, isAppAdmin, type Person } from "./access";
 import { forgetSites } from "./sites";
+import { logActivity } from "./log";
 
 // People, per-app access and public-site switches. Every action re-checks the
 // caller: a super admin can do anything here; an app's admin/owner can add
@@ -79,16 +80,19 @@ export async function addPerson(input: { email: string; name: string; password?:
   if (!existing) {
     const { error } = await hub.from("people").insert({ email, name, created_by: actor.email });
     if (error) return deny("That didn't save. Try again.");
+    await logActivity({ actor: actor.email, app: "hub", action: "person.add", target: email, detail: { name } });
   } else if (name && (actor.isSuper || !existing.name)) {
     await hub.from("people").update({ name }).eq("email", email);
   }
   if (input.password) {
     const err = await setPassword(email, input.password);
     if (err) return deny("The sign-in couldn't be saved: " + err);
+    await logActivity({ actor: actor.email, app: "hub", action: "password.set", target: email });
   }
   if (input.app && input.role) {
     const { error } = await hub.from("access").upsert({ email, app: input.app, role: input.role, granted_by: actor.email, granted_at: new Date().toISOString() }, { onConflict: "email,app" });
     if (error) return deny("That didn't save. Try again.");
+    await logActivity({ actor: actor.email, app: input.app, action: "access.grant", target: email, detail: { role: input.role } });
   }
   return done();
 }
@@ -104,10 +108,18 @@ export async function setAccess(email: string, app: AppKey, role: string | null)
   if (!t.person) return deny("Add this person first.");
   if (t.person.super_admin && !actor.isSuper) return deny("Only the super admin can change a super admin's access.");
   const hub = createHubClient();
+  const { data: before } = await hub.from("access").select("role").eq("email", email).eq("app", app).maybeSingle();
   const { error } = role === null
     ? await hub.from("access").delete().eq("email", email).eq("app", app)
     : await hub.from("access").upsert({ email, app, role, granted_by: actor.email, granted_at: new Date().toISOString() }, { onConflict: "email,app" });
   if (error) return deny("That didn't save. Try again.");
+  await logActivity({
+    actor: actor.email,
+    app,
+    action: role === null ? "access.remove" : before ? "access.change" : "access.grant",
+    target: email,
+    detail: { role, from: before?.role ?? null },
+  });
   return done();
 }
 
@@ -120,7 +132,9 @@ export async function resetPassword(email: string, password: string): Promise<Re
   if (!(await target(email)).person) return deny("Add this person first.");
   if (!(await mayManageLogin(actor, email))) return deny("Only the super admin can change this person's password.");
   const err = await setPassword(email, password);
-  return err ? deny("The password couldn't be saved: " + err) : done();
+  if (err) return deny("The password couldn't be saved: " + err);
+  await logActivity({ actor: actor.email, app: "hub", action: "password.set", target: email });
+  return done();
 }
 
 /** Super admin only: make someone a super admin, or remove / restore them everywhere. */
@@ -134,7 +148,12 @@ export async function setPersonFlags(email: string, flags: { superAdmin?: boolea
   if (flags.superAdmin !== undefined) patch.super_admin = flags.superAdmin;
   if (flags.active !== undefined) patch.active = flags.active;
   const { error } = await createHubClient().from("people").update(patch).eq("email", email);
-  return error ? deny("That didn't save. Try again.") : done();
+  if (error) return deny("That didn't save. Try again.");
+  if (flags.superAdmin !== undefined)
+    await logActivity({ actor: actor.email, app: "hub", action: flags.superAdmin ? "super.grant" : "super.remove", target: email });
+  if (flags.active !== undefined)
+    await logActivity({ actor: actor.email, app: "hub", action: flags.active ? "person.restore" : "person.remove", target: email });
+  return done();
 }
 
 /** Super admin only: switch a public site on or off. */
@@ -148,5 +167,6 @@ export async function setSiteEnabled(key: SiteKey, enabled: boolean): Promise<Re
     .eq("key", key);
   if (error) return deny("That didn't save. Try again.");
   forgetSites();
+  await logActivity({ actor: actor.email, app: "sites", action: enabled ? "site.on" : "site.off", target: key });
   return done();
 }

@@ -16,10 +16,12 @@ export default async function PeoplePage() {
   if (!me.isSuper && !apps.length) redirect("/admin?denied=people");
 
   const hub = createHubClient();
-  const [{ data: people }, { data: access }] = await Promise.all([
+  const [{ data: people, error: e1 }, { data: access, error: e2 }] = await Promise.all([
     hub.from("people").select("email, name, super_admin, active").order("name"),
     hub.from("access").select("email, app, role"),
   ]);
+  // Without the grants we can't tell whose people are whose, so show nothing rather than everyone.
+  if (e1 || e2) throw new Error("Couldn't load people and access. Reload the page to try again.");
   const grants = new Map<string, Record<string, string>>();
   for (const a of access ?? []) grants.set(a.email, { ...(grants.get(a.email) ?? {}), [a.app]: a.role });
   let rows: PersonRow[] = (people ?? []).map((p) => ({
@@ -30,8 +32,11 @@ export default async function PeoplePage() {
     grants: grants.get(p.email) ?? {},
   }));
   // App admins see the people in their apps (and anyone not yet in any app, so they can add them).
+  // An app admin sees only the apps they run: other apps' roles aren't sent to the page.
   if (!me.isSuper)
-    rows = rows.filter((r) => r.active && (apps.some((a) => r.grants[a]) || !Object.keys(r.grants).length) && !r.isSuper);
+    rows = rows
+      .filter((r) => r.active && (apps.some((a) => r.grants[a]) || !Object.keys(r.grants).length) && !r.isSuper)
+      .map((r) => ({ ...r, grants: Object.fromEntries(apps.filter((a) => r.grants[a]).map((a) => [a, r.grants[a]])) }));
 
   return (
     <>

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getMerchViewer } from "@/lib/merch/auth";
+import { logActivity } from "@/lib/hub/log";
 import { IMPORTABLE, isDocPath, MAX_DOC_BYTES, topCollection } from "@/lib/merch/rules";
 
 export const dynamic = "force-dynamic";
@@ -36,5 +37,7 @@ export async function POST(request: NextRequest) {
     if (error) return NextResponse.json({ error: `Stopped at ${path} after ${done} documents. Try again.` }, { status: 503 });
     done++;
   }
+  const note = typeof (b as { note?: unknown }).note === "string" ? (b as { note: string }).note.slice(0, 200) : null;
+  await logActivity({ actor: me.email, app: "merch", action: "merch.data_loaded", detail: { documents: done, note } });
   return NextResponse.json({ loaded: done });
 }
