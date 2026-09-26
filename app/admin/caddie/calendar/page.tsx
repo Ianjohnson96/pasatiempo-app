@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getViewer } from "@/lib/events/auth";
+import { requireCaddieStaff } from "@/lib/caddie/auth";
 import CaddieHeader from "@/components/caddie/CaddieHeader";
 import {
   addDays,
@@ -43,8 +42,7 @@ export default async function CaddieCalendarPage({
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
-  const viewer = await getViewer();
-  if (!viewer) redirect("/login");
+  const viewer = await requireCaddieStaff();
 
   const settings = await getSettings();
   const tz = settings.courseTimezone;

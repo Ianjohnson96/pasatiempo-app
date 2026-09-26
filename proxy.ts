@@ -1,6 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { sectionForHost, isAdminHost, SECTIONS } from "@/lib/sections";
+import { siteForPath } from "@/lib/hub/apps";
+import { isSuperAdmin, siteIsOn } from "@/lib/hub/sites";
+import { safeNext } from "@/lib/hub/next";
 
 // ===========================================================================
 // Proxy (Next.js 16's renamed "middleware"). Two jobs:
@@ -127,18 +130,28 @@ export async function proxy(request: NextRequest) {
   // --- 3) Staff gate: the admin area AND the hub root (the section directory)
   //        require a signed-in user. Public visitors reach the individual
   //        sections directly (/mhi, /events/…, /sombrero) — never the hub. ----
-  // Merchandise-program-only accounts (app_metadata.merch_only) count as
-  // signed out here: they sign in to /merch, never to the admin area.
-  const staff = user && !user.app_metadata?.merch_only ? user : null;
+  // --- 2a) Public sites the super admin has switched off ------------------
+  //         Visitors get the "not available" page; super admins still see it.
+  const site = isAdminPath(internalPath) ? null : siteForPath(internalPath);
+  if (site && !(await siteIsOn(site)) && !(await isSuperAdmin(user?.email))) {
+    url.pathname = "/unavailable";
+    return withCookies(NextResponse.rewrite(url, { request }));
+  }
+
+  // Signing in only proves who someone is; what each app lets them do is
+  // checked by that app (lib/hub/access.ts).
   const staffOnly = isAdminPath(internalPath) || internalPath === "/";
-  if (staffOnly && !staff) {
+  if (staffOnly && !user) {
     const redirect = url.clone();
     redirect.pathname = "/login";
+    redirect.search = "";
+    if (internalPath !== "/" && internalPath !== "/admin") redirect.searchParams.set("next", internalPath);
     return withCookies(NextResponse.redirect(redirect));
   }
-  if (isLoginPath(internalPath) && staff) {
+  if (isLoginPath(internalPath) && user) {
     const redirect = url.clone();
-    redirect.pathname = "/admin";
+    redirect.pathname = safeNext(url.searchParams.get("next")) ?? "/admin";
+    redirect.search = "";
     return withCookies(NextResponse.redirect(redirect));
   }
 

@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { getViewer } from "@/lib/events/auth";
+import { requireCaddieStaff } from "@/lib/caddie/auth";
 import CaddieHeader from "@/components/caddie/CaddieHeader";
 import RosterManager from "@/components/caddie/RosterManager";
 import { caddieReach, listCaddies, listTiers } from "@/lib/caddie/data";
@@ -8,8 +7,7 @@ import { caddieReach, listCaddies, listTiers } from "@/lib/caddie/data";
 export const dynamic = "force-dynamic";
 
 export default async function CaddieRosterPage() {
-  const viewer = await getViewer();
-  if (!viewer) redirect("/login");
+  const viewer = await requireCaddieStaff();
 
   const [caddies, tiers, reach] = await Promise.all([
     listCaddies(),

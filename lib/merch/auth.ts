@@ -1,6 +1,6 @@
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createHubClient } from "@/lib/supabase/admin";
 import { sectionForHost } from "@/lib/sections";
+import { getPerson, roleIn } from "@/lib/hub/access";
 import type { MerchRole } from "./rules";
 
 export interface MerchViewer {
@@ -9,47 +9,18 @@ export interface MerchViewer {
   role: MerchRole;
 }
 
-export interface MerchMember extends MerchViewer {
-  active: boolean;
-  createdAt: string;
-}
-
-// The signed-in user if they are an active member of the merchandise program,
-// else null. Membership lives in merch.members; sign-in is Supabase Auth.
+// Merchandise Program access comes from hub.access (lib/hub/access.ts):
+// owner | staff | viewer. A super admin is an owner.
 export async function getMerchViewer(): Promise<MerchViewer | null> {
-  let email: string | null = null;
-  try {
-    const supa = await createClient();
-    const {
-      data: { user },
-    } = await supa.auth.getUser();
-    email = user?.email?.toLowerCase() ?? null;
-  } catch {
-    email = null;
-  }
-  if (!email) return null;
-  const { data } = await createAdminClient("merch")
-    .from("members")
-    .select("email, name, role, active")
-    .eq("email", email)
-    .maybeSingle();
-  if (!data || !data.active) return null;
-  return { email: data.email, name: data.name, role: data.role as MerchRole };
+  const p = await getPerson();
+  const role = roleIn(p, "merch");
+  return p && role ? { email: p.email, name: p.name, role } : null;
 }
 
-/** Everyone in the program, for showing names next to entries. */
-export async function listMembers(): Promise<MerchMember[]> {
-  const { data } = await createAdminClient("merch")
-    .from("members")
-    .select("email, name, role, active, created_at")
-    .order("name");
-  return (data ?? []).map((m) => ({
-    email: m.email,
-    name: m.name,
-    role: m.role as MerchRole,
-    active: m.active,
-    createdAt: m.created_at,
-  }));
+/** Display names for everyone in the hub, for showing who entered what. */
+export async function memberNames(): Promise<Record<string, string>> {
+  const { data } = await createHubClient().from("people").select("email, name");
+  return Object.fromEntries((data ?? []).map((m) => [m.email, m.name]));
 }
 
 /**

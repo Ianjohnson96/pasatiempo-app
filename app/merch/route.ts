@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { basePath, getMerchViewer, listMembers } from "@/lib/merch/auth";
+import { basePath, getMerchViewer, memberNames } from "@/lib/merch/auth";
 import { programHtml } from "@/lib/merch/page";
-import { isSignedIn } from "@/lib/merch/guard";
+import { signedInEmail } from "@/lib/hub/access";
 
 export const dynamic = "force-dynamic";
 
@@ -10,10 +10,10 @@ export async function GET(request: NextRequest) {
   const base = basePath(request.headers.get("host"));
   const viewer = await getMerchViewer();
   if (!viewer) {
-    const to = base + "/login" + ((await isSignedIn()) ? "?denied=1" : "");
+    const to = base + "/login" + ((await signedInEmail()) ? "?denied=1" : "");
     return NextResponse.redirect(new URL(to, request.url));
   }
-  const members = Object.fromEntries((await listMembers()).map((m) => [m.email, m.name]));
+  const members = await memberNames();
   return new NextResponse(programHtml(viewer, members, base), {
     headers: {
       "Content-Type": "text/html; charset=utf-8",

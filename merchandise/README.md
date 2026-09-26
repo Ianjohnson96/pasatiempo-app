@@ -15,17 +15,17 @@ The page is served by `app/merch/route.ts`. It assembles `app/src` with the shim
 
 | Role | Can |
 |---|---|
-| owner | everything, including the forecast (`plan/…`), budget changes, brand calls, month-end data, and **People & data** (`/merch/admin`) |
+| owner | everything, including the forecast (`plan/…`), budget changes, brand calls and month-end data (`/merch/admin`) |
 | staff | orders, receipts, vendors, subcategories, counts, to-do states, month-end checklist |
 | viewer | read only |
 
-People are managed on `/merch/admin`, stored in `merch.members`. Adding someone with a password creates their Supabase Auth login, flagged `app_metadata.merch_only`. The proxy and `lib/events/auth.ts` keep those accounts out of the events admin area.
+Roles are granted per app on the hub's **People & access** page (`/admin/people`, stored in `hub.access`; see `lib/hub/access.ts`). A super admin is an owner here. Everyone signs in once for all Pasatiempo apps.
 
 ## Setup (once)
 
 1. Run `supabase/migration-merch-schema.sql` in the hub project. Then add `merch` under Settings → API → Exposed schemas.
 2. For now the program is served by path at `pasatiempo-app.vercel.app/merch`. To give it its own domain later, add the domain to the Vercel project and list it under the `merch` entry in `lib/sections.ts`.
-3. Sign in at that address. Open **More → People & data** and load the latest data file.
+3. Sign in at that address. Open **More → Load month-end data** and load the latest data file. Add staff on `/admin/people`.
 
 ## Pages
 
@@ -64,7 +64,7 @@ Fiscal year: May 1 – Apr 30. Sales are at retail. Stock and budgets are at cos
    python pipeline/refresh.py data/reports data/out --prior data/prior --note "October close"
    ```
    The report type is detected from each PDF's text, so file names don't matter. On a first build with no prior folder, include the full-year Sales by Category, Sales by Item and April SKU Analysis for last fiscal year.
-4. Load `data/out/Merchandise_Program_Data_<asOf>.json` on **People & data → Load month-end data**. A data file can only replace `base`, `inventory`, `insights`, `brands`, `refreshes` and `skuhist`. Orders, vendors, counts, budget changes and brand calls are never touched. Items marked done or dismissed stay that way, because `istate` is keyed by item id.
+4. Load `data/out/Merchandise_Program_Data_<asOf>.json` on **More → Load month-end data** (`/merch/admin`). A data file can only replace `base`, `inventory`, `insights`, `brands`, `refreshes` and `skuhist`. Orders, vendors, counts, budget changes and brand calls are never touched. Items marked done or dismissed stay that way, because `istate` is keyed by item id.
 
 ## Planning constants
 
