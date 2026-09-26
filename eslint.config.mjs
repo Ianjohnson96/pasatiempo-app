@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone merchandise program (single-file page + Python pipeline), not part of the Next app.
+    "merchandise/**",
   ]),
 ]);
 

@@ -1,0 +1,5 @@
+# POS reports and generated documents hold the shop's sales and cost data; keep them out of git.
+data/
+dist/
+__pycache__/
+*.pyc
