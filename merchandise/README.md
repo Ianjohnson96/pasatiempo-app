@@ -1,6 +1,6 @@
 # Pro Shop Merchandise Program
 
-The Pro Shop's forecast, open-to-buy (OTB), order book and brand scorecard. It runs as a section of this club app: `/merch`, or its own domain from `lib/sections.ts`. Staff sign in with an email and password the owner sets. Nobody needs a Claude account.
+The Pro Shop's forecast, open-to-buy (OTB), order book and brand scorecard. It runs as a section of this club app at `/merch` (its own domain can be added in `lib/sections.ts`). Staff sign in with an email and password the owner sets. Nobody needs a Claude account.
 
 ```
 pipeline/     POS report PDFs  ->  month-end documents and a loadable data file (Python)
@@ -24,7 +24,7 @@ People are managed on `/merch/admin`, stored in `merch.members`. Adding someone 
 ## Setup (once)
 
 1. Run `supabase/migration-merch-schema.sql` in the hub project. Then add `merch` under Settings → API → Exposed schemas.
-2. Add the section's domain (`pasatiempo-merch.vercel.app`, or a custom one) to the Vercel project. List it in `lib/sections.ts`.
+2. For now the program is served by path at `pasatiempo-app.vercel.app/merch`. To give it its own domain later, add the domain to the Vercel project and list it under the `merch` entry in `lib/sections.ts`.
 3. Sign in at that address. Open **More → People & data** and load the latest data file.
 
 ## Pages

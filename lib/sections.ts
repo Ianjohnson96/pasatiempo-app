@@ -61,8 +61,8 @@ export const SECTIONS: Section[] = [
     schema: "merch",
     pathPrefix: "/merch",
     hosts: [
-      "pasatiempo-merch.vercel.app", // add this domain to the Vercel project
-      // TODO: add a custom domain here too, e.g. "merch.pasatiempo.com"
+      // Served by path for now: pasatiempo-app.vercel.app/merch.
+      // TODO: add its own domain here later, e.g. "merch.pasatiempo.com"
       "merch.local",
       "merch.local:3000",
     ],
