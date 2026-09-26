@@ -4,7 +4,7 @@ import AppBar from "@/components/events/AppBar";
 import FinancialsPanel from "@/components/events/FinancialsPanel";
 import { getEvent, registrationsFor } from "@/lib/events/data";
 import { getFinance, listPrizes } from "@/lib/events/finance-data";
-import { getViewer } from "@/lib/events/auth";
+import { requireEventsViewer } from "@/lib/events/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +17,7 @@ export default async function FinancialsPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const viewer = await getViewer();
-  if (!viewer) redirect("/login");
+  const viewer = await requireEventsViewer();
   if (!viewer.isGlobalAdmin) redirect("/admin");
 
   const { id } = await params;

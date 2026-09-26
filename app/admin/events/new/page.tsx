@@ -1,13 +1,11 @@
-import { redirect } from "next/navigation";
 import AppBar from "@/components/events/AppBar";
 import EventEditor from "@/components/events/EventEditor";
-import { getViewer } from "@/lib/events/auth";
+import { requireEventsViewer } from "@/lib/events/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewEventPage() {
-  const viewer = await getViewer();
-  if (!viewer) redirect("/login");
+  const viewer = await requireEventsViewer();
   return (
     <>
       <AppBar admin email={viewer.email} />

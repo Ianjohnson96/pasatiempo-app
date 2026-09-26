@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getViewer } from "@/lib/events/auth";
+import { requireCaddieStaff } from "@/lib/caddie/auth";
 import CaddieHeader from "@/components/caddie/CaddieHeader";
 import { caddieLedger, listCaddies } from "@/lib/caddie/data";
 import { nextUpOrder } from "@/lib/caddie/ledger";
@@ -16,8 +16,7 @@ const money = (cents: number) =>
   cents === 0 ? "—" : `$${(cents / 100).toFixed(0)}`;
 
 export default async function CaddieLedgerPage() {
-  const viewer = await getViewer();
-  if (!viewer) redirect("/login");
+  const viewer = await requireCaddieStaff();
   if (!viewer.isGlobalAdmin) redirect("/admin/caddie");
 
   const [caddies, ledger] = await Promise.all([listCaddies(), caddieLedger(60)]);

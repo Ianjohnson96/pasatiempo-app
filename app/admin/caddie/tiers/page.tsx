@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { getViewer } from "@/lib/events/auth";
+import { requireCaddieStaff } from "@/lib/caddie/auth";
 import CaddieHeader from "@/components/caddie/CaddieHeader";
 import TierManager from "@/components/caddie/TierManager";
 import WaterfallEditor from "@/components/caddie/WaterfallEditor";
@@ -11,8 +10,7 @@ import { caddieCountByTier, getSettings, listTiers } from "@/lib/caddie/data";
 export const dynamic = "force-dynamic";
 
 export default async function CaddieTiersPage() {
-  const viewer = await getViewer();
-  if (!viewer) redirect("/login");
+  const viewer = await requireCaddieStaff();
 
   const [tiers, counts, settings] = await Promise.all([
     listTiers(),

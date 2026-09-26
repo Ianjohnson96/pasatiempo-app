@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import AppBar from "@/components/events/AppBar";
 import EventEditor from "@/components/events/EventEditor";
 import { getEvent } from "@/lib/events/data";
-import { canManageEvent, getViewer } from "@/lib/events/auth";
+import { canManageEvent, requireEventsViewer } from "@/lib/events/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +11,7 @@ export default async function EditEventPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const viewer = await getViewer();
-  if (!viewer) redirect("/login");
+  const viewer = await requireEventsViewer();
   const { id } = await params;
   const event = await getEvent(id);
   if (!event) notFound();

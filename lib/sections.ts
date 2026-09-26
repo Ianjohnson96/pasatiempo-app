@@ -10,9 +10,15 @@
 // project, add a route folder at app/<prefix>, and point its domain at the
 // deployment. That is all a PUBLIC section needs.
 //
-// A section with its own signed-in users needs one more thing: a gate in
-// proxy.ts. The gate there knows about staff only (Supabase Auth), so "caddie"
-// carries its own cookie check — see lib/caddie/session.ts.
+// Access (who can use which staff app) is NOT decided here — see
+// lib/hub/apps.ts (the apps and their roles) and lib/hub/access.ts (the
+// checks). Staff sign in once with Supabase Auth; each app's pages call
+// requireApp() and its server actions assertApp(). A super admin has every
+// app. Public sites (events pages, MHI, El Sombrero) can be switched off by
+// the super admin (hub.sites, enforced in proxy.ts).
+//
+// Caddies are not staff: the caddie portal carries its own cookie check in
+// proxy.ts — see lib/caddie/session.ts.
 //
 // TODO(domains): replace the "*.example.com" placeholders with your real
 // custom domains. The "*.local" and localhost entries make dev work without

@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { getViewer } from "@/lib/events/auth";
+import { requireCaddieStaff } from "@/lib/caddie/auth";
 import CaddieHeader from "@/components/caddie/CaddieHeader";
 import RatesEditor from "@/components/caddie/RatesEditor";
 import { getSettings } from "@/lib/caddie/data";
@@ -9,8 +8,7 @@ import { getSettings } from "@/lib/caddie/data";
 export const dynamic = "force-dynamic";
 
 export default async function CaddieRatesPage() {
-  const viewer = await getViewer();
-  if (!viewer) redirect("/login");
+  const viewer = await requireCaddieStaff();
 
   const settings = await getSettings();
 

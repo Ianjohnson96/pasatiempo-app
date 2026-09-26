@@ -9,6 +9,7 @@ import { planBooking } from "./booking";
 import { dayRange, formatTee, getSettings } from "./data";
 import { resolveOrigin } from "./origin";
 import { getCaddieSession, mintInvite, signOutCaddie } from "./session";
+import { assertCaddieStaff } from "./auth";
 import {
   notifyActiveCaddies,
   notifyCaddies,
@@ -95,6 +96,7 @@ export interface LoopInput {
  */
 export async function saveLoop(input: LoopInput): Promise<Result<LoopRec>> {
   try {
+    await assertCaddieStaff();
     const supa = createAdminClient("caddie");
     const { courseTimezone } = await getSettings();
 
@@ -186,6 +188,7 @@ export async function createGroupBooking(
   input: GroupInput,
 ): Promise<Result<{ bookingId: string; created: number }>> {
   try {
+    await assertCaddieStaff();
     const name = input.name.trim();
     if (!name) return { ok: false, error: "The group needs a name." };
 
@@ -279,6 +282,7 @@ export async function setLoopStatus(
   status: "Completed" | "Cancelled" | "Unassigned",
 ): Promise<Result> {
   try {
+    await assertCaddieStaff();
     const supa = createAdminClient("caddie");
 
     // Cancelling is signed; restoring clears the signature rather than leaving
@@ -302,6 +306,7 @@ export async function setLoopStatus(
 
 export async function deleteLoop(loopId: string): Promise<Result> {
   try {
+    await assertCaddieStaff();
     const supa = createAdminClient("caddie");
     const { error } = await supa.from("loops").delete().eq("id", loopId);
     if (error) throw error;
@@ -317,6 +322,7 @@ export async function setOpenBoard(
   on: boolean,
 ): Promise<Result> {
   try {
+    await assertCaddieStaff();
     const supa = createAdminClient("caddie");
     const { error } = await supa
       .from("loops")
@@ -344,6 +350,7 @@ export async function setOpenBoard(
  */
 export async function cancelDay(day: string): Promise<Result<number>> {
   try {
+    await assertCaddieStaff();
     const supa = createAdminClient("caddie");
     const { courseTimezone } = await getSettings();
     const { from, to } = dayRange(day, courseTimezone);
@@ -404,6 +411,7 @@ export async function duplicateDay(
   toDay: string,
 ): Promise<Result<number>> {
   try {
+    await assertCaddieStaff();
     if (fromDay === toDay) {
       return { ok: false, error: "Pick a different date to copy to." };
     }
@@ -511,6 +519,7 @@ export async function offerLoop(
   caddieIds: string[],
 ): Promise<Result<OfferOutcome>> {
   try {
+    await assertCaddieStaff();
     if (caddieIds.length === 0) {
       return { ok: false, error: "Pick at least one caddie." };
     }
@@ -599,6 +608,7 @@ export async function offerToTiers(
   tierIds: string[],
 ): Promise<Result<OfferOutcome>> {
   try {
+    await assertCaddieStaff();
     if (tierIds.length === 0) {
       return { ok: false, error: "Pick at least one tier." };
     }
@@ -671,6 +681,7 @@ async function offerAlert(loopId: string, broadcast: boolean) {
  */
 export async function nudgePending(loopId: string): Promise<Result<number>> {
   try {
+    await assertCaddieStaff();
     const supa = createAdminClient("caddie");
 
     const { data: loopRow, error: loopErr } = await supa
@@ -715,6 +726,7 @@ export async function nudgePending(loopId: string): Promise<Result<number>> {
 /** Pull an offer back before the caddie answers. */
 export async function withdrawOffer(assignmentId: string): Promise<Result> {
   try {
+    await assertCaddieStaff();
     const supa = createAdminClient("caddie");
     const { error } = await supa
       .from("assignments")
@@ -744,6 +756,7 @@ export async function respondForCaddie(
   accept: boolean,
 ): Promise<Result<string>> {
   try {
+    await assertCaddieStaff();
     const supa = createAdminClient("caddie");
     const { data, error } = await supa.rpc("respond_to_offer", {
       p_assignment_id: assignmentId,
@@ -923,6 +936,7 @@ export async function unsubscribeFromPush(endpoint: string): Promise<Result> {
  */
 export async function callAllCaddies(loopId: string): Promise<Result<number>> {
   try {
+    await assertCaddieStaff();
     const supa = createAdminClient("caddie");
     const settings = await getSettings();
 
@@ -1213,6 +1227,7 @@ export interface TierInput {
  */
 export async function saveTier(input: TierInput): Promise<Result> {
   try {
+    await assertCaddieStaff();
     const name = input.name.trim();
     if (!name) return { ok: false, error: "A tier needs a name." };
 
@@ -1270,6 +1285,7 @@ export async function moveTier(
   direction: "up" | "down",
 ): Promise<Result> {
   try {
+    await assertCaddieStaff();
     const supa = createAdminClient("caddie");
 
     const { data: rows, error: readErr } = await supa
@@ -1310,6 +1326,7 @@ export async function moveTier(
  */
 export async function deleteTier(tierId: string): Promise<Result> {
   try {
+    await assertCaddieStaff();
     const supa = createAdminClient("caddie");
 
     const { count, error: countErr } = await supa
@@ -1346,6 +1363,7 @@ export async function deleteTier(tierId: string): Promise<Result> {
  */
 export async function saveWaterfall(input: Waterfall): Promise<Result> {
   try {
+    await assertCaddieStaff();
     const supa = createAdminClient("caddie");
 
     const clean = {
@@ -1396,6 +1414,7 @@ export interface CaddieInput {
 
 export async function saveCaddie(input: CaddieInput): Promise<Result<CaddieRec>> {
   try {
+    await assertCaddieStaff();
     const fullName = input.fullName.trim();
     if (!fullName) return { ok: false, error: "A caddie needs a name." };
 
@@ -1476,6 +1495,7 @@ export async function setCaddieTier(
   tierId: string,
 ): Promise<Result> {
   try {
+    await assertCaddieStaff();
     const supa = createAdminClient("caddie");
     const { error } = await supa
       .from("caddies")
@@ -1495,6 +1515,7 @@ export async function setCaddieStatus(
   status: CaddieStatus,
 ): Promise<Result> {
   try {
+    await assertCaddieStaff();
     const supa = createAdminClient("caddie");
     const { error } = await supa
       .from("caddies")
@@ -1518,6 +1539,7 @@ export async function setCaddieStatus(
  */
 export async function deleteCaddie(caddieId: string): Promise<Result> {
   try {
+    await assertCaddieStaff();
     const supa = createAdminClient("caddie");
     const { count, error: countErr } = await supa
       .from("assignments")
@@ -1564,6 +1586,7 @@ export async function createInvite(
   caddieId: string,
 ): Promise<Result<InviteHandout>> {
   try {
+    await assertCaddieStaff();
     const settings = await getSettings();
     const origin = await siteOrigin();
     const invite = await mintInvite(
@@ -1636,6 +1659,7 @@ function normalisePhone(raw: string): string | null {
  */
 export async function saveRates(rates: Record<string, number>): Promise<Result> {
   try {
+    await assertCaddieStaff();
     const supa = createAdminClient("caddie");
 
     const clean: Record<string, number> = {};

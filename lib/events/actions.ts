@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { assertCanManageEvent, assertCanManageRegistration, assertEventsViewer } from "./auth";
 import { eventToRow, rowToEvent, rowToReg } from "./map";
 import { newId, newSlug, slugify } from "./ids";
 import { availability, rosterCount, onRoster } from "./data";
@@ -89,6 +90,8 @@ export async function saveEvent(input: EventInput): Promise<SaveEventResult> {
 }
 
 async function saveEventInner(input: EventInput): Promise<SaveEventResult> {
+  if (input.id) await assertCanManageEvent(input.id);
+  else await assertEventsViewer();
   const supa = createAdminClient("events");
 
   const cleanSlots: Slot[] = input.slots
@@ -208,6 +211,7 @@ export async function setEventStatus(
   id: string,
   status: "draft" | "open" | "closed",
 ): Promise<void> {
+  await assertCanManageEvent(id);
   const supa = createAdminClient("events");
   const { data, error } = await supa
     .from("events")
@@ -223,6 +227,7 @@ export async function setEventStatus(
 }
 
 export async function deleteEvent(id: string): Promise<void> {
+  await assertCanManageEvent(id);
   const supa = createAdminClient("events");
   // remove any stored photos for this event, then the row (registrations cascade)
   try {
@@ -267,6 +272,11 @@ export async function uploadPhoto(
   eventId: string,
   formData: FormData,
 ): Promise<{ ok: boolean; photos?: string[]; error?: string }> {
+  try {
+    await assertCanManageEvent(eventId);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0)
     return { ok: false, error: "No file received." };
@@ -307,6 +317,7 @@ export async function removePhoto(
   eventId: string,
   photoUrl: string,
 ): Promise<string[]> {
+  await assertCanManageEvent(eventId);
   const supa = createAdminClient("events");
   const path = storagePath(photoUrl);
   if (path) await supa.storage.from(PHOTO_BUCKET).remove([path]).catch(() => {});
@@ -326,6 +337,7 @@ export async function movePhoto(
   photoUrl: string,
   dir: -1 | 1,
 ): Promise<string[]> {
+  await assertCanManageEvent(eventId);
   const supa = createAdminClient("events");
   const { data: ev } = await supa
     .from("events")
@@ -347,6 +359,7 @@ export async function setGalleryMode(
   eventId: string,
   mode: GalleryMode,
 ): Promise<void> {
+  await assertCanManageEvent(eventId);
   const supa = createAdminClient("events");
   const { data, error } = await supa
     .from("events")
@@ -725,6 +738,7 @@ export async function setRegStatus(
   regId: string,
   status: RegStatus,
 ): Promise<void> {
+  await assertCanManageRegistration(regId);
   const supa = createAdminClient("events");
   const { data, error } = await supa
     .from("registrations")
@@ -754,6 +768,11 @@ export interface RegistrationEdit {
 export async function updateRegistration(
   input: RegistrationEdit,
 ): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await assertCanManageRegistration(input.id);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
   const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
   if (!name) return { ok: false, error: "Please enter a name." };
@@ -789,6 +808,7 @@ export async function updateRegistration(
 }
 
 export async function deleteRegistration(regId: string): Promise<void> {
+  await assertCanManageRegistration(regId);
   const supa = createAdminClient("events");
   const { data, error } = await supa
     .from("registrations")

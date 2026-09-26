@@ -21,3 +21,16 @@ export function createAdminClient(section: SectionKey) {
     },
   );
 }
+
+// Server-only client for the hub's own schema: people, per-app access and
+// public-site switches (lib/hub/access.ts). Same service_role key.
+export function createHubClient() {
+  return createSbClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      db: { schema: "hub" },
+      auth: { persistSession: false, autoRefreshToken: false },
+    },
+  );
+}
