@@ -8,14 +8,18 @@
 //
 // To add a new section later: add one entry here, create its schema in the hub
 // project, add a route folder at app/<prefix>, and point its domain at the
-// deployment. Nothing else needs to change.
+// deployment. That is all a PUBLIC section needs.
+//
+// A section with its own signed-in users needs one more thing: a gate in
+// proxy.ts. The gate there knows about staff only (Supabase Auth), so "caddie"
+// carries its own cookie check — see lib/caddie/session.ts.
 //
 // TODO(domains): replace the "*.example.com" placeholders with your real
 // custom domains. The "*.local" and localhost entries make dev work without
 // touching your hosts file.
 // ===========================================================================
 
-export type SectionKey = "events" | "mhi" | "sombrero" | "merch";
+export type SectionKey = "events" | "mhi" | "sombrero" | "caddie" | "merch";
 
 export interface Section {
   key: SectionKey;
@@ -77,6 +81,21 @@ export const SECTIONS: Section[] = [
       "sombrero.local",
       "sombrero.local:3000",
     ],
+  },
+  {
+    key: "caddie",
+    label: "Caddie Program",
+    schema: "caddie",
+    // The CADDIE-FACING portal (availability, offers, my schedule). The Pro
+    // Shop's dispatch board lives at /admin/caddie with the rest of staff.
+    //
+    // On its own subdomain because the sign-in QR codes bake the origin in
+    // permanently: a link handed to a caddie today has to keep working, so the
+    // address it points at should be one the club owns rather than a Vercel
+    // deployment name. The umbrella host keeps serving /caddie by path as
+    // well, so links issued before the domain existed do not break.
+    pathPrefix: "/caddie",
+    hosts: ["caddie.pasatiempo.com", "caddie.local", "caddie.local:3000"],
   },
 ];
 

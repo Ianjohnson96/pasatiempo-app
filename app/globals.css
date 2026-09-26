@@ -1463,6 +1463,24 @@ textarea {
   .rs-table tr {
     page-break-inside: avoid;
   }
+
+  /* Caddie day sheet: the shop prints this and writes on it. Everything that
+     only works with a mouse comes off, and each loop keeps some white space
+     so a name can be pencilled in beside it. */
+  .seg,
+  .notice {
+    display: none !important;
+  }
+  .evrow {
+    page-break-inside: avoid;
+    padding: 10px 0;
+    border-bottom: 1px solid #ddd;
+  }
+  .container {
+    max-width: none;
+    padding: 0;
+  }
+
   @page {
     margin: 14mm;
   }

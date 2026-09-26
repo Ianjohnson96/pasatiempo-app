@@ -1,0 +1,14 @@
+{
+  "name": "Pasatiempo Caddies",
+  "short_name": "Caddies",
+  "description": "Job alerts, availability and your schedule.",
+  "start_url": "/caddie",
+  "scope": "/caddie",
+  "display": "standalone",
+  "background_color": "#f6f2e9",
+  "theme_color": "#14532d",
+  "icons": [
+    { "src": "/icon-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512x512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
