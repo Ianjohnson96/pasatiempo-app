@@ -127,13 +127,16 @@ export async function proxy(request: NextRequest) {
   // --- 3) Staff gate: the admin area AND the hub root (the section directory)
   //        require a signed-in user. Public visitors reach the individual
   //        sections directly (/mhi, /events/…, /sombrero) — never the hub. ----
+  // Merchandise-program-only accounts (app_metadata.merch_only) count as
+  // signed out here: they sign in to /merch, never to the admin area.
+  const staff = user && !user.app_metadata?.merch_only ? user : null;
   const staffOnly = isAdminPath(internalPath) || internalPath === "/";
-  if (staffOnly && !user) {
+  if (staffOnly && !staff) {
     const redirect = url.clone();
     redirect.pathname = "/login";
     return withCookies(NextResponse.redirect(redirect));
   }
-  if (isLoginPath(internalPath) && user) {
+  if (isLoginPath(internalPath) && staff) {
     const redirect = url.clone();
     redirect.pathname = "/admin";
     return withCookies(NextResponse.redirect(redirect));

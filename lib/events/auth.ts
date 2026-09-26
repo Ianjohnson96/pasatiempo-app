@@ -16,7 +16,9 @@ export async function getViewer(): Promise<Viewer | null> {
     const {
       data: { user },
     } = await supa.auth.getUser();
-    email = user?.email?.toLowerCase() ?? null;
+    // Accounts created for the merchandise program only (see
+    // app/merch/api/people) never get into the admin area.
+    email = user && !user.app_metadata?.merch_only ? (user.email?.toLowerCase() ?? null) : null;
   } catch {
     email = null;
   }
