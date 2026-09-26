@@ -283,7 +283,7 @@ code.k{font-family:var(--mono);font-size:12px;background:var(--sunk);padding:1px
 .mini input{width:100%;border:1px solid var(--rule2);background:var(--paper);border-radius:3px;padding:5px 6px;font-family:var(--mono);font-size:12.5px;text-align:right}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:4px;font-size:13px;z-index:60;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
 @media (max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}}
-@media (max-width:1000px){.grid,.help{grid-template-columns:1fr}}
+@media (max-width:1000px){.grid,.help{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:640px){.kpis{grid-template-columns:repeat(2,1fr)}.top h1{font-size:25px}.row2,.row3,.lr,.lr3{grid-template-columns:1fr}.receive .rr{grid-template-columns:1fr 1fr}input.field-inline{width:100%}.item{grid-template-columns:5px 1fr}.item .side{grid-column:2;align-items:flex-start;flex-direction:row;padding:0 0 12px}.gl{grid-template-columns:1fr}.routine li{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 /* program pages */

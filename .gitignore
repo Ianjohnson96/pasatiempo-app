@@ -23,3 +23,6 @@ supabase/schema-mhi.sql
 
 # editor/office lock files
 ~$*
+
+# python
+__pycache__/

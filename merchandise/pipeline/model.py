@@ -176,7 +176,7 @@ def build(reports, prior=None):
 
     ly = fy - 1
     if ly not in hist_fy:
-        raise ValueError(f'No FY{ly} history: provide the full-year Sales by Category or a prior base document')
+        raise ValueError(f'Last year\'s (FY{ly}) monthly sales are missing. Load a month-end data file first, or include the full-year Sales by Category for FY{ly}.')
 
     # ----- this year's actuals -----
     closed = [k for k in fy_months(fy) if k <= actual_through]
@@ -435,7 +435,7 @@ def build_brands(ctx):
     B = defaultdict(lambda: dict(skus=0, t12=0.0, cogs12=0.0, oh=0.0, aged=0.0, ly=0, ty=0, g=0.0, c=0.0, md=0.0, units12=0,
                                  ytd=0.0, ytdly=0.0, series=defaultdict(float), cats=defaultdict(float), top=[], agedList=[]))
     unassigned = defaultdict(float)
-    for s in set(hist) | set(snap):
+    for s in sorted(set(hist) | set(snap)):  # sorted: ties in the top lists come out the same every run
         c = cat_of.get(s)
         if c not in MERCH or c in OTB_EXCLUDE:
             continue

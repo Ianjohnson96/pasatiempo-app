@@ -193,6 +193,9 @@ document.addEventListener('click', async e => {
   if (t.id === 'aCancel'){ $('#cAdjForm').innerHTML = ''; return; }
   if (ds.saveadj){ const code = ds.saveadj; if (await saveAdj(code, num($('#aAmt').value), $('#aMonth').value, $('#aNote').value.trim())){ toast('Budget changed'); setTimeout(() => openCategory(code), 350); } return; }
   if (ds.deladj){ if (!confirm('Remove this budget change?')) return; try { await db.doc(`plan/${adjKey(PLAN)}/adjustments/` + ds.deladj).delete(); toast('Change removed'); } catch (err){ writeError(err); } return; }
+  if (t.id === 'upRead') return readReports();
+  if (t.id === 'upApply') return applyReports();
+  if (t.id === 'upReset'){ upReset(); return render(); }
   if (t.id === 'iPrev') return previewImport();
   if (t.id === 'iGo') return runImport();
   if (D){
@@ -220,6 +223,7 @@ document.addEventListener('input', e => {
   if (t.id === 'bQ'){ bfilt.q = t.value; clearTimeout(document._bq); document._bq = setTimeout(() => { render(); const f = $('#bQ'); if (f){ f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 250); return; }
   if (t.id === 'fQ'){ filt.q = t.value; clearTimeout(document._q); document._q = setTimeout(() => { render(); const f = $('#fQ'); if (f){ f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 250); return; }
   if (t.dataset.cb != null || t.dataset.cc != null) return countTotalsUI();
+  if (t.id === 'upNote'){ UP.note = t.value; return; }
   if (!D) return;
   if (t.dataset.d){ D[t.dataset.d] = t.value; return updateTotals(); }
   if (t.dataset.q){ const l = D.lines.find(x => x.id === t.dataset.q); const v = Math.max(0, Math.floor(num(t.value))); if (v) l.qty[t.dataset.k] = v; else delete l.qty[t.dataset.k]; return updateTotals(); }
@@ -234,6 +238,7 @@ document.addEventListener('change', e => {
   if (t.id === 'otbCat'){ OTBV.cat = t.value; saveOTBV(); return render(); }
   if (t.dataset.wi){ if (t.value === '' || !isFinite(+t.value)) return render(); const g = t.dataset.wi; setWhatIf(g, t.dataset.k, g === 'wos' ? Math.max(1, Math.min(52, Math.round(+t.value))) : +t.value / 100); return; }
   if (t.dataset.chk){ return toggleCheck(t.dataset.chkm, t.dataset.chk, t.checked); }
+  if (t.id === 'upFiles'){ UP.files = [...t.files]; UP.error = null; UP.found = null; return render(); }
   if (!D) return;
   if (t.id === 'dVendor'){ if (t.value === '__new'){ D._addVendor = true; } else { D._addVendor = false; D.vendorId = t.value; } renderVendorBox(); return updateTotals(); }
   if (t.dataset.d){ D[t.dataset.d] = t.value; return updateTotals(); }

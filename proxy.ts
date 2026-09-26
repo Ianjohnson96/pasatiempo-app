@@ -164,7 +164,9 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
+  // api/merch/ is the Python report reader (api/merch/reports.py): it checks
+  // its own pass, and must be reached at that path on every host.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|api/merch/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
