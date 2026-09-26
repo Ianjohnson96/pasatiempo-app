@@ -166,7 +166,7 @@ function renderHelp(){
     <li><span class="when">Every order</span><span>Enter it the day you write it: vendor, delivery month, cancel date, and the lines with sizes. The budget check happens as you type.</span></li>
     <li><span class="when">Deliveries</span><span>Open the order and click <b>Record receipt</b> when the goods come in.</span></li>
     <li><span class="when">Mondays</span><span>Go through <b>To do</b>. Mark each item Done or Dismiss.</span></li>
-    <li><span class="when">Month-end</span><span>Work through the <b>Month-end</b> checklist: run the five reports and upload them to the chat with Claude. The forecast, budgets, on-hand, suggestions and brand scorecard are then refreshed.</span></li>
+    <li><span class="when">Month-end</span><span>Work through the <b>Month-end</b> checklist: run the reports and the owner uploads them on that page, PDF or Excel. The forecast, budgets, on-hand, suggestions and brand scorecard are then refreshed.</span></li>
     <li><span class="when">Each season</span><span>Review the <b>Brands</b> page before market or a buying appointment. Set your own call where you disagree.</span></li>
     <li><span class="when">Quarterly</span><span>After the count, go to <b>Inventory &amp; counts</b> and record book and counted values by category.</span></li></ul></div></section>
   <section class="panel"><div class="in"><h3>Words used on this page</h3><dl class="gl">

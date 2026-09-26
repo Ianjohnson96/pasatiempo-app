@@ -1,0 +1,6 @@
+# Python function api/merch/reports.py (the Merchandise Program's month-end report reader).
+# Keep in step with merchandise/pipeline/requirements.txt.
+pdfplumber>=0.10
+pypdf>=4.0
+openpyxl>=3.1
+xlrd>=2.0

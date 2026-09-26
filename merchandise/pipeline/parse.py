@@ -8,10 +8,15 @@ def _n(s):
     return float(s.replace(',', ''))
 
 
+# A number as the POS prints it (1,234 or 1,234.56). Spreadsheet exports may drop or add
+# the decimals, so the parsers accept either.
+NUM = r'-?[\d,]+(?:\.\d+)?'
+
+
 def parse_best100(text):
     """Cost & margin by SKU. Returns {period, rows:[...]}."""
-    period = re.search(r'for the period (\w{3}\d{2}/\d{2}) through (\w{3}\d{2}/\d{2})', text)
-    row = re.compile(r'^(\d+)\s+(\w+)\s+(.*?)\s+(-?[\d,]+)\s+(-?[\d,]+)\s+(-?[\d,]+)\s+(-?[\d.]+)%\s+(-?[\d,]+)$')
+    period = re.search(r'for the period\s+(\w{3}\d{2}/\d{2})\s+through\s+(\w{3}\d{2}/\d{2})', text)
+    row = re.compile(rf'^(\d+)\s+(\w+)\s+(.*?)\s+({NUM})\s+({NUM})\s+({NUM})\s+(-?[\d.]+)%?\s+({NUM})$')
     cat, rows = None, []
     for ln in text.splitlines():
         m = re.match(r'^0{5,}(\d+) - (.+)$', ln.strip())
@@ -32,7 +37,7 @@ def parse_sales_by_category(text):
     starts = [i for i, l in enumerate(lines) if re.match(r'^10 - ', l.strip())]
     if len(starts) > 1:
         lines = lines[starts[0]:starts[1]]
-    item = re.compile(r'^(\d+)\s+(\S+)\s+(.*?)\s+(-?[\d,]+\.\d\d)\s+(-?[\d,]+\.\d\d)\s+(-?[\d,]+\.\d\d)$')
+    item = re.compile(rf'^(\d+)\s+(\S+)\s+(.*?)\s+({NUM})\s+({NUM})\s+({NUM})$')
     cats, cat = {}, None
     for ln in lines:
         s = ln.strip()
@@ -47,12 +52,12 @@ def parse_sales_by_category(text):
         if m and cat:
             g = m.groups()
             cats[cat]['items'].append(dict(sku=g[1], desc=g[2].strip(), avg=_n(g[3]), units=_n(g[4]), value=_n(g[5])))
-    period = re.search(r'for (\w{3} \d{1,2}/\d{2}) thru (\w{3} \d{1,2}/\d{2})', text)
-    return dict(period=period.groups() if period else None, cats=cats)
+    period = re.search(r'for\s+(\w{3}\s+\d{1,2}/\d{2})\s+thru\s+(\w{3}\s+\d{1,2}/\d{2})', text)
+    return dict(period=tuple(' '.join(x.split()) for x in period.groups()) if period else None, cats=cats)
 
 
 def parse_sales_by_item(text):
-    item = re.compile(r'^(\d+)\s+(\S+)\s+(.*?)\s+(-?[\d,]+\.\d\d)\s+(-?[\d,]+\.\d\d)\s+(-?[\d,]+\.\d\d)$')
+    item = re.compile(rf'^(\d+)\s+(\S+)\s+(.*?)\s+({NUM})\s+({NUM})\s+({NUM})$')
     out = {}
     for ln in text.splitlines():
         m = item.match(ln.strip())
@@ -65,7 +70,7 @@ def parse_sales_by_item(text):
 def parse_sku_analysis(text):
     """On-hand, cost, trailing 12 months of unit sales by SKU. Month columns read from the header."""
     lines = text.splitlines()
-    as_of = re.search(r'SKU Analysis as of (\w{3}) (\d{4})', text)
+    as_of = re.search(r'SKU Analysis as of\s+(\w{3})\s+(\d{4})', text)
     mons, years = None, None
     for i, ln in enumerate(lines):
         if 'Units' in ln and 'Cost' in ln and 'Last' in ln:
@@ -81,10 +86,19 @@ def parse_sku_analysis(text):
         if m:
             cat = (m.group(1), m.group(2).strip())
             continue
-        if len(s) < 80 or not cat:
+        if not cat:
             continue
-        sku, desc, lr, ls = s[0:16].strip(), s[16:42].strip(), s[42:51].strip(), s[51:60].strip()
-        rest = s[60:].split()
+        if '\t' in s:  # a spreadsheet row: SKU, description, last received, last sale, then the numbers
+            cells = [c.strip() for c in s.strip().split('\t')]
+            if len(cells) < 19:
+                continue
+            sku, desc, lr, ls = cells[0], cells[1], cells[2].strip('-'), cells[3].strip('-')
+            rest = ['0' if c == '-' else c for c in cells[4:]]
+        else:
+            if len(s) < 80:
+                continue
+            sku, desc, lr, ls = s[0:16].strip(), s[16:42].strip(), s[42:51].strip(), s[51:60].strip()
+            rest = s[60:].split()
         if not re.match(r'^[A-Za-z0-9]+$', sku) or len(rest) < 15 or (lr and not dt.match(lr)) or (ls and not dt.match(ls)):
             continue
         try:
@@ -101,7 +115,7 @@ def parse_daily_sales(text):
     """Daily Sales Report by Item: today / month-to-date / fiscal YTD by item and category."""
     def n(s):
         return 0.0 if s == '-' else _n(s)
-    trip = r'(-|-?[\d,]+\.\d\d)\s+(-|-?[\d,]+)\s+(-|-?[\d,]+\.\d\d)'
+    trip = rf'(-|{NUM})\s+(-|{NUM})\s+(-|{NUM})'
     item = re.compile(r'^(.*?)\s+' + trip + r'\s+' + trip + r'\s+' + trip + r'$')
     tot = re.compile(r'^Total Category\s+' + trip + r'\s+' + trip + r'\s+' + trip + r'$')
     rep = re.compile(r'^Total Report\s+' + trip + r'\s+' + trip + r'\s+' + trip + r'$')
@@ -132,7 +146,7 @@ def parse_daily_sales(text):
         if s and not s.startswith(('=', '-', 'Pasatiempo', 'Daily Sales', 'For ', 'Units', 'Amount', 'Total Report', 'September', 'October',
                                    'November', 'December', 'January', 'February', 'March', 'April', 'May ', 'June', 'July', 'August')) and 'T O D A Y' not in s:
             pend = s
-    d = re.search(r'For (\w{3}) (\d{1,2})/(\d{2})', text)
+    d = re.search(r'For\s+(\w{3})\s+(\d{1,2})/(\d{2})', text)
     date = f'20{d.group(3)}-{MON[d.group(1)]:02d}-{int(d.group(2)):02d}' if d else None
     return dict(date=date, cats=cats, report=report)
 
@@ -142,7 +156,7 @@ def parse_rounds(text):
     out, label = {}, None
     num = r'((?:\s*(?:-|[\d,]+)){13})\s*$'
     for ln in text.splitlines():
-        m = re.match(r'^(.+?)\s{2,}Weekdays\s+' + num, ln.rstrip())
+        m = re.match(r'^(.+?)(?:\s{2,}|\t)Weekdays\s+' + num, ln.rstrip())
         if m:
             label = m.group(1).strip()
             continue

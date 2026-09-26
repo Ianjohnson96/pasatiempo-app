@@ -8,7 +8,8 @@ interface Bundle {
   docs: Record<string, unknown>;
 }
 
-// Owner page: load a month-end data file (built by merchandise/pipeline/refresh.py).
+// Owner page: load a month-end data file (built by merchandise/pipeline/refresh.py). The usual
+// monthly route is the report upload on the program's Month-end page (api/merch/reports.py).
 export default function DataLoader({ base, peopleHref }: { base: string; peopleHref: string | null }) {
   const [bundle, setBundle] = useState<Bundle | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -58,6 +59,9 @@ export default function DataLoader({ base, peopleHref }: { base: string; peopleH
         <h2>Load month-end data</h2>
         <p className="m-note" style={{ marginTop: 0 }}>
           Load a Merchandise Program data file (.json): the forecast base, stock, suggestions and brand scorecard. It replaces those parts of the program. Orders, vendors, counts, budget changes and brand calls are never touched.
+        </p>
+        <p className="m-note">
+          Each month, the simpler way is to upload the POS reports (PDF or Excel) on the program&apos;s <b>Month-end</b> page. Use this page for a data file built outside the app.
         </p>
         {msg && <p className={msg.ok ? "m-ok" : "m-error"}>{msg.text}</p>}
         <input type="file" accept=".json,application/json" onChange={(e) => pick(e.target.files?.[0])} />

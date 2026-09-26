@@ -5,5 +5,11 @@
       "path": "/api/cron/caddie",
       "schedule": "0 1 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "api/merch/reports.py": {
+      "maxDuration": 60,
+      "includeFiles": "merchandise/pipeline/**"
+    }
+  }
 }

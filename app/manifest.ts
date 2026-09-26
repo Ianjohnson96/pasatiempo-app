@@ -1,12 +1,12 @@
 import type { MetadataRoute } from "next";
 
-// Installable app identity: red Pasatiempo EVENTS icon (matches the
+// Installable app identity: red Pasatiempo APP icon (matches the
 // scheduler's icon style — club emblem on a rounded tile).
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Pasatiempo Events",
-    short_name: "Events",
-    description: "Event registration for Pasatiempo Golf Club",
+    name: "Pasatiempo App",
+    short_name: "Pasatiempo",
+    description: "Pasatiempo Golf Club apps",
     start_url: "/",
     display: "standalone",
     background_color: "#f6f2e9",

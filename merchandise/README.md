@@ -3,10 +3,11 @@
 The Pro Shop's forecast, open-to-buy (OTB), order book and brand scorecard. It runs as a section of this club app at `/merch` (its own domain can be added in `lib/sections.ts`). Staff sign in with an email and password the owner sets. Nobody needs a Claude account.
 
 ```
-pipeline/     POS report PDFs  ->  month-end documents and a loadable data file (Python)
+pipeline/     POS reports (PDF, Excel or CSV)  ->  month-end documents and a loadable data file (Python)
 app/src/      the program page: plain HTML/JS, one file per area
 app/host/     club-shim.js: backs the page's database and user with the club app
 app/build.py  optional standalone single-file build of the page, with data embedded
+../api/merch/reports.py   the pipeline as a Vercel Python function, for the Month-end page's upload
 ```
 
 The page is served by `app/merch/route.ts`. It assembles `app/src` with the shim at request time (see `lib/merch/page.ts`). All data lives in the hub Supabase project's `merch` schema (`supabase/migration-merch-schema.sql`): one row per JSON document, addressed by path, e.g. `pos/{id}`, `vendors/{id}` or `base/current`. The browser reads and writes documents only through `/merch/api/db`. It polls every 15 seconds and again when the tab comes back into view. Every write is checked against the rules in `lib/merch/rules.ts`. POS reports and generated data are git-ignored.
@@ -15,7 +16,7 @@ The page is served by `app/merch/route.ts`. It assembles `app/src` with the shim
 
 | Role | Can |
 |---|---|
-| owner | everything, including the forecast (`plan/…`), budget changes, brand calls and month-end data (`/merch/admin`) |
+| owner | everything, including the forecast (`plan/…`), budget changes, brand calls and month-end data (the Month-end upload, or `/merch/admin`) |
 | staff | orders, receipts, vendors, subcategories, counts, to-do states, month-end checklist |
 | viewer | read only |
 
@@ -25,7 +26,7 @@ Roles are granted per app on the hub's **People & access** page (`/admin/people`
 
 1. Run `supabase/migration-merch-schema.sql` in the hub project. Then add `merch` under Settings → API → Exposed schemas.
 2. For now the program is served by path at `pasatiempo-app.vercel.app/merch`. To give it its own domain later, add the domain to the Vercel project and list it under the `merch` entry in `lib/sections.ts`.
-3. Sign in at that address. Open **More → Load month-end data** and load the latest data file. Add staff on `/admin/people`.
+3. Sign in at that address. Open **More → Load month-end data** and load the latest data file. Add staff on `/admin/people`. After that, each month's reports are uploaded on the Month-end page.
 
 ## Pages
 
@@ -56,15 +57,26 @@ Fiscal year: May 1 – Apr 30. Sales are at retail. Stock and budgets are at cos
 
 ## Month-end refresh
 
-1. Pull the five month-end reports (see the Month-end page): SKU Analysis, Daily Sales Report by Item, Sales by Category (FYTD), Sales by Item (FYTD), BEST 100 cost & margin (FYTD). Also pull the Yearly Rounds Summary when it's available.
-2. Export last month's documents from `merch.docs` into a prior folder: `base/current` → `base.json`; `skuhist/FY…`, `skuhist/meta` → `skuhist_FY2027.json`, `skuhist_meta.json`, …; and `plan/assumptions` → `assumptions.json` if it exists.
-3. Run:
+1. Pull the month-end reports (see the Month-end page): SKU Analysis, Daily Sales Report by Item, Sales by Item (FYTD) and BEST 100 cost & margin (FYTD). The checklist also lists Sales by Category (FYTD), which is kept for the record; only a full-year Sales by Category changes the forecast. Add the Yearly Rounds Summary when it's available. Excel exports read in seconds; PDFs take up to a minute.
+2. As the owner, open **Month-end → Update from this month's reports** and choose all the files at once. The report type is detected from each file's contents, so file names don't matter.
+3. The page shows how each file was read, any warnings (a missing report, or data older than what's loaded), and the new numbers next to the current ones. Nothing changes until **Update the program**, which loads the new data file through `/merch/api/import`.
+
+How it runs: the page gets a 15-minute pass and last month's documents (`base/current`, `skuhist/…`, `plan/assumptions`) from `/merch/api/refresh`. It posts them with the files to `/api/merch/reports`, a Python function that runs `pipeline/refresh.py`. The pass is signed with a key derived from `SUPABASE_SERVICE_ROLE_KEY` (`lib/merch/ticket.ts`), so no other secret is needed. Uploads are limited to 3.2 MB per batch. `next dev` doesn't serve the Python function; use `vercel dev` to try the upload locally.
+
+The spreadsheet reader turns each row into a tab-separated line with numbers and dates written as the printout shows them, so one set of parsers reads PDF, Excel and CSV. It was checked against Excel, `.xls` and CSV copies of the September 2026 PDFs. If the POS's own exports are laid out differently, a file is reported as "no rows could be read" and the PDF still works.
+
+To run the refresh by hand instead:
+
+1. Export last month's documents from `merch.docs` into a prior folder: `base/current` → `base.json`; `skuhist/FY…`, `skuhist/meta` → `skuhist_FY2027.json`, `skuhist_meta.json`, …; and `plan/assumptions` → `assumptions.json` if it exists.
+2. Run:
    ```
    pip install -r pipeline/requirements.txt
    python pipeline/refresh.py data/reports data/out --prior data/prior --note "October close"
    ```
-   The report type is detected from each PDF's text, so file names don't matter. On a first build with no prior folder, include the full-year Sales by Category, Sales by Item and April SKU Analysis for last fiscal year.
-4. Load `data/out/Merchandise_Program_Data_<asOf>.json` on **More → Load month-end data** (`/merch/admin`). A data file can only replace `base`, `inventory`, `insights`, `brands`, `refreshes` and `skuhist`. Orders, vendors, counts, budget changes and brand calls are never touched. Items marked done or dismissed stay that way, because `istate` is keyed by item id.
+   On a first build with no prior folder, include the full-year Sales by Category, Sales by Item and April SKU Analysis for last fiscal year.
+3. Load `data/out/Merchandise_Program_Data_<asOf>.json` on **More → Load month-end data** (`/merch/admin`).
+
+Either way, a data file can only replace `base`, `inventory`, `insights`, `brands`, `refreshes` and `skuhist`. Orders, vendors, counts, budget changes and brand calls are never touched. Items marked done or dismissed stay that way, because `istate` is keyed by item id.
 
 ## Planning constants
 
