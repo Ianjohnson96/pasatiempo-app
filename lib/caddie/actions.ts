@@ -1427,24 +1427,18 @@ export async function saveCaddie(input: CaddieInput): Promise<Result<CaddieRec>>
     }
     const email = input.email.trim().toLowerCase() || null;
 
-    // Mirrors caddies_reachable_chk. Checked here so the caddie sees a sentence
+    // Mirrors caddies_reachable_chk. Checked here so the shop sees a sentence
     // rather than a constraint name.
-    const reachable =
-      input.preferredContactMethod === "SMS"
-        ? !!phone
-        : input.preferredContactMethod === "Email"
-          ? !!email
-          : !!phone || !!email;
-    if (!reachable) {
-      return {
-        ok: false,
-        error:
-          input.preferredContactMethod === "SMS"
-            ? "A caddie contacted by SMS needs a phone number."
-            : input.preferredContactMethod === "Email"
-              ? "A caddie contacted by email needs an email address."
-              : "Add a phone number or an email address.",
-      };
+    //
+    // Contact details are optional: caddies sign in by QR code and hear about
+    // loops by push, so a name alone is a working roster entry. Only a chosen
+    // channel with nothing behind it is refused — "contact by SMS" with no
+    // number is a broken setting, not a missing detail.
+    if (input.preferredContactMethod === "SMS" && !phone) {
+      return { ok: false, error: "A caddie contacted by SMS needs a phone number." };
+    }
+    if (input.preferredContactMethod === "Email" && !email) {
+      return { ok: false, error: "A caddie contacted by email needs an email address." };
     }
 
     const supa = createAdminClient("caddie");
