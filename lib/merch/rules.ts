@@ -16,6 +16,7 @@ const OWNER_ONLY = new Set([
   "brandCalls",
   "refreshes",
   "skuhist",
+  "remindersSent",
 ]);
 
 // Collections a month-end data file may replace. Everything people enter by
@@ -23,7 +24,8 @@ const OWNER_ONLY = new Set([
 export const IMPORTABLE = new Set(["base", "inventory", "insights", "brands", "refreshes", "skuhist"]);
 
 // Collections the page never needs; kept out of the initial load.
-export const NOT_LOADED = new Set(["skuhist"]);
+// remindersSent/{date} marks a day's reminder email as sent (app/api/cron/merch).
+export const NOT_LOADED = new Set(["skuhist", "remindersSent"]);
 
 const SEGMENT = /^[A-Za-z0-9_.~:@+-]{1,200}$/;
 

@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/caddie",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/merch",
+      "schedule": "0 15 * * *"
     }
   ],
   "functions": {

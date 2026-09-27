@@ -110,7 +110,8 @@ function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = fals
 function closeOverlay(){ $('#overlay').innerHTML = ''; D = null; DX = null; }
 
 /* ---------- render + mode ---------- */
-const PAGES = {overview: renderOverview, forecast: renderForecast, otb: renderOTB, orders: renderOrders, brands: renderBrands, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, help: renderHelp};
+const PAGES = {overview: renderOverview, forecast: renderForecast, otb: renderOTB, orders: renderOrders, brands: renderBrands, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
+if (location.hash === '#reports' && RPT){ TAB = 'reports'; history.replaceState(null, '', location.pathname + location.search); }  // the reminder email's link
 function render(){
   if (!BASE && !LEGACY_PLAN){
     $('.monthbar').hidden = true; $('#summary').hidden = true; $('#kpis').hidden = true; $('#tabs').innerHTML = '';
@@ -124,6 +125,7 @@ function render(){
   if (bar) renderMonths();
   if (TAB === 'overview'){ renderSummary(S); renderKpis(S); }
   renderTabs(S);
+  if (RPT) renderDueBar();
   const w = $('#wibar'); w.hidden = !WHATIF || TAB === 'forecast';
   if (WHATIF) w.innerHTML = `<span><b>What-if in use.</b> Budgets on every page reflect forecast changes that aren't saved.</span><span style="display:flex;gap:8px"><button class="btn sm" type="button" data-tab="forecast">Review</button><button class="btn sm" type="button" data-fc="discard">Discard</button></span>`;
   const scrollY = window.scrollY;

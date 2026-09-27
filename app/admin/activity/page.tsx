@@ -47,6 +47,7 @@ function describe(r: Row, who: (e: string | null) => string): string {
     case "site.off": return `switched off ${SITES[r.target as keyof typeof SITES]?.label ?? r.target}`;
     case "site.on": return `switched on ${SITES[r.target as keyof typeof SITES]?.label ?? r.target}`;
     case "merch.data_loaded": return `loaded month-end data (${d.documents} documents)${d.note ? ` — ${d.note}` : ""}`;
+    case "merch.reminder_sent": return `emailed the report reminder to ${d.to} ${d.to === 1 ? "person" : "people"} (${d.periods})${d.failed ? `; ${d.failed} didn't go` : ""}`;
     default: return r.action;
   }
 }

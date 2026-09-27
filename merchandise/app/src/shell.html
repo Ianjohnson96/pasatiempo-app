@@ -287,6 +287,13 @@ code.k{font-family:var(--mono);font-size:12px;background:var(--sunk);padding:1px
 @media (max-width:640px){.kpis{grid-template-columns:repeat(2,1fr)}.top h1{font-size:25px}.row2,.row3,.lr,.lr3{grid-template-columns:1fr}.receive .rr{grid-template-columns:1fr 1fr}input.field-inline{width:100%}.item{grid-template-columns:5px 1fr}.item .side{grid-column:2;align-items:flex-start;flex-direction:row;padding:0 0 12px}.gl{grid-template-columns:1fr}.routine li{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 /* program pages */
+.duebar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;color:var(--ink)}
+.duebar.late{border-left-color:var(--brick);background:var(--tint-stop)}
+.rstat{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;padding:2px 7px;border-radius:2px;white-space:nowrap}
+.rstat.upcoming{background:var(--tint-fog);color:var(--fog)}
+.rstat.due{background:var(--tint-warn);color:var(--ochre)}
+.rstat.overdue{background:var(--tint-stop);color:var(--brick)}
+.rstat.done{background:var(--tint-go);color:var(--cypress)}
 .wibar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;border-left-color:var(--fog);color:var(--ink)}
 .months.years button{min-width:84px}
 .months.years:empty{display:none}

@@ -35,9 +35,18 @@ const inline = (v: unknown) => JSON.stringify(v).replace(/</g, "\\u003c").replac
 
 const EMPTY = { base: null, plan: null, brands: null, inventory: { asOf: "", cats: {} }, insights: { asOf: "", items: [] } };
 
-export function programHtml(viewer: MerchViewer, members: Record<string, string>, base: string): string {
+/** The reporting calendar as the page shows it (lib/merch/schedule.ts): today's open checklists and what's next. */
+export interface ReportsForPage {
+  today: string;
+  periods: unknown[];
+  upcoming: unknown[];
+  cadences: Record<string, string>;
+  emailOn: boolean;
+}
+
+export function programHtml(viewer: MerchViewer, members: Record<string, string>, base: string, reports?: ReportsForPage): string {
   const p = parts();
-  const host = { base, me: viewer, members };
+  const host = { base, me: viewer, members, reports: reports ?? null };
   return `<!doctype html>
 <html lang="en">
 <head>
