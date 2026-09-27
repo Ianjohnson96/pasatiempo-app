@@ -1,0 +1,507 @@
+/* ==========================================================================
+   The club hub — the staff dashboard at /admin, front door to every app.
+
+   Imported by app/admin/page.tsx alone. globals.css is shared by admin,
+   caddie, events and login, so nothing here may live there: a hub tweak must
+   never move a button on the dispatch board.
+
+   The palette comes off the crest rather than a colour picker: the palm's
+   olive, the trunk's sand, the sombrero's red, on the cream the club already
+   prints on. Red is used once — it is a hat, not a theme.
+   ========================================================================== */
+
+.hub {
+  --hub-olive: #4b5a33;
+  --hub-olive-deep: #2f3a20;
+  --hub-sand: #b8966a;
+  --hub-sand-soft: #e7d9c3;
+  --hub-red: #b3262c;
+  --hub-cream: #f6f2e9;
+  --hub-paper: #fffdf8;
+  --hub-ink: #1f2419;
+  --hub-muted: #6b6a5c;
+  --hub-line: #e4dccb;
+  --hub-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  min-height: 100vh;
+  background: var(--hub-cream);
+  color: var(--hub-ink);
+}
+
+/* ---- Hero --------------------------------------------------------------- */
+
+.hub-hero {
+  position: relative;
+  isolation: isolate;
+  min-height: 360px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.hub-hero-img {
+  object-fit: cover;
+  object-position: center 58%;
+  z-index: -2;
+  /* A slow settle on arrival, so the page opens rather than appears. */
+  animation: hub-settle 1.6s var(--hub-ease) both;
+}
+
+.hub-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    180deg,
+    rgba(20, 26, 14, 0.05) 0%,
+    rgba(20, 26, 14, 0.25) 45%,
+    rgba(20, 26, 14, 0.82) 100%
+  );
+}
+
+.hub-hero-inner {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 88px 24px 40px;
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  color: #fff;
+}
+
+.hub-crest {
+  flex: none;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: var(--hub-paper);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+  animation: hub-rise 0.8s var(--hub-ease) 0.15s both;
+}
+
+.hub-eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--hub-sand-soft);
+  animation: hub-rise 0.8s var(--hub-ease) 0.25s both;
+}
+
+.hub-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(34px, 5vw, 50px);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
+  animation: hub-rise 0.8s var(--hub-ease) 0.32s both;
+}
+
+.hub-sub {
+  margin: 10px 0 0;
+  max-width: 520px;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.86);
+  animation: hub-rise 0.8s var(--hub-ease) 0.4s both;
+}
+
+/* ---- Body --------------------------------------------------------------- */
+
+.hub-main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 36px 24px 56px;
+}
+
+.hub-section-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 18px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--hub-muted);
+}
+.hub-section-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--hub-line);
+}
+
+/* auto-fill rather than auto-fit: someone with access to one app gets one
+   tile at a normal size, not a single card stretched across the page. */
+.hub-grid {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+/* ---- Tiles -------------------------------------------------------------- */
+
+.hub-tile {
+  --i: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--hub-paper);
+  border: 1px solid var(--hub-line);
+  box-shadow:
+    0 1px 2px rgba(47, 58, 32, 0.06),
+    0 8px 24px rgba(47, 58, 32, 0.07);
+  transform: translateY(0) scale(1);
+  transition:
+    transform 0.35s var(--hub-ease),
+    box-shadow 0.35s var(--hub-ease),
+    border-color 0.35s var(--hub-ease);
+  /* Tiles arrive one after another rather than all at once.
+     `backwards`, not `both`: a filled-forward animation keeps its last
+     keyframe's transform applied for good, and an animation outranks the
+     :hover and :active rules below — so `both` silently cancelled the lift and
+     the press. `backwards` holds the start state through the stagger delay,
+     then lets go once the tile has arrived. */
+  animation: hub-rise 0.7s var(--hub-ease) calc(0.45s + var(--i) * 0.08s)
+    backwards;
+  -webkit-tap-highlight-color: transparent;
+}
+.hub-tile:hover {
+  transform: translateY(-5px);
+  border-color: var(--hub-sand-soft);
+  box-shadow:
+    0 2px 4px rgba(47, 58, 32, 0.07),
+    0 22px 44px rgba(47, 58, 32, 0.16);
+}
+/* The press: a quick give under the finger, so a tap feels like it landed
+   before the next page has had time to load. Keyed on the link rather than
+   the tile, so pressing the site switch inside a tile does not also squash
+   the tile as though it were leaving the page. */
+.hub-tile:has(.hub-tile-link:active) {
+  transform: translateY(-1px) scale(0.985);
+  transition-duration: 0.09s;
+}
+.hub-tile:has(.hub-tile-link:focus-visible) {
+  outline: 3px solid var(--hub-sand);
+  outline-offset: 3px;
+}
+
+/* The whole tile is the link, but not literally: a tile can hold the super
+   admin's site switch, and a button inside a link is invalid and eats clicks.
+   So the title's link is stretched over the card, and the controls sit above
+   the stretch where they stay clickable in their own right. */
+.hub-tile-link {
+  color: inherit;
+  text-decoration: none;
+}
+.hub-tile-link:hover {
+  text-decoration: none;
+}
+.hub-tile-link:focus-visible {
+  outline: none;
+}
+.hub-tile-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.hub-tile-controls {
+  position: relative;
+  z-index: 2;
+}
+
+.hub-tile-media {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--hub-sand-soft);
+}
+.hub-tile-img {
+  object-fit: cover;
+  transform: scale(1.001);
+  transition: transform 0.9s var(--hub-ease);
+}
+.hub-tile:hover .hub-tile-img {
+  transform: scale(1.06);
+}
+.hub-tile-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 55%,
+    rgba(20, 26, 14, 0.35) 100%
+  );
+  pointer-events: none;
+}
+
+.hub-tag {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 1;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(255, 253, 248, 0.92);
+  color: var(--hub-olive-deep);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.hub-tag.staff {
+  background: var(--hub-olive);
+  color: #fff;
+}
+
+.hub-tile-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+}
+
+.hub-tile-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 23px;
+  line-height: 1.2;
+  color: var(--hub-ink);
+}
+
+.hub-tile-desc {
+  margin: 6px 0 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--hub-muted);
+}
+
+.hub-tile-cta {
+  margin-top: auto;
+  padding-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--hub-olive);
+}
+.hub-tile-cta .arrow {
+  display: inline-block;
+  transition: transform 0.35s var(--hub-ease);
+}
+.hub-tile:hover .hub-tile-cta .arrow {
+  transform: translateX(5px);
+}
+
+/* Wraps, so a long title with two badges ("super admin", "reports overdue")
+   drops the badges to their own line instead of clipping the second one
+   against the card's edge. */
+.hub-tile-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px 10px;
+}
+.hub-tile-badges {
+  flex: none;
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+/* The live numbers, where the old rows had them — just calmer. */
+.hub-stats {
+  display: flex;
+  gap: 22px;
+  margin-top: 14px;
+}
+.hub-stat .num {
+  font-family: var(--serif);
+  font-size: 26px;
+  line-height: 1;
+  color: var(--hub-olive-deep);
+}
+.hub-stat .lbl {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--hub-muted);
+}
+
+.hub-meta {
+  margin: 12px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 12.5px;
+  color: var(--hub-muted);
+}
+.hub-meta .warn {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.hub-tile-foot {
+  margin-top: auto;
+  padding-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.hub-tile-foot .hub-tile-cta {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.hub-notice {
+  margin: 0 0 20px;
+}
+.hub-footnote {
+  margin: 26px 0 0;
+  font-size: 13px;
+  color: var(--hub-muted);
+}
+
+/* ---- Footer ------------------------------------------------------------- */
+
+.hub-foot {
+  margin-top: 40px;
+  padding-top: 22px;
+  border-top: 1px solid var(--hub-line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--hub-muted);
+}
+.hub-foot-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hub-admin-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--hub-line);
+  background: var(--hub-paper);
+  color: var(--hub-olive-deep);
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background 0.25s var(--hub-ease),
+    border-color 0.25s var(--hub-ease),
+    transform 0.09s var(--hub-ease);
+}
+.hub-admin-link:hover {
+  text-decoration: none;
+  background: #fff;
+  border-color: var(--hub-sand);
+}
+.hub-admin-link:active {
+  transform: scale(0.97);
+}
+.hub-admin-link:focus-visible {
+  outline: 3px solid var(--hub-sand);
+  outline-offset: 2px;
+}
+
+/* The one use of the sombrero's red. */
+.hub-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--hub-red);
+}
+
+/* ---- Motion ------------------------------------------------------------- */
+
+@keyframes hub-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hub-settle {
+  from {
+    transform: scale(1.06);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* Motion is decoration here, never information, so it goes entirely for
+   anyone who has asked their device for less of it. */
+@media (prefers-reduced-motion: reduce) {
+  .hub *,
+  .hub *::before,
+  .hub *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .hub-tile:hover,
+  .hub-tile:has(.hub-tile-link:active),
+  .hub-tile:hover .hub-tile-img {
+    transform: none;
+  }
+}
+
+/* ---- Small screens ------------------------------------------------------ */
+
+@media (max-width: 720px) {
+  .hub-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .hub-hero {
+    min-height: 300px;
+  }
+  .hub-hero-inner {
+    padding: 72px 16px 28px;
+    gap: 14px;
+  }
+  .hub-crest {
+    width: 60px;
+    height: 60px;
+  }
+  .hub-main {
+    padding: 26px 16px 44px;
+  }
+  .hub-foot {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -1,16 +1,23 @@
+import "../hub.css";
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createAdminClient, createHubClient } from "@/lib/supabase/admin";
 import { getPerson, hasApp, isAppAdmin, roleIn, signedInEmail } from "@/lib/hub/access";
 import { APPS, type AppKey, type SiteKey } from "@/lib/hub/apps";
+import HubTile from "@/components/hub/HubTile";
 import SiteSwitch from "@/components/hub/SiteSwitch";
 import { reportStatus } from "@/lib/merch/reminders";
 import { pacificToday } from "@/lib/merch/schedule";
 
 // Staff dashboard — one home for every Pasatiempo app. The proxy makes sure
-// someone is signed in; each row below appears only for people with access to
+// someone is signed in; each tile below appears only for people with access to
 // that app (lib/hub/access.ts). The super admin also sees the public-site
 // switches and People & access.
+//
+// Every tile carries a photograph of the course rather than an icon. The club
+// is the brand, and a hub that looks like any other dashboard tells staff
+// nothing about where they are.
 export const dynamic = "force-dynamic";
 
 async function eventsStats() {
@@ -108,8 +115,12 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
   const siteSwitch = (key: SiteKey) => (isSuper ? <SiteSwitch site={key} enabled={sites[key] !== false} /> : null);
   const nothing = !see("events") && !see("caddie") && !see("merch") && !isSuper;
 
+  // Stagger index, counted over the tiles actually shown so the arrival
+  // animation never pauses for one this person cannot see.
+  let order = 0;
+
   return (
-    <>
+    <div className="hub">
       <div className="appbar">
         <div className="appbar-inner">
           <Link href="/admin" className="brand">
@@ -138,161 +149,181 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
         </div>
       </div>
 
-      <main className="container">
-        <div className="page-head">
+      <header className="hub-hero">
+        <Image
+          src="/sombrero/email/horserace.jpg"
+          alt="Morning light across a green at Pasatiempo"
+          fill
+          priority
+          sizes="100vw"
+          className="hub-hero-img"
+        />
+        <div className="hub-hero-inner">
+          <div className="hub-crest">
+            <Image src="/logo-mark.png" alt="" width={56} height={56} />
+          </div>
           <div>
-            <h1>Dashboard</h1>
-            <div className="sub">
-              {isSuper ? "Super admin — every Pasatiempo app, the public sites, and who can use what." : "The Pasatiempo apps you have access to."}
-            </div>
+            <p className="hub-eyebrow">Pasatiempo Golf Club</p>
+            <h1 className="hub-title">Club Hub</h1>
+            <p className="hub-sub">
+              {isSuper
+                ? "Super admin — every Pasatiempo app, the public sites, and who can use what."
+                : "The Pasatiempo apps you have access to."}
+            </p>
           </div>
         </div>
+      </header>
 
-        {denied && DENIED[denied] && <div className="notice" style={{ marginBottom: 16 }}>{DENIED[denied]}</div>}
+      <main className="hub-main">
+        {denied && DENIED[denied] && <div className="notice hub-notice">{DENIED[denied]}</div>}
         {nothing && (
-          <div className="notice" style={{ marginBottom: 16 }}>
+          <div className="notice hub-notice">
             You&apos;re signed in, but no app has been shared with you yet. Ask the person who runs the app to add you.
           </div>
         )}
 
-        <div className="evlist">
+        {!nothing && <h2 className="hub-section-label">Your apps</h2>}
+
+        <div className="hub-grid">
           {ev && (
-            <div className="evrow">
-              <div className="ev-main">
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <span className="ev-title">Event Planner</span>
-                  {role("events")}
-                </div>
-                <div className="ev-meta">
-                  <span>schema: events</span>
-                  {!ev.ok && <span style={{ color: "var(--danger)" }}>⚠︎ unreachable</span>}
-                </div>
-              </div>
-              <div className="ev-count">
-                <div className="num">{ev.events}</div>
-                <div className="lbl">events</div>
-              </div>
-              <div className="ev-count">
-                <div className="num">{ev.regs}</div>
-                <div className="lbl">signups</div>
-              </div>
-              {siteSwitch("events")}
-              <Link href="/admin/events" className="btn secondary small">
-                Manage
-              </Link>
-            </div>
+            <HubTile
+              index={order++}
+              href="/admin/events"
+              title="Event Planner"
+              desc="Club events and clinics — registrations, rosters and financials."
+              tag="Members"
+              img="/sombrero/img/course-green.jpg"
+              focus="center 60%"
+              badge={role("events")}
+              stats={[
+                { num: ev.events, lbl: "events" },
+                { num: ev.regs, lbl: "signups" },
+              ]}
+              meta={!ev.ok ? <span className="warn">⚠︎ Couldn&apos;t reach the database</span> : null}
+              cta="Manage"
+              controls={siteSwitch("events")}
+            />
           )}
 
           {cad && (
-            <div className="evrow">
-              <div className="ev-main">
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <span className="ev-title">Caddie Program</span>
-                  {role("caddie")}
-                </div>
-                <div className="ev-meta">
-                  <span>schema: caddie</span>
-                  <span>caddies sign in separately at /caddie</span>
-                  {!cad.ok && <span style={{ color: "var(--danger)" }}>⚠︎ unreachable</span>}
-                </div>
-              </div>
-              <div className="ev-count">
-                <div className="num">{cad.caddies}</div>
-                <div className="lbl">caddies</div>
-              </div>
-              <div className="ev-count">
-                <div className="num">{cad.open}</div>
-                <div className="lbl">open loops</div>
-              </div>
-              <Link href="/admin/caddie" className="btn secondary small">
-                Manage
-              </Link>
-            </div>
+            <HubTile
+              index={order++}
+              href="/admin/caddie"
+              title="Caddie Program"
+              desc="Post loops, reach the roster and see who is free — without ringing round."
+              tag="Staff"
+              staffTag
+              img="/sombrero/img/course-bunkers.jpg"
+              focus="center 45%"
+              badge={role("caddie")}
+              stats={[
+                { num: cad.caddies, lbl: "caddies" },
+                { num: cad.open, lbl: "open loops" },
+              ]}
+              meta={
+                <>
+                  <span>Caddies sign in separately at /caddie</span>
+                  {!cad.ok && <span className="warn">⚠︎ Couldn&apos;t reach the database</span>}
+                </>
+              }
+              cta="Manage"
+            />
           )}
 
           {see("merch") && (
-            <div className="evrow">
-              <div className="ev-main">
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <span className="ev-title">Merchandise Program</span>
+            <HubTile
+              index={order++}
+              // A full page load rather than a client-side hop: the
+              // Merchandise Program is its own app with its own styles.
+              hard
+              href={reports.length ? "/merch#reports" : "/merch"}
+              title="Merchandise Program"
+              desc="Forecast, open-to-buy, orders and the brand scorecard."
+              tag="Pro Shop"
+              // The clubhouse — where the shop is.
+              img="/sombrero/img/course-wide.jpg"
+              focus="center 48%"
+              badge={
+                <>
                   {role("merch")}
-                  {!!reports.length && <span className={"badge " + (reportsLate ? "closed" : "full")}>{reportsLate ? "reports overdue" : "reports due"}</span>}
-                </div>
-                <div className="ev-meta">
-                  {reports.length ? (
-                    reports.map((r) => (
+                  {!!reports.length && (
+                    <span className={"badge " + (reportsLate ? "closed" : "full")}>
+                      {reportsLate ? "reports overdue" : "reports due"}
+                    </span>
+                  )}
+                </>
+              }
+              meta={
+                reports.length
+                  ? reports.map((r) => (
                       <span key={r.period.key}>
                         {r.period.label}: {r.left} left
                       </span>
                     ))
-                  ) : (
-                    <>
-                      <span>schema: merch</span>
-                      <span>forecast, open-to-buy, orders, brand scorecard</span>
-                    </>
-                  )}
-                </div>
-              </div>
-              <a href={reports.length ? "/merch#reports" : "/merch"} className="btn secondary small">
-                {reports.length ? "Reports" : "Open"}
-              </a>
-            </div>
+                  : null
+              }
+              cta={reports.length ? "Open reports" : "Open"}
+            />
           )}
 
           {mhi && (
-            <div className="evrow">
-              <div className="ev-main">
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <span className="ev-title">Marion Hollins Invitational</span>
-                  <span className="badge gray">public site</span>
-                </div>
-                <div className="ev-meta">
-                  <span>schema: mhi</span>
-                  <span>roster edited in Supabase for now</span>
-                  {!mhi.ok && <span style={{ color: "var(--danger)" }}>⚠︎ unreachable</span>}
-                </div>
-              </div>
-              <div className="ev-count">
-                <div className="num">{mhi.teams}</div>
-                <div className="lbl">teams</div>
-              </div>
-              <div className="ev-count">
-                <div className="num">{mhi.players}</div>
-                <div className="lbl">players</div>
-              </div>
-              {siteSwitch("mhi")}
-              <a href="/mhi" target="_blank" rel="noopener noreferrer" className="btn secondary small">
-                View site ↗
-              </a>
-            </div>
+            <HubTile
+              index={order++}
+              external
+              href="/mhi"
+              title="Marion Hollins Invitational"
+              desc="The tournament site — schedule, flights, formats and the Horse Race."
+              tag="Public site"
+              // Hollins herself rather than another fairway: the event carries
+              // her name, and the only black-and-white photo on the page marks
+              // it as the heritage one. Portrait, so the crop sits high.
+              img="/mhi/images/mh-swing.avif"
+              focus="center 18%"
+              stats={[
+                { num: mhi.teams, lbl: "teams" },
+                { num: mhi.players, lbl: "players" },
+              ]}
+              meta={
+                <>
+                  <span>Roster edited in Supabase for now</span>
+                  {!mhi.ok && <span className="warn">⚠︎ Couldn&apos;t reach the database</span>}
+                </>
+              }
+              cta="View site"
+              controls={siteSwitch("mhi")}
+            />
           )}
 
           {isSuper && (
-            <div className="evrow">
-              <div className="ev-main">
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <span className="ev-title">El Sombrero</span>
-                  <span className="badge gray">public site</span>
-                </div>
-                <div className="ev-meta">
-                  <span>Men&apos;s Club info page</span>
-                  <span>edited in code (app/sombrero)</span>
-                </div>
-              </div>
-              {siteSwitch("sombrero")}
-              <a href="/sombrero" target="_blank" rel="noopener noreferrer" className="btn secondary small">
-                View site ↗
-              </a>
-            </div>
+            <HubTile
+              index={order++}
+              external
+              href="/sombrero"
+              title="El Sombrero"
+              desc="The Men’s Club event page — schedule, format and details."
+              tag="Public site"
+              img="/sombrero/email/altshot.jpg"
+              focus="center 55%"
+              meta={<span>Edited in code (app/sombrero)</span>}
+              cta="View site"
+              controls={siteSwitch("sombrero")}
+            />
           )}
         </div>
 
         {isSuper && (
-          <p className="muted" style={{ marginTop: 22, fontSize: 13 }}>
+          <p className="hub-footnote">
             A public site that&apos;s switched off shows visitors a &ldquo;not available&rdquo; page. You still see it, so you can check it before switching it back on.
           </p>
         )}
+
+        <footer className="hub-foot">
+          <span className="hub-foot-note">
+            <span className="hub-dot" aria-hidden />
+            Pasatiempo Golf Club · Santa Cruz, California
+          </span>
+        </footer>
       </main>
-    </>
+    </div>
   );
 }
