@@ -126,15 +126,19 @@ def prior_from_docs(docs):
 def warnings(reports, prior, summary):
     """Plain-English notes on what this refresh can't update, for the owner to see before loading it."""
     out = []
-    if not reports.get('daily_sales'):
-        out.append("No Daily Sales Report: this year's sales are estimated from the SKU Analysis instead of the POS totals.")
     if not reports.get('best100'):
         out.append('No cost & margin report (BEST 100): margins stay as they were.')
     if not reports.get('sales_by_item'):
         out.append('No Sales by Item report: selling prices stay as they were.')
     if not (prior or {}).get('skusnap'):
         out.append("Deliveries are matched to orders from the next upload on: this one saves the stock snapshot they're worked out from.")
-    was = ((prior or {}).get('base') or {}).get('asOf')
+    pb = (prior or {}).get('base') or {}
+    if pb.get('fy') == summary.get('fy') and (pb.get('ytdActual') or 0) > 0 and summary['ytd'] < pb['ytdActual'] * 0.97:
+        out.append(f"This year's sales to date come out lower than at the last upload (${pb['ytdActual']:,.0f} -> ${summary['ytd']:,.0f}). "
+                   "Check the reports are the latest before updating.")
+    if not reports.get('daily_sales') and not any(model.fytd_by_category([c], int(summary['fy'][2:]), summary['actualThrough']) for c in reports.get('sales_by_category', [])):
+        out.append('No Daily Sales Report or Sales by Category (May 1 to date), so this year\'s sales are estimated from the SKU Analysis and prices.')
+    was = pb.get('asOf')
     day = lambda d: f'{datetime.fromisoformat(d):%b} {int(d[8:10])}, {d[:4]}'
     if was and summary['asOf'] < was:
         out.append(f"These reports are older than the program's data (as of {day(was)}). Updating would take it back to {day(summary['asOf'])}.")

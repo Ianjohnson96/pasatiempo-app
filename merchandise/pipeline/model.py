@@ -91,6 +91,21 @@ def prices(items_reports, prior_meta, snap):
     return p
 
 
+def fytd_by_category(cat_reports, fy, cur):
+    """Sales by category from a Net Sales by Category run May 1 through the current month, or None."""
+    for cr in cat_reports:
+        per = cr.get('period')
+        if not per:
+            continue
+        a, b = per
+        if not a.strip().startswith('May 1/'):
+            continue
+        start_y, end = 2000 + int(a[-2:]), ym(2000 + int(b[-2:]), MON[b[:3]])
+        if fy_of(ym(start_y, 5)) == fy and end == cur:
+            return {c: sum(i['value'] for i in cr['cats'].get(c, {}).get('items', [])) for c in MERCH}
+    return None
+
+
 # ---------- main build ----------
 def build(reports, prior=None):
     """reports: dict kind -> parsed report (lists for sku_analysis, rounds, sales_by_item, sales_by_category, best100).
@@ -195,6 +210,26 @@ def build(reports, prior=None):
     est_closed = sum(est[c].get(k, 0) for c in MERCH for k in closed)
     f = rep_closed / est_closed if rep_closed and est_closed else 1.0
     act = {c: {k: est[c].get(k, 0) * f for k in closed} for c in MERCH}
+    if not daily and closed:
+        # No Daily Sales Report: a Sales by Category from May 1 to this month gives each category's actual
+        # sales so far, so the monthly estimates are scaled to it (spread like last year where there's no estimate).
+        fytd = fytd_by_category(reports.get('sales_by_category', []), fy, cur)
+        if fytd:
+            for c in MERCH:
+                target, tot = fytd.get(c, 0.0), sum(act[c].values())
+                if tot > 0:
+                    act[c] = {k: v * target / tot for k, v in act[c].items()}
+                else:
+                    shape = {k: hist_fy.get(ly, {}).get(c, {}).get(add_months(k, -12), 0) for k in closed}
+                    st = sum(shape.values())
+                    act[c] = {k: (target * v / st if st else target / len(closed)) for k, v in shape.items()}
+                ytd_cat[c] = target
+            rep_closed = sum(fytd.get(c, 0.0) for c in MERCH)
+    units_closed = sum(u for sk, mo in hist.items() if cat_of.get(sk) in MERCH for k, u in mo.items() if k in closed)
+    if closed and units_closed > 0 and sum(v for c in MERCH for v in act[c].values()) <= 0:
+        raise ValueError("This year's sales come out at $0: there are no selling prices to turn unit sales into dollars. "
+                         "Include the Net Sales by Item report (fiscal year to date from May 1), or the Daily Sales Report "
+                         "or Net Sales by Category (May 1 to date).")
 
     # ----- margin by category (realized, from the cost & margin report) -----
     best = reports.get('best100', [])
