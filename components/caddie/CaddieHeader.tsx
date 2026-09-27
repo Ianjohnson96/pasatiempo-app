@@ -5,6 +5,9 @@ import Link from "next/link";
 
 const TABS = [
   { href: "/admin/caddie", key: "dispatch", label: "Dispatch" },
+  // Every job in date order and who is filling it. Visible to all caddie
+  // staff; the page itself keeps drop history to Caddie Program admins.
+  { href: "/admin/caddie/jobs", key: "jobs", label: "Jobs" },
   { href: "/admin/caddie/calendar", key: "calendar", label: "Calendar" },
   {
     href: "/admin/caddie/availability",

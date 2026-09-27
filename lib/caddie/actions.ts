@@ -745,6 +745,114 @@ export async function withdrawOffer(assignmentId: string): Promise<Result> {
   }
 }
 
+const JOBS_PATH = "/admin/caddie/jobs";
+
+/**
+ * A caddie hands back a loop they accepted — from their own portal.
+ *
+ * Recorded as Dropped rather than quietly deleted: the loop reopens for
+ * someone else (refresh_loop_status only counts Accepted), and the caddie
+ * master can see who hands work back, and how late. That record is the whole
+ * point; a drop that left no trace would reward exactly the habit of taking
+ * every loop and letting go of the ones that did not suit.
+ */
+export async function dropMyLoop(assignmentId: string): Promise<Result> {
+  try {
+    const caddie = await getCaddieSession();
+    if (!caddie) {
+      return { ok: false, error: "You are signed out. Ask the shop for a new link." };
+    }
+    return await recordDrop(assignmentId, {
+      caddieId: caddie.id,
+      channel: "web",
+      markedBy: null,
+    });
+  } catch (e) {
+    return fail(e, "Could not give the loop back.");
+  }
+}
+
+/**
+ * The shop records a drop for a caddie who phoned in.
+ *
+ * Carries the staff member's name, so a mark against a caddie's record always
+ * says who put it there.
+ */
+export async function markDropped(assignmentId: string): Promise<Result> {
+  try {
+    const staff = await assertCaddieStaff();
+    return await recordDrop(assignmentId, {
+      caddieId: null,
+      channel: "admin",
+      markedBy: staff.email,
+    });
+  } catch (e) {
+    return fail(e, "Could not record the drop.");
+  }
+}
+
+async function recordDrop(
+  assignmentId: string,
+  opts: { caddieId: string | null; channel: "web" | "admin"; markedBy: string | null },
+): Promise<Result> {
+  const supa = createAdminClient("caddie");
+
+  let q = supa
+    .from("assignments")
+    .select("id, confirmation_status, loops!inner(tee_time, status)")
+    .eq("id", assignmentId);
+  // A caddie may only give back their own loop; the shop may record any.
+  if (opts.caddieId) q = q.eq("caddie_id", opts.caddieId);
+
+  const { data: row, error } = await q.maybeSingle();
+  if (error) throw error;
+  if (!row) {
+    return {
+      ok: false,
+      error: opts.caddieId ? "That loop is not yours." : "That assignment no longer exists.",
+    };
+  }
+  if (row.confirmation_status !== "Accepted") {
+    return { ok: false, error: "Only a loop that has been accepted can be handed back." };
+  }
+
+  const loop = row.loops as unknown as { tee_time: string; status: string };
+  if (loop.status === "Cancelled" || loop.status === "Completed") {
+    return { ok: false, error: "That loop is no longer on." };
+  }
+  // After the tee time it is not a drop, it is a no-show — a different thing,
+  // and not one a caddie gets to record against himself.
+  if (new Date(loop.tee_time).getTime() <= Date.now()) {
+    return { ok: false, error: "That loop has already teed off." };
+  }
+
+  const now = new Date().toISOString();
+  // Conditional on still being Accepted, so a double tap or two people acting
+  // at once records one drop, not two.
+  const { data: updated, error: upErr } = await supa
+    .from("assignments")
+    .update({
+      confirmation_status: "Dropped",
+      dropped_at: now,
+      responded_at: now,
+      response_channel: opts.channel,
+      marked_by: opts.markedBy,
+    })
+    .eq("id", assignmentId)
+    .eq("confirmation_status", "Accepted")
+    .select("id")
+    .maybeSingle();
+  if (upErr) throw upErr;
+  if (!updated) {
+    return { ok: false, error: "That loop changed while you were looking. Refresh and try again." };
+  }
+
+  revalidatePath("/caddie");
+  revalidatePath(BOARD_PATH);
+  revalidatePath(JOBS_PATH);
+  return { ok: true, value: undefined };
+}
+
 /**
  * Answer on a caddie's behalf — they rang the shop instead of tapping.
  *

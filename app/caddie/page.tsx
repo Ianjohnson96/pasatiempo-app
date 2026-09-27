@@ -70,8 +70,9 @@ export default async function CaddiePortalHome({
     day: "numeric",
   });
 
-  const items: PortalLoop[] = work.map(({ assignment, loop }) => ({
+  const items: PortalLoop[] = work.map(({ assignment, loop, started }) => ({
     assignmentId: assignment.id,
+    started,
     status: assignment.confirmationStatus,
     offerExpiresAt: assignment.offerExpiresAt,
     teeLabel: formatTee(loop.teeTime, tz),

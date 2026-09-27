@@ -531,8 +531,20 @@ export async function loopsForDay(
   day: string,
   tz: string = DEFAULT_TZ,
 ): Promise<LoopWithCrew[]> {
-  const supa = createAdminClient("caddie");
   const { from, to } = dayRange(day, tz);
+  return loopsWithCrewBetween(from, to);
+}
+
+/**
+ * Every loop between two instants, in tee-time order, each with its whole
+ * crew — accepted, pending, declined and dropped alike, so a list of jobs can
+ * show who is on it and who handed it back.
+ */
+export async function loopsWithCrewBetween(
+  from: string,
+  to: string,
+): Promise<LoopWithCrew[]> {
+  const supa = createAdminClient("caddie");
 
   const { data: loopRows, error: loopErr } = await supa
     .from("loops")
@@ -831,6 +843,12 @@ export function pastLoopIds(loops: LoopWithCrew[]): string[] {
 export interface OpenWork {
   assignment: AssignmentRec;
   loop: LoopRec;
+  /**
+   * The tee time has passed. The list reaches six hours back so a caddie can
+   * still see the loop they are on, but a loop under way can no longer be
+   * handed back — at that point it is a no-show, not a drop.
+   */
+  started: boolean;
 }
 
 /**
@@ -869,9 +887,17 @@ export async function openWorkFor(caddieId: string): Promise<OpenWork[]> {
     (loopRows ?? []).map((r) => [String(r.id), rowToLoop(r)]),
   );
 
+  const now = Date.now();
   return assignments
     .filter((a) => loopsById.has(a.loopId))
-    .map((a) => ({ assignment: a, loop: loopsById.get(a.loopId)! }))
+    .map((a) => {
+      const loop = loopsById.get(a.loopId)!;
+      return {
+        assignment: a,
+        loop,
+        started: new Date(loop.teeTime).getTime() <= now,
+      };
+    })
     .sort((x, y) => x.loop.teeTime.localeCompare(y.loop.teeTime));
 }
 
@@ -1010,4 +1036,47 @@ export async function caddieLedger(days = 60): Promise<Map<string, LedgerRow>> {
   });
 
   return summariseLedger(events, settings.rates);
+}
+
+// ---------------------------------------------------------------------------
+// The jobs list
+// ---------------------------------------------------------------------------
+
+export interface JobRow extends LoopWithCrew {
+  /** Course-local date, "yyyy-mm-dd", for grouping by day. */
+  day: string;
+  /** Tee time has passed — nothing can be handed back any more. */
+  started: boolean;
+}
+
+/**
+ * Every job between two course-local days, inclusive, in tee-time order, with
+ * its whole crew and the day it falls on at the course.
+ *
+ * The day and the "has it started" flag are worked out here rather than in
+ * the page, so the page never reads the clock while it renders.
+ */
+export async function jobsBetween(
+  fromDay: string,
+  toDay: string,
+  tz: string = DEFAULT_TZ,
+): Promise<JobRow[]> {
+  const rows = await loopsWithCrewBetween(
+    zonedMidnight(fromDay, tz).toISOString(),
+    zonedMidnight(addDays(toDay, 1), tz).toISOString(),
+  );
+
+  const asCourseDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const now = Date.now();
+
+  return rows.map((r) => ({
+    ...r,
+    day: asCourseDate.format(new Date(r.loop.teeTime)),
+    started: new Date(r.loop.teeTime).getTime() <= now,
+  }));
 }

@@ -29,7 +29,12 @@ export type ConfirmationStatus =
   | "Accepted"
   | "Declined"
   | "Expired"
-  | "Withdrawn";
+  // The shop pulled the offer.
+  | "Withdrawn"
+  // The caddie took the loop, then handed it back.
+  | "Dropped"
+  // The caddie took the loop and did not turn up. Staff mark this.
+  | "No Show";
 
 /** What a caddie normally does on a given weekday. "Off" is a standing no. */
 export type DefaultSlot = TimeSlot | "Off";
@@ -165,6 +170,10 @@ export interface AssignmentRec {
   confirmationStatus: ConfirmationStatus;
   respondedAt: string | null;
   responseChannel: ResponseChannel | null;
+  /** When the caddie handed the loop back. */
+  droppedAt: string | null;
+  /** Staff email, when a drop or no-show was recorded by the shop. */
+  markedBy: string | null;
 }
 
 // An assignment with its caddie attached, as the board renders it.
@@ -290,6 +299,8 @@ export function rowToAssignment(r: Row): AssignmentRec {
       (r.confirmation_status as ConfirmationStatus) ?? "Pending",
     respondedAt: (r.responded_at as string | null) ?? null,
     responseChannel: (r.response_channel as ResponseChannel | null) ?? null,
+    droppedAt: r.dropped_at ? String(r.dropped_at) : null,
+    markedBy: (r.marked_by as string | null) ?? null,
   };
 }
 
