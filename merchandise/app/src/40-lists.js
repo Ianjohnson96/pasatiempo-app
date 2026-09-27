@@ -164,7 +164,7 @@ function renderHelp(){
   </div></section>
   <section class="panel"><div class="in"><h3>Your routine</h3><ul class="routine">
     <li><span class="when">Every order</span><span>Enter it the day you write it: vendor, delivery month, cancel date, and the lines with sizes. The budget check happens as you type.</span></li>
-    <li><span class="when">Deliveries</span><span>Open the order and click <b>Record receipt</b> when the goods come in.</span></li>
+    <li><span class="when">Deliveries</span><span>Receive boxes into the POS as usual. At each month-end upload the program works out what arrived from the SKU Analysis and matches it to open orders; the owner confirms the list. Whatever hasn't come stays on order.</span></li>
     <li><span class="when">Mondays</span><span>Go through <b>To do</b>. Mark each item Done or Dismiss.</span></li>
     <li><span class="when">Month-end</span><span>Work through the <b>Month-end</b> checklist: run the reports and the owner uploads them on that page, PDF or Excel. The forecast, budgets, on-hand, suggestions and brand scorecard are then refreshed.</span></li>
     <li><span class="when">Each season</span><span>Review the <b>Brands</b> page before market or a buying appointment. Set your own call where you disagree.</span></li>

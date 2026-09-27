@@ -241,6 +241,8 @@ document.addEventListener('change', e => {
   if (t.dataset.wi){ if (t.value === '' || !isFinite(+t.value)) return render(); const g = t.dataset.wi; setWhatIf(g, t.dataset.k, g === 'wos' ? Math.max(1, Math.min(52, Math.round(+t.value))) : +t.value / 100); return; }
   if (t.dataset.chk){ return toggleCheck(t.dataset.chkm, t.dataset.chk, t.checked); }
   if (t.id === 'upFiles'){ UP.files = [...t.files]; UP.error = null; UP.found = null; return render(); }
+  if (t.dataset.rcvon != null && UP.rcv){ UP.rcv.matches[+t.dataset.rcvon].on = t.checked; return schedule(); }  // next frame: the field may still be losing focus
+  if (t.dataset.rcvamt != null && UP.rcv){ UP.rcv.matches[+t.dataset.rcvamt].amount = Math.max(0, r2(num(t.value))); return schedule(); }
   if (!D) return;
   if (t.id === 'dVendor'){ if (t.value === '__new'){ D._addVendor = true; } else { D._addVendor = false; D.vendorId = t.value; } renderVendorBox(); return updateTotals(); }
   if (t.dataset.d){ D[t.dataset.d] = t.value; return updateTotals(); }

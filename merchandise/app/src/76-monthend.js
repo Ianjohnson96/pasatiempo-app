@@ -7,7 +7,7 @@ const MONTH_END = [
   {k: 'cat', t: 'Sales by Category', d: 'Net Sales by Category – Pro Shop, fiscal year to date from May 1.'},
   {k: 'item', t: 'Sales by Item', d: 'Net Sales by Item – Pro Shop, fiscal year to date. Gives each SKU\'s average selling price.'},
   {k: 'best', t: 'Cost & margin report', d: 'PRSHP – BEST 100 based on Quantity Sold, fiscal year to date — past the top 100 if the system allows.'},
-  {k: 'pos', t: 'Every purchase order is in the Order Book', d: 'Including phone and show orders. Mark anything received this month.'},
+  {k: 'pos', t: 'Every purchase order is in the Order Book', d: 'Including phone and show orders, so this month\'s deliveries have an order to match to.'},
   {k: 'recv', t: 'Receipts entered in the POS', d: 'Every box that came in is received in the POS before the SKU Analysis runs.'},
   {k: 'send', t: 'Upload the reports', d: 'The owner uploads them on this page, PDF or Excel, checks what changes, then updates the program.'}
 ];
@@ -63,11 +63,11 @@ async function toggleCheck(m, k, on){
    1. POST {base}/api/refresh      a pass for the report reader + last month's documents
    2. POST /api/merch/reports      the reader (Python) returns a data file and its headline numbers
    3. POST {base}/api/import       once the owner confirms, the data file replaces the month-end documents */
-const UP = {files: [], note: '', busy: false, applying: false, result: null, error: null, found: null};
+const UP = {files: [], note: '', busy: false, applying: false, result: null, error: null, found: null, rcv: null};
 const UP_MAX = 3.2e6;  // raw bytes; base64 adds a third and the reader takes 4.4 MB
 const UP_KINDS = {sku_analysis: 'SKU Analysis', daily_sales: 'Daily Sales Report', best100: 'Cost & margin (BEST 100)', sales_by_category: 'Sales by Category', sales_by_item: 'Sales by Item', rounds: 'Rounds Summary'};
 const ownerHere = () => !!(window.MERCH_HOST && MERCH_HOST.me && MERCH_HOST.me.role === 'owner') && canAct();
-function upReset(){ Object.assign(UP, {files: [], note: '', busy: false, applying: false, result: null, error: null, found: null}); }
+function upReset(){ Object.assign(UP, {files: [], note: '', busy: false, applying: false, result: null, error: null, found: null, rcv: null}); }
 function upFilesTable(found){
   if (!found || !found.length) return '';
   return `<table class="mini" style="margin:8px 16px 4px;width:calc(100% - 32px)"><thead><tr><th>File</th><th>Read as</th></tr></thead><tbody>${found.map(f => `<tr><td style="word-break:break-all">${esc(f.name)}</td><td>${f.ok ? esc(UP_KINDS[f.kind] || f.kind) : `<span class="neg">${esc(f.note || 'Not used')}</span>`}</td></tr>`).join('')}</tbody></table>`;
@@ -91,7 +91,8 @@ function renderUpload(){
         ${row(`FY${fy} budget left`, last.otbCur != null ? money(num(last.otbCur)) : '—', money(s.otbCur))}
         ${row(`FY${fy + 1} budget`, last.otbNext != null ? money(num(last.otbNext)) : '—', money(s.otbNext))}
       </tbody></table>
-      <div class="note">Budgets are before orders and budget changes, like the refresh history below. Orders, vendors, counts, budget changes and brand calls aren't touched.</div>
+      ${rcvHTML(UP.rcv)}
+      <div class="note">Budgets are before orders and budget changes, like the refresh history below. Vendors, counts, budget changes and brand calls aren't touched${UP.rcv && UP.rcv.matches.some(m => m.on) ? '; the orders ticked above get their delivery' : ''}.</div>
       <div style="display:flex;gap:8px;padding:4px 16px 14px"><button type="button" class="btn primary" id="upApply" ${UP.applying ? 'disabled' : ''}>${UP.applying ? 'Updating…' : 'Update the program'}</button><button type="button" class="btn" id="upReset" ${UP.applying ? 'disabled' : ''}>Cancel</button></div></section>`;
   }
   const size = UP.files.reduce((a, f) => a + f.size, 0);
@@ -125,6 +126,8 @@ async function readReports(){
     const start = await upJSON(H.base + '/api/refresh');
     const files = await Promise.all(UP.files.map(async f => ({name: f.name, data: await fileB64(f)})));
     UP.result = await upJSON('/api/merch/reports', {ticket: start.ticket, prior: start.prior, note: UP.note, files});
+    const arr = UP.result.bundle && UP.result.bundle.docs && UP.result.bundle.docs['arrivals/' + UP.result.summary.asOf];
+    UP.rcv = arr ? matchArrivals(arr) : null;
   } catch (e){ UP.error = e.message; UP.found = e.found || null; }
   UP.busy = false; render();
 }
@@ -133,8 +136,9 @@ async function applyReports(){
   UP.applying = true; render();
   try {
     await upJSON(window.MERCH_HOST.base + '/api/import', r.bundle);
+    const delivered = UP.rcv ? await applyArrivals(UP.rcv) : true;
     const asOf = r.summary.asOf; upReset(); render();
-    toast(`Updated to reports as of ${dateLabel(asOf)}. Reloading…`);
+    toast(delivered ? `Updated to reports as of ${dateLabel(asOf)}. Reloading…` : `Updated to reports as of ${dateLabel(asOf)}, but some deliveries didn't save; record them on the order. Reloading…`);
     setTimeout(() => location.reload(), 1200);
   } catch (e){ UP.applying = false; UP.error = e.message; UP.result = null; render(); }
 }

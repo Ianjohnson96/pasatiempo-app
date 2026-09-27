@@ -258,7 +258,7 @@ def build(reports, prior=None):
             meta[s] = [c, desc_of.get(s, ''), round(price.get(s, 0), 2)]
     skuhist = history_docs(hist, meta, sorted({fy_of(k) for mo in hist.values() for k in mo}))
 
-    ctx = dict(as_of=as_of, cur=cur, actual_through=actual_through, fy=fy, snap=snap, hist=hist, px=px, sku_gm=sku_gm,
+    ctx = dict(as_of=as_of, cur=cur, actual_through=actual_through, fy=fy, snap=snap, sku_month=snap_rep['as_of'], hist=hist, px=px, sku_gm=sku_gm,
                desc_of=desc_of, cat_of=cat_of, items=reports.get('sales_by_item', []), base=base)
     return dict(base=base, inventory=inventory, skuhist=skuhist, ctx=ctx)
 

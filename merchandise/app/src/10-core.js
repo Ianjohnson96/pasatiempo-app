@@ -74,26 +74,58 @@ function poUnits(p){ return (p.lines && p.lines.length) ? p.lines.reduce((a,l) =
 function committed(p){ const cost = poTotal(p), rec = num(p.received);
   if (p.status === 'cancelled') return rec; if (p.status === 'received') return rec || cost; return Math.max(cost, rec); }
 function onOrder(p){ return (p.status === 'open' || p.status === 'partial') ? Math.max(poTotal(p) - num(p.received), 0) : 0; }
+/* Deliveries on an order: receipts [{date, amount, byCat?, source}]. Orders from before deliveries were kept
+   one by one have a single delivery of `received` on `receivedDate`. */
+function poReceipts(p){
+  if (Array.isArray(p.receipts) && p.receipts.length) return p.receipts;
+  return num(p.received) > 0 ? [{date: p.receivedDate || p.orderDate || todayISO, amount: num(p.received), source: 'manual'}] : [];
+}
+function inWindow(m, P){ const w = P.months.map(x => x.m); return m < w[0] ? 'before' : m > w[w.length - 1] ? 'later' : m; }
+/* Where the still-to-come part of an order counts: its expected month, or this month once it's late. */
 function bucket(p, P = PLAN){
-  const w = P.months.map(x => x.m);
-  if (p.receivedDate && p.receivedDate < P.start && (p.status === 'received' || p.status === 'cancelled')) return 'before';
-  let m = (p.status === 'received' && p.receivedDate) ? p.receivedDate.slice(0,7) : p.deliveryMonth;
+  let m = p.deliveryMonth;
   if (!m) return null;
   if ((p.status === 'open' || p.status === 'partial') && m < THIS_MONTH) m = THIS_MONTH;
-  if (m < w[0]) return 'before';
-  if (m > w[w.length-1]) return 'later';
-  return m;
+  return inWindow(m, P);
 }
+function poParts(p){
+  return (p.lines && p.lines.length) ? p.lines.map(l => ({cat: l.cat || p.cat, sub: l.sub || '', ext: lineExt(l), units: lineUnits(l)}))
+                                     : [{cat: p.cat, sub: '', ext: poTotal(p), units: num(p.units)}];
+}
+/* Delivered so far by category: a delivery matched from the SKU Analysis says which categories it was;
+   one recorded by hand is spread over the order's lines. */
+function receivedByCat(p){
+  const parts = poParts(p), tot = parts.reduce((a, x) => a + x.ext, 0), out = {};
+  for (const r of poReceipts(p)){
+    if (r.byCat) for (const [c, v] of Object.entries(r.byCat)) out[c] = (out[c] || 0) + num(v);
+    else for (const x of parts) out[x.cat] = (out[x.cat] || 0) + num(r.amount) * (tot > 0 ? x.ext / tot : 1 / parts.length);
+  }
+  return out;
+}
+/* What an order commits, month by month. Each delivery counts in the month it arrived, and not at all once
+   it's in the on-hand stock (on or before the SKU Analysis); what's still to come counts in the expected month. */
 function ledger(list, P = PLAN){
   const out = [];
   for (const p of list){
-    const b = bucket(p, P), c = committed(p), o = onOrder(p);
-    const parts = (p.lines && p.lines.length) ? p.lines.map(l => ({cat: l.cat || p.cat, sub: l.sub || '', ext: lineExt(l), units: lineUnits(l)}))
-                                            : [{cat: p.cat, sub: '', ext: poTotal(p), units: num(p.units)}];
-    const tot = parts.reduce((a,x) => a + x.ext, 0);
+    const parts = poParts(p), tot = parts.reduce((a, x) => a + x.ext, 0), recs = poReceipts(p);
+    const catExt = {}; for (const x of parts) catExt[x.cat] = (catExt[x.cat] || 0) + x.ext;
+    const push = (x, b, amount, open) => out.push({po: p.id, cat: x.cat, sub: x.sub, b, committed: amount, open,
+      units: x.ext > 0 ? x.units * amount / x.ext : (amount ? x.units : 0), status: p.status});
+    for (const r of recs){
+      const b = r.date < P.start ? 'before' : inWindow(r.date.slice(0, 7), P);
+      if (r.byCat){
+        for (const [c, v] of Object.entries(r.byCat)){
+          const xs = parts.filter(x => x.cat === c);
+          if (!xs.length) push({cat: c, sub: '', ext: 0, units: 0}, b, num(v), 0);
+          for (const x of xs) push(x, b, num(v) * (catExt[c] > 0 ? x.ext / catExt[c] : 1 / xs.length), 0);
+        }
+      } else for (const x of parts) push(x, b, num(r.amount) * (tot > 0 ? x.ext / tot : 1 / parts.length), 0);
+    }
+    if (p.status !== 'open' && p.status !== 'partial') continue;
+    const rc = receivedByCat(p), b = bucket(p, P);
     for (const x of parts){
-      const sh = tot > 0 ? x.ext / tot : 1 / parts.length;
-      out.push({po: p.id, cat: x.cat, sub: x.sub, b, committed: c * sh, open: o * sh, units: x.units, status: p.status});
+      const got = catExt[x.cat] > 0 ? num(rc[x.cat]) * x.ext / catExt[x.cat] : 0, owed = Math.max(x.ext - got, 0);
+      if (owed > 0.005 || !recs.length) push(x, b, owed, owed);
     }
   }
   return out;
@@ -126,6 +158,6 @@ function stats(list){
   }
   const cm = (code, k) => { let s = 0; const bm = byCatMonth[code] || {}; for (const x of w) if (x <= k) s += bm[x] || 0; return s; };
   let room = 0; for (const c of catList()) if (inOTB(c.code)) room += roomThrough(c.code, m);
-  const receivedSince = POS.filter(p => p.receivedDate && p.receivedDate > INV.asOf).reduce((s,p) => s + num(p.received), 0);
+  const receivedSince = POS.reduce((s, p) => s + poReceipts(p).filter(r => r.date > INV.asOf).reduce((a, r) => a + num(r.amount), 0), 0);
   return {L, m, byCat, byCatMonth, bySub, commit, open, later, soOpen, arriving, room, left: room - commit, cm, receivedSince};
 }
