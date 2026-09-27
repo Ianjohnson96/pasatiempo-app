@@ -97,6 +97,8 @@ def load_prior(folder):
             pr['skuhist'][n[8:]] = d
         elif n == 'skusnap':
             pr['skusnap'] = d
+        elif n == 'brandmap':
+            pr['brandmap'] = d
         elif n == 'assumptions':
             pr['assumptions'] = {k: d[k] for k in ('g27', 'g27cat', 'g28', 'wos') if k in d}
     return pr
@@ -116,21 +118,27 @@ def prior_from_docs(docs):
             pr['assumptions'] = {k: d[k] for k in ('g27', 'g27cat', 'g28', 'wos') if k in d}
         elif path == 'skusnap/current':
             pr['skusnap'] = d
+        elif path == 'brandmap/current':
+            pr['brandmap'] = d
     return pr
 
 
 def warnings(reports, prior, summary):
     """Plain-English notes on what this refresh can't update, for the owner to see before loading it."""
     out = []
-    if not reports.get('daily_sales'):
-        out.append("No Daily Sales Report: this year's sales are estimated from the SKU Analysis instead of the POS totals.")
     if not reports.get('best100'):
         out.append('No cost & margin report (BEST 100): margins stay as they were.')
     if not reports.get('sales_by_item'):
         out.append('No Sales by Item report: selling prices stay as they were.')
     if not (prior or {}).get('skusnap'):
         out.append("Deliveries are matched to orders from the next upload on: this one saves the stock snapshot they're worked out from.")
-    was = ((prior or {}).get('base') or {}).get('asOf')
+    pb = (prior or {}).get('base') or {}
+    if pb.get('fy') == summary.get('fy') and (pb.get('ytdActual') or 0) > 0 and summary['ytd'] < pb['ytdActual'] * 0.97:
+        out.append(f"This year's sales to date come out lower than at the last upload (${pb['ytdActual']:,.0f} -> ${summary['ytd']:,.0f}). "
+                   "Check the reports are the latest before updating.")
+    if not reports.get('daily_sales') and not any(model.fytd_by_category([c], int(summary['fy'][2:]), summary['actualThrough']) for c in reports.get('sales_by_category', [])):
+        out.append('No Daily Sales Report or Sales by Category (May 1 to date), so this year\'s sales are estimated from the SKU Analysis and prices.')
+    was = pb.get('asOf')
     day = lambda d: f'{datetime.fromisoformat(d):%b} {int(d[8:10])}, {d[:4]}'
     if was and summary['asOf'] < was:
         out.append(f"These reports are older than the program's data (as of {day(was)}). Updating would take it back to {day(summary['asOf'])}.")
@@ -169,7 +177,7 @@ def build_bundle(reports, prior=None, notes=None):
     insights = model.build_insights(built['ctx'], calls)
     brands = model.build_brands(built['ctx'])
     docs = {'base': base, 'inventory': built['inventory'], 'insights': insights, 'brands': brands,
-            'skusnap': receipts.snapshot(built['ctx'])}
+            'skusnap': receipts.snapshot(built['ctx']), 'brandskus': model.brand_skus(built['ctx'])}
     arrived = receipts.arrivals((prior or {}).get('skusnap'), built['ctx'])
     if arrived:
         docs['arrivals'] = arrived
@@ -183,7 +191,8 @@ def build_bundle(reports, prior=None, notes=None):
                            forecast={k: round(sum(r['sales'][c][k] for c in base['cats'])) for k in open_months},
                            notes=notes)
     paths = {'base': 'base/current', 'inventory': 'inventory/current', 'insights': 'insights/current', 'brands': 'brands/current',
-             'refresh': f"refreshes/{base['asOf']}", 'skusnap': 'skusnap/current', 'arrivals': f"arrivals/{base['asOf']}"}
+             'refresh': f"refreshes/{base['asOf']}", 'skusnap': 'skusnap/current', 'brandskus': 'brandskus/current',
+             'arrivals': f"arrivals/{base['asOf']}"}
     paths.update({f'skuhist_{k}': f'skuhist/{k}' for k in built['skuhist']})
     bundle = dict(kind='pasatiempo-merch-bundle', version=1,
                   note=f"Month-end data as of {base['asOf']}" + (': ' + '; '.join(notes) if notes else ''),

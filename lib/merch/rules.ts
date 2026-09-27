@@ -19,13 +19,16 @@ const OWNER_ONLY = new Set([
   "remindersSent",
   "skusnap",
   "arrivals",
+  "brandskus",
 ]);
 
 // Collections a month-end data file may replace. Everything people enter by
 // hand (orders, vendors, counts, budget changes, brand calls) is left alone.
 // skusnap/current is each refresh's stock by SKU; arrivals/{asOf} is what came in since the last one
 // (merchandise/pipeline/receipts.py).
-export const IMPORTABLE = new Set(["base", "inventory", "insights", "brands", "refreshes", "skuhist", "skusnap", "arrivals"]);
+// brandskus/current lists every SKU for assigning brands; the assignments themselves
+// (brandmap/current) are entered in the program and never come from a data file.
+export const IMPORTABLE = new Set(["base", "inventory", "insights", "brands", "refreshes", "skuhist", "skusnap", "arrivals", "brandskus"]);
 
 // Collections the page never needs; kept out of the initial load.
 // remindersSent/{date} marks a day's reminder email as sent (app/api/cron/merch).

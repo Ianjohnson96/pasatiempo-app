@@ -46,7 +46,7 @@ function rcvHTML(R){
       <td class="r"><input type="number" min="0" step="0.01" data-rcvamt="${i}" value="${num(m.amount).toFixed(2)}" style="width:96px;text-align:right" ${m.on ? '' : 'disabled'}></td>
       <td>${m.on ? `<span class="pill ${after.status}">${STATUS[after.status]}</span>${after.status === 'partial' ? `<br><span style="color:var(--muted);font-size:12px">${money(after.left)} still to come</span>` : ''}` : '<span style="color:var(--faint)">not recorded</span>'}</td></tr>`;
   }).join('');
-  const loose = R.loose.slice(0, 8).map(g => `<li>${esc(g.brand || 'Brand not recognised')} · ${esc(CAT(g.cat).name)}: ${money(g.value)}${g.top[0] ? ` <span style="color:var(--muted)">(e.g. ${esc(g.top[0].desc)})</span>` : ''}</li>`).join('');
+  const loose = R.loose.slice(0, 8).map(g => `<li>${esc(g.brand || 'Unknown brand')} · ${esc(CAT(g.cat).name)}: ${money(g.value)}${g.top[0] ? ` <span style="color:var(--muted)">(e.g. ${esc(g.top[0].desc)})</span>` : ''}</li>`).join('');
   return `<div class="note" style="font-size:13.5px;color:var(--ink);padding-top:12px"><b>Deliveries ${dateLabel(A.from)} – ${dateLabel(A.to)}</b>: ${money(A.total)} arrived at cost, worked out from the SKU Analysis.
     ${R.matches.length ? `${money(R.matches.reduce((a, m) => a + m.found, 0))} of it matches ${R.matches.length} open order${R.matches.length === 1 ? '' : 's'}. Untick anything that isn't right, or change an amount.` : 'None of it matches an open order in the book.'}</div>
     ${R.matches.length ? `<div style="overflow-x:auto"><table class="mini" style="margin:6px 16px 4px;width:calc(100% - 32px)"><thead><tr><th></th><th>Order</th><th class="r">Arrived</th><th>After</th></tr></thead><tbody>${rows}</tbody></table></div>
