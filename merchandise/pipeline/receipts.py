@@ -14,7 +14,7 @@ than it sold is reported separately rather than netted against deliveries.
 """
 from collections import defaultdict
 
-from brands import brand_of
+from brands import brand_split
 from config import CATS
 
 MERCH = set(CATS)
@@ -71,15 +71,16 @@ def arrivals(prev, ctx):
             down['skus'] += 1
             continue
         desc = ctx['desc_of'].get(s) or r['desc']
-        g = groups[(r['cat_no'], brand_of(desc))]
-        g['value'] += value
-        g['units'] += units
-        g['skus'] += 1
-        g['top'].append(dict(sku=s, desc=desc, units=units, value=round(value, 2)))
+        for brand, sh in brand_split(ctx.get('bmap'), s, desc, r['desc']) or [(None, 1.0)]:  # a multi-brand SKU splits by share
+            g = groups[(r['cat_no'], brand)]
+            g['value'] += value * sh
+            g['units'] += units * sh
+            g['skus'] += 1
+            g['top'].append(dict(sku=s, desc=desc, units=round(units * sh), value=round(value * sh, 2)))
     out = []
     for (cat, brand), g in groups.items():
         g['top'] = sorted(g['top'], key=lambda x: -x['value'])[:TOP]
-        out.append(dict(cat=cat, brand=brand, value=round(g['value'], 2), units=g['units'], skus=g['skus'], top=g['top']))
+        out.append(dict(cat=cat, brand=brand, value=round(g['value'], 2), units=round(g['units']), skus=g['skus'], top=g['top']))
     out.sort(key=lambda g: -g['value'])
     return dict(**{'from': prev['asOf'], 'to': as_of}, total=round(sum(g['value'] for g in out), 2), groups=out,
                 down=dict(value=round(down['value'], 2), units=down['units'], skus=down['skus']))

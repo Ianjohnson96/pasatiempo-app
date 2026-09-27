@@ -46,3 +46,20 @@ def segment_of(cat, desc):
     if cat == '440':
         return 'hats' if is_hat(desc) else 'accessories'
     return _SEG.get(cat, 'other')
+
+
+def brand_split(bmap, sku, *descs):
+    """[(brand, share)] for a SKU, shares adding up to 1; [] when the brand is unknown.
+
+    bmap is the program's brand assignments (Brands -> Assign brands, document brandmap/current):
+    {sku: [{"b": brand, "s": percent}, ...]}, several entries for a SKU that carries more than one
+    brand. Without an assignment, the brand is the one named in the SKU's description."""
+    rows = [r for r in ((bmap or {}).get(sku) or []) if isinstance(r, dict) and str(r.get('b', '')).strip()]
+    shares = [max(float(r.get('s') or 0), 0.0) for r in rows]
+    if sum(shares) > 0:
+        return [(str(r['b']).strip(), v / sum(shares)) for r, v in zip(rows, shares) if v > 0]
+    for d in descs:
+        b = brand_of(d)
+        if b:
+            return [(b, 1.0)]
+    return []

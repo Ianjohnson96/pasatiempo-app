@@ -162,6 +162,14 @@ document.addEventListener('click', async e => {
   if (ds.bsmall){ bfilt.small = !bfilt.small; return render(); }
   if (ds.bsort){ bsort = {key: ds.bsort, dir: bsort.key === ds.bsort ? -bsort.dir : (ds.bsort === 'brand' ? 1 : -1)}; return render(); }
   if (ds.bcsave) return saveBrandCall(ds.bcsave);
+  if (ds.bmopen){ BM.edit = null; return openBrandMap(); }
+  if (ds.bmfilt){ BM.filter = ds.bmfilt; BM.q = ''; return openBrandMap(); }
+  if (ds.bmedit) return bmStartEdit(ds.bmedit);
+  if (ds.bmadd){ if (BM.draft.length === 1 && num(BM.draft[0].s) === 100) BM.draft[0].s = 50; BM.draft.push({b: '', s: BM.draft.length === 1 ? 50 : 0}); openBrandMap(); return setTimeout(() => $(`#bmB${BM.draft.length - 1}`)?.focus(), 0); }
+  if (ds.bmdrop != null){ BM.draft.splice(+ds.bmdrop, 1); if (BM.draft.length === 1) BM.draft[0].s = 100; return openBrandMap(); }
+  if (ds.bmsave) return bmSave(false);
+  if (ds.bmclear) return bmSave(true);
+  if (ds.bmcancel){ BM.edit = null; BM.draft = []; return openBrandMap(); }
   if (ds.bcclear){ try { await db.doc('brandCalls/' + ds.bcclear).delete(); toast('Back to the suggested call'); setTimeout(() => openBrand(ds.bcclear), 300); } catch (err){ writeError(err); } return; }
   if (ds.brand && !D) return openBrand(ds.brand);
   if (ds.month){ SEL = ds.month; try { localStorage.setItem('ob.month', SEL); } catch (_) {} return render(); }
@@ -226,6 +234,9 @@ document.addEventListener('input', e => {
   if (t.id === 'fQ'){ filt.q = t.value; clearTimeout(document._q); document._q = setTimeout(() => { render(); const f = $('#fQ'); if (f){ f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 250); return; }
   if (t.dataset.cb != null || t.dataset.cc != null) return countTotalsUI();
   if (t.id === 'upNote'){ UP.note = t.value; return; }
+  if (t.id === 'bmQ'){ BM.q = t.value; clearTimeout(document._bmq); document._bmq = setTimeout(() => { openBrandMap(); const f = $('#bmQ'); if (f){ f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 250); return; }
+  if (t.dataset.bmb != null){ BM.draft[+t.dataset.bmb].b = t.value; return; }
+  if (t.dataset.bms != null){ BM.draft[+t.dataset.bms].s = t.value; const tot = BM.draft.reduce((a, x) => a + num(x.s), 0), h = $('#bmTot'); if (h) h.textContent = `Shares add up to ${tot}%${tot === 100 ? '' : ' (they need to make 100%)'}. Sales, stock and deliveries are split the same way.`; return; }
   if (!D) return;
   if (t.dataset.d){ D[t.dataset.d] = t.value; return updateTotals(); }
   if (t.dataset.q){ const l = D.lines.find(x => x.id === t.dataset.q); const v = Math.max(0, Math.floor(num(t.value))); if (v) l.qty[t.dataset.k] = v; else delete l.qty[t.dataset.k]; return updateTotals(); }
@@ -288,6 +299,8 @@ render(); applyMode();
     assume: () => db.doc('plan/assumptions').onSnapshot(s => { SAVED = s.exists ? s.data() : null; live(); }, onErr('assume')),
     base: () => db.doc('base/current').onSnapshot(s => { if (s.exists) BASE = s.data(); live(); }, onErr('base')),
     brands: () => db.doc('brands/current').onSnapshot(s => { if (s.exists) BRANDS = s.data(); live(); }, onErr('brands')),
+    bskus: () => db.doc('brandskus/current').onSnapshot(s => { BRANDSKUS = s.exists ? s.data() : null; live(); }, onErr('bskus')),
+    bmap: () => db.doc('brandmap/current').onSnapshot(s => { BRANDMAP = s.exists ? s.data() : {skus: {}}; live(); }, onErr('bmap')),
     bcalls: () => coll('brandCalls', v => BCALLS = Object.fromEntries(v.map(x => [x.id, x])), 'bcalls'),
     refreshes: () => coll('refreshes', v => REFRESHES = v, 'refreshes'),
     checks: () => coll('checklist', v => CHECKS = Object.fromEntries(v.map(x => [x.id, x])), 'checks'),

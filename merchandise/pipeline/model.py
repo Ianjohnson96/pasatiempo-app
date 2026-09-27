@@ -15,7 +15,7 @@ from calendar import monthrange
 from collections import defaultdict
 from datetime import date, timedelta
 
-from brands import brand_of, segment_of, is_hat
+from brands import brand_of, brand_split, segment_of, is_hat
 from config import (CATS, OTB_EXCLUDE, TARGET_WOS, MARKDOWN, G27_DEFAULT, G28_DEFAULT, COMBINED, DAILY_NAMES)
 
 MERCH = set(CATS)
@@ -259,6 +259,7 @@ def build(reports, prior=None):
     skuhist = history_docs(hist, meta, sorted({fy_of(k) for mo in hist.values() for k in mo}))
 
     ctx = dict(as_of=as_of, cur=cur, actual_through=actual_through, fy=fy, snap=snap, sku_month=snap_rep['as_of'], hist=hist, px=px, sku_gm=sku_gm,
+               bmap=((prior.get('brandmap') or {}).get('skus') or {}),
                desc_of=desc_of, cat_of=cat_of, items=reports.get('sales_by_item', []), base=base)
     return dict(base=base, inventory=inventory, skuhist=skuhist, ctx=ctx)
 
@@ -441,42 +442,47 @@ def build_brands(ctx):
             continue
         desc = desc_of.get(s, '')
         r = snap.get(s)
-        b = brand_of(desc) or (brand_of(r['desc']) if r else None)
+        splits = brand_split(ctx.get('bmap'), s, desc, r['desc'] if r else '')
         seg = segment_of(c, desc)
         mo = hist.get(s, {})
         p = px(s)
         t12 = sum(mo.get(k, 0) for k in t12m) * p
-        if not b:
+        if not splits:
             unassigned[seg] += t12
             continue
-        a = B[(seg, b)]
         cost = r['cost'] if r else 0
         u12 = sum(mo.get(k, 0) for k in t12m)
-        a['skus'] += 1
-        a['t12'] += t12
-        a['units12'] += u12
-        a['cogs12'] += u12 * cost
-        a['ty'] += sum(mo.get(k, 0) for k in last3)
-        a['ly'] += sum(mo.get(k, 0) for k in ly3)
-        a['ytd'] += sum(mo.get(k, 0) for k in fyc) * p
-        a['ytdly'] += sum(mo.get(k, 0) for k in fyl) * p
-        a['cats'][c] += t12
-        for k in series_m:
-            if mo.get(k):
-                a['series'][k] += mo[k] * p
         v = max(r['oh'], 0) * cost if r else 0
-        a['oh'] += v
         ls = pos_date(r['last_sale']) if r else None
-        if v and (not ls or (as_of - ls).days > 365):
-            a['aged'] += v
-            a['agedList'].append(dict(sku=s, desc=desc, oh=r['oh'], value=round(v), last=r['last_sale']))
+        aged = v and (not ls or (as_of - ls).days > 365)
         bb = sku_gm.get(s)
-        if bb:
-            a['g'] += bb['g']
-            a['c'] += bb['c']
-            a['md'] += bb['md']
-        if t12 > 0 or v > 0:
-            a['top'].append(dict(sku=s, desc=desc, cat=c, t12=round(t12), units=u12, oh=r['oh'] if r else 0, value=round(v)))
+        # A SKU carrying several brands counts toward each at its share.
+        for b, sh in splits:
+            a = B[(seg, b)]
+            a['skus'] += 1
+            a['t12'] += t12 * sh
+            a['units12'] += u12 * sh
+            a['cogs12'] += u12 * cost * sh
+            a['ty'] += sum(mo.get(k, 0) for k in last3) * sh
+            a['ly'] += sum(mo.get(k, 0) for k in ly3) * sh
+            a['ytd'] += sum(mo.get(k, 0) for k in fyc) * p * sh
+            a['ytdly'] += sum(mo.get(k, 0) for k in fyl) * p * sh
+            a['cats'][c] += t12 * sh
+            for k in series_m:
+                if mo.get(k):
+                    a['series'][k] += mo[k] * p * sh
+            a['oh'] += v * sh
+            part = {} if sh >= 0.9995 else dict(share=round(sh, 3))
+            if aged:
+                a['aged'] += v * sh
+                a['agedList'].append(dict(sku=s, desc=desc, oh=round(r['oh'] * sh), value=round(v * sh), last=r['last_sale'], **part))
+            if bb:
+                a['g'] += bb['g'] * sh
+                a['c'] += bb['c'] * sh
+                a['md'] += bb['md'] * sh
+            if t12 > 0 or v > 0:
+                a['top'].append(dict(sku=s, desc=desc, cat=c, t12=round(t12 * sh), units=round(u12 * sh), oh=round((r['oh'] if r else 0) * sh),
+                                     value=round(v * sh), **part))
     rows = []
     for (seg, b), a in B.items():
         if a['t12'] < 100 and a['oh'] <= 0:
@@ -487,10 +493,10 @@ def build_brands(ctx):
         wks = a['oh'] / (a['cogs12'] / 52) if a['cogs12'] > 0 else (None if a['oh'] <= 0 else 999)
         gmroi = (a['t12'] * gm) / a['oh'] if a['oh'] > 0 and gm is not None else None
         m = dict(seg=seg, brand=b, id=re.sub(r'[^a-z0-9]+', '-', f'{seg}-{b}'.lower()).strip('-'), skus=a['skus'], t12=round(a['t12']),
-                 units12=a['units12'], ytd=round(a['ytd']), ytdly=round(a['ytdly']), oh=round(a['oh']), aged=round(a['aged']),
+                 units12=round(a['units12']), ytd=round(a['ytd']), ytdly=round(a['ytdly']), oh=round(a['oh']), aged=round(a['aged']),
                  agedPct=round(a['aged'] / a['oh'], 3) if a['oh'] else 0, gm=round(gm, 3) if gm is not None else None,
                  md=round(md, 3) if md is not None else None, wks=round(wks, 1) if wks is not None else None,
-                 gmroi=round(gmroi, 2) if gmroi is not None else None, ly=a['ly'], ty=a['ty'],
+                 gmroi=round(gmroi, 2) if gmroi is not None else None, ly=round(a['ly']), ty=round(a['ty']),
                  cats={c: round(v) for c, v in sorted(a['cats'].items(), key=lambda x: -x[1]) if v > 0},
                  series=[round(a['series'].get(k, 0)) for k in series_m],
                  top=sorted(a['top'], key=lambda x: -x['t12'])[:8], agedSkus=sorted(a['agedList'], key=lambda x: -x['value'])[:6])
@@ -499,3 +505,22 @@ def build_brands(ctx):
     rows.sort(key=lambda r: -r['t12'])
     return dict(asOf=as_of.isoformat(), through=at, months=series_m, t12Months=[t12m[0], t12m[-1]], compare=[ly3, last3],
                 unassigned={k: round(v) for k, v in unassigned.items()}, rows=rows)
+
+
+def brand_skus(ctx):
+    """Every SKU with stock or sales in the last 12 months, for assigning brands in the program:
+    [sku, description, category, brand from the description ('' if none), 12-month sales $, on hand $ at cost]."""
+    at, snap, hist, px = ctx['actual_through'], ctx['snap'], ctx['hist'], ctx['px']
+    t12m = [add_months(at, -i) for i in range(12)]
+    rows = []
+    for s in sorted(set(hist) | set(snap)):
+        c = ctx['cat_of'].get(s)
+        if c not in MERCH:
+            continue
+        r = snap.get(s)
+        desc = ctx['desc_of'].get(s, '') or (r['desc'] if r else '')
+        t12 = sum(hist.get(s, {}).get(k, 0) for k in t12m) * px(s)
+        oh = max(r['oh'], 0) * r['cost'] if r else 0
+        if t12 > 0 or oh > 0:
+            rows.append([s, desc, c, brand_of(desc) or (brand_of(r['desc']) if r else None) or '', round(t12), round(oh)])
+    return dict(asOf=ctx['as_of'].isoformat(), rows=rows)

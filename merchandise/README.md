@@ -55,6 +55,16 @@ Fiscal year: May 1 – Apr 30. Sales are at retail. Stock and budgets are at cos
 
 `pipeline/engine.py` and `app/src/20-engine.js` implement the same model. They must agree. With the Sep 11, 2026 reports, the FY2027 remaining budget comes to $717,316 with default FY2028 growth, or $702,037 with FY2028 growth set to 0. The second figure is the original published plan's $701,996, give or take rounding in SKU prices.
 
+## Brands
+
+A SKU's brand comes from its description (`pipeline/brands.py`, a list of brand names and their spellings) unless someone has assigned it. On the Brands tab, **Assign brands** lists every SKU with stock or sales (`brandskus/current`, written at each upload), starting with the ones with no brand. Anyone who can log orders can:
+
+- give a SKU its brand, including a new brand the list doesn't know yet (typing an existing brand in any case uses its spelling);
+- split a SKU that carries several brands by percentage (e.g. a towel SKU shared by PRG and Winston). Each brand gets that share of the SKU's sales, stock, margin and deliveries;
+- put a SKU back to its description.
+
+Assignments are kept in `brandmap/current` (`{sku: [{b: brand, s: percent}]}`, not replaced by data files). The reader applies them at the next month-end upload (`brand_split()`), in the brand scorecard, the SKU list and delivery matching.
+
 ## Deliveries
 
 Boxes are received into the POS without purchase orders, so nobody logs deliveries in the program. Each month-end upload works them out instead (`pipeline/receipts.py`):

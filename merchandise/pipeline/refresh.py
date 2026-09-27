@@ -97,6 +97,8 @@ def load_prior(folder):
             pr['skuhist'][n[8:]] = d
         elif n == 'skusnap':
             pr['skusnap'] = d
+        elif n == 'brandmap':
+            pr['brandmap'] = d
         elif n == 'assumptions':
             pr['assumptions'] = {k: d[k] for k in ('g27', 'g27cat', 'g28', 'wos') if k in d}
     return pr
@@ -116,6 +118,8 @@ def prior_from_docs(docs):
             pr['assumptions'] = {k: d[k] for k in ('g27', 'g27cat', 'g28', 'wos') if k in d}
         elif path == 'skusnap/current':
             pr['skusnap'] = d
+        elif path == 'brandmap/current':
+            pr['brandmap'] = d
     return pr
 
 
@@ -169,7 +173,7 @@ def build_bundle(reports, prior=None, notes=None):
     insights = model.build_insights(built['ctx'], calls)
     brands = model.build_brands(built['ctx'])
     docs = {'base': base, 'inventory': built['inventory'], 'insights': insights, 'brands': brands,
-            'skusnap': receipts.snapshot(built['ctx'])}
+            'skusnap': receipts.snapshot(built['ctx']), 'brandskus': model.brand_skus(built['ctx'])}
     arrived = receipts.arrivals((prior or {}).get('skusnap'), built['ctx'])
     if arrived:
         docs['arrivals'] = arrived
@@ -183,7 +187,8 @@ def build_bundle(reports, prior=None, notes=None):
                            forecast={k: round(sum(r['sales'][c][k] for c in base['cats'])) for k in open_months},
                            notes=notes)
     paths = {'base': 'base/current', 'inventory': 'inventory/current', 'insights': 'insights/current', 'brands': 'brands/current',
-             'refresh': f"refreshes/{base['asOf']}", 'skusnap': 'skusnap/current', 'arrivals': f"arrivals/{base['asOf']}"}
+             'refresh': f"refreshes/{base['asOf']}", 'skusnap': 'skusnap/current', 'brandskus': 'brandskus/current',
+             'arrivals': f"arrivals/{base['asOf']}"}
     paths.update({f'skuhist_{k}': f'skuhist/{k}' for k in built['skuhist']})
     bundle = dict(kind='pasatiempo-merch-bundle', version=1,
                   note=f"Month-end data as of {base['asOf']}" + (': ' + '; '.join(notes) if notes else ''),
