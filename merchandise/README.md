@@ -55,6 +55,17 @@ Fiscal year: May 1 – Apr 30. Sales are at retail. Stock and budgets are at cos
 
 `pipeline/engine.py` and `app/src/20-engine.js` implement the same model. They must agree. With the Sep 11, 2026 reports, the FY2027 remaining budget comes to $717,316 with default FY2028 growth, or $702,037 with FY2028 growth set to 0. The second figure is the original published plan's $701,996, give or take rounding in SKU prices.
 
+## Deliveries
+
+Boxes are received into the POS without purchase orders, so nobody logs deliveries in the program. Each month-end upload works them out instead (`pipeline/receipts.py`):
+
+1. Every refresh saves a stock snapshot, `skusnap/current`: on-hand, cost, and the month's unit sales by SKU.
+2. The next refresh works out, for every SKU, **arrived = on-hand now − on-hand then + units sold in between**. It values that at cost (capped at the average selling price, because some special orders carry the whole order's cost as their unit cost), totals it by category and brand, and saves it as `arrivals/{asOf}`. Stock that fell by more than it sold (counts, shrink, returns) is reported separately.
+3. The upload preview matches those totals to open orders for the same brand (through the vendor name) and category, oldest expected delivery first (`app/src/77-receiving.js`). Orders expected more than two months after the upload, or written after it, aren't matched. Arrivals with no open order are listed.
+4. The owner unticks or changes anything that's wrong, and **Update the program** records each delivery on its order (`receipts: [{date, amount, byCat, source: "pos"}]`). An order within 3% or $25 of its total is marked Received; otherwise it's Partly received and the rest stays on order.
+
+In the budget (`ledger()` in `app/src/10-core.js`), each delivery counts in the month it arrived, and not at all once it's in the on-hand stock (on or before the SKU Analysis date). Only what's still to come counts in the order's expected month, or in the current month once it's late. A delivery can still be recorded by hand on the order for anything the matching can't see.
+
 ## Reports calendar and reminders
 
 The **Reports** tab lists every report and task on the Pro Shop reporting calendar, with tick boxes everyone shares (`checklist/{key}`):

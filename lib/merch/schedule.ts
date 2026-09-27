@@ -39,7 +39,7 @@ export const ITEMS: Record<Cadence, ReportItem[]> = {
   weekly: [
     { k: "daily", t: "Daily Sales Report for Sunday", d: "Run it for Sunday's date: month-to-date sales by category against plan." },
     { k: "orders", t: "Order Book is up to date", d: "Every PO written this week is entered; changes, cancellations and new cancel dates are in." },
-    { k: "recv", t: "Last week's receipts are recorded", d: "Every delivery is marked received, so late orders and missed cancel dates get flagged." },
+    { k: "recv", t: "Last week's boxes are received in the POS", d: "Every delivery is received into the POS; the program matches deliveries to orders at month-end." },
     { k: "todo", t: "Work the To do list", d: "Mark each item Done or Dismiss." },
   ],
   // Keys match the checklist the Month-end page has always used, so earlier ticks still count.
@@ -50,9 +50,9 @@ export const ITEMS: Record<Cadence, ReportItem[]> = {
     { k: "item", t: "Sales by Item", d: "Net Sales by Item – Pro Shop, fiscal year to date. Gives each SKU's average selling price." },
     { k: "best", t: "Cost & margin report", d: "PRSHP – BEST 100 based on Quantity Sold, fiscal year to date — without the zero-on-hand filter, past the top 100 if the system allows." },
     { k: "rounds", t: "Rounds Summary", d: "Yearly Rounds Summary by Golfer Classification, calendar year to date." },
-    { k: "pos", t: "Every purchase order is in the Order Book", d: "Including phone and show orders. Mark anything received this month." },
+    { k: "pos", t: "Every purchase order is in the Order Book", d: "Including phone and show orders, so this month's deliveries have an order to match to." },
     { k: "recv", t: "Receipts entered in the POS", d: "Every box that came in is received in the POS before the SKU Analysis runs." },
-    { k: "send", t: "Upload the reports", d: "The owner uploads them on the Month-end page, PDF or Excel, checks what changes, then updates the program." },
+    { k: "send", t: "Upload the reports", d: "The owner uploads them on the Month-end page, PDF or Excel, checks the new numbers and the deliveries matched to orders, then updates the program." },
   ],
   quarterly: [
     { k: "fix", t: "Fix data issues first", d: "Correct negative on-hand and retired SKUs before posting the count." },

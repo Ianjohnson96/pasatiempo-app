@@ -18,6 +18,7 @@ import os
 import engine
 import model
 import parse
+import receipts
 from config import OTB_EXCLUDE, REPLENISH
 from extract import SHEETS, detect_kind, report_text
 
@@ -94,6 +95,8 @@ def load_prior(folder):
             pr['base'] = d
         elif n.startswith('skuhist_'):
             pr['skuhist'][n[8:]] = d
+        elif n == 'skusnap':
+            pr['skusnap'] = d
         elif n == 'assumptions':
             pr['assumptions'] = {k: d[k] for k in ('g27', 'g27cat', 'g28', 'wos') if k in d}
     return pr
@@ -111,6 +114,8 @@ def prior_from_docs(docs):
             pr['skuhist'][path[8:]] = d
         elif path == 'plan/assumptions':
             pr['assumptions'] = {k: d[k] for k in ('g27', 'g27cat', 'g28', 'wos') if k in d}
+        elif path == 'skusnap/current':
+            pr['skusnap'] = d
     return pr
 
 
@@ -123,6 +128,8 @@ def warnings(reports, prior, summary):
         out.append('No cost & margin report (BEST 100): margins stay as they were.')
     if not reports.get('sales_by_item'):
         out.append('No Sales by Item report: selling prices stay as they were.')
+    if not (prior or {}).get('skusnap'):
+        out.append("Deliveries are matched to orders from the next upload on: this one saves the stock snapshot they're worked out from.")
     was = ((prior or {}).get('base') or {}).get('asOf')
     day = lambda d: f'{datetime.fromisoformat(d):%b} {int(d[8:10])}, {d[:4]}'
     if was and summary['asOf'] < was:
@@ -161,7 +168,11 @@ def build_bundle(reports, prior=None, notes=None):
         base['cats'][c]['call'] = k
     insights = model.build_insights(built['ctx'], calls)
     brands = model.build_brands(built['ctx'])
-    docs = {'base': base, 'inventory': built['inventory'], 'insights': insights, 'brands': brands}
+    docs = {'base': base, 'inventory': built['inventory'], 'insights': insights, 'brands': brands,
+            'skusnap': receipts.snapshot(built['ctx'])}
+    arrived = receipts.arrivals((prior or {}).get('skusnap'), built['ctx'])
+    if arrived:
+        docs['arrivals'] = arrived
     docs.update({f'skuhist_{k}': v for k, v in built['skuhist'].items()})
     ex = [c for c in base['cats'] if c not in OTB_EXCLUDE]
     open_months = [k for k in r['m27'] + r['m28'] if k > base['actualThrough']]
@@ -172,14 +183,15 @@ def build_bundle(reports, prior=None, notes=None):
                            forecast={k: round(sum(r['sales'][c][k] for c in base['cats'])) for k in open_months},
                            notes=notes)
     paths = {'base': 'base/current', 'inventory': 'inventory/current', 'insights': 'insights/current', 'brands': 'brands/current',
-             'refresh': f"refreshes/{base['asOf']}"}
+             'refresh': f"refreshes/{base['asOf']}", 'skusnap': 'skusnap/current', 'arrivals': f"arrivals/{base['asOf']}"}
     paths.update({f'skuhist_{k}': f'skuhist/{k}' for k in built['skuhist']})
     bundle = dict(kind='pasatiempo-merch-bundle', version=1,
                   note=f"Month-end data as of {base['asOf']}" + (': ' + '; '.join(notes) if notes else ''),
                   docs={paths[n]: d for n, d in docs.items()})
     rf = docs['refresh']
     summary = dict(asOf=base['asOf'], fy=base['fy'], actualThrough=base['actualThrough'], partial=base['partial'],
-                   ytd=rf['ytd'], onHand=rf['onHand'], otbCur=rf['otbCur'], otbNext=rf['otbNext'])
+                   ytd=rf['ytd'], onHand=rf['onHand'], otbCur=rf['otbCur'], otbNext=rf['otbNext'],
+                   arrivals=dict(total=arrived['total'], **{'from': arrived['from']}) if arrived else None)
     return docs, bundle, summary
 
 

@@ -6,7 +6,7 @@ function orderAlerts(S){
     const tag = `PO ${p.poNumber} · ${vendorName(p)}`;
     if (p.cancelDate && p.cancelDate < todayISO) out.push({id:'o-cx-'+p.id, kind:'order', sev:'crit', po:p.id, title:`${tag}: past its cancel date`, detail:`Cancel-by was ${dateLabel(p.cancelDate)}.`, action:'Confirm with the vendor that it is still coming, or cancel it.'});
     else if (p.cancelDate && daysBetween(todayISO, p.cancelDate) <= 14) out.push({id:'o-cw-'+p.id, kind:'order', sev:'warn', po:p.id, title:`${tag}: cancel window closes in ${daysBetween(todayISO, p.cancelDate)} days`, detail:`Last day to cancel or trim is ${dateLabel(p.cancelDate)}.`, action:'Decide now whether you still want all of it.'});
-    if (p.deliveryMonth && p.deliveryMonth < THIS_MONTH) out.push({id:'o-late-'+p.id, kind:'order', sev:'warn', po:p.id, title:`${tag}: late`, detail:`Was due ${monthLabel(p.deliveryMonth)}; ${money(onOrder(p))} still outstanding.`, action:'Chase the vendor for a ship date.'});
+    if (p.deliveryMonth && p.deliveryMonth < THIS_MONTH) out.push({id:'o-late-'+p.id, kind:'order', sev:'warn', po:p.id, title:`${tag}: late`, detail:`Was due ${monthLabel(p.deliveryMonth)}; ${money(onOrder(p))} still to come${num(p.received) ? ` (${money(num(p.received))} has arrived)` : ''}.`, action:'Chase the vendor for a ship date and change the expected month, or set the order to Cancelled if the rest won\'t come. What arrived still counts.'});
   }
   for (const c of catList()){
     if (!inOTB(c.code)) continue;

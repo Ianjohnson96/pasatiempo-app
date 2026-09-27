@@ -36,8 +36,12 @@ function openOrder(id, preset){
       <div id="dTotals"></div>
       <div class="sec">3 · Budget check</div>
       <div id="dImpact"></div>
-      ${DX && !ro ? `<div class="receive"><h3>Record a delivery</h3>
-        <div class="lab" style="margin-bottom:8px">Received so far: <span class="num">${money(num(DX.received))}</span>${DX.receivedDate ? ' · last ' + dateLabel(DX.receivedDate) : ''}</div>
+      ${DX ? `<div class="receive"><h3>Deliveries</h3>
+        <div class="lab" style="margin-bottom:8px">Received so far: <span class="num">${money(num(DX.received))}</span> of ${money(poTotal(DX))}</div>
+        ${poReceipts(DX).length ? `<table class="mini" style="margin-bottom:10px"><tbody>${poReceipts(DX).map(r => `<tr><td>${dateLabel(r.date)}</td><td class="r num">${money(num(r.amount))}</td><td style="color:var(--muted)">${r.source === 'pos' ? 'matched from the SKU Analysis' : 'recorded by hand'}</td></tr>`).join('')}</tbody></table>` : `<div class="hint" style="margin-bottom:10px">Deliveries are matched from the SKU Analysis at each month-end upload; nothing needs logging when boxes arrive.</div>`}
+      </div>` : ''}
+      ${DX && !ro ? `<div class="receive"><h3>Record a delivery by hand</h3>
+        <div class="hint" style="margin-bottom:8px">Only for something the month-end matching can't see, e.g. an order for another brand's goods.</div>
         <div class="rr"><div class="f"><label for="rAmt">Cost value received ($)</label><input id="rAmt" type="number" min="0" step="0.01" value="${Math.max(poTotal(DX) - num(DX.received), 0).toFixed(2)}"></div>
         <div class="f"><label for="rDate">Date</label><input id="rDate" type="date" value="${todayISO}"></div><button class="btn" type="button" id="rBtn">Record</button></div></div>` : ''}
       <div class="f"><label for="dNotes">Notes</label><textarea id="dNotes" data-d="notes" ${ro ? 'disabled' : ''} placeholder="Confirmation #, ship-to, anything the next person needs">${esc(D.notes)}</textarea></div>
@@ -184,8 +188,9 @@ async function saveOrder(){
 async function recordReceipt(){
   const amt = r2(num($('#rAmt').value)), date = $('#rDate').value || todayISO;
   if (!(amt > 0)){ toast('Enter the cost value received.'); return; }
-  const received = r2(num(DX.received) + amt), status = received >= poTotal(DX) - 0.5 ? 'received' : 'partial';
-  const body = {...DX, received, receivedDate: date, status, updatedBy: myId, updatedAt: new Date().toISOString()}; delete body.id;
+  const receipts = [...poReceipts(DX), {date, amount: amt, source: 'manual', by: myId, at: new Date().toISOString()}];
+  const received = r2(receipts.reduce((a, r) => a + num(r.amount), 0)), status = received >= poTotal(DX) - 0.5 ? 'received' : 'partial';
+  const body = {...DX, receipts, received, receivedDate: receipts.map(r => r.date).sort().pop(), status, updatedBy: myId, updatedAt: new Date().toISOString()}; delete body.id;
   $('#rBtn').disabled = true;
   if (await write(`pos/${DX.id}`, body)){ closeOverlay(); toast(status === 'received' ? `PO ${DX.poNumber} fully received` : `Recorded ${money(amt)} received on PO ${DX.poNumber}`); }
   else if ($('#rBtn')) $('#rBtn').disabled = false;
