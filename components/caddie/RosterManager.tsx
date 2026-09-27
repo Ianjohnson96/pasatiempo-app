@@ -214,7 +214,16 @@ export default function RosterManager({ caddies, tiers, reach }: Props) {
                     )}
                     {c.phone && <span>{formatPhone(c.phone)}</span>}
                     {c.email && <span>{c.email}</span>}
-                    <span>contact by {c.preferredContactMethod}</span>
+                    {/* Contact details are optional, so say plainly when there
+                        are none rather than "contact by Both" with nothing to
+                        contact. */}
+                    {c.phone || c.email ? (
+                      <span>contact by {c.preferredContactMethod}</span>
+                    ) : (
+                      <span style={{ color: "var(--warn)" }}>
+                        no contact on file
+                      </span>
+                    )}
                     <span>
                       {c.lastWorkedOn
                         ? `last loop ${c.lastWorkedOn}`
