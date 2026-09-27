@@ -4,6 +4,8 @@ import { createAdminClient, createHubClient } from "@/lib/supabase/admin";
 import { getPerson, hasApp, isAppAdmin, roleIn, signedInEmail } from "@/lib/hub/access";
 import { APPS, type AppKey, type SiteKey } from "@/lib/hub/apps";
 import SiteSwitch from "@/components/hub/SiteSwitch";
+import { reportStatus } from "@/lib/merch/reminders";
+import { pacificToday } from "@/lib/merch/schedule";
 
 // Staff dashboard — one home for every Pasatiempo app. The proxy makes sure
 // someone is signed in; each row below appears only for people with access to
@@ -61,6 +63,16 @@ async function siteSwitches(): Promise<Record<string, boolean>> {
   return Object.fromEntries((data ?? []).map((s) => [s.key, s.enabled]));
 }
 
+// The Pro Shop's reporting calendar: what's due or overdue right now (lib/merch/schedule.ts).
+async function merchReports() {
+  try {
+    const open = await reportStatus(pacificToday());
+    return open.filter((r) => r.status === "due" || r.status === "overdue");
+  } catch {
+    return [];
+  }
+}
+
 const DENIED: Record<string, string> = {
   events: "You don't have access to the Event Planner.",
   caddie: "You don't have access to the Caddie Program.",
@@ -81,12 +93,14 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
   const isSuper = !!person?.isSuper;
   const managesPeople = !!person && (isSuper || (Object.keys(APPS) as AppKey[]).some((a) => isAppAdmin(person, a)));
 
-  const [ev, mhi, cad, sites] = await Promise.all([
+  const [ev, mhi, cad, sites, reports] = await Promise.all([
     see("events") ? eventsStats() : null,
     isSuper ? mhiStats() : null,
     see("caddie") ? caddieStats() : null,
     isSuper ? siteSwitches() : Promise.resolve({} as Record<string, boolean>),
+    see("merch") ? merchReports() : Promise.resolve([]),
   ]);
+  const reportsLate = reports.some((r) => r.status === "overdue");
   const role = (app: AppKey) => {
     const r = roleIn(person, app);
     return r ? <span className="badge gray">{isSuper ? "super admin" : ROLE_LABEL[r]}</span> : null;
@@ -202,14 +216,25 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
                 <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                   <span className="ev-title">Merchandise Program</span>
                   {role("merch")}
+                  {!!reports.length && <span className={"badge " + (reportsLate ? "closed" : "full")}>{reportsLate ? "reports overdue" : "reports due"}</span>}
                 </div>
                 <div className="ev-meta">
-                  <span>schema: merch</span>
-                  <span>forecast, open-to-buy, orders, brand scorecard</span>
+                  {reports.length ? (
+                    reports.map((r) => (
+                      <span key={r.period.key}>
+                        {r.period.label}: {r.left} left
+                      </span>
+                    ))
+                  ) : (
+                    <>
+                      <span>schema: merch</span>
+                      <span>forecast, open-to-buy, orders, brand scorecard</span>
+                    </>
+                  )}
                 </div>
               </div>
-              <a href="/merch" className="btn secondary small">
-                Open
+              <a href={reports.length ? "/merch#reports" : "/merch"} className="btn secondary small">
+                {reports.length ? "Reports" : "Open"}
               </a>
             </div>
           )}

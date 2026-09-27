@@ -16,7 +16,10 @@ function renderMonthEnd(){
   if (!BASE){ $('#pane').innerHTML = `<section class="panel"><div class="note">Month-end status appears after the first refresh.</div></section>`; return; }
   const due = nextRefreshMonth(), dueEnd = due + '-' + pad(new Date(+due.slice(0,4), +due.slice(5,7), 0).getDate());
   const late = todayISO > dueEnd ? daysBetween(dueEnd, todayISO) : 0;
-  const chk = CHECKS[due] || {items: {}}, done = MONTH_END.filter(x => chk.items && chk.items[x.k]).length;
+  // The checklist follows the calendar (Reports tab) when the club app provides it; otherwise the data's next refresh month.
+  const mp = typeof rptMonthly === 'function' ? rptMonthly() : null;
+  const ckKey = mp ? mp.key : due, ckItems = mp ? mp.items : MONTH_END, ckTitle = mp ? `${mp.label} checklist` : `${monthFull(due)} month-end checklist`;
+  const chk = CHECKS[ckKey] || {items: {}}, done = ckItems.filter(x => chk.items && chk.items[x.k]).length;
   const hist = REFRESHES.slice().sort((a, b) => String(b.asOf).localeCompare(String(a.asOf)));
   const fyNow = curFY(), closed = fyMonths(fyNow).filter(k => monthStatus(k) === 'actual');
   const fcFor = k => { const r = hist.filter(h => h.forecast && h.forecast[k] != null && h.asOf < k + '-01').sort((a, b) => String(b.asOf).localeCompare(String(a.asOf)))[0]; return r ? r.forecast[k] : null; };
@@ -28,9 +31,9 @@ function renderMonthEnd(){
           <p style="margin-top:0">Sales, stock and suggestions are as of <b>${dateLabel(BASE.asOf)}</b>. Closed months run through <b>${monthFull(BASE.actualThrough)} ${BASE.actualThrough.slice(0,4)}</b>${BASE.partial ? `; ${monthFull(BASE.partial.m)} had ${money(BASE.partial.actual)} of sales by day ${BASE.partial.day}` : ''}.</p>
           <p>${late ? `<b class="neg">The ${monthFull(due)} refresh is ${late} day${late === 1 ? '' : 's'} overdue.</b> Budgets are still using ${dateLabel(BASE.asOf)} stock, so anything received since then isn't reflected yet.` : `Next refresh: after <b>${monthFull(due)} ${due.slice(0,4)}</b> closes (${dateLabel(dueEnd)}).`}</p>
           <p style="margin-bottom:0">Orders, vendors, counts, budget changes and brand calls are live — they never wait for a refresh.</p></div></section>
-      <section class="panel"><header><h2>${monthFull(due)} month-end checklist</h2><span class="lab">${done} of ${MONTH_END.length} done</span></header>
-        <ul class="checks">${MONTH_END.map(x => { const on = !!(chk.items && chk.items[x.k]); return `<li><label><input type="checkbox" data-chk="${x.k}" data-chkm="${due}" ${on ? 'checked' : ''} ${canAct() ? '' : 'disabled'}><span><b>${x.t}</b><span class="d">${x.d}</span>${on && chk.by && chk.by[x.k] ? `<span class="who">✓ <span class="person" data-uid="${esc(chk.by[x.k])}"></span></span>` : ''}</span></label></li>`; }).join('')}</ul>
-        <div class="note">Anyone who can log orders can tick these off; everyone sees the same list. Save each report as Excel if you can (it reads in seconds), PDF otherwise.</div></section>
+      <section class="panel"><header><h2>${esc(ckTitle)}</h2><span class="lab">${done} of ${ckItems.length} done</span></header>
+        ${checklistHTML(ckKey, ckItems)}
+        <div class="note">Anyone who can log orders can tick these off; everyone sees the same list${RPT ? ', here and on the Reports tab' : ''}. Save each report as Excel if you can (it reads in seconds), PDF otherwise.</div></section>
     </div>
     <div class="stack">
       ${renderUpload()}
@@ -52,7 +55,7 @@ function renderMonthEnd(){
 }
 async function toggleCheck(m, k, on){
   const cur = CHECKS[m] || {items: {}, by: {}};
-  const body = {items: {...(cur.items || {}), [k]: on}, by: {...(cur.by || {}), [k]: on ? myId : null}, month: m};
+  const body = {items: {...(cur.items || {}), [k]: on}, by: {...(cur.by || {}), [k]: on ? myId : null}, month: m};  // "month" is the checklist key (a month, week, quarter…)
   await write('checklist/' + m, body);
 }
 

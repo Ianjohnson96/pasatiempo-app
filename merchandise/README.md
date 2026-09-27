@@ -55,6 +55,22 @@ Fiscal year: May 1 – Apr 30. Sales are at retail. Stock and budgets are at cos
 
 `pipeline/engine.py` and `app/src/20-engine.js` implement the same model. They must agree. With the Sep 11, 2026 reports, the FY2027 remaining budget comes to $717,316 with default FY2028 growth, or $702,037 with FY2028 growth set to 0. The second figure is the original published plan's $701,996, give or take rounding in SKU prices.
 
+## Reports calendar and reminders
+
+The **Reports** tab lists every report and task on the Pro Shop reporting calendar, with tick boxes everyone shares (`checklist/{key}`):
+
+| Checklist | Shows | Due | Overdue from | Reminder emails |
+|---|---|---|---|---|
+| Weekly | Monday–Sunday | Monday | Wednesday | Monday, Wednesday |
+| Month-end | 3 days before the last day | Last day | The 4th of the next month | 3 days before, last day, the 4th |
+| Quarterly count (Jul, Oct, Jan, Apr) | Quarter's last day | 10 days later | 11 days later | Quarter end, the day it's late |
+| Buying review (Aug, Nov, Feb) | The 1st | The 15th | The 16th | The 1st, the 16th |
+| Year-end | Apr 23 | Apr 30 | May 11 | Apr 23, Apr 30, May 11 |
+
+The items and dates live in `lib/merch/schedule.ts`; the Month-end page shows the same month-end checklist. While anything is due or overdue, a banner shows on every page of the program, and the hub dashboard's Merchandise row says so.
+
+On reminder days, `/api/cron/merch` (Vercel Cron, 15:00 UTC, about 8 am Pacific) emails everyone with the Merchandise Program, and the super admins, listing what's still unticked. Nothing is sent once a checklist is finished. It needs `CRON_SECRET` and an SMTP mailbox in the Vercel environment (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`; see `.env.local.example`). Without the mailbox, the reminders show in the app only. Each send is logged on the Activity page.
+
 ## Month-end refresh
 
 1. Pull the month-end reports (see the Month-end page): SKU Analysis, Daily Sales Report by Item, Sales by Item (FYTD) and BEST 100 cost & margin (FYTD). The checklist also lists Sales by Category (FYTD), which is kept for the record; only a full-year Sales by Category changes the forecast. Add the Yearly Rounds Summary when it's available. Excel exports read in seconds; PDFs take up to a minute.
