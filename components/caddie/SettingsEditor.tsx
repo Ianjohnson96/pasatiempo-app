@@ -10,16 +10,30 @@ import { saveCaddieSettings, type SettingsInput } from "@/lib/caddie/actions";
 // because the person changing it is thinking about the yard, not about a key
 // called horizon_days. Rates and the waterfall keep their own screens.
 
+export interface TextingStatus {
+  /** The Twilio keys are in the environment. */
+  configured: boolean;
+  fromNumber: string | null;
+  /** What to paste into Twilio as the incoming-message webhook. */
+  webhookUrl: string;
+  /** The public terms page the carrier registration asks for. */
+  termsUrl: string;
+  optedIn: number;
+  active: number;
+}
+
 export default function SettingsEditor({
   initial,
   alertRecipients,
   mailReady,
+  texting,
 }: {
   initial: SettingsInput;
   /** Who drop alerts already reach, from the access list. */
   alertRecipients: string[];
   /** Whether outgoing email is configured at all. */
   mailReady: boolean;
+  texting: TextingStatus;
 }) {
   const router = useRouter();
   const [s, setS] = useState<SettingsInput>(initial);
@@ -180,6 +194,80 @@ export default function SettingsEditor({
             />
           </label>
         </div>
+      </Section>
+
+      <Section
+        title="Texting"
+        help="Texts go out alongside app alerts, only to caddies who switched texts on from their own phone. A caddie answers an offer by replying Y or N."
+      >
+        {!texting.configured ? (
+          <p className="notice warn" style={{ margin: 0 }}>
+            Not connected yet. Texting needs a Twilio number and three settings in Vercel:{" "}
+            <code>TWILIO_ACCOUNT_SID</code>, <code>TWILIO_AUTH_TOKEN</code> and{" "}
+            <code>TWILIO_FROM_NUMBER</code>. Caddies can already sign up; nothing is sent until
+            this is connected and switched on.
+          </p>
+        ) : (
+          <p className="notice ok" style={{ margin: 0 }}>
+            Connected to Twilio{texting.fromNumber ? ` — texts come from ${texting.fromNumber}` : ""}.
+          </p>
+        )}
+
+        <div className="muted" style={{ fontSize: 13 }}>
+          {texting.optedIn} of {texting.active} active caddies have switched texts on.
+        </div>
+
+        <Toggle
+          on={s.smsEnabled}
+          onChange={(v) => set("smsEnabled", v)}
+          label="Send texts"
+          hint={
+            texting.configured
+              ? "Leave this off until Twilio has approved the number for sending — texts sent before then are blocked by the carriers."
+              : "Can be switched on now; nothing is sent until Twilio is connected."
+          }
+        />
+        <div style={{ display: "grid", gap: 8, paddingLeft: 28, opacity: s.smsEnabled ? 1 : 0.5 }}>
+          <Toggle
+            on={s.sms.offers}
+            disabled={!s.smsEnabled}
+            onChange={(v) => set("sms", { ...s.sms, offers: v })}
+            label="Offers"
+            hint="An offer sent to a caddie by name, by tier, or as next-up. They can reply Y to take it."
+          />
+          <Toggle
+            on={s.sms.reminders}
+            disabled={!s.smsEnabled}
+            onChange={(v) => set("sms", { ...s.sms, reminders: v })}
+            label="Reminders"
+            hint="The day-before reminder of a loop they've accepted."
+          />
+          <Toggle
+            on={s.sms.board}
+            disabled={!s.smsEnabled}
+            onChange={(v) => set("sms", { ...s.sms, board: v })}
+            label="Job board posts"
+            hint="Every job posted to everyone, and Call all. Off is usually right: a text to the whole roster for every job is how people start replying STOP."
+          />
+        </div>
+
+        <details style={{ fontSize: 13 }}>
+          <summary style={{ cursor: "pointer" }}>For the Twilio setup</summary>
+          <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+            <div>
+              Incoming-message webhook (HTTP POST):
+              <code style={{ display: "block", wordBreak: "break-all", marginTop: 2 }}>
+                {texting.webhookUrl}
+              </code>
+            </div>
+            <div>
+              Terms and opt-in page for the registration:
+              <code style={{ display: "block", wordBreak: "break-all", marginTop: 2 }}>
+                {texting.termsUrl}
+              </code>
+            </div>
+          </div>
+        </details>
       </Section>
 
       <Section title="Offers">

@@ -36,10 +36,11 @@ function isCaddiePath(p: string): boolean {
   return p === "/caddie" || p.startsWith("/caddie/");
 }
 
-// Public inside the portal: the QR landing page, and the portal's own front
-// door, which explains how to get a link when you arrive without one.
+// Public inside the portal: the QR landing page, the portal's own front door,
+// which explains how to get a link when you arrive without one, and the texting
+// terms, which the carriers' reviewers must be able to read without a login.
 function isCaddiePublicPath(p: string): boolean {
-  return p === "/caddie" || p.startsWith("/caddie/join/");
+  return p === "/caddie" || p === "/caddie/texts" || p.startsWith("/caddie/join/");
 }
 
 // A static-HTML section (e.g. El Sombrero) served straight from /public — either

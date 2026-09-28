@@ -14,6 +14,8 @@ import {
 import {
   CADDIE_STATUSES,
   CONTACT_METHODS,
+  LOOP_TYPES,
+  NO_PREFS,
   type CaddieRec,
   type CaddieStatus,
   type ContactMethod,
@@ -29,7 +31,13 @@ interface Props {
   /** Active caddie id -> whether we can actually reach them. */
   reach: Record<
     string,
-    { devices: number; hasPhone: boolean; hasEmail: boolean; lastSeenAt: string | null }
+    {
+      devices: number;
+      hasPhone: boolean;
+      hasEmail: boolean;
+      texts: boolean;
+      lastSeenAt: string | null;
+    }
   >;
 }
 
@@ -47,6 +55,7 @@ const BLANK: CaddieInput = {
   status: "Active",
   preferredContactMethod: "Both",
   notes: "",
+  jobPrefs: NO_PREFS,
 };
 
 export default function RosterManager({ caddies, tiers, reach }: Props) {
@@ -66,6 +75,7 @@ export default function RosterManager({ caddies, tiers, reach }: Props) {
   const onAlerts = activeList.filter(
     (c) => (reach[c.id]?.devices ?? 0) > 0,
   ).length;
+  const onTexts = activeList.filter((c) => reach[c.id]?.texts).length;
 
   function run(
     fn: () => Promise<{ ok: boolean; error?: string }>,
@@ -89,7 +99,7 @@ export default function RosterManager({ caddies, tiers, reach }: Props) {
           <h1>Caddie Roster</h1>
           <div className="sub">
             {caddies.length} on the roster · {active} active · {onAlerts} with
-            job alerts on
+            job alerts on · {onTexts} taking texts
           </div>
         </div>
         <button
@@ -212,6 +222,24 @@ export default function RosterManager({ caddies, tiers, reach }: Props) {
                             : "never signed in"}
                       </span>
                     )}
+                    {c.status === "Active" && reach[c.id]?.texts && (
+                      <span
+                        className="badge open"
+                        title={
+                          c.smsOptInAt
+                            ? `Agreed to texts ${new Date(c.smsOptInAt).toLocaleDateString()}`
+                            : "Agreed to texts"
+                        }
+                      >
+                        texts on
+                      </span>
+                    )}
+                    {c.jobPrefs.avoid.length > 0 && (
+                      <span style={{ color: "var(--warn)" }}>
+                        rather not: {c.jobPrefs.avoid.join(", ")}
+                      </span>
+                    )}
+                    {c.jobPrefs.note && <span>“{c.jobPrefs.note}”</span>}
                     {c.phone && <span>{formatPhone(c.phone)}</span>}
                     {c.email && <span>{c.email}</span>}
                     {/* Contact details are optional, so say plainly when there
@@ -302,7 +330,9 @@ export default function RosterManager({ caddies, tiers, reach }: Props) {
                         status: c.status,
                         preferredContactMethod: c.preferredContactMethod,
                         notes: c.notes,
+                        jobPrefs: c.jobPrefs,
                       }}
+                      textsOn={c.smsOptIn}
                       busy={busy}
                       submitLabel="Save changes"
                       onCancel={() => setEditing(null)}
@@ -474,6 +504,7 @@ function CaddieForm({
   onSubmit,
   onCancel,
   onDelete,
+  textsOn,
 }: {
   initial: CaddieInput;
   tiers: TierRec[];
@@ -482,10 +513,15 @@ function CaddieForm({
   onSubmit: (input: CaddieInput) => void;
   onCancel: () => void;
   onDelete?: () => void;
+  /** They have agreed to texts, so the shop may switch them off. */
+  textsOn?: boolean;
 }) {
   const [form, setForm] = useState<CaddieInput>(initial);
   const set = <K extends keyof CaddieInput>(k: K, v: CaddieInput[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
+  const prefs = form.jobPrefs ?? NO_PREFS;
+  const phoneChanged = (form.phone.replace(/\D/g, "").slice(-10)) !==
+    (initial.phone.replace(/\D/g, "").slice(-10));
 
   return (
     <form
@@ -582,6 +618,61 @@ function CaddieForm({
           />
         </Field>
       </div>
+
+      {/* Preferences are the caddie's to set from their phone; the shop can
+          set them too, for the caddie who rings in to say it. Ticked = happy
+          to take it, the same way round as the caddie sees it. */}
+      <div style={{ marginTop: 12 }}>
+        <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 4 }}>
+          Happy to take (untick what they&apos;d rather not do — it ranks them lower, never
+          hides them)
+        </div>
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 14 }}>
+          {LOOP_TYPES.map((t) => (
+            <label key={t} style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={!prefs.avoid.includes(t)}
+                onChange={(e) =>
+                  set("jobPrefs", {
+                    ...prefs,
+                    avoid: e.target.checked
+                      ? prefs.avoid.filter((x) => x !== t)
+                      : [...prefs.avoid, t],
+                  })
+                }
+              />
+              {t}
+            </label>
+          ))}
+        </div>
+        <input
+          value={prefs.note}
+          onChange={(e) => set("jobPrefs", { ...prefs, note: e.target.value })}
+          placeholder="Their preference note, e.g. mornings only on weekdays"
+          maxLength={200}
+          style={{ ...inputStyle, width: "100%", marginTop: 8, fontSize: 14 }}
+        />
+      </div>
+
+      {textsOn && (
+        <div style={{ marginTop: 12, fontSize: 14 }}>
+          <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={form.stopTexts ?? false}
+              onChange={(e) => set("stopTexts", e.target.checked)}
+            />
+            Stop texting them (they asked)
+          </label>
+          {phoneChanged && (
+            <div style={{ color: "var(--warn)", fontSize: 13, marginTop: 4 }}>
+              Changing the number stops their texts — they agreed for the old one, and will need
+              to switch texts on again from their phone.
+            </div>
+          )}
+        </div>
+      )}
 
       <div
         style={{ display: "flex", gap: 10, marginTop: 14, alignItems: "center" }}

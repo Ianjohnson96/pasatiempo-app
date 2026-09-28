@@ -142,6 +142,13 @@ export default function CaddiePortal({
       >
         Set your availability →
       </Link>
+      <Link
+        href="/caddie/preferences"
+        className="btn ghost"
+        style={{ display: "block", textAlign: "center", marginTop: 8 }}
+      >
+        {caddie.smsOptIn ? "Job preferences & texts →" : "Job preferences · get offers by text →"}
+      </Link>
 
       {/* ---- Offers waiting on an answer -------------------------------- */}
       <h2 className="section-title" style={{ marginTop: 28 }}>

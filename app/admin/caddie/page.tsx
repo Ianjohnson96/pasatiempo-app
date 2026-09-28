@@ -21,6 +21,7 @@ import {
   rankCandidates,
 } from "@/lib/caddie/data";
 import { pushConfigured } from "@/lib/caddie/push";
+import { smsConfigured } from "@/lib/caddie/sms";
 
 // The Pro Shop's dispatch board. Access is gated by the proxy (signed-in
 // Supabase user) and re-checked here, the same as every other /admin route.
@@ -55,7 +56,11 @@ export default async function CaddieDispatchPage({
   ]);
   const tiers = await listTiers();
 
-  const coverage = alertCoverage(reach);
+  // A post reaches a caddie by push, or by text when board texts are live.
+  const coverage = alertCoverage(
+    reach,
+    settings.smsEnabled && settings.sms.board && smsConfigured(),
+  );
 
   const past = pastLoopIds(loops);
 
@@ -80,6 +85,7 @@ export default async function CaddieDispatchPage({
       availability: c.availability,
       alreadyOffered: c.alreadyOffered,
       conflict: c.conflict,
+      prefersNot: c.prefersNot,
     }));
   }
 

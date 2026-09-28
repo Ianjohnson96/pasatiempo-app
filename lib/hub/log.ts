@@ -6,7 +6,7 @@ import { createHubClient } from "@/lib/supabase/admin";
 // Logging never blocks the change it records: a failed write is swallowed, so
 // an outage of the log can't stop someone fixing an access problem.
 
-export type ActivityApp = "events" | "caddie" | "merch" | "hub" | "sites";
+export type ActivityApp = "events" | "caddie" | "merch" | "lessons" | "hub" | "sites";
 
 export interface ActivityEntry {
   actor: string | null;

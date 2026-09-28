@@ -43,6 +43,8 @@ export interface BoardCandidate {
   availability: "Available" | "Unavailable" | "Pending" | null;
   alreadyOffered: boolean;
   conflict: boolean;
+  /** Said they would rather not take this kind of loop. Ranks lower; still pickable. */
+  prefersNot: boolean;
 }
 
 /** One active caddie, as the new-job form needs them. */
@@ -961,6 +963,17 @@ function OfferPanel({
                 )}
                 {c.conflict && <span className="badge closed">conflict</span>}
                 {c.alreadyOffered && <span className="badge gray">asked</span>}
+                {c.prefersNot && (
+                  <span
+                    className="badge gray"
+                    title={
+                      c.caddie.jobPrefs.note ||
+                      "They've said they'd rather not take this kind of loop."
+                    }
+                  >
+                    rather not
+                  </span>
+                )}
                 <span className="muted" style={{ fontSize: 12 }}>
                   {c.caddie.lastWorkedOn
                     ? `last ${c.caddie.lastWorkedOn}`

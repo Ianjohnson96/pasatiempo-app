@@ -40,8 +40,10 @@ function caddie(id: string, over: Partial<CaddieRec> = {}): CaddieRec {
     status: "Active",
     preferredContactMethod: "Both",
     smsOptIn: false,
+    smsOptInAt: null,
     lastWorkedOn: null,
     notes: "",
+    jobPrefs: { avoid: [], note: "" },
     ...over,
   };
 }
@@ -305,5 +307,41 @@ describe("rankCandidates ordering rules", () => {
     const ranked = rankCandidates(target, [busy, free], day, new Map(), 4);
     expect(ranked[0].caddie.id).toBe(free.id);
     expect(ranked.find((c) => c.caddie.id === busy.id)?.conflict).toBe(true);
+  });
+});
+
+describe("rankCandidates and job preferences", () => {
+  const double = loop(AM_LOOP_UTC, { loopType: "Double Bag" });
+  const noDoubles = caddie("no-doubles", {
+    lastWorkedOn: "2026-01-01", // waited longest, so would otherwise lead
+    jobPrefs: { avoid: ["Double Bag"], note: "" },
+  });
+  const happy = caddie("happy", { lastWorkedOn: "2026-09-19" });
+
+  it("puts a caddie who would rather not below one who is happy to", () => {
+    const ranked = rankCandidates(double, [noDoubles, happy], [{ loop: double, crew: [] }], new Map(), 4);
+    expect(ranked.map((c) => c.caddie.id)).toEqual([happy.id, noDoubles.id]);
+    expect(ranked[1].prefersNot).toBe(true);
+    // Soft: still on the list, still offerable.
+    expect(ranked[1].conflict).toBe(false);
+  });
+
+  it("weighs a preference below availability, not above it", () => {
+    // Free but would rather not, against happy but never said whether free.
+    const ranked = rankCandidates(
+      double,
+      [happy, noDoubles],
+      [{ loop: double, crew: [] }],
+      new Map([[noDoubles.id, said("AM")]]),
+      4,
+    );
+    expect(ranked[0].caddie.id).toBe(noDoubles.id);
+  });
+
+  it("ignores the preference for other kinds of loop", () => {
+    const single = loop(AM_LOOP_UTC, { loopType: "Single Bag" });
+    const ranked = rankCandidates(single, [happy, noDoubles], [{ loop: single, crew: [] }], new Map(), 4);
+    expect(ranked[0].caddie.id).toBe(noDoubles.id);
+    expect(ranked.every((c) => !c.prefersNot)).toBe(true);
   });
 });

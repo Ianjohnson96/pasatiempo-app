@@ -31,6 +31,16 @@ export const APPS = {
       viewer: "Look only",
     },
   },
+  // Ian's own teaching book. One role, granted to nobody by default - a super
+  // admin holds it automatically, so it stays invisible to other staff.
+  lessons: {
+    label: "Lesson Book",
+    home: "/lessons",
+    roles: ["owner"],
+    roleHelp: {
+      owner: "Teaching book, pricing and payments",
+    },
+  },
 } as const;
 
 export type AppKey = keyof typeof APPS;
