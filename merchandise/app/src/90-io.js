@@ -163,6 +163,7 @@ document.addEventListener('click', async e => {
   if (ds.bsort){ bsort = {key: ds.bsort, dir: bsort.key === ds.bsort ? -bsort.dir : (ds.bsort === 'brand' ? 1 : -1)}; return render(); }
   if (ds.bcsave) return saveBrandCall(ds.bcsave);
   if (ds.bmopen){ BM.edit = null; return openBrandMap(); }
+  if (ds.bupd) return updateBrands();
   if (ds.beopen){ BE.edit = null; return openBrandList(); }
   if (ds.benew) return beStart('');
   if (ds.beedit) return beStart(ds.beedit);

@@ -20,6 +20,7 @@ const OWNER_ONLY = new Set([
   "skusnap",
   "arrivals",
   "brandskus",
+  "brandin",
 ]);
 
 // Collections a month-end data file may replace. Everything people enter by
@@ -28,11 +29,12 @@ const OWNER_ONLY = new Set([
 // (merchandise/pipeline/receipts.py).
 // brandskus/current lists every SKU for assigning brands; the assignments themselves
 // (brandmap/current) are entered in the program and never come from a data file.
-export const IMPORTABLE = new Set(["base", "inventory", "insights", "brands", "refreshes", "skuhist", "skusnap", "arrivals", "brandskus"]);
+// brandin/current holds what Brands -> Update brands needs to rebuild the scorecard between uploads.
+export const IMPORTABLE = new Set(["base", "inventory", "insights", "brands", "refreshes", "skuhist", "skusnap", "arrivals", "brandskus", "brandin"]);
 
 // Collections the page never needs; kept out of the initial load.
 // remindersSent/{date} marks a day's reminder email as sent (app/api/cron/merch).
-export const NOT_LOADED = new Set(["skuhist", "remindersSent", "skusnap"]);
+export const NOT_LOADED = new Set(["skuhist", "remindersSent", "skusnap", "brandin"]);
 
 const SEGMENT = /^[A-Za-z0-9_.~:@+-]{1,200}$/;
 

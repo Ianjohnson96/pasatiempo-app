@@ -47,7 +47,7 @@ function openBrandMap(){
   $('#overlay').innerHTML = `<div class="scrim" data-close="1"></div>
   <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="bmTitle">
     <header><div><div class="lab">${unknown.length} SKU${unknown.length === 1 ? '' : 's'} with no brand · ${money(sum(unknown, r => r[4]))} of 12-month sales</div><h2 id="bmTitle">Assign brands</h2>
-      <div style="font-size:12.5px;color:var(--muted);margin-top:4px">Give a SKU its brand, or split one that carries several brands. The brand scorecard and delivery matching use this from the next month-end upload.</div></div>
+      <div style="font-size:12.5px;color:var(--muted);margin-top:4px">Give a SKU its brand, or split one that carries several brands. ${isAdmin ? '<b>Update brands</b> on the Brands tab' : 'The owner\'s <b>Update brands</b>'} puts it into the scorecard; delivery matching uses it from the next month-end upload.</div></div>
       <button class="x" type="button" data-close="1" aria-label="Close">×</button></header>
     <div class="body">
       ${ed ? `<div class="inline-add"><div class="lab">SKU ${esc(ed[0])} · ${esc(ed[1])}</div>
@@ -94,7 +94,7 @@ async function bmSave(clear){
 
 /* ---------- edit brands (owner) ----------
    Rename a brand, merge one into another, or add a brand and the words that find it in item descriptions.
-   Saved in brandmap/current; this page shows the change at once, the scorecard and delivery matching from the next upload. */
+   Saved in brandmap/current; this page shows the change at once, the scorecard at the next Update brands. */
 const BE = {edit: null, name: '', words: '', q: ''};  // edit: the brand being edited, '' for a new one, null for the list
 const beCanEdit = () => isAdmin && canAct();
 const beWordsOf = b => Object.entries(BRANDMAP.words || {}).filter(([k]) => bmRen(k) === b).flatMap(([, ws]) => ws || []);
@@ -127,7 +127,7 @@ function openBrandList(){
   $('#overlay').innerHTML = `<div class="scrim" data-close="1"></div>
   <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="beTitle">
     <header><div><div class="lab">${list.length} brand${list.length === 1 ? '' : 's'} · ${bmUnknown().length} SKUs with no brand</div><h2 id="beTitle">Edit brands</h2>
-      <div style="font-size:12.5px;color:var(--muted);margin-top:4px">Rename a brand, merge two into one, or add a brand with the words that find it in item descriptions. Names and words show here at once; the brand scorecard and delivery matching use them from the next month-end upload.</div></div>
+      <div style="font-size:12.5px;color:var(--muted);margin-top:4px">Rename a brand, merge two into one, or add a brand with the words that find it in item descriptions. Names and words show here at once; press <b>Update brands</b> to rebuild the scorecard with them. Delivery matching uses them from the next month-end upload.</div></div>
       <button class="x" type="button" data-close="1" aria-label="Close">×</button></header>
     <div class="body">
       ${ed ? `<div class="inline-add"><div class="lab">${BE.edit ? `Editing ${esc(BE.edit)}` : 'New brand'}</div>
@@ -186,4 +186,22 @@ async function beUndo(a){
   if (await write('brandmap/current', {...BRANDMAP, rename: R, updatedBy: myId, updatedAt: new Date().toISOString()})){
     BRANDMAP = {...BRANDMAP, rename: R}; toast(`${a} is its own brand again`); openBrandList(); if (TAB === 'brands') render();
   }
+}
+
+/* ---------- update brands (owner) ----------
+   Rebuilds brands/current and brandskus/current from the stored documents with today's assignments and brand list,
+   the same way a month-end upload does: the pass from {base}/api/refresh, the reader's "rebuild" mode, then /api/import. */
+const BUP = {busy: false};
+const bmPending = () => !!(BRANDS && BRANDMAP.updatedAt && BRANDMAP.updatedAt > (BRANDS.at || ''));  // a scorecard from before "at" was kept counts as older
+async function updateBrands(){
+  if (BUP.busy || !window.MERCH_HOST) return;
+  BUP.busy = true; render();
+  try {
+    const H = window.MERCH_HOST, start = await upJSON(H.base + '/api/refresh');
+    const r = await upJSON('/api/merch/reports', {ticket: start.ticket, prior: start.prior, rebuild: 'brands'});
+    await upJSON(H.base + '/api/import', r.bundle);
+    BRANDS = r.bundle.docs['brands/current']; BRANDSKUS = r.bundle.docs['brandskus/current'];
+    toast(`Brand scorecard updated: ${r.summary.lines} brand lines, ${money(r.summary.unassigned)} of sales with no brand.`);
+  } catch (e){ toast(e.message); }
+  BUP.busy = false; render();
 }
