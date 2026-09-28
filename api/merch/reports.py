@@ -6,7 +6,8 @@ owner's page first asks the Next.js app for a pass and last month's documents
 
   {"ticket": "...", "prior": {path: data}, "note": "...", "files": [{"name": "...", "data": "<base64>"}]}
 
-and gets back {"bundle": ..., "summary": ..., "files": [...]}. Nothing is saved here: the page
+and gets back {"bundle": ..., "summary": ..., "files": [...]}. With "rebuild": "brands" and no files, it
+rebuilds only the brand scorecard from the stored documents (Brands -> Update brands). Nothing is saved here: the page
 shows the result, and the owner's "Update the program" sends the bundle to /merch/api/import,
 which checks the owner again and writes it.
 
@@ -65,6 +66,13 @@ def run(req):
     claims = check_ticket(req.get('ticket'))
     if not claims:
         return 401, {'error': 'Your upload pass has expired. Reload the page and try again.'}
+    if req.get('rebuild') == 'brands':  # Brands -> Update brands: no reports, just the stored documents
+        docs = req.get('prior') if isinstance(req.get('prior'), dict) else {}
+        try:
+            bundle, summary = refresh.rebuild_brands(docs)
+        except ValueError as e:
+            return 422, {'error': str(e)}
+        return 200, {'bundle': bundle, 'summary': summary}
     files = req.get('files')
     if not isinstance(files, list) or not files:
         return 400, {'error': 'Choose the report files first.'}

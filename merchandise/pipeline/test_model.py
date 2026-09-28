@@ -1,6 +1,6 @@
 """python merchandise/pipeline/test_model.py"""
 from config import CATS
-from model import build, fy_months, fytd_by_category
+from model import brand_inputs, brand_skus, build, build_brands, fy_months, fytd_by_category, rebuild_ctx
 
 
 def cat_report(start, end, sales):
@@ -49,6 +49,22 @@ def test_new_fiscal_year_turns_last_uploads_actuals_into_history():
     assert all(h[k] == 200.0 for k in fy_months(2027)[:11])
     assert h['2027-04'] == 200.0  # April from the SKU history, scaled like the closed months (4 x $50 x 1.0)
     assert h['2025-05'] == 100.0  # the year before stays
+
+
+def test_brand_scorecard_rebuilds_from_stored_documents():
+    """Brands -> Update brands gives what a month-end upload with the same reports would."""
+    ly = {k: 100.0 for k in fy_months(2026)}
+    units = {'2026-05': 3, '2026-06': 4, '2026-07': 5}
+    rep = sku_report('2026-07', units)
+    rep['rows'].append(dict(sku='B2', cat_no='480', desc='Shirt Peter Millar', oh=2, cost=30.0, last_sale='Jan02/24', mo={'2025-08': 2}))
+    bm = {'skus': {'A1': [{'b': 'Straight Down', 's': 100}]}}
+    prior = dict(base=prior_base(2027, ly, {}), skuhist={'meta': {'A1': ['480', 'Polo', 50.0]}}, brandmap=bm)
+    b = build({'sku_analysis': [rep]}, prior)
+    docs = {'base/current': b['base'], 'brandin/current': brand_inputs(b['ctx']), 'brandmap/current': bm}
+    docs.update({f'skuhist/{k}': v for k, v in b['skuhist'].items()})
+    ctx = rebuild_ctx(docs)
+    assert build_brands(ctx) == build_brands(b['ctx'])
+    assert brand_skus(ctx) == brand_skus(b['ctx'])
 
 
 if __name__ == '__main__':

@@ -30,11 +30,30 @@ _SEG = {'400': 'mens', '430': 'mens', '470': 'mens', '480': 'mens', '490': 'mens
         '350': 'equipment'}
 
 
-def brand_of(desc):
+def _word_rx(w):
+    return re.compile(r'(?<![a-z0-9])' + re.escape(w.strip().lower()) + r'(?![a-z0-9])')
+
+
+def renamed(bl, b):
+    """A brand's name after the program's renames and merges (brandmap/current "rename": {old: new})."""
+    ren = (bl or {}).get('rename') or {}
+    for _ in range(10):
+        if not isinstance(ren.get(b), str) or not ren[b].strip() or ren[b] == b:
+            break
+        b = ren[b].strip()
+    return b
+
+
+def brand_of(desc, bl=None):
+    """The brand named in a description. bl is brandmap/current: words added in the program
+    ("words": {brand: [word or phrase, ...]}) are checked before the built-in list, and renames apply."""
     d = (desc or '').lower()
+    for b, words in ((bl or {}).get('words') or {}).items():
+        if isinstance(words, list) and any(isinstance(w, str) and w.strip() and _word_rx(w).search(d) for w in words):
+            return renamed(bl, b)
     for b, rx in _RX:
         if rx.search(d):
-            return b
+            return renamed(bl, b)
     return None
 
 
@@ -48,18 +67,24 @@ def segment_of(cat, desc):
     return _SEG.get(cat, 'other')
 
 
-def brand_split(bmap, sku, *descs):
+def brand_split(bmap, sku, *descs, bl=None):
     """[(brand, share)] for a SKU, shares adding up to 1; [] when the brand is unknown.
 
     bmap is the program's brand assignments (Brands -> Assign brands, document brandmap/current):
     {sku: [{"b": brand, "s": percent}, ...]}, several entries for a SKU that carries more than one
-    brand. Without an assignment, the brand is the one named in the SKU's description."""
+    brand. Without an assignment, the brand is the one named in the SKU's description. bl is the whole
+    brandmap/current document, for the brand words and renames entered in the program (Brands -> Edit brands)."""
     rows = [r for r in ((bmap or {}).get(sku) or []) if isinstance(r, dict) and str(r.get('b', '')).strip()]
     shares = [max(float(r.get('s') or 0), 0.0) for r in rows]
     if sum(shares) > 0:
-        return [(str(r['b']).strip(), v / sum(shares)) for r, v in zip(rows, shares) if v > 0]
+        out = {}  # two brands merged into one add together
+        for r, v in zip(rows, shares):
+            if v > 0:
+                b = renamed(bl, str(r['b']).strip())
+                out[b] = out.get(b, 0) + v / sum(shares)
+        return list(out.items())
     for d in descs:
-        b = brand_of(d)
+        b = brand_of(d, bl)
         if b:
             return [(b, 1.0)]
     return []

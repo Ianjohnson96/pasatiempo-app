@@ -123,6 +123,18 @@ def prior_from_docs(docs):
     return pr
 
 
+def rebuild_brands(docs):
+    """Brands -> Update brands: the brand scorecard and SKU list again from stored documents ({path: data}), with
+    today's brand assignments and brand list. Returns (bundle, summary); nothing else changes."""
+    ctx = model.rebuild_ctx(docs)
+    brands, bskus = model.build_brands(ctx), model.brand_skus(ctx)
+    brands['at'] = datetime.now(timezone.utc).isoformat(timespec='seconds')
+    bundle = dict(kind='pasatiempo-merch-bundle', version=1, note='Brand scorecard updated with the brand assignments',
+                  docs={'brands/current': brands, 'brandskus/current': bskus})
+    return bundle, dict(lines=len(brands['rows']), unassigned=sum(brands['unassigned'].values()),
+                        noBrand=sum(1 for r in bskus['rows'] if not r[3]))
+
+
 def warnings(reports, prior, summary):
     """Plain-English notes on what this refresh can't update, for the owner to see before loading it."""
     out = []
@@ -179,8 +191,9 @@ def build_bundle(reports, prior=None, notes=None):
         base['cats'][c]['call'] = k
     insights = model.build_insights(built['ctx'], calls)
     brands = model.build_brands(built['ctx'])
+    brands['at'] = datetime.now(timezone.utc).isoformat(timespec='seconds')  # the page compares brand edits with this
     docs = {'base': base, 'inventory': built['inventory'], 'insights': insights, 'brands': brands,
-            'skusnap': receipts.snapshot(built['ctx']), 'brandskus': model.brand_skus(built['ctx'])}
+            'skusnap': receipts.snapshot(built['ctx']), 'brandskus': model.brand_skus(built['ctx']), 'brandin': model.brand_inputs(built['ctx'])}
     arrived = receipts.arrivals((prior or {}).get('skusnap'), built['ctx'])
     if arrived:
         docs['arrivals'] = arrived
@@ -195,7 +208,7 @@ def build_bundle(reports, prior=None, notes=None):
                            notes=notes)
     paths = {'base': 'base/current', 'inventory': 'inventory/current', 'insights': 'insights/current', 'brands': 'brands/current',
              'refresh': f"refreshes/{base['asOf']}", 'skusnap': 'skusnap/current', 'brandskus': 'brandskus/current',
-             'arrivals': f"arrivals/{base['asOf']}"}
+             'arrivals': f"arrivals/{base['asOf']}", 'brandin': 'brandin/current'}
     paths.update({f'skuhist_{k}': f'skuhist/{k}' for k in built['skuhist']})
     bundle = dict(kind='pasatiempo-merch-bundle', version=1,
                   note=f"Month-end data as of {base['asOf']}" + (': ' + '; '.join(notes) if notes else ''),

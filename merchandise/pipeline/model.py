@@ -304,7 +304,7 @@ def build(reports, prior=None):
     skuhist = history_docs(hist, meta, sorted({fy_of(k) for mo in hist.values() for k in mo}))
 
     ctx = dict(as_of=as_of, cur=cur, actual_through=actual_through, fy=fy, snap=snap, sku_month=snap_rep['as_of'], hist=hist, px=px, sku_gm=sku_gm,
-               bmap=((prior.get('brandmap') or {}).get('skus') or {}),
+               bmap=((prior.get('brandmap') or {}).get('skus') or {}), blist=prior.get('brandmap') or {},
                desc_of=desc_of, cat_of=cat_of, items=reports.get('sales_by_item', []), base=base)
     return dict(base=base, inventory=inventory, skuhist=skuhist, ctx=ctx)
 
@@ -487,7 +487,7 @@ def build_brands(ctx):
             continue
         desc = desc_of.get(s, '')
         r = snap.get(s)
-        splits = brand_split(ctx.get('bmap'), s, desc, r['desc'] if r else '')
+        splits = brand_split(ctx.get('bmap'), s, desc, r['desc'] if r else '', bl=ctx.get('blist'))
         seg = segment_of(c, desc)
         mo = hist.get(s, {})
         p = px(s)
@@ -552,6 +552,49 @@ def build_brands(ctx):
                 unassigned={k: round(v) for k, v in unassigned.items()}, rows=rows)
 
 
+def brand_inputs(ctx):
+    """What the brand scorecard needs beyond the stored history, prices and base, so Brands -> Update brands can
+    rebuild it between uploads (rebuild_ctx): {sku: [price, on hand, cost, last sale, SKU Analysis description,
+    gross, cost, markdown]}. On hand to description are null for a SKU not in the SKU Analysis; the last three,
+    from the cost & margin report, are left off when it has none."""
+    out = {}
+    for s in sorted(set(ctx['hist']) | set(ctx['snap'])):
+        if ctx['cat_of'].get(s) not in MERCH:
+            continue
+        r, g = ctx['snap'].get(s), ctx['sku_gm'].get(s)
+        row = [ctx['px'](s)] + ([r['oh'], r['cost'], r['last_sale'], r['desc']] if r else [None] * 4)
+        out[s] = row + ([g['g'], g['c'], g['md']] if g else [])
+    return dict(asOf=ctx['as_of'].isoformat(), skus=out)
+
+
+def rebuild_ctx(docs):
+    """The context build_brands() and brand_skus() take, from stored documents instead of reports:
+    base/current, skuhist/*, brandin/current and brandmap/current ({path: data})."""
+    base, bi, meta = docs.get('base/current'), docs.get('brandin/current'), docs.get('skuhist/meta') or {}
+    if not base or not bi:
+        raise ValueError('The brand scorecard can be updated once a month-end upload has saved its inputs. Upload the reports once more.')
+    hist = defaultdict(dict)
+    for path, d in docs.items():
+        if path.startswith('skuhist/FY'):
+            for sku, arr in d.items():
+                for k, u in zip(fy_months(int(path[10:])), arr):
+                    if u:
+                        hist[sku][k] = u
+    cat_of = {s: v[0] for s, v in meta.items()}
+    desc_of = {s: v[1] for s, v in meta.items()}
+    snap, px, sku_gm = {}, {}, {}
+    for s, r in bi['skus'].items():
+        px[s] = r[0]
+        if r[1] is not None:
+            snap[s] = dict(sku=s, oh=r[1], cost=r[2], last_sale=r[3], desc=r[4], cat_no=cat_of.get(s))
+        if len(r) > 5:
+            sku_gm[s] = dict(g=r[5], c=r[6], md=r[7])
+    bm = docs.get('brandmap/current') or {}
+    return dict(as_of=date.fromisoformat(base['asOf']), actual_through=base['actualThrough'], fy=int(base['fy'][2:]), snap=snap,
+                hist=hist, px=lambda s: px.get(s, 0), sku_gm=sku_gm, desc_of=desc_of, cat_of=cat_of, base=base,
+                bmap=bm.get('skus') or {}, blist=bm)
+
+
 def brand_skus(ctx):
     """Every SKU with stock or sales in the last 12 months, for assigning brands in the program:
     [sku, description, category, brand from the description ('' if none), 12-month sales $, on hand $ at cost]."""
@@ -567,5 +610,5 @@ def brand_skus(ctx):
         t12 = sum(hist.get(s, {}).get(k, 0) for k in t12m) * px(s)
         oh = max(r['oh'], 0) * r['cost'] if r else 0
         if t12 > 0 or oh > 0:
-            rows.append([s, desc, c, brand_of(desc) or (brand_of(r['desc']) if r else None) or '', round(t12), round(oh)])
+            rows.append([s, desc, c, brand_of(desc, ctx.get('blist')) or (brand_of(r['desc'], ctx.get('blist')) if r else None) or '', round(t12), round(oh)])
     return dict(asOf=ctx['as_of'].isoformat(), rows=rows)

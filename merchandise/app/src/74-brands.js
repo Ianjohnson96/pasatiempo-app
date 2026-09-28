@@ -52,7 +52,7 @@ function spark(series, w = 96, h = 24){
 const trendTxt = r => r.ly >= 10 ? pct(r.ty / r.ly - 1) : (r.ty ? 'new' : '—');
 function renderBrands(){
   if (!BRANDS){ $('#pane').innerHTML = `<section class="panel"><div class="note">The brand scorecard loads after the first month-end refresh.</div></section>`; return; }
-  const BO = brandOrders(), rows0 = BRANDS.rows.map(r => ({...r, ecall: bCall(r), ord: BO[r.id] || {cur: 0, next: 0, open: 0, pos: new Set()}}));
+  const BO = brandOrders(), rows0 = BRANDS.rows.map(r => ({...r, brand: bmRen(r.brand), was: r.brand, ecall: bCall(r), ord: BO[r.id] || {cur: 0, next: 0, open: 0, pos: new Set()}}));
   const q = bfilt.q.trim().toLowerCase();
   const inSeg = rows0.filter(r => bfilt.seg === 'all' || r.seg === bfilt.seg);
   const small = r => r.t12 < 1500 && r.oh < 1500;
@@ -84,22 +84,22 @@ function renderBrands(){
   $('#pane').innerHTML = `<section class="kpis" style="margin-top:0">${kpis}</section>
   <section class="summary"><h2>Brand calls${bfilt.seg === 'all' ? '' : ' · ' + SEGS[bfilt.seg]}</h2><ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul></section>
   <section class="panel" style="margin-top:14px">
-    <div class="chips">${segBtn('all', 'All')}${Object.entries(SEGS).map(([s, l]) => segBtn(s, l)).join('')}<button type="button" class="btn sm" data-bmopen="1" style="margin-left:auto">Assign brands${BRANDSKUS ? ` <span class="cnt ${BRANDSKUS.rows.some(r => !r[3] && !bmFor(r[0])) ? 'hot' : ''}">${BRANDSKUS.rows.filter(r => !r[3] && !bmFor(r[0])).length}</span>` : ''}</button></div>
+    <div class="chips">${segBtn('all', 'All')}${Object.entries(SEGS).map(([s, l]) => segBtn(s, l)).join('')}<span style="margin-left:auto;display:flex;gap:8px">${isAdmin ? `<button type="button" class="btn sm ${bmPending() ? 'primary' : ''}" data-bupd="1" ${BUP.busy || !canAct() ? 'disabled' : ''} title="${bmPending() ? 'Brand changes since the scorecard was built: update it to see them' : 'Rebuild the scorecard with the brand assignments and brand list'}">${BUP.busy ? 'Updating…' : 'Update brands'}</button><button type="button" class="btn sm" data-beopen="1">Edit brands</button>` : ''}<button type="button" class="btn sm" data-bmopen="1">Assign brands${BRANDSKUS ? ` <span class="cnt ${bmUnknown().length ? 'hot' : ''}">${bmUnknown().length}</span>` : ''}</button></span></div>
     <div class="chips">${callBtn('all', 'Every call')}${Object.entries(BCALL).map(([c, l]) => callBtn(c, l)).join('')}<button type="button" class="fchip" data-bsmall="1" aria-pressed="${bfilt.small}" title="Brands under $1,500 in both sales and stock">Small brands<span class="c">${nSmall}</span></button><input id="bQ" type="search" placeholder="Find a brand" value="${esc(bfilt.q)}" style="margin-left:auto;padding:5px 10px;border:1px solid var(--rule2);border-radius:4px;background:var(--card)"></div>
     <div class="tbl"><table class="brandt" style="min-width:1180px"><thead><tr>${th('brand', 'Brand')}${th('call', 'Call')}${th('t12', 'Sales, 12 mo', 1)}${th('trend', 'Trend', 1)}<th><span class="h">24 months</span></th>${th('oh', 'On hand', 1)}${th('wks', 'Weeks', 1)}${th('gm', 'Margin', 1)}${th('gmroi', 'GMROI', 1)}${th('agedPct', 'Aged', 1)}${th('ordcur', 'On order ' + PLANS.cur.fy, 1)}${th('ordnext', 'Bought ' + (PLANS.next ? PLANS.next.fy : 'next yr'), 1)}</tr></thead>
     <tbody class="click">${rows.map(r => `<tr data-brand="${esc(r.id)}" tabindex="0" style="cursor:pointer">
-      <td><b>${esc(r.brand)}</b><div style="font-size:11.5px;color:var(--faint)">${SEGS[r.seg]}</div></td>
+      <td><b>${esc(r.brand)}</b><div style="font-size:11.5px;color:var(--faint)">${SEGS[r.seg]}${r.was !== r.brand ? ` · was ${esc(r.was)}, combined at the next Update brands` : ''}</div></td>
       <td><span class="chip b-${r.ecall}">${BCALL[r.ecall]}</span>${BCALLS[r.id] ? ' <span title="Set by the owner" style="color:var(--faint)">✎</span>' : ''}</td>
       <td class="r num">${money(r.t12)}</td><td class="r num ${r.ly >= 10 && r.ty < r.ly * .75 ? 'neg' : ''}">${trendTxt(r)}</td><td>${spark(r.series)}</td>
       <td class="r num">${money(r.oh)}</td><td class="r num ${r.wks > 40 ? 'neg' : ''}">${r.wks == null ? '—' : r.wks >= 999 ? 'no sales' : Math.round(r.wks)}</td>
       <td class="r num">${r.gm == null ? '—' : Math.round(r.gm * 100) + '%'}</td><td class="r num ${r.gmroi != null && r.gmroi < (r.seg === 'equipment' ? .5 : 1) ? 'neg' : ''}">${r.gmroi == null ? '—' : r.gmroi.toFixed(2)}</td>
       <td class="r num ${r.agedPct > .3 ? 'neg' : ''}">${r.oh ? Math.round(r.agedPct * 100) + '%' : '—'}</td>
       <td class="r num">${r.ord.cur ? money(r.ord.cur) : '<span style="color:var(--faint)">–</span>'}</td><td class="r num">${r.ord.next ? money(r.ord.next) : '<span style="color:var(--faint)">–</span>'}</td></tr>`).join('') || '<tr><td colspan="12" style="color:var(--muted);padding:12px">No brands match.</td></tr>'}</tbody></table></div>
-    <div class="note"><b>GMROI</b> = gross margin earned in 12 months for every $1 of stock at cost; under 1.0 means the stock isn't paying its way (equipment runs lower because margins are thin). <b>Weeks</b> = weeks of supply at the last 12 months' pace. <b>Aged</b> = share of the stock with no sale in 12 months. Brands come from item descriptions and from <b>Assign brands</b>; ${money(sum(Object.values(BRANDS.unassigned || {})))} of sales had no brand at the last upload. Assignments count from the next month-end upload.</div></section>`;
+    <div class="note"><b>GMROI</b> = gross margin earned in 12 months for every $1 of stock at cost; under 1.0 means the stock isn't paying its way (equipment runs lower because margins are thin). <b>Weeks</b> = weeks of supply at the last 12 months' pace. <b>Aged</b> = share of the stock with no sale in 12 months. Brands come from item descriptions, <b>Assign brands</b> and <b>Edit brands</b>; ${money(sum(Object.values(BRANDS.unassigned || {})))} of sales had no brand when the scorecard was built${BRANDS.at ? ` (${dateLabel(BRANDS.at.slice(0, 10))})` : ''}. ${isAdmin ? '<b>Update brands</b> rebuilds it with the latest changes; so does every month-end upload.' : 'The owner\'s <b>Update brands</b> puts brand changes into it, and so does every month-end upload.'}</div></section>`;
 }
 function openBrand(id){
   const r0 = BRANDS.rows.find(x => x.id === id); if (!r0) return;
-  const r = {...r0, ecall: bCall(r0)}, ov = BCALLS[id], ords = (brandOrders()[id] || {pos: new Set()}), pos = POS.filter(p => ords.pos.has(p.id));
+  const r = {...r0, brand: bmRen(r0.brand), ecall: bCall(r0)}, ov = BCALLS[id], ords = (brandOrders()[id] || {pos: new Set()}), pos = POS.filter(p => ords.pos.has(p.id));
   const n = r.series.length, half = n / 2, ly = r.series.slice(0, half), ty = r.series.slice(half), months = BRANDS.months.slice(half);
   const hi = Math.max(...r.series, 1), W = 520, H = 150, L = 44, bw = (W - L - 6) / half, y = v => 10 + (H - 34) * (1 - v / hi);
   let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Monthly sales for ${esc(r.brand)}, this year against last year">`;

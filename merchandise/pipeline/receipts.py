@@ -71,7 +71,7 @@ def arrivals(prev, ctx):
             down['skus'] += 1
             continue
         desc = ctx['desc_of'].get(s) or r['desc']
-        for brand, sh in brand_split(ctx.get('bmap'), s, desc, r['desc']) or [(None, 1.0)]:  # a multi-brand SKU splits by share
+        for brand, sh in brand_split(ctx.get('bmap'), s, desc, r['desc'], bl=ctx.get('blist')) or [(None, 1.0)]:  # a multi-brand SKU splits by share
             g = groups[(r['cat_no'], brand)]
             g['value'] += value * sh
             g['units'] += units * sh

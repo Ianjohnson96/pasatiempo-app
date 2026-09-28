@@ -65,6 +65,15 @@ A SKU's brand comes from its description (`pipeline/brands.py`, a list of brand 
 
 Assignments are kept in `brandmap/current` (`{sku: [{b: brand, s: percent}]}`, not replaced by data files). The reader applies them at the next month-end upload (`brand_split()`), in the brand scorecard, the SKU list and delivery matching.
 
+**Edit brands** (owner) changes the brand list itself, kept in the same document:
+
+- `words: {brand: [word or phrase]}` — words that find a brand in item descriptions (whole words, any case). They're checked before the built-in list in `brands.py`, so they can add a brand or correct one. A word belongs to one brand; giving it to another moves it.
+- `rename: {old: new}` — a brand's new name wherever it comes from (the built-in list, words or assignments). Renaming into an existing brand merges the two; Undo takes a rename back out. The owner's call on the old name is copied to the new one.
+
+The page shows new names and words at once (brand labels, the SKU list's "no brand" count).
+
+**Update brands** (owner) rebuilds the scorecard (`brands/current`) and the SKU list (`brandskus/current`) with the latest assignments and brand list, without new reports. Each upload saves what that needs beyond the stored history and prices in `brandin/current` (`model.brand_inputs()`: per SKU its price, on-hand, cost, last sale, SKU Analysis description and cost & margin figures). The button gets the same pass and documents as an upload (`/merch/api/refresh`), sends them to the reader with `"rebuild": "brands"` (`refresh.rebuild_brands()`, which puts the stored documents back into the context `build_brands()` takes), and saves the result through `/merch/api/import`. It gives exactly what an upload of the same reports would; the button is highlighted when brand changes are newer than the scorecard (`brands/current.at`).
+
 ## Deliveries
 
 Boxes are received into the POS without purchase orders, so nobody logs deliveries in the program. Each month-end upload works them out instead (`pipeline/receipts.py`):
