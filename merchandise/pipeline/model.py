@@ -304,7 +304,7 @@ def build(reports, prior=None):
     skuhist = history_docs(hist, meta, sorted({fy_of(k) for mo in hist.values() for k in mo}))
 
     ctx = dict(as_of=as_of, cur=cur, actual_through=actual_through, fy=fy, snap=snap, sku_month=snap_rep['as_of'], hist=hist, px=px, sku_gm=sku_gm,
-               bmap=((prior.get('brandmap') or {}).get('skus') or {}),
+               bmap=((prior.get('brandmap') or {}).get('skus') or {}), blist=prior.get('brandmap') or {},
                desc_of=desc_of, cat_of=cat_of, items=reports.get('sales_by_item', []), base=base)
     return dict(base=base, inventory=inventory, skuhist=skuhist, ctx=ctx)
 
@@ -487,7 +487,7 @@ def build_brands(ctx):
             continue
         desc = desc_of.get(s, '')
         r = snap.get(s)
-        splits = brand_split(ctx.get('bmap'), s, desc, r['desc'] if r else '')
+        splits = brand_split(ctx.get('bmap'), s, desc, r['desc'] if r else '', bl=ctx.get('blist'))
         seg = segment_of(c, desc)
         mo = hist.get(s, {})
         p = px(s)
@@ -567,5 +567,5 @@ def brand_skus(ctx):
         t12 = sum(hist.get(s, {}).get(k, 0) for k in t12m) * px(s)
         oh = max(r['oh'], 0) * r['cost'] if r else 0
         if t12 > 0 or oh > 0:
-            rows.append([s, desc, c, brand_of(desc) or (brand_of(r['desc']) if r else None) or '', round(t12), round(oh)])
+            rows.append([s, desc, c, brand_of(desc, ctx.get('blist')) or (brand_of(r['desc'], ctx.get('blist')) if r else None) or '', round(t12), round(oh)])
     return dict(asOf=ctx['as_of'].isoformat(), rows=rows)

@@ -163,6 +163,12 @@ document.addEventListener('click', async e => {
   if (ds.bsort){ bsort = {key: ds.bsort, dir: bsort.key === ds.bsort ? -bsort.dir : (ds.bsort === 'brand' ? 1 : -1)}; return render(); }
   if (ds.bcsave) return saveBrandCall(ds.bcsave);
   if (ds.bmopen){ BM.edit = null; return openBrandMap(); }
+  if (ds.beopen){ BE.edit = null; return openBrandList(); }
+  if (ds.benew) return beStart('');
+  if (ds.beedit) return beStart(ds.beedit);
+  if (ds.besave) return beSave();
+  if (ds.becancel){ BE.edit = null; return openBrandList(); }
+  if (ds.beundo) return beUndo(ds.beundo);
   if (ds.bmfilt){ BM.filter = ds.bmfilt; BM.q = ''; return openBrandMap(); }
   if (ds.bmedit) return bmStartEdit(ds.bmedit);
   if (ds.bmadd){ if (BM.draft.length === 1 && num(BM.draft[0].s) === 100) BM.draft[0].s = 50; BM.draft.push({b: '', s: BM.draft.length === 1 ? 50 : 0}); openBrandMap(); return setTimeout(() => $(`#bmB${BM.draft.length - 1}`)?.focus(), 0); }
@@ -235,6 +241,9 @@ document.addEventListener('input', e => {
   if (t.dataset.cb != null || t.dataset.cc != null) return countTotalsUI();
   if (t.id === 'upNote'){ UP.note = t.value; return; }
   if (t.id === 'bmQ'){ BM.q = t.value; clearTimeout(document._bmq); document._bmq = setTimeout(() => { openBrandMap(); const f = $('#bmQ'); if (f){ f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 250); return; }
+  if (t.id === 'beQ'){ BE.q = t.value; clearTimeout(document._beq); document._beq = setTimeout(() => { openBrandList(); const f = $('#beQ'); if (f){ f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 250); return; }
+  if (t.id === 'beName'){ BE.name = t.value; const h = $('#beNameHint'); if (h) h.innerHTML = beNameHint(); return; }
+  if (t.id === 'beWords'){ BE.words = t.value; const h = $('#bePrev'); if (h) h.innerHTML = bePreview(); return; }
   if (t.dataset.bmb != null){ BM.draft[+t.dataset.bmb].b = t.value; return; }
   if (t.dataset.bms != null){ BM.draft[+t.dataset.bms].s = t.value; const tot = BM.draft.reduce((a, x) => a + num(x.s), 0), h = $('#bmTot'); if (h) h.textContent = `Shares add up to ${tot}%${tot === 100 ? '' : ' (they need to make 100%)'}. Sales, stock and deliveries are split the same way.`; return; }
   if (!D) return;

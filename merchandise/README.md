@@ -65,6 +65,13 @@ A SKU's brand comes from its description (`pipeline/brands.py`, a list of brand 
 
 Assignments are kept in `brandmap/current` (`{sku: [{b: brand, s: percent}]}`, not replaced by data files). The reader applies them at the next month-end upload (`brand_split()`), in the brand scorecard, the SKU list and delivery matching.
 
+**Edit brands** (owner) changes the brand list itself, kept in the same document:
+
+- `words: {brand: [word or phrase]}` — words that find a brand in item descriptions (whole words, any case). They're checked before the built-in list in `brands.py`, so they can add a brand or correct one. A word belongs to one brand; giving it to another moves it.
+- `rename: {old: new}` — a brand's new name wherever it comes from (the built-in list, words or assignments). Renaming into an existing brand merges the two; Undo takes a rename back out. The owner's call on the old name is copied to the new one.
+
+The page shows new names and words at once (brand labels, the SKU list's "no brand" count); the scorecard combines merged brands at the next upload.
+
 ## Deliveries
 
 Boxes are received into the POS without purchase orders, so nobody logs deliveries in the program. Each month-end upload works them out instead (`pipeline/receipts.py`):
