@@ -78,6 +78,18 @@ The page shows new names and words at once (brand labels, the SKU list's "no bra
 
 **New descriptions.** Each upload compares every SKU's SKU Analysis description with the last upload's (`desc_changes()`, against `brandin/current`). A change is flagged in `brandskus/current.changed` and `brandin/current.changed`, counted in the upload preview, and listed under Assign brands → New description until someone answers: reused (marks it as above, with the old description and category) or same product (`checked: {sku: description}`).
 
+## Subcategories
+
+Inside each category, the **Subcategories** page shows where the sales and the stock are, with the brand scorecard's measures: 12-month sales and share of the category, trend, on hand, weeks of supply, margin, GMROI, aged stock, what the Order Book has committed this year, and a call. Special orders are left out. It is reporting only: budgets stay by category.
+
+- The subcategory list is the program's own (`subcats/{id}`, the same list order lines use).
+- A SKU's subcategory comes from its description (`config.SUB_RULES`, checked in order; `model.sub_auto`), unless someone sets it under **Sort SKUs** (`submap/current`: `{skus: {sku: subcat id}}`, where `""` means not sorted). Choosing the one the description gives removes the override. A rule for a subcategory that was removed is skipped.
+- The report is `assort/current` (`model.build_subcats`), built at every month-end upload and by **Update brands** / **Update subcategories** (both rebuild the scorecard and the report). The category panel on the Overview shows the same split.
+
+## Navigation
+
+The tabs are grouped the way a buying month runs, **Plan** (Overview, Forecast, Open-to-buy), **Buy** (Orders, Vendors), **Assortment** (Brands, Subcategories, Inventory & counts, To do) and **Close the month** (Month-end, Reports), and stay pinned at the top as the page scrolls.
+
 ## Deliveries
 
 Boxes are received into the POS without purchase orders, so nobody logs deliveries in the program. Each month-end upload works them out instead (`pipeline/receipts.py`):

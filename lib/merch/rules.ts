@@ -21,6 +21,7 @@ const OWNER_ONLY = new Set([
   "arrivals",
   "brandskus",
   "brandin",
+  "assort",
 ]);
 
 // Collections a month-end data file may replace. Everything people enter by
@@ -30,7 +31,8 @@ const OWNER_ONLY = new Set([
 // brandskus/current lists every SKU for assigning brands; the assignments themselves
 // (brandmap/current) are entered in the program and never come from a data file.
 // brandin/current holds what Brands -> Update brands needs to rebuild the scorecard between uploads.
-export const IMPORTABLE = new Set(["base", "inventory", "insights", "brands", "refreshes", "skuhist", "skusnap", "arrivals", "brandskus", "brandin"]);
+// assort/current is the subcategory report; which subcategory a SKU belongs to (submap/current) is set in the program.
+export const IMPORTABLE = new Set(["base", "inventory", "insights", "brands", "refreshes", "skuhist", "skusnap", "arrivals", "brandskus", "brandin", "assort"]);
 
 // Collections the page never needs; kept out of the initial load.
 // remindersSent/{date} marks a day's reminder email as sent (app/api/cron/merch).

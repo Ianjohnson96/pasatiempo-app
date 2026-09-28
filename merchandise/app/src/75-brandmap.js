@@ -252,7 +252,8 @@ async function updateBrands(){
     const r = await upJSON('/api/merch/reports', {ticket: start.ticket, prior: start.prior, rebuild: 'brands'});
     await upJSON(H.base + '/api/import', r.bundle);
     BRANDS = r.bundle.docs['brands/current']; BRANDSKUS = r.bundle.docs['brandskus/current'];
-    toast(`Brand scorecard updated: ${r.summary.lines} brand lines, ${money(r.summary.unassigned)} of sales with no brand.`);
+    if (r.bundle.docs['assort/current']) ASSORT = r.bundle.docs['assort/current'];
+    toast(`Brand scorecard and subcategories updated: ${r.summary.lines} brand lines, ${money(r.summary.unassigned)} of sales with no brand.`);
   } catch (e){ toast(e.message); }
   BUP.busy = false; render();
 }

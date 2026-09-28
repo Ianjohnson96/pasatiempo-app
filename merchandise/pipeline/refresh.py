@@ -122,6 +122,9 @@ def prior_from_docs(docs):
             pr['brandmap'] = d
         elif path == 'brandin/current':
             pr['brandin'] = d
+        elif path == 'submap/current':
+            pr['submap'] = d
+    pr['subids'] = model.subcat_ids(docs)
     return pr
 
 
@@ -129,10 +132,10 @@ def rebuild_brands(docs):
     """Brands -> Update brands: the brand scorecard and SKU list again from stored documents ({path: data}), with
     today's brand assignments and brand list. Returns (bundle, summary); nothing else changes."""
     ctx = model.rebuild_ctx(docs)
-    brands, bskus = model.build_brands(ctx), model.brand_skus(ctx)
+    brands, bskus, assort = model.build_brands(ctx), model.brand_skus(ctx), model.build_subcats(ctx)
     brands['at'] = datetime.now(timezone.utc).isoformat(timespec='seconds')
-    bundle = dict(kind='pasatiempo-merch-bundle', version=1, note='Brand scorecard updated with the brand assignments',
-                  docs={'brands/current': brands, 'brandskus/current': bskus})
+    bundle = dict(kind='pasatiempo-merch-bundle', version=1, note='Brand scorecard and subcategories updated',
+                  docs={'brands/current': brands, 'brandskus/current': bskus, 'assort/current': assort})
     return bundle, dict(lines=len(brands['rows']), unassigned=sum(brands['unassigned'].values()),
                         noBrand=sum(1 for r in bskus['rows'] if not r[3]), descChanged=len(bskus['changed']))
 
@@ -199,7 +202,8 @@ def build_bundle(reports, prior=None, notes=None):
     brands = model.build_brands(built['ctx'])
     brands['at'] = datetime.now(timezone.utc).isoformat(timespec='seconds')  # the page compares brand edits with this
     docs = {'base': base, 'inventory': built['inventory'], 'insights': insights, 'brands': brands,
-            'skusnap': receipts.snapshot(built['ctx']), 'brandskus': model.brand_skus(built['ctx']), 'brandin': model.brand_inputs(built['ctx'])}
+            'skusnap': receipts.snapshot(built['ctx']), 'brandskus': model.brand_skus(built['ctx']), 'brandin': model.brand_inputs(built['ctx']),
+            'assort': model.build_subcats(built['ctx'])}
     arrived = receipts.arrivals((prior or {}).get('skusnap'), built['ctx'])
     if arrived:
         docs['arrivals'] = arrived
@@ -214,7 +218,7 @@ def build_bundle(reports, prior=None, notes=None):
                            notes=notes)
     paths = {'base': 'base/current', 'inventory': 'inventory/current', 'insights': 'insights/current', 'brands': 'brands/current',
              'refresh': f"refreshes/{base['asOf']}", 'skusnap': 'skusnap/current', 'brandskus': 'brandskus/current',
-             'arrivals': f"arrivals/{base['asOf']}", 'brandin': 'brandin/current'}
+             'arrivals': f"arrivals/{base['asOf']}", 'brandin': 'brandin/current', 'assort': 'assort/current'}
     paths.update({f'skuhist_{k}': f'skuhist/{k}' for k in built['skuhist']})
     bundle = dict(kind='pasatiempo-merch-bundle', version=1,
                   note=f"Month-end data as of {base['asOf']}" + (': ' + '; '.join(notes) if notes else ''),

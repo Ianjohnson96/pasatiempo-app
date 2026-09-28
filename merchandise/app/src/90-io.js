@@ -110,7 +110,7 @@ function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = fals
 function closeOverlay(){ $('#overlay').innerHTML = ''; D = null; DX = null; }
 
 /* ---------- render + mode ---------- */
-const PAGES = {overview: renderOverview, forecast: renderForecast, otb: renderOTB, orders: renderOrders, brands: renderBrands, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
+const PAGES = {overview: renderOverview, forecast: renderForecast, otb: renderOTB, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
 if (location.hash === '#reports' && RPT){ TAB = 'reports'; history.replaceState(null, '', location.pathname + location.search); }  // the reminder email's link
 function render(){
   if (!BASE && !LEGACY_PLAN){
@@ -149,7 +149,7 @@ function applyMode(){
 /* ---------- events ---------- */
 document.addEventListener('click', e => { if (!e.target.closest('.menu')) $('#morePop').hidden = true; }, true);
 document.addEventListener('click', async e => {
-  const t = e.target.closest('button,[data-cat],[data-po],[data-count],tr[data-po],tr[data-brand]'); if (!t) return;
+  const t = e.target.closest('button,[data-cat],[data-po],[data-count],tr[data-po],tr[data-brand],tr[data-subrow]'); if (!t) return;
   const ds = t.dataset;
   if (ds.close) return closeOverlay();
   if (ds.fy){ FYSEL = ds.fy; SEL = null; try { localStorage.setItem('mp.fy', FYSEL); localStorage.removeItem('ob.month'); } catch (_) {} return render(); }
@@ -164,6 +164,10 @@ document.addEventListener('click', async e => {
   if (ds.bcsave) return saveBrandCall(ds.bcsave);
   if (ds.bmopen){ BM.edit = null; return openBrandMap(); }
   if (ds.bupd) return updateBrands();
+  if (ds.sccat){ SC.cat = ds.sccat; return render(); }
+  if (ds.subrow != null) return openSubcat(ds.subrow);
+  if (ds.ssopen){ if (ds.ssopen !== '1'){ SS.cat = ds.ssopen; SS.filter = 'all'; SS.q = ''; } return openSortSkus(); }
+  if (ds.ssfilt){ SS.filter = ds.ssfilt; SS.q = ''; return openSortSkus(); }
   if (ds.beopen){ BE.edit = null; return openBrandList(); }
   if (ds.benew) return beStart('');
   if (ds.beedit) return beStart(ds.beedit);
@@ -184,7 +188,8 @@ document.addEventListener('click', async e => {
   if (ds.bcclear){ try { await db.doc('brandCalls/' + ds.bcclear).delete(); toast('Back to the suggested call'); setTimeout(() => openBrand(ds.bcclear), 300); } catch (err){ writeError(err); } return; }
   if (ds.brand && !D) return openBrand(ds.brand);
   if (ds.month){ SEL = ds.month; try { localStorage.setItem('ob.month', SEL); } catch (_) {} return render(); }
-  if (ds.tab){ TAB = ds.tab; try { localStorage.setItem('ob.tab', TAB); } catch (_) {} closeOverlay(); render(); return window.scrollTo({top: $('#tabs').offsetTop - 10}); }
+  if (ds.sccatgo) SC.cat = ds.sccatgo;
+  if (ds.tab){ TAB = ds.tab; try { localStorage.setItem('ob.tab', TAB); } catch (_) {} closeOverlay(); render(); return window.scrollTo({top: 0}); }
   if (t.id === 'btnMore'){ const p = $('#morePop'); p.hidden = !p.hidden; t.setAttribute('aria-expanded', String(!p.hidden)); return; }
   if (ds.act === 'import'){ $('#morePop').hidden = true; return openImport(); }
   if (ds.act === 'exportOrders'){ $('#morePop').hidden = true; return exportOrders(); }
@@ -237,7 +242,7 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape'){ if ($('#overlay').innerHTML) closeOverlay(); $('#morePop').hidden = true; }
-  if (e.key === 'Enter' && e.target.matches && e.target.matches('tr[data-po],[data-cat][tabindex],tr[data-brand]')){ e.preventDefault(); e.target.click(); }
+  if (e.key === 'Enter' && e.target.matches && e.target.matches('tr[data-po],[data-cat][tabindex],tr[data-brand],tr[data-subrow]')){ e.preventDefault(); e.target.click(); }
 });
 document.addEventListener('input', e => {
   const t = e.target;
@@ -246,6 +251,7 @@ document.addEventListener('input', e => {
   if (t.dataset.cb != null || t.dataset.cc != null) return countTotalsUI();
   if (t.id === 'upNote'){ UP.note = t.value; return; }
   if (t.id === 'bmQ'){ BM.q = t.value; clearTimeout(document._bmq); document._bmq = setTimeout(() => { openBrandMap(); const f = $('#bmQ'); if (f){ f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 250); return; }
+  if (t.id === 'ssQ'){ SS.q = t.value; clearTimeout(document._ssq); document._ssq = setTimeout(() => { openSortSkus(); const f = $('#ssQ'); if (f){ f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 250); return; }
   if (t.id === 'beQ'){ BE.q = t.value; clearTimeout(document._beq); document._beq = setTimeout(() => { openBrandList(); const f = $('#beQ'); if (f){ f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 250); return; }
   if (t.id === 'beName'){ BE.name = t.value; const h = $('#beNameHint'); if (h) h.innerHTML = beNameHint(); return; }
   if (t.id === 'beWords'){ BE.words = t.value; const h = $('#bePrev'); if (h) h.innerHTML = bePreview(); return; }
@@ -265,6 +271,8 @@ document.addEventListener('change', e => {
   if (t.id === 'aCat'){ afilt.cat = t.value; return render(); }
   if (t.id === 'aRes'){ afilt.showResolved = t.checked; return render(); }
   if (t.id === 'otbCat'){ OTBV.cat = t.value; saveOTBV(); return render(); }
+  if (t.id === 'ssCat'){ SS.cat = t.value; return openSortSkus(); }
+  if (t.dataset.sssku){ return ssSave(t.dataset.sssku, t.value); }
   if (t.dataset.wi){ if (t.value === '' || !isFinite(+t.value)) return render(); const g = t.dataset.wi; setWhatIf(g, t.dataset.k, g === 'wos' ? Math.max(1, Math.min(52, Math.round(+t.value))) : +t.value / 100); return; }
   if (t.dataset.chk){ return toggleCheck(t.dataset.chkm, t.dataset.chk, t.checked); }
   if (t.id === 'upFiles'){ UP.files = [...t.files]; UP.error = null; UP.found = null; return render(); }
@@ -317,6 +325,8 @@ render(); applyMode();
     brands: () => db.doc('brands/current').onSnapshot(s => { if (s.exists) BRANDS = s.data(); live(); }, onErr('brands')),
     bskus: () => db.doc('brandskus/current').onSnapshot(s => { BRANDSKUS = s.exists ? s.data() : null; live(); }, onErr('bskus')),
     bmap: () => db.doc('brandmap/current').onSnapshot(s => { BRANDMAP = s.exists ? s.data() : {skus: {}}; live(); }, onErr('bmap')),
+    assort: () => db.doc('assort/current').onSnapshot(s => { ASSORT = s.exists ? s.data() : null; live(); }, onErr('assort')),
+    submap: () => db.doc('submap/current').onSnapshot(s => { SUBMAP = s.exists ? s.data() : {skus: {}}; live(); }, onErr('submap')),
     bcalls: () => coll('brandCalls', v => BCALLS = Object.fromEntries(v.map(x => [x.id, x])), 'bcalls'),
     refreshes: () => coll('refreshes', v => REFRESHES = v, 'refreshes'),
     checks: () => coll('checklist', v => CHECKS = Object.fromEntries(v.map(x => [x.id, x])), 'checks'),

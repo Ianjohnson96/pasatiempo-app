@@ -72,10 +72,17 @@ function renderKpis(S){
 function renderTabs(S){
   const att = openAttention(S), crit = att.filter(i => i.sev === 'crit').length;
   const due = BASE ? nextRefreshMonth() : null, overdue = due && todayISO > due + '-' + pad(new Date(+due.slice(0,4), +due.slice(5,7), 0).getDate());
-  const T = [['overview','Overview'],['forecast','Forecast'],['otb','Open-to-buy'],['orders','Orders', POS.length],['brands','Brands'],['attention','To do', att.length, crit],['inventory','Inventory & counts'],['monthend','Month-end', overdue ? '!' : null, overdue]];
-  if (RPT){ const a = rptAlerts(); T.push(['reports', 'Reports', a.length ? a.reduce((n, x) => n + x.left, 0) : null, a.some(x => x.status === 'overdue')]); }
-  T.push(['help','How it works']);
-  $('#tabs').innerHTML = T.map(([id,l,c,hot]) => `<button type="button" role="tab" data-tab="${id}" aria-selected="${TAB === id}">${l}${c != null ? `<span class="cnt ${hot ? 'hot' : ''}">${c}</span>` : ''}</button>`).join('');
+  const a = RPT ? rptAlerts() : [];
+  const G = [
+    ['Plan', [['overview','Overview'],['forecast','Forecast'],['otb','Open-to-buy']]],
+    ['Buy', [['orders','Orders', POS.length],['vendors','Vendors']]],
+    ['Assortment', [['brands','Brands'],['subcats','Subcategories', ssUnsorted().length || null],['inventory','Inventory & counts'],['attention','To do', att.length, crit]]],
+    ['Close the month', [['monthend','Month-end', overdue ? '!' : null, overdue], ...(RPT ? [['reports', 'Reports', a.length ? a.reduce((n, x) => n + x.left, 0) : null, a.some(x => x.status === 'overdue')]] : [])]],
+    ['', [['help','How it works']]],
+  ];
+  const btn = ([id,l,c,hot]) => id === 'vendors' ? `<button type="button" data-vendors="1" title="Vendor contacts, terms and lead times">${l}</button>`
+    : `<button type="button" role="tab" data-tab="${id}" aria-selected="${TAB === id}">${l}${c != null ? `<span class="cnt ${hot ? 'hot' : ''}">${c}</span>` : ''}</button>`;
+  $('#tabs').innerHTML = G.map(([g, T]) => `<div class="tg" role="group" ${g ? `aria-label="${g}"` : ''}><span class="tgl">${g || '&nbsp;'}</span><div class="tgb">${T.map(btn).join('')}</div></div>`).join('');
 }
 
 /* ---------- overview ---------- */
