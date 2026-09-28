@@ -479,7 +479,7 @@ def build_brands(ctx):
     fyl = [add_months(k, -12) for k in fyc]
     base = ctx['base']
     B = defaultdict(lambda: dict(skus=0, t12=0.0, cogs12=0.0, oh=0.0, aged=0.0, ly=0, ty=0, g=0.0, c=0.0, md=0.0, units12=0,
-                                 ytd=0.0, ytdly=0.0, series=defaultdict(float), cats=defaultdict(float), top=[], agedList=[]))
+                                 ytd=0.0, ytdly=0.0, series=defaultdict(float), cats=defaultdict(float), top=[], agedList=[], assigned=False))
     unassigned = defaultdict(float)
     for s in sorted(set(hist) | set(snap)):  # sorted: ties in the top lists come out the same every run
         c = cat_of.get(s)
@@ -502,8 +502,10 @@ def build_brands(ctx):
         aged = v and (not ls or (as_of - ls).days > 365)
         bb = sku_gm.get(s)
         # A SKU carrying several brands counts toward each at its share.
+        assigned = bool((ctx.get('bmap') or {}).get(s))
         for b, sh in splits:
             a = B[(seg, b)]
+            a['assigned'] = a['assigned'] or assigned
             a['skus'] += 1
             a['t12'] += t12 * sh
             a['units12'] += u12 * sh
@@ -530,7 +532,7 @@ def build_brands(ctx):
                                      value=round(v * sh), **part))
     rows = []
     for (seg, b), a in B.items():
-        if a['t12'] < 100 and a['oh'] <= 0:
+        if a['t12'] < 100 and a['oh'] <= 0 and not a['assigned']:  # a brand someone assigned always gets its line
             continue
         cat_gm = sum(base['cats'][c]['gm'] * v for c, v in a['cats'].items()) / a['t12'] if a['t12'] else None
         gm = (a['g'] - a['c']) / a['g'] if a['g'] > 0 else cat_gm
