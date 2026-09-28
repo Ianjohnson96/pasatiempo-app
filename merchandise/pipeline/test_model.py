@@ -1,6 +1,6 @@
 """python merchandise/pipeline/test_model.py"""
 from config import CATS
-from model import brand_inputs, brand_skus, build, build_brands, fy_months, fytd_by_category, rebuild_ctx
+from model import brand_inputs, brand_skus, build, build_brands, desc_changes, fy_months, fytd_by_category, open_desc_changes, rebuild_ctx
 
 
 def cat_report(start, end, sales):
@@ -65,6 +65,36 @@ def test_brand_scorecard_rebuilds_from_stored_documents():
     ctx = rebuild_ctx(docs)
     assert build_brands(ctx) == build_brands(b['ctx'])
     assert brand_skus(ctx) == brand_skus(b['ctx'])
+
+
+def test_a_reused_sku_number_keeps_the_old_products_sales_apart():
+    """SKU A1 was a Polo shirt until August; from September the number is a hat."""
+    ly = {k: 100.0 for k in fy_months(2026)}
+    units = {'2026-06': 10, '2026-07': 10, '2026-08': 10, '2026-09': 4}
+    rep = sku_report('2026-09', units)
+    rep['rows'][0].update(cat_no='440', desc='Hat Melin')
+    bm = {'skus': {}, 'recycled': {'A1': {'from': '2026-09', 'brand': 'Peter Millar', 'cat': '480', 'desc': 'Shirt Polo'}}}
+    prior = dict(base=prior_base(2027, ly, {}), skuhist={'meta': {'A1': ['480', 'Shirt Polo', 50.0]}}, brandmap=bm)
+    b = build({'sku_analysis': [rep]}, prior)
+    rows = {(r['brand'], r['seg']): r for r in build_brands(b['ctx'])['rows']}
+    assert rows[('Peter Millar', 'mens')]['units12'] == 30  # the shirt's months stay with the shirt
+    assert rows[('Melin', 'hats')]['units12'] == 4  # the hat starts fresh
+    assert 'A1~2026-09' not in {r[0] for r in brand_skus(b['ctx'])['rows']}
+    # the same from the stored documents (Update brands), before and after the split is saved
+    docs = {'base/current': b['base'], 'brandin/current': brand_inputs(b['ctx']), 'brandmap/current': bm}
+    docs.update({f'skuhist/{k}': v for k, v in b['skuhist'].items()})
+    assert build_brands(rebuild_ctx(docs)) == build_brands(b['ctx'])
+
+
+def test_a_new_description_is_flagged_until_answered():
+    snap = {'A1': dict(sku='A1', desc='Hat Melin', cat_no='440'), 'B2': dict(sku='B2', desc='Shirt  FJ', cat_no='480')}
+    prev = {'skus': {'A1': [50.0, 3, 20.0, 'Aug01/26', 'Shirt Polo'], 'B2': [40.0, 1, 20.0, 'Aug01/26', 'shirt fj']}}
+    got = desc_changes(prev, snap, {'A1': ['480', 'Shirt Polo', 50.0]}, {}, '2026-10-01T00:00:00+00:00')
+    assert list(got) == ['A1'] and got['A1']['was'] == 'Shirt Polo' and got['A1']['wasCat'] == '480'  # spacing and case don't count
+    assert desc_changes({**prev, 'skus': {}, 'changed': got}, snap, {}, {}, 'later') == got  # carried to the next upload
+    assert open_desc_changes(got, {'checked': {'A1': 'hat melin'}}) == {}  # same product
+    assert open_desc_changes(got, {'recycled': {'A1': {'from': '2026-09', 'at': '2026-10-02T09:00:00Z'}}}) == {}  # marked reused
+    assert open_desc_changes(got, {'recycled': {'A1': {'from': '2025-01', 'at': '2025-02-01T09:00:00Z'}}}) == got  # an older reuse
 
 
 if __name__ == '__main__':

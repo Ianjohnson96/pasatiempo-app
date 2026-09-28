@@ -7,7 +7,18 @@
    The same document holds the owner's brand list edits (Edit brands, below): "words" ({brand: [word or phrase]}), checked
    before the built-in list, and "rename" ({old: new}; renaming into an existing brand merges the two). */
 let BRANDSKUS = null, BRANDMAP = {skus: {}};
-const BM = {filter: 'unknown', q: '', edit: null, draft: []};
+const BM = {filter: 'unknown', q: '', edit: null, draft: [], rc: null};  // rc: a reused number being marked, {from, brand}
+const bmRc = sku => (BRANDMAP.recycled || {})[sku] || null;
+const bmNorm = d => String(d || '').replace(/\s+/g, ' ').trim().toLowerCase();
+/* a new description at the last upload that nobody has answered yet (pipeline/model.py open_desc_changes) */
+function bmChanged(sku){
+  const v = ((BRANDSKUS && BRANDSKUS.changed) || {})[sku]; if (!v) return null;
+  const r = bmRc(sku), ck = (BRANDMAP.checked || {})[sku];
+  if (r && String(r.at || '') >= String(v.at || '')) return null;
+  if (ck != null && bmNorm(ck) === bmNorm(v.now)) return null;
+  return v;
+}
+const bmChangedRows = () => ((BRANDSKUS && BRANDSKUS.rows) || []).filter(r => bmChanged(r[0]));
 const bmFor = sku => (BRANDMAP.skus || {})[sku] || null;
 const bmRen = b => { const r = BRANDMAP.rename || {}; for (let i = 0; i < 10 && typeof r[b] === 'string' && r[b] && r[b] !== b; i++) b = r[b]; return b; };
 // whole words, like pipeline/brands.py
@@ -36,8 +47,8 @@ function bmLabel(row){
 function openBrandMap(){
   if (!BRANDSKUS){ $('#overlay').innerHTML = `<div class="scrim" data-close="1"></div><aside class="drawer" role="dialog" aria-modal="true"><header><div><h2>Assign brands</h2></div><button class="x" type="button" data-close="1" aria-label="Close">×</button></header><div class="body"><div class="note">The SKU list arrives with the next month-end upload.</div></div></aside>`; return; }
   const ro = !canAct(), all = BRANDSKUS.rows, q = BM.q.trim().toLowerCase();
-  const unknown = bmUnknown(), mine = all.filter(r => bmFor(r[0]));
-  let list = BM.filter === 'unknown' ? unknown : BM.filter === 'mine' ? mine : all;
+  const unknown = bmUnknown(), mine = all.filter(r => bmFor(r[0])), changed = bmChangedRows();
+  let list = BM.filter === 'unknown' ? unknown : BM.filter === 'mine' ? mine : BM.filter === 'changed' ? changed : all;
   if (q) list = all.filter(r => r[0].toLowerCase().includes(q) || String(r[1]).toLowerCase().includes(q) || String(r[3]).toLowerCase().includes(q)
     || (bmFor(r[0]) || []).some(x => x.b.toLowerCase().includes(q)));
   list = list.slice().sort((a, b) => (b[4] + b[5]) - (a[4] + a[5]));
@@ -55,13 +66,14 @@ function openBrandMap(){
         ${BM.draft.map((x, i) => `<div class="row2" style="align-items:end"><div class="f"><label for="bmB${i}">Brand</label><input id="bmB${i}" list="bmList" data-bmb="${i}" value="${esc(x.b)}" placeholder="Type or pick a brand"></div>
           <div class="f" style="max-width:130px"><label for="bmS${i}">Share %</label><input id="bmS${i}" type="number" min="0" max="100" step="1" data-bms="${i}" value="${esc(x.s)}" ${BM.draft.length === 1 ? 'disabled' : ''}></div>
           ${BM.draft.length > 1 ? `<button class="btn sm ghost" type="button" data-bmdrop="${i}" aria-label="Remove this brand">Remove</button>` : ''}</div>`).join('')}
+        ${bmRcHTML(ed)}
         <div class="hint" id="bmTot" style="margin:4px 0 10px">${BM.draft.length > 1 ? `Shares add up to ${tot}%${tot === 100 ? '' : ' (they need to make 100%)'}. Sales, stock and deliveries are split the same way.` : 'Add another brand if this SKU carries more than one.'}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary sm" type="button" data-bmsave="1">Save</button><button class="btn sm" type="button" data-bmadd="1">+ Another brand</button>
           ${bmFor(ed[0]) ? `<button class="btn sm" type="button" data-bmclear="1">${bmWordBrand(ed[1]) || ed[3] ? `Use ${esc(bmWordBrand(ed[1]) || bmRen(ed[3]))} from the description` : 'Remove the assignment'}</button>` : ''}<button class="btn sm ghost" type="button" data-bmcancel="1">Cancel</button></div></div>` : ''}
-      <div class="chips" style="margin-bottom:10px">${seg('unknown', 'Unknown brand', unknown.length)}${seg('mine', 'Assigned here', mine.length)}${seg('all', 'All SKUs', all.length)}
+      <div class="chips" style="margin-bottom:10px">${seg('unknown', 'Unknown brand', unknown.length)}${changed.length || BM.filter === 'changed' ? seg('changed', 'New description', changed.length) : ''}${seg('mine', 'Assigned here', mine.length)}${seg('all', 'All SKUs', all.length)}
         <input id="bmQ" type="search" placeholder="Find a SKU, description or brand" value="${esc(BM.q)}" style="margin-left:auto;padding:5px 10px;border:1px solid var(--rule2);border-radius:4px;background:var(--card);min-width:210px"></div>
       ${shown.length ? `<div style="overflow-x:auto"><table class="mini"><thead><tr><th>SKU</th><th>Description</th><th class="r">12-mo sales</th><th class="r">On hand</th><th>Brand</th><th></th></tr></thead><tbody>
-        ${shown.map(r => `<tr${BM.edit === r[0] ? ' style="background:var(--hover)"' : ''}><td class="num">${esc(r[0])}</td><td>${esc(r[1])}<br><span style="color:var(--muted);font-size:11.5px">${esc(CAT(r[2]).name)}${r[2] === '640' ? ' · special order, not on the scorecard' : ''}</span></td>
+        ${shown.map(r => `<tr${BM.edit === r[0] ? ' style="background:var(--hover)"' : ''}><td class="num">${esc(r[0])}</td><td>${esc(r[1])}<br><span style="color:var(--muted);font-size:11.5px">${esc(CAT(r[2]).name)}${r[2] === '640' ? ' · special order, not on the scorecard' : ''}${bmRc(r[0]) ? ` · number reused from ${monthLabel(bmRc(r[0]).from)}` : ''}</span>${bmChanged(r[0]) ? `<br><span class="neg" style="font-size:11.5px">New description; was “${esc(bmChanged(r[0]).was)}”</span>` : ''}</td>
           <td class="r num">${money(r[4])}</td><td class="r num">${money(r[5])}</td><td>${bmLabel(r)}</td>
           <td>${ro ? '' : `<button class="btn sm" type="button" data-bmedit="${esc(r[0])}">${bmFor(r[0]) || !bmEff(r) ? 'Edit' : 'Change'}</button>`}</td></tr>`).join('')}</tbody></table></div>
         ${list.length > shown.length ? `<div class="note">Showing the ${shown.length} biggest of ${list.length}. Search to find others.</div>` : ''}` : `<div class="note">${q ? 'No SKUs match.' : BM.filter === 'unknown' ? 'Every SKU has a brand.' : 'Nothing assigned here yet.'}</div>`}
@@ -70,7 +82,7 @@ function openBrandMap(){
 function bmStartEdit(sku){
   const row = BRANDSKUS.rows.find(r => r[0] === sku), m = bmFor(sku);
   const e = row && bmEff(row);
-  BM.edit = sku; BM.draft = m ? m.map(x => ({b: bmRen(x.b), s: num(x.s)})) : [{b: e ? e[0].b : '', s: 100}];
+  BM.edit = sku; BM.rc = null; BM.draft = m ? m.map(x => ({b: bmRen(x.b), s: num(x.s)})) : [{b: e ? e[0].b : '', s: 100}];
   openBrandMap(); setTimeout(() => $('#bmB0')?.focus(), 0);
 }
 async function bmSave(clear){
@@ -83,12 +95,51 @@ async function bmSave(clear){
     if (rows.length > 1 && rows.reduce((a, x) => a + x.s, 0) !== 100){ toast('The shares need to add up to 100%.'); return; }
     if (rows.length === 1) rows[0].s = 100;
   }
-  const skus = {...(BRANDMAP.skus || {})};
+  const skus = {...(BRANDMAP.skus || {})}, recycled = {...(BRANDMAP.recycled || {})}, rc = BM.rc;
+  if (rc){
+    if (!/^\d{4}-\d{2}$/.test(rc.from || '')){ toast('Enter the month the new product started.'); return; }
+    if (!String(rc.brand || '').trim()){ toast("Enter the old product's brand."); return; }
+    const row = BRANDSKUS.rows.find(r => r[0] === sku) || [], ch = bmChanged(sku);  // after an upload the list already has the new product's details
+    recycled[sku] = {from: rc.from, brand: canon(String(rc.brand).trim()), cat: (ch && ch.wasCat) || row[2] || '', desc: (ch && ch.was) || row[1] || '', by: myId, at: new Date().toISOString()};
+  }
   if (clear) delete skus[sku]; else skus[sku] = rows;
-  if (await write('brandmap/current', {...BRANDMAP, skus, updatedBy: myId, updatedAt: new Date().toISOString()})){
-    BRANDMAP = {...BRANDMAP, skus}; BM.edit = null; BM.draft = [];
-    toast(clear ? `SKU ${sku} goes back to its description` : `SKU ${sku}: ${rows.map(x => rows.length > 1 ? `${x.b} ${x.s}%` : x.b).join(', ')}`);
+  if (await write('brandmap/current', {...BRANDMAP, skus, recycled, updatedBy: myId, updatedAt: new Date().toISOString()})){
+    BRANDMAP = {...BRANDMAP, skus, recycled}; BM.edit = null; BM.draft = []; BM.rc = null;
+    toast((clear ? `SKU ${sku} goes back to its description` : `SKU ${sku}: ${rows.map(x => rows.length > 1 ? `${x.b} ${x.s}%` : x.b).join(', ')}`)
+      + (rc ? `; sales before ${monthLabel(rc.from)} stay with ${recycled[sku].brand}` : ''));
     openBrandMap();
+  }
+}
+
+/* A reused SKU number: the month the new product started and the old product's brand. The reader keeps the
+   sales before that month apart, under the old brand and category (pipeline/model.py split_recycled). */
+function bmRcHTML(ed){
+  const cur = bmRc(ed[0]), ch = bmChanged(ed[0]);
+  if (ch && !BM.rc) return `<div class="note" style="margin:0"><b>The description changed</b> at the last upload, from “${esc(ch.was)}” to “${esc(ch.now)}”. Was this number reused for a new product?
+    <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap"><button class="btn sm" type="button" data-bmrcon="1">Yes, reused for a new product…</button><button class="btn sm ghost" type="button" data-bmsame="1">No, same product</button></div></div>`;
+  if (BM.rc) return `<div class="row2" style="align-items:end"><div class="f" style="max-width:190px"><label for="bmRcF">New product from</label><input id="bmRcF" type="month" data-bmrcf="1" value="${esc(BM.rc.from)}"></div>
+      <div class="f"><label for="bmRcB">Old product's brand</label><input id="bmRcB" list="bmList" data-bmrcb="1" value="${esc(BM.rc.brand)}" placeholder="Type or pick a brand"></div></div>
+    <div class="hint">Sales before that month stay with the old product and its brand. The brand above the line is the new product's. <button class="btn sm ghost" type="button" data-bmrcoff="1">Not reused</button></div>`;
+  if (cur) return `<div class="hint">Number reused from <b>${monthLabel(cur.from)}</b>: earlier sales stay with <b>${esc(bmRen(cur.brand))}</b>. <button class="btn sm ghost" type="button" data-bmrcdel="1">Undo</button></div>`;
+  return `<div><button class="btn sm ghost" type="button" data-bmrcon="1">This number was reused for a new product…</button></div>`;
+}
+function bmRcStart(){
+  const row = BRANDSKUS.rows.find(r => r[0] === BM.edit), e = row && bmEff(row);
+  BM.rc = {from: THIS_MONTH, brand: e ? e[0].b : ''};
+  BM.draft = [{b: '', s: 100}];  // the brand for the new product
+  openBrandMap(); setTimeout(() => $('#bmB0')?.focus(), 0);
+}
+async function bmSame(){
+  const sku = BM.edit, ch = bmChanged(sku); if (!ch) return;
+  const checked = {...(BRANDMAP.checked || {}), [sku]: ch.now};
+  if (await write('brandmap/current', {...BRANDMAP, checked, updatedBy: myId, updatedAt: new Date().toISOString()})){
+    BRANDMAP = {...BRANDMAP, checked}; toast(`SKU ${sku}: same product, new description`); openBrandMap();
+  }
+}
+async function bmRcDelete(){
+  const sku = BM.edit, recycled = {...(BRANDMAP.recycled || {})}; delete recycled[sku];
+  if (await write('brandmap/current', {...BRANDMAP, recycled, updatedBy: myId, updatedAt: new Date().toISOString()})){
+    BRANDMAP = {...BRANDMAP, recycled}; toast(`SKU ${sku}'s sales are one product again`); openBrandMap();
   }
 }
 
