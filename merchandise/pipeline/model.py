@@ -15,8 +15,8 @@ from calendar import monthrange
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 
-from brands import brand_of, brand_split, segment_of, is_hat
-from config import (CATS, OTB_EXCLUDE, TARGET_WOS, MARKDOWN, G27_DEFAULT, G28_DEFAULT, COMBINED, DAILY_NAMES)
+from brands import _SEG, brand_of, brand_split, segment_of, is_hat
+from config import (CATS, OTB_EXCLUDE, TARGET_WOS, MARKDOWN, G27_DEFAULT, G28_DEFAULT, COMBINED, DAILY_NAMES, SUB_RULES)
 
 MERCH = set(CATS)
 MON = {'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6, 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12}
@@ -380,7 +380,8 @@ def build(reports, prior=None):
                            datetime.now(timezone.utc).isoformat(timespec='seconds'))
     ctx = dict(as_of=as_of, cur=cur, actual_through=actual_through, fy=fy, snap=snap, sku_month=snap_rep['as_of'], hist=hist, px=px, sku_gm=sku_gm,
                bmap=brand_assignments(prior.get('brandmap')), blist=prior.get('brandmap') or {},
-               desc_of=desc_of, cat_of=cat_of, items=reports.get('sales_by_item', []), base=base, changed=changed)
+               desc_of=desc_of, cat_of=cat_of, items=reports.get('sales_by_item', []), base=base, changed=changed,
+               submap=(prior.get('submap') or {}).get('skus') or {}, subids=prior.get('subids'))
     return dict(base=base, inventory=inventory, skuhist=skuhist, ctx=ctx)
 
 
@@ -541,18 +542,40 @@ def call_for(m):
     return 'keep', 'Performing in line with the shop.'
 
 
-def build_brands(ctx):
-    as_of, snap, hist, px, sku_gm = ctx['as_of'], ctx['snap'], ctx['hist'], ctx['px'], ctx['sku_gm']
-    desc_of, cat_of = ctx['desc_of'], ctx['cat_of']
+_SUB_RX = {c: [(sid, re.compile(rx)) for sid, rx in rules] for c, rules in SUB_RULES.items()}
+
+
+def sub_auto(cat, desc, subids=None):
+    """A SKU's subcategory from its description (config.SUB_RULES), '' when none fits. subids: the program's
+    active subcategory ids; a rule for one that was removed is skipped."""
+    d = (desc or '').lower()
+    for sid, rx in _SUB_RX.get(cat, []):
+        if (subids is None or sid in subids) and rx.search(d):
+            return sid
+    return ''
+
+
+def sub_of(ctx, sku, cat, desc):
+    """Subcategory: the one set in the program (submap/current "skus": {sku: id}), else from the description."""
+    m = ctx.get('submap') or {}
+    if sku in m and (not m[sku] or ctx.get('subids') is None or m[sku] in ctx['subids']):
+        return m[sku] or ''
+    return sub_auto(cat, desc, ctx.get('subids'))
+
+
+def _windows(ctx):
     at = ctx['actual_through']
     t12m = [add_months(at, -i) for i in range(12)][::-1]
-    last3 = t12m[-3:]
-    ly3 = [add_months(k, -12) for k in last3]
-    series_m = [add_months(at, -i) for i in range(24)][::-1]
-    fy = ctx['fy']
-    fyc = [k for k in fy_months(fy) if k <= at]
-    fyl = [add_months(k, -12) for k in fyc]
-    base = ctx['base']
+    fyc = [k for k in fy_months(ctx['fy']) if k <= at]
+    return dict(at=at, t12m=t12m, last3=t12m[-3:], ly3=[add_months(k, -12) for k in t12m[-3:]],
+                series_m=[add_months(at, -i) for i in range(24)][::-1], fyc=fyc, fyl=[add_months(k, -12) for k in fyc])
+
+
+def _aggregate(ctx, W, groups_of):
+    """Sales, stock and margin by group over every merchandise SKU outside special orders.
+    groups_of(sku, cat, desc, snapshot row) -> ([(key, share)], assigned, key for sales that fit no group)."""
+    as_of, snap, hist, px, sku_gm = ctx['as_of'], ctx['snap'], ctx['hist'], ctx['px'], ctx['sku_gm']
+    desc_of, cat_of = ctx['desc_of'], ctx['cat_of']
     B = defaultdict(lambda: dict(skus=0, t12=0.0, cogs12=0.0, oh=0.0, aged=0.0, ly=0, ty=0, g=0.0, c=0.0, md=0.0, units12=0,
                                  ytd=0.0, ytdly=0.0, series=defaultdict(float), cats=defaultdict(float), top=[], agedList=[], assigned=False))
     unassigned = defaultdict(float)
@@ -562,35 +585,33 @@ def build_brands(ctx):
             continue
         desc = desc_of.get(s, '')
         r = snap.get(s)
-        splits = brand_split(ctx.get('bmap'), s, desc, r['desc'] if r else '', bl=ctx.get('blist'))
-        seg = segment_of(c, desc)
+        splits, assigned, miss = groups_of(s, c, desc, r)
         mo = hist.get(s, {})
         p = px(s)
-        t12 = sum(mo.get(k, 0) for k in t12m) * p
+        t12 = sum(mo.get(k, 0) for k in W['t12m']) * p
         if not splits:
-            unassigned[seg] += t12
+            unassigned[miss] += t12
             continue
         cost = r['cost'] if r else 0
-        u12 = sum(mo.get(k, 0) for k in t12m)
+        u12 = sum(mo.get(k, 0) for k in W['t12m'])
         v = max(r['oh'], 0) * cost if r else 0
         ls = pos_date(r['last_sale']) if r else None
         aged = v and (not ls or (as_of - ls).days > 365)
         bb = sku_gm.get(s)
-        # A SKU carrying several brands counts toward each at its share.
-        assigned = bool((ctx.get('bmap') or {}).get(s))
-        for b, sh in splits:
-            a = B[(seg, b)]
+        # A SKU split between groups (a multi-brand SKU) counts toward each at its share.
+        for key, sh in splits:
+            a = B[key]
             a['assigned'] = a['assigned'] or assigned
             a['skus'] += 1
             a['t12'] += t12 * sh
             a['units12'] += u12 * sh
             a['cogs12'] += u12 * cost * sh
-            a['ty'] += sum(mo.get(k, 0) for k in last3) * sh
-            a['ly'] += sum(mo.get(k, 0) for k in ly3) * sh
-            a['ytd'] += sum(mo.get(k, 0) for k in fyc) * p * sh
-            a['ytdly'] += sum(mo.get(k, 0) for k in fyl) * p * sh
+            a['ty'] += sum(mo.get(k, 0) for k in W['last3']) * sh
+            a['ly'] += sum(mo.get(k, 0) for k in W['ly3']) * sh
+            a['ytd'] += sum(mo.get(k, 0) for k in W['fyc']) * p * sh
+            a['ytdly'] += sum(mo.get(k, 0) for k in W['fyl']) * p * sh
             a['cats'][c] += t12 * sh
-            for k in series_m:
+            for k in W['series_m']:
                 if mo.get(k):
                     a['series'][k] += mo[k] * p * sh
             a['oh'] += v * sh
@@ -605,28 +626,70 @@ def build_brands(ctx):
             if t12 > 0 or v > 0:
                 a['top'].append(dict(sku=s, desc=desc, cat=c, t12=round(t12 * sh), units=round(u12 * sh), oh=round((r['oh'] if r else 0) * sh),
                                      value=round(v * sh), **part))
+    return B, unassigned
+
+
+def _metrics(a, base, W):
+    cat_gm = sum(base['cats'][c]['gm'] * v for c, v in a['cats'].items()) / a['t12'] if a['t12'] else None
+    gm = (a['g'] - a['c']) / a['g'] if a['g'] > 0 else cat_gm
+    md = a['md'] / (a['g'] + a['md']) if a['g'] + a['md'] > 0 else None
+    wks = a['oh'] / (a['cogs12'] / 52) if a['cogs12'] > 0 else (None if a['oh'] <= 0 else 999)
+    gmroi = (a['t12'] * gm) / a['oh'] if a['oh'] > 0 and gm is not None else None
+    return dict(skus=a['skus'], t12=round(a['t12']),
+                units12=round(a['units12']), ytd=round(a['ytd']), ytdly=round(a['ytdly']), oh=round(a['oh']), aged=round(a['aged']),
+                agedPct=round(a['aged'] / a['oh'], 3) if a['oh'] else 0, gm=round(gm, 3) if gm is not None else None,
+                md=round(md, 3) if md is not None else None, wks=round(wks, 1) if wks is not None else None,
+                gmroi=round(gmroi, 2) if gmroi is not None else None, ly=round(a['ly']), ty=round(a['ty']),
+                cats={c: round(v) for c, v in sorted(a['cats'].items(), key=lambda x: -x[1]) if v > 0},
+                series=[round(a['series'].get(k, 0)) for k in W['series_m']],
+                top=sorted(a['top'], key=lambda x: -x['t12'])[:8], agedSkus=sorted(a['agedList'], key=lambda x: -x['value'])[:6])
+
+
+def _header(ctx, W):
+    return dict(asOf=ctx['as_of'].isoformat(), through=W['at'], months=W['series_m'], t12Months=[W['t12m'][0], W['t12m'][-1]],
+                compare=[W['ly3'], W['last3']])
+
+
+def build_brands(ctx):
+    W = _windows(ctx)
+    bmap = ctx.get('bmap') or {}
+
+    def groups(s, c, desc, r):
+        seg = segment_of(c, desc)
+        splits = brand_split(bmap, s, desc, r['desc'] if r else '', bl=ctx.get('blist'))
+        return [((seg, b), sh) for b, sh in splits], bool(bmap.get(s)), seg
+
+    B, unassigned = _aggregate(ctx, W, groups)
     rows = []
     for (seg, b), a in B.items():
         if a['t12'] < 100 and a['oh'] <= 0 and not a['assigned']:  # a brand someone assigned always gets its line
             continue
-        cat_gm = sum(base['cats'][c]['gm'] * v for c, v in a['cats'].items()) / a['t12'] if a['t12'] else None
-        gm = (a['g'] - a['c']) / a['g'] if a['g'] > 0 else cat_gm
-        md = a['md'] / (a['g'] + a['md']) if a['g'] + a['md'] > 0 else None
-        wks = a['oh'] / (a['cogs12'] / 52) if a['cogs12'] > 0 else (None if a['oh'] <= 0 else 999)
-        gmroi = (a['t12'] * gm) / a['oh'] if a['oh'] > 0 and gm is not None else None
-        m = dict(seg=seg, brand=b, id=re.sub(r'[^a-z0-9]+', '-', f'{seg}-{b}'.lower()).strip('-'), skus=a['skus'], t12=round(a['t12']),
-                 units12=round(a['units12']), ytd=round(a['ytd']), ytdly=round(a['ytdly']), oh=round(a['oh']), aged=round(a['aged']),
-                 agedPct=round(a['aged'] / a['oh'], 3) if a['oh'] else 0, gm=round(gm, 3) if gm is not None else None,
-                 md=round(md, 3) if md is not None else None, wks=round(wks, 1) if wks is not None else None,
-                 gmroi=round(gmroi, 2) if gmroi is not None else None, ly=round(a['ly']), ty=round(a['ty']),
-                 cats={c: round(v) for c, v in sorted(a['cats'].items(), key=lambda x: -x[1]) if v > 0},
-                 series=[round(a['series'].get(k, 0)) for k in series_m],
-                 top=sorted(a['top'], key=lambda x: -x['t12'])[:8], agedSkus=sorted(a['agedList'], key=lambda x: -x['value'])[:6])
+        m = dict(seg=seg, brand=b, id=re.sub(r'[^a-z0-9]+', '-', f'{seg}-{b}'.lower()).strip('-'), **_metrics(a, ctx['base'], W))
         m['call'], m['why'] = call_for(m)
         rows.append(m)
     rows.sort(key=lambda r: -r['t12'])
-    return dict(asOf=as_of.isoformat(), through=at, months=series_m, t12Months=[t12m[0], t12m[-1]], compare=[ly3, last3],
-                unassigned={k: round(v) for k, v in unassigned.items()}, rows=rows)
+    return dict(_header(ctx, W), unassigned={k: round(v) for k, v in unassigned.items()}, rows=rows)
+
+
+def build_subcats(ctx):
+    """Subcategory report (assort/current): the brand scorecard's measures by category and subcategory, sub ''
+    for SKUs no subcategory fits. Reporting only: budgets stay by category."""
+    W = _windows(ctx)
+
+    def groups(s, c, desc, r):
+        return [((c, sub_of(ctx, s, c, desc or (r['desc'] if r else ''))), 1.0)], False, c
+
+    B, _ = _aggregate(ctx, W, groups)
+    rows = []
+    for (c, sub), a in B.items():
+        if a['t12'] <= 0 and a['oh'] <= 0:
+            continue
+        m = dict(cat=c, sub=sub, seg=_SEG.get(c, 'other'), **_metrics(a, ctx['base'], W))
+        m['call'], m['why'] = call_for(m)
+        del m['seg']
+        rows.append(m)
+    rows.sort(key=lambda r: (r['cat'], -r['t12']))
+    return dict(_header(ctx, W), at=datetime.now(timezone.utc).isoformat(timespec='seconds'), rows=rows)
 
 
 def brand_inputs(ctx):
@@ -643,6 +706,12 @@ def brand_inputs(ctx):
         row = [ctx['px'](s)] + ([r['oh'], r['cost'], r['last_sale'], r['desc']] if r else [None] * 4)
         out[s] = row + ([g['g'], g['c'], g['md']] if g else [])
     return dict(asOf=ctx['as_of'].isoformat(), skus=out, changed=ctx.get('changed') or {})
+
+
+def subcat_ids(docs):
+    """The active subcategory ids among stored documents (subcats/{id}), or None when none were passed."""
+    ids = {p[8:] for p, d in docs.items() if p.startswith('subcats/') and isinstance(d, dict) and d.get('active') is not False}
+    return ids or None
 
 
 def rebuild_ctx(docs):
@@ -672,12 +741,14 @@ def rebuild_ctx(docs):
             sku_gm[s] = dict(g=r[5], c=r[6], md=r[7])
     return dict(as_of=date.fromisoformat(base['asOf']), actual_through=base['actualThrough'], fy=int(base['fy'][2:]), snap=snap,
                 hist=hist, px=lambda s: px.get(s, 0), sku_gm=sku_gm, desc_of=desc_of, cat_of=cat_of, base=base,
-                bmap=brand_assignments(bm), blist=bm, changed=open_desc_changes(bi.get('changed'), bm))
+                bmap=brand_assignments(bm), blist=bm, changed=open_desc_changes(bi.get('changed'), bm),
+                submap=(docs.get('submap/current') or {}).get('skus') or {}, subids=subcat_ids(docs))
 
 
 def brand_skus(ctx):
     """Every SKU with stock or sales in the last 12 months, for assigning brands in the program:
-    [sku, description, category, brand from the description ('' if none), 12-month sales $, on hand $ at cost]."""
+    [sku, description, category, brand from the description ('' if none), 12-month sales $, on hand $ at cost,
+    subcategory from the description ('' if none)]."""
     at, snap, hist, px = ctx['actual_through'], ctx['snap'], ctx['hist'], ctx['px']
     t12m = [add_months(at, -i) for i in range(12)]
     rows = []
@@ -690,5 +761,6 @@ def brand_skus(ctx):
         t12 = sum(hist.get(s, {}).get(k, 0) for k in t12m) * px(s)
         oh = max(r['oh'], 0) * r['cost'] if r else 0
         if t12 > 0 or oh > 0:
-            rows.append([s, desc, c, brand_of(desc, ctx.get('blist')) or (brand_of(r['desc'], ctx.get('blist')) if r else None) or '', round(t12), round(oh)])
+            rows.append([s, desc, c, brand_of(desc, ctx.get('blist')) or (brand_of(r['desc'], ctx.get('blist')) if r else None) or '', round(t12), round(oh),
+                         sub_auto(c, desc, ctx.get('subids'))])
     return dict(asOf=ctx['as_of'].isoformat(), rows=rows, changed=ctx.get('changed') or {})

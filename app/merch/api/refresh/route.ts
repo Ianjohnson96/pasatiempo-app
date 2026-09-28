@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 // documents, which the reader builds on: the forecast base, the SKU history,
 // the last stock snapshot (to work out what arrived since), the brand
 // assignments and any saved forecast assumptions. Brands -> Update brands uses the same pass and documents
-// (with brandin/current) to rebuild only the brand scorecard. The reader returns a data file, and the
+// (with brandin/current) to rebuild only the brand scorecard and the subcategory report (subcats/* and submap/current). The reader returns a data file, and the
 // page loads it through /merch/api/import once the owner confirms.
 export async function POST() {
   const me = await getMerchViewer();
@@ -18,8 +18,8 @@ export async function POST() {
     return NextResponse.json({ error: "Only the owner can update the program from reports." }, { status: 403 });
   const supa = createAdminClient("merch");
   const [named, hist] = await Promise.all([
-    supa.from("docs").select("path, data").eq("deleted", false).in("path", ["base/current", "plan/assumptions", "skusnap/current", "brandmap/current", "brandin/current"]),
-    supa.from("docs").select("path, data").eq("deleted", false).like("path", "skuhist/%"),
+    supa.from("docs").select("path, data").eq("deleted", false).in("path", ["base/current", "plan/assumptions", "skusnap/current", "brandmap/current", "brandin/current", "submap/current"]),
+    supa.from("docs").select("path, data").eq("deleted", false).or("path.like.skuhist/%,path.like.subcats/%"),
   ]);
   if (named.error || hist.error)
     return NextResponse.json({ error: "Last month's data couldn't be loaded. Try again." }, { status: 503 });

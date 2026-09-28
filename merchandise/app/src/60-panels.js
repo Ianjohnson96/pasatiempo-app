@@ -36,6 +36,7 @@ function openCategory(code){
       <div class="row3"><div><div class="lab">On hand</div><div class="num" style="font-size:17px;font-weight:600">${money(inv.cost)}</div><div style="font-size:12px;color:var(--muted)">${int(inv.units)} units · ${int(inv.skus || 0)} SKUs</div></div>
         <div><div class="lab">Not sold 12+ months</div><div class="num" style="font-size:17px;font-weight:600">${money(inv.aged)}</div><div style="font-size:12px;color:var(--muted)">${inv.cost ? Math.round(inv.aged / inv.cost * 100) : 0}% of the category</div></div>
         <div><div class="lab">Weeks of supply</div><div class="num" style="font-size:17px;font-weight:600">${wksNow(code, inv.cost) ? Math.round(wksNow(code, inv.cost)) : "—"}</div><div style="font-size:12px;color:var(--muted)">target ${c.wos || '—'}</div></div></div>
+      ${subcatSectionHTML(code)}
       ${subs.length ? `<div class="sec">On order by subcategory</div><table class="mini"><thead><tr><th>Subcategory</th><th class="r">Units</th><th class="r">Committed</th></tr></thead><tbody>${subs.map(s => `<tr><td>${esc(s.name)}</td><td class="r num">${int(s.units)}</td><td class="r num">${money(s.dollars)}</td></tr>`).join('')}</tbody></table>` : ''}
       ${items.length ? `<div class="sec">Suggestions for this category</div><ul class="items" style="border:1px solid var(--rule)">${items.slice(0,8).map(i => itemHtml(i, true)).join('')}</ul>` : ''}
       <div class="sec">Orders</div>

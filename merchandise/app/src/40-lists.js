@@ -129,12 +129,16 @@ const countTotals = ct => Object.values(ct.cats || {}).reduce((a,c) => ({book:a.
 function renderHelp(){
   const P = PLANS.cur || PLAN, ga = P.cats['620'] || {};
   $('#pane').innerHTML = `<div class="help">
-  <section class="panel"><div class="in"><h3>The pages</h3><dl class="gl">
+  <section class="panel"><div class="in"><h3>The pages</h3>
+    <p>The tabs at the top are grouped the way a buying month runs: <b>Plan</b> the money, <b>Buy</b> against it, check the <b>Assortment</b>, then <b>Close the month</b>. They stay at the top of the screen as you scroll.</p><dl class="gl">
     <dt>Overview</dt><dd>Budget left by category for the year and month you pick, and the top things to do.</dd>
     <dt>Forecast</dt><dd>Sales by month for this year and next. Growth and target weeks can be changed; every budget follows.</dd>
     <dt>Open-to-buy</dt><dd>The budget as a category × month grid for this year, next year or calendar ${P.fyNum || 2027}, plus the month-by-month worksheet.</dd>
     <dt>Orders</dt><dd>Every purchase order. Each one counts against the fiscal year it arrives in.</dd>
     <dt>Brands</dt><dd>A scorecard for every brand, by men's, ladies', hats, accessories and equipment, with a call: Grow, Keep, Watch, Reduce or Drop.</dd>
+    <dt>Vendors</dt><dd>Vendor contacts, account numbers, terms and lead times.</dd>
+    <dt>Subcategories</dt><dd>Inside each category, where the sales and the stock are: headcovers against towels, polos against quarter-zips. Sales, trend, weeks of supply, margin, GMROI, aged stock and what's on order, with a call for each. SKUs are sorted from their descriptions; <b>Sort SKUs</b> fixes any that land in the wrong place. Budgets stay by category.</dd>
+    <dt>Inventory &amp; counts</dt><dd>Stock by category, aging, and the quarterly count.</dd>
     <dt>To do</dt><dd>Order problems and item-level suggestions: reorders, stock-outs, aged stock, combined SKUs, data errors.</dd>
     <dt>Month-end</dt><dd>The checklist, the refresh history, and how each month came in against the forecast.</dd></dl>
     <h3 style="margin-top:14px">What the open-to-buy is</h3>

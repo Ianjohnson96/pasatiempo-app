@@ -1,6 +1,6 @@
 """python merchandise/pipeline/test_model.py"""
 from config import CATS
-from model import brand_inputs, brand_skus, build, build_brands, desc_changes, fy_months, fytd_by_category, open_desc_changes, rebuild_ctx
+from model import brand_inputs, brand_skus, build, build_brands, build_subcats, sub_auto, desc_changes, fy_months, fytd_by_category, open_desc_changes, rebuild_ctx
 
 
 def cat_report(start, end, sales):
@@ -95,6 +95,23 @@ def test_a_new_description_is_flagged_until_answered():
     assert open_desc_changes(got, {'checked': {'A1': 'hat melin'}}) == {}  # same product
     assert open_desc_changes(got, {'recycled': {'A1': {'from': '2026-09', 'at': '2026-10-02T09:00:00Z'}}}) == {}  # marked reused
     assert open_desc_changes(got, {'recycled': {'A1': {'from': '2025-01', 'at': '2025-02-01T09:00:00Z'}}}) == got  # an older reuse
+
+
+def test_subcategories_from_descriptions_and_the_programs_choice():
+    assert sub_auto('620', 'Winston/Vanto/Seamus Dr Cover') == 's-620-headcovers'
+    assert sub_auto('620', 'Misc. PRG Bag Tag') == 's-620-bag-tags'  # before totes & pouches ("bag")
+    assert sub_auto('490', 'Sweater Greyson Hoodie') == 's-490-hoodies'
+    assert sub_auto('350', 'Bag Titleist Travel') == 's-350-travel-covers'
+    assert sub_auto('620', 'Misc Headcover PRG', subids={'s-620-towels'}) == ''  # a removed subcategory is skipped
+    ly = {k: 100.0 for k in fy_months(2026)}
+    rep = sku_report('2026-07', {'2026-06': 4, '2026-07': 6})
+    rep['rows'].append(dict(sku='B2', cat_no='480', desc='Shirt FJ Hoodie', oh=2, cost=30.0, last_sale='Jul02/26', mo={'2026-07': 3}))
+    prior = dict(base=prior_base(2027, ly, {}), skuhist={'meta': {'A1': ['480', 'Polo', 50.0], 'B2': ['480', 'Shirt FJ Hoodie', 40.0]}},
+                 submap={'skus': {'A1': 's-480-junior'}})
+    b = build({'sku_analysis': [rep]}, prior)
+    rows = {r['sub']: r for r in build_subcats(b['ctx'])['rows']}
+    assert rows['s-480-junior']['units12'] == 10  # set in the program
+    assert rows['s-480-other']['units12'] == 3  # from the description
 
 
 if __name__ == '__main__':

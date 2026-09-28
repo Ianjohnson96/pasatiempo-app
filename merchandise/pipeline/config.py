@@ -49,3 +49,38 @@ COMBINED = {
     '445400': 'The whole Legendary hat line on one SKU.', '446200': 'The whole Branded Bills line on one SKU.',
     '321300': 'Every size and hand of the custom glove on one SKU.', '472100': 'Every color and size of the FJ hoodie on one SKU.',
 }
+
+# Subcategory of a SKU from its description, for subcategory reporting (model.sub_auto). The ids are the
+# program's subcategories (subcats/{id}, the ones order lines use). Checked in order, first match wins;
+# "." catches the rest of the category. Brands -> Subcategories -> Sort SKUs corrects any SKU.
+SUB_RULES = {
+    '160': [('s-160-custom-imprint', r'imprint|custom|\('), ('s-160-logo-balls', r'logo|pasatiempo|\bind\b'), ('s-160-stock-balls', r'.')],
+    '200': [('s-200-custom-fitting-orders', r'\('), ('s-200-putters', r'putter'), ('s-200-drivers-woods', r'wood|driver|\bdr\b|fwy|hyb'),
+            ('s-200-irons-wedges', r'iron|wedge|\bsm\d|vokey')],
+    '220': [('s-220-demo-clubs', r'.')],
+    '300': [('s-300-junior-shoes', r'\bjr\b|junior'), ('s-300-shoe-accessories', r'spike|lace|shoe bag|tree'),
+            ("s-300-women-s-shoes", r'\bw\b|wmn|women|ladies'), ("s-300-men-s-shoes", r'.')],
+    '320': [('s-320-rain-winter-pairs', r'rain|winter|weather'), ("s-320-women-s-gloves", r'\bw\b|ladies|women|kalea'), ("s-320-men-s-gloves", r'.')],
+    '350': [('s-350-travel-covers', r'travel'), ('s-350-backpacks-duffels', r'back ?pack|bpack|duffel'), ('s-350-cart-bags', r'cart'),
+            ('s-350-staff-tour-bags', r'staff|tour\b|signature'), ('s-350-stand-carry-bags', r'.')],
+    '400': [('s-400-junior', r'\bjr\b|junior'), ('s-400-hoodies', r'hood'), ('s-400-t-shirts', r't-?shirt|\btee\b|\bt$'), ('s-400-polos', r'.')],
+    '430': [('s-430-rain-pants', r'rain'), ("s-430-men-s-shorts", r'short'), ("s-430-men-s-pants", r'.')],
+    '440': [('s-440-beanies', r'beanie'), ('s-440-bucket-sun-hats', r'bucket|\bsun\b|visor|straw|aussie'), ('s-440-belts', r'belt'),
+            ('s-440-socks', r'sock'), ('s-440-hats-caps', r'hat|cap\b|snap'), ('s-440-other', r'.')],
+    '470': [('s-470-junior', r'\bjr\b|junior'), ('s-470-rain-jackets', r'rain'), ('s-470-vests', r'vest'), ('s-470-hoodies', r'hood'),
+            ('s-470-wind-hybrid-jackets', r'.')],
+    '480': [('s-480-junior', r'\bjr\b|junior'), ("s-480-men-s-long-sleeve-sweater-polos", r'\bls\b|long ?sl|sweater polo'),
+            ('s-480-other', r'hood|t-?shirt|\btee\b'), ("s-480-men-s-polos", r'.')],
+    '490': [('s-490-hoodies', r'hood'), ('s-490-vests', r'vest'), ('s-490-quarter-zips-pullovers', r'.')],
+    '500': [('s-500-junior-girls', r'\bjr\b|junior|girl'), ('s-500-skorts-skirts', r'skort|skirt|short'), ('s-500-pants', r'pant|capri|tregging'),
+            ('s-500-jackets-vests', r'jacket|vest'), ('s-500-sweaters-layers', r'sweater|hood|pullover|1/4'), ('s-500-tops-polos', r'.')],
+    '620': [('s-620-headcovers', r'headcover|cover|\bdr c|fwy/|putt'), ('s-620-towels', r'towel'), ('s-620-bag-tags', r'bag tag'),
+            ('s-620-ball-markers-poker-chips', r'marker|coin|poker|chip|jewel|ballmark'), ('s-620-divot-tools-hat-clips', r'divot|hat ?cl'),
+            ('s-620-drinkware', r'mug|yeti|tumbler|tervis|glass|flask|tempercraft|coaster|bottle|colster|wine|shot|cup\b'),
+            ('s-620-sunglasses-rangefinders', r'sunglass|maui|oakley|bushnell|rangefinder|\bmj\b|lens'), ('s-620-flags', r'flag'),
+            ('s-620-yardage-books-scorecard-holders', r'yardage|score'), ('s-620-books-posters', r'book|poster|\bmap\b|print|photo|painting|card'),
+            ('s-620-totes-pouches', r'tote|pouch|toiletry|duffel|bag'), ('s-620-grips-training-aids', r'grip|align|stick|squid|board|battery|mgi|remote|training'),
+            ('s-620-other-accessories', r'.')],
+    '640': [('s-640-customer-special-order', r'.')],
+    '660': [('s-660-greens-yardage-books', r'.')],
+}
