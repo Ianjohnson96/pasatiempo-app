@@ -74,6 +74,10 @@ The page shows new names and words at once (brand labels, the SKU list's "no bra
 
 **Update brands** (owner) rebuilds the scorecard (`brands/current`) and the SKU list (`brandskus/current`) with the latest assignments and brand list, without new reports. Each upload saves what that needs beyond the stored history and prices in `brandin/current` (`model.brand_inputs()`: per SKU its price, on-hand, cost, last sale, SKU Analysis description and cost & margin figures). The button gets the same pass and documents as an upload (`/merch/api/refresh`), sends them to the reader with `"rebuild": "brands"` (`refresh.rebuild_brands()`, which puts the stored documents back into the context `build_brands()` takes), and saves the result through `/merch/api/import`. It gives exactly what an upload of the same reports would; the button is highlighted when brand changes are newer than the scorecard (`brands/current.at`).
 
+**Reused SKU numbers.** A SKU number reused for a new product carries the old product's sales in the POS. Assign brands marks it (`brandmap/current` `recycled: {sku: {from: "YYYY-MM", brand, cat, desc}}`): `split_recycled()` moves the months before `from` to a retired key (`sku~YYYY-MM`) that keeps the old product's category, description, price and brand (`brand_assignments()`), so the number starts fresh. Special orders (640) are off the scorecard either way; there the split keeps delivery matching and the category's history right.
+
+**New descriptions.** Each upload compares every SKU's SKU Analysis description with the last upload's (`desc_changes()`, against `brandin/current`). A change is flagged in `brandskus/current.changed` and `brandin/current.changed`, counted in the upload preview, and listed under Assign brands → New description until someone answers: reused (marks it as above, with the old description and category) or same product (`checked: {sku: description}`).
+
 ## Deliveries
 
 Boxes are received into the POS without purchase orders, so nobody logs deliveries in the program. Each month-end upload works them out instead (`pipeline/receipts.py`):

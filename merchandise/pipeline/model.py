@@ -13,7 +13,7 @@ All inventory and OTB values are at cost; sales are at retail. Fiscal year runs 
 import re
 from calendar import monthrange
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from brands import brand_of, brand_split, segment_of, is_hat
 from config import (CATS, OTB_EXCLUDE, TARGET_WOS, MARKDOWN, G27_DEFAULT, G28_DEFAULT, COMBINED, DAILY_NAMES)
@@ -65,6 +65,78 @@ def merge_history(sku_reports, prior=None):
         for r in rep['rows']:
             hist[r['sku']].update(r['mo'])
     return hist
+
+
+def recycled_key(sku, start):
+    """The retired half of a reused SKU number: its sales before the new product started."""
+    return f'{sku}~{start}'
+
+
+def split_recycled(hist, meta, bm):
+    """SKU numbers reused for a new product (Brands -> Assign brands -> Reused number; brandmap/current
+    "recycled": {sku: {from: "YYYY-MM", brand, cat, desc}}). Sales before "from" move to a retired key
+    (recycled_key) that keeps the old product's category, description, price and brand, so the SKU number
+    starts fresh for the new product. Works in place on {sku: {ym: units}} and {sku: [cat, desc, price]};
+    running it again changes nothing."""
+    for sku, r in ((bm or {}).get('recycled') or {}).items():
+        start = r.get('from') if isinstance(r, dict) else None
+        if not isinstance(start, str) or not re.fullmatch(r'\d{4}-\d{2}', start):
+            continue
+        old = recycled_key(sku, start)
+        moved = {k: u for k, u in hist.get(sku, {}).items() if k < start}
+        if moved:
+            hist.setdefault(old, {}).update(moved)
+            for k in moved:
+                del hist[sku][k]
+        if old in hist and old not in meta:
+            was = meta.get(sku) or [None, '', 0]
+            meta[old] = [r.get('cat') or was[0], r.get('desc') or was[1], was[2]]
+
+
+def brand_assignments(bm):
+    """brandmap/current's SKU assignments, plus the old brand of each reused SKU's retired sales."""
+    out = dict((bm or {}).get('skus') or {})
+    for sku, r in ((bm or {}).get('recycled') or {}).items():
+        if isinstance(r, dict) and isinstance(r.get('from'), str) and str(r.get('brand') or '').strip():
+            out[recycled_key(sku, r['from'])] = [{'b': str(r['brand']).strip(), 's': 100}]
+    return out
+
+
+def _norm_desc(d):
+    return re.sub(r'\s+', ' ', str(d or '')).strip().lower()
+
+
+def open_desc_changes(changed, bm):
+    """The new-description flags nobody has answered yet. A flag is answered when the SKU is marked reused
+    after the flag was raised (brandmap "recycled"), or marked the same product for that description
+    (brandmap "checked": {sku: description})."""
+    rec, checked = (bm or {}).get('recycled') or {}, (bm or {}).get('checked') or {}
+    out = {}
+    for sku, v in (changed or {}).items():
+        r = rec.get(sku)
+        if isinstance(r, dict) and str(r.get('at') or '') >= str(v.get('at') or ''):
+            continue
+        if sku in checked and _norm_desc(checked[sku]) == _norm_desc(v.get('now')):
+            continue
+        out[sku] = v
+    return out
+
+
+def desc_changes(prev_inputs, snap, meta, bm, now):
+    """SKUs whose SKU Analysis description differs from the last upload's: the sign of a SKU number reused
+    for a new product. {sku: {was, wasCat, now, at}}. Flags not yet answered carry over while the
+    description stays the same."""
+    before = (prev_inputs or {}).get('skus') or {}
+    out = {}
+    for sku, v in ((prev_inputs or {}).get('changed') or {}).items():
+        r = snap.get(sku)
+        if r and _norm_desc(r['desc']) == _norm_desc(v.get('now')):
+            out[sku] = v
+    for sku, r in snap.items():
+        old = (before.get(sku) or [None] * 5)[4]
+        if old and _norm_desc(old) != _norm_desc(r['desc']):
+            out[sku] = dict(was=old, wasCat=(meta.get(sku) or [None])[0], now=r['desc'], at=now)
+    return open_desc_changes(out, bm)
 
 
 def history_docs(hist, meta, fys):
@@ -123,7 +195,8 @@ def build(reports, prior=None):
 
     phist = prior.get('skuhist', {})
     hist = merge_history(skus, {k: v for k, v in phist.items() if k.startswith('FY')})
-    pmeta = phist.get('meta', {})
+    pmeta = dict(phist.get('meta', {}))
+    split_recycled(hist, pmeta, prior.get('brandmap'))
     price = prices(reports.get('sales_by_item', []), pmeta, snap)
 
     # category of each SKU: snapshot, then prior meta
@@ -303,9 +376,11 @@ def build(reports, prior=None):
             meta[s] = [c, desc_of.get(s, ''), round(price.get(s, 0), 2)]
     skuhist = history_docs(hist, meta, sorted({fy_of(k) for mo in hist.values() for k in mo}))
 
+    changed = desc_changes(prior.get('brandin'), snap, phist.get('meta', {}), prior.get('brandmap'),
+                           datetime.now(timezone.utc).isoformat(timespec='seconds'))
     ctx = dict(as_of=as_of, cur=cur, actual_through=actual_through, fy=fy, snap=snap, sku_month=snap_rep['as_of'], hist=hist, px=px, sku_gm=sku_gm,
-               bmap=((prior.get('brandmap') or {}).get('skus') or {}), blist=prior.get('brandmap') or {},
-               desc_of=desc_of, cat_of=cat_of, items=reports.get('sales_by_item', []), base=base)
+               bmap=brand_assignments(prior.get('brandmap')), blist=prior.get('brandmap') or {},
+               desc_of=desc_of, cat_of=cat_of, items=reports.get('sales_by_item', []), base=base, changed=changed)
     return dict(base=base, inventory=inventory, skuhist=skuhist, ctx=ctx)
 
 
@@ -558,7 +633,8 @@ def brand_inputs(ctx):
     """What the brand scorecard needs beyond the stored history, prices and base, so Brands -> Update brands can
     rebuild it between uploads (rebuild_ctx): {sku: [price, on hand, cost, last sale, SKU Analysis description,
     gross, cost, markdown]}. On hand to description are null for a SKU not in the SKU Analysis; the last three,
-    from the cost & margin report, are left off when it has none."""
+    from the cost & margin report, are left off when it has none. "changed" keeps the open new-description flags
+    (desc_changes), so the next upload can compare with this one's descriptions and carry them over."""
     out = {}
     for s in sorted(set(ctx['hist']) | set(ctx['snap'])):
         if ctx['cat_of'].get(s) not in MERCH:
@@ -566,7 +642,7 @@ def brand_inputs(ctx):
         r, g = ctx['snap'].get(s), ctx['sku_gm'].get(s)
         row = [ctx['px'](s)] + ([r['oh'], r['cost'], r['last_sale'], r['desc']] if r else [None] * 4)
         out[s] = row + ([g['g'], g['c'], g['md']] if g else [])
-    return dict(asOf=ctx['as_of'].isoformat(), skus=out)
+    return dict(asOf=ctx['as_of'].isoformat(), skus=out, changed=ctx.get('changed') or {})
 
 
 def rebuild_ctx(docs):
@@ -582,19 +658,21 @@ def rebuild_ctx(docs):
                 for k, u in zip(fy_months(int(path[10:])), arr):
                     if u:
                         hist[sku][k] = u
+    bm = docs.get('brandmap/current') or {}
+    meta = dict(meta)
+    split_recycled(hist, meta, bm)
     cat_of = {s: v[0] for s, v in meta.items()}
     desc_of = {s: v[1] for s, v in meta.items()}
-    snap, px, sku_gm = {}, {}, {}
+    snap, px, sku_gm = {}, {s: v[2] for s, v in meta.items() if '~' in s}, {}
     for s, r in bi['skus'].items():
         px[s] = r[0]
         if r[1] is not None:
             snap[s] = dict(sku=s, oh=r[1], cost=r[2], last_sale=r[3], desc=r[4], cat_no=cat_of.get(s))
         if len(r) > 5:
             sku_gm[s] = dict(g=r[5], c=r[6], md=r[7])
-    bm = docs.get('brandmap/current') or {}
     return dict(as_of=date.fromisoformat(base['asOf']), actual_through=base['actualThrough'], fy=int(base['fy'][2:]), snap=snap,
                 hist=hist, px=lambda s: px.get(s, 0), sku_gm=sku_gm, desc_of=desc_of, cat_of=cat_of, base=base,
-                bmap=bm.get('skus') or {}, blist=bm)
+                bmap=brand_assignments(bm), blist=bm, changed=open_desc_changes(bi.get('changed'), bm))
 
 
 def brand_skus(ctx):
@@ -605,7 +683,7 @@ def brand_skus(ctx):
     rows = []
     for s in sorted(set(hist) | set(snap)):
         c = ctx['cat_of'].get(s)
-        if c not in MERCH:
+        if c not in MERCH or '~' in s:  # a reused SKU's retired sales keep the brand set when it was reused
             continue
         r = snap.get(s)
         desc = ctx['desc_of'].get(s, '') or (r['desc'] if r else '')
@@ -613,4 +691,4 @@ def brand_skus(ctx):
         oh = max(r['oh'], 0) * r['cost'] if r else 0
         if t12 > 0 or oh > 0:
             rows.append([s, desc, c, brand_of(desc, ctx.get('blist')) or (brand_of(r['desc'], ctx.get('blist')) if r else None) or '', round(t12), round(oh)])
-    return dict(asOf=ctx['as_of'].isoformat(), rows=rows)
+    return dict(asOf=ctx['as_of'].isoformat(), rows=rows, changed=ctx.get('changed') or {})

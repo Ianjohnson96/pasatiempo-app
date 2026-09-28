@@ -176,7 +176,11 @@ document.addEventListener('click', async e => {
   if (ds.bmdrop != null){ BM.draft.splice(+ds.bmdrop, 1); if (BM.draft.length === 1) BM.draft[0].s = 100; return openBrandMap(); }
   if (ds.bmsave) return bmSave(false);
   if (ds.bmclear) return bmSave(true);
-  if (ds.bmcancel){ BM.edit = null; BM.draft = []; return openBrandMap(); }
+  if (ds.bmcancel){ BM.edit = null; BM.draft = []; BM.rc = null; return openBrandMap(); }
+  if (ds.bmrcon) return bmRcStart();
+  if (ds.bmrcoff){ BM.rc = null; return openBrandMap(); }
+  if (ds.bmrcdel) return bmRcDelete();
+  if (ds.bmsame) return bmSame();
   if (ds.bcclear){ try { await db.doc('brandCalls/' + ds.bcclear).delete(); toast('Back to the suggested call'); setTimeout(() => openBrand(ds.bcclear), 300); } catch (err){ writeError(err); } return; }
   if (ds.brand && !D) return openBrand(ds.brand);
   if (ds.month){ SEL = ds.month; try { localStorage.setItem('ob.month', SEL); } catch (_) {} return render(); }
@@ -245,6 +249,8 @@ document.addEventListener('input', e => {
   if (t.id === 'beQ'){ BE.q = t.value; clearTimeout(document._beq); document._beq = setTimeout(() => { openBrandList(); const f = $('#beQ'); if (f){ f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 250); return; }
   if (t.id === 'beName'){ BE.name = t.value; const h = $('#beNameHint'); if (h) h.innerHTML = beNameHint(); return; }
   if (t.id === 'beWords'){ BE.words = t.value; const h = $('#bePrev'); if (h) h.innerHTML = bePreview(); return; }
+  if (t.dataset.bmrcf != null && BM.rc){ BM.rc.from = t.value; return; }
+  if (t.dataset.bmrcb != null && BM.rc){ BM.rc.brand = t.value; return; }
   if (t.dataset.bmb != null){ BM.draft[+t.dataset.bmb].b = t.value; return; }
   if (t.dataset.bms != null){ BM.draft[+t.dataset.bms].s = t.value; const tot = BM.draft.reduce((a, x) => a + num(x.s), 0), h = $('#bmTot'); if (h) h.textContent = `Shares add up to ${tot}%${tot === 100 ? '' : ' (they need to make 100%)'}. Sales, stock and deliveries are split the same way.`; return; }
   if (!D) return;

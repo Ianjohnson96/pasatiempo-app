@@ -120,6 +120,8 @@ def prior_from_docs(docs):
             pr['skusnap'] = d
         elif path == 'brandmap/current':
             pr['brandmap'] = d
+        elif path == 'brandin/current':
+            pr['brandin'] = d
     return pr
 
 
@@ -132,7 +134,7 @@ def rebuild_brands(docs):
     bundle = dict(kind='pasatiempo-merch-bundle', version=1, note='Brand scorecard updated with the brand assignments',
                   docs={'brands/current': brands, 'brandskus/current': bskus})
     return bundle, dict(lines=len(brands['rows']), unassigned=sum(brands['unassigned'].values()),
-                        noBrand=sum(1 for r in bskus['rows'] if not r[3]))
+                        noBrand=sum(1 for r in bskus['rows'] if not r[3]), descChanged=len(bskus['changed']))
 
 
 def warnings(reports, prior, summary):
@@ -153,8 +155,12 @@ def warnings(reports, prior, summary):
     if pb.get('fy') and summary.get('fy') and pb['fy'] < summary['fy']:
         out.append(f"{pb['fy']} has closed: its months become last year's sales from the last upload. "
                    f"Set {summary['fy']}'s monthly growth on the Forecast tab; until then the forecast repeats last year's months.")
+    if summary.get('descChanged'):
+        n = summary['descChanged']
+        out.append(f"{n} SKU{'s have' if n != 1 else ' has'} a new description since the last upload. If a number was reused for a new product, "
+                   "mark it in Brands -> Assign brands -> New description, so its old sales stay with the old product.")
     was = pb.get('asOf')
-    day =lambda d: f'{datetime.fromisoformat(d):%b} {int(d[8:10])}, {d[:4]}'
+    day = lambda d: f'{datetime.fromisoformat(d):%b} {int(d[8:10])}, {d[:4]}'
     if was and summary['asOf'] < was:
         out.append(f"These reports are older than the program's data (as of {day(was)}). Updating would take it back to {day(summary['asOf'])}.")
     elif was and summary['asOf'] == was:
@@ -216,7 +222,8 @@ def build_bundle(reports, prior=None, notes=None):
     rf = docs['refresh']
     summary = dict(asOf=base['asOf'], fy=base['fy'], actualThrough=base['actualThrough'], partial=base['partial'],
                    ytd=rf['ytd'], onHand=rf['onHand'], otbCur=rf['otbCur'], otbNext=rf['otbNext'],
-                   arrivals=dict(total=arrived['total'], **{'from': arrived['from']}) if arrived else None)
+                   arrivals=dict(total=arrived['total'], **{'from': arrived['from']}) if arrived else None,
+                   descChanged=len(docs['brandskus'].get('changed') or {}))
     return docs, bundle, summary
 
 
