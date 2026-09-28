@@ -88,14 +88,47 @@ export async function POST(request: NextRequest) {
     if (hErr) return NextResponse.json({ error: hErr.message, at: "students.read" }, { status: 500 });
 
     const known = new Set((have ?? []).map((r) => norm(r.name as string)));
-    const fresh = students.filter((s) => !known.has(norm(s.name)));
+
+    // Dedupe within the batch as well as against the table. The roster can hold
+    // two rows differing only by case or spacing ("Ray Gorski" / "ray  gorski"),
+    // and uniqueness is on lower(btrim(name)) - so sending both fails the whole
+    // insert on students_name_key and takes the rest of the push down with it.
+    // A dropped duplicate hands its aliases to the survivor: those spellings are
+    // how future lessons get matched, and losing them would orphan them.
+    const byNorm = new Map<
+      string,
+      { name: string; aliases: Set<string>; email: string | null; active: boolean }
+    >();
+    for (const s of students) {
+      const k = norm(s.name);
+      if (known.has(k)) continue;
+      const at = byNorm.get(k);
+      if (at) {
+        for (const a of s.aliases ?? []) if (a?.trim()) at.aliases.add(a.trim());
+        at.email = at.email ?? s.email ?? null;
+        // Active wins: one row marked inactive must not retire a name that
+        // another row says is still being taught.
+        at.active = at.active || (s.active ?? true);
+        continue;
+      }
+      byNorm.set(k, {
+        name: s.name.trim(),
+        aliases: new Set(
+          (s.aliases ?? []).filter((a) => a?.trim()).map((a) => a.trim()),
+        ),
+        email: s.email ?? null,
+        active: s.active ?? true,
+      });
+    }
+
+    const fresh = [...byNorm.values()];
     if (fresh.length) {
       const { error } = await supa.from("students").insert(
         fresh.map((s) => ({
-          name: s.name.trim(),
-          aliases: s.aliases ?? [],
-          email: s.email ?? null,
-          active: s.active ?? true,
+          name: s.name,
+          aliases: [...s.aliases],
+          email: s.email,
+          active: s.active,
         })),
       );
       if (error) return NextResponse.json({ error: error.message, at: "students" }, { status: 500 });
