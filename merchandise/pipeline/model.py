@@ -171,6 +171,16 @@ def build(reports, prior=None):
         for c, v in pbase['cats'].items():
             for k, x in v.get('hist', {}).items():
                 hist_fy.setdefault(fy_of(k), {}).setdefault(c, {})[k] = x
+        # once the fiscal year turns, the last upload's actuals become last year's history; months it
+        # hadn't closed yet come from the SKU history, scaled the way its closed months were
+        pfy = int(str(pbase.get('fy') or 'FY0')[2:] or 0)
+        if pfy < fy and pfy not in hist_fy:
+            ms = fy_months(pfy)
+            pact = {c: (pbase['cats'].get(c) or {}).get('act', {}) for c in MERCH}
+            have = [k for k in ms if any(k in a for a in pact.values())]
+            est_have = sum(est[c].get(k, 0) for c in MERCH for k in have)
+            f = sum(pact[c].get(k, 0) for c in MERCH for k in have) / est_have if est_have else 1.0
+            hist_fy[pfy] = {c: {k: pact[c].get(k, 0) if k in have else est[c].get(k, 0) * f for k in ms} for c in MERCH}
     for cr in reports.get('sales_by_category', []):
         # a full fiscal-year category report defines that year's history
         per = cr['period']
@@ -280,7 +290,7 @@ def build(reports, prior=None):
         rounds.setdefault(y, v)
 
     base = dict(asOf=as_of.isoformat(), fy=f'FY{fy}', actualThrough=actual_through, partial=partial, cats=cats, order=order,
-                ytdActual=round(rep_closed or 0, 2), ytdReport=round(daily['report']['fytd'], 2) if daily else None,
+                ytdActual=round(rep_closed or sum(v for c in MERCH for v in act[c].values()), 2), ytdReport=round(daily['report']['fytd'], 2) if daily else None,
                 defaults=dict(g27={k: v for k, v in G27_DEFAULT.items()}, g28=G28_DEFAULT, wos=TARGET_WOS),
                 rounds=rounds, exclude=sorted(OTB_EXCLUDE))
 
