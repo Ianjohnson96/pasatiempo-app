@@ -196,6 +196,8 @@ export async function getSettings(): Promise<CaddieSettings> {
       ? (d.drop_alert_emails as unknown[]).map(String).filter(Boolean)
       : [],
     release: readRelease(d.release),
+    // On unless switched off: it existed before the switch did.
+    fairShareEnabled: d.fair_share_enabled !== false,
   };
 }
 

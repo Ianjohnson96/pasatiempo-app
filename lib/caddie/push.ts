@@ -465,7 +465,13 @@ export async function processBoard(
   const out = { announced: 0, offered: 0 };
   const supa = createAdminClient("caddie");
   const settings = await getSettings();
-  const rules = settings.release;
+  // First refusal goes to whoever is furthest behind on Fair share. With Fair
+  // share off there is no such person, so first refusal is off too, whatever
+  // its own switch says.
+  const rules = {
+    ...settings.release,
+    priorityEnabled: settings.release.priorityEnabled && settings.fairShareEnabled,
+  };
   const tz = settings.courseTimezone;
 
   let q = supa

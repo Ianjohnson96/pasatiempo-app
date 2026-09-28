@@ -8,7 +8,7 @@ import QRCode from "qrcode";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { planBooking } from "./booking";
-import { dayRange, getSettings } from "./data";
+import { dayRange, formatTee, getSettings } from "./data";
 import { resolveOrigin } from "./origin";
 import { getCaddieSession, mintInvite, signOutCaddie } from "./session";
 import { assertCaddieStaff } from "./auth";
@@ -164,15 +164,27 @@ export interface GroupInput {
   /** Minutes between tee times. Defaults to the course's ten. */
   intervalMinutes?: number;
   /**
-   * Put the loops straight on the job board and tell every active caddie.
+   * Who hears about it, in the same step as booking it.
    *
    * The whole point of this app is not ringing eighteen people one at a time,
-   * and booking then hunting for a Post button is two steps where the shop
-   * only ever meant one. Off by default, because entering tomorrow's sheet in
-   * bulk should not set off a phone in every pocket.
+   * and booking then hunting for an offer button is two steps where the shop
+   * only ever meant one. Defaults to nobody, because entering tomorrow's sheet
+   * in bulk should not set off a phone in every pocket.
    */
-  announce?: boolean;
+  send?: BookingSend;
 }
+
+/**
+ * Who a new job goes to.
+ *
+ * "everyone" posts it to the job board under the release rules; "tiers" and
+ * "caddies" send a real offer — first to answer wins — to just those people.
+ */
+export type BookingSend =
+  | { to: "none" }
+  | { to: "everyone" }
+  | { to: "tiers"; tierIds: string[] }
+  | { to: "caddies"; caddieIds: string[] };
 
 /**
  * Book a party across consecutive tee times in one go.
@@ -190,11 +202,23 @@ export interface GroupInput {
  */
 export async function createGroupBooking(
   input: GroupInput,
-): Promise<Result<{ bookingId: string; created: number }>> {
+): Promise<
+  Result<{ bookingId: string; created: number; offered: number; notified: number }>
+> {
   try {
     await assertCaddieStaff();
     const name = input.name.trim();
     if (!name) return { ok: false, error: "The group needs a name." };
+
+    const send: BookingSend = input.send ?? { to: "none" };
+    // Checked before anything is booked, so a missed choice never leaves a
+    // half-made booking behind.
+    if (send.to === "tiers" && send.tierIds.length === 0) {
+      return { ok: false, error: "Pick at least one tier to send it to." };
+    }
+    if (send.to === "caddies" && send.caddieIds.length === 0) {
+      return { ok: false, error: "Pick at least one caddie to send it to." };
+    }
 
     const groups = (input.groups ?? []).slice(0, 20);
     if (groups.length === 0) {
@@ -245,8 +269,10 @@ export async function createGroupBooking(
       notes: input.notes.trim(),
       booking_id: String(booking.id),
       created_by: by,
-      open_board: input.announce === true,
-      board_posted_at: input.announce === true ? new Date().toISOString() : null,
+      // Only "everyone" goes on the open board. An offer to chosen tiers or
+      // caddies is theirs to answer, not a job anyone can claim.
+      open_board: send.to === "everyone",
+      board_posted_at: send.to === "everyone" ? new Date().toISOString() : null,
     }));
 
     const { data: inserted, error } = await supa
@@ -255,25 +281,117 @@ export async function createGroupBooking(
       .select("id, tee_time");
     if (error) throw error;
 
-    // Through the board's release rules rather than straight to everyone: a
-    // job posted for next month should wait for its release time or go to
-    // next-up first, exactly as if it had been posted from the board. With
-    // every rule off it opens now, with one notification for the whole
-    // booking — four pushes for a party across four tee times is how a
-    // roster learns to ignore the notification.
-    if (input.announce && (inserted?.length ?? 0) > 0) {
-      await processBoard(inserted!.map((r) => String(r.id)));
+    const created = (inserted ?? []).map((r) => ({
+      id: String(r.id),
+      teeTime: String(r.tee_time),
+    }));
+    let offered = 0;
+    let notified = 0;
+
+    if (send.to === "everyone" && created.length > 0) {
+      // Through the board's release rules rather than straight to everyone: a
+      // job for next month should wait for its release time or go to next-up
+      // first, exactly as if it had been posted from the board. With every
+      // rule off it opens now, with one notification for the whole booking.
+      await processBoard(created.map((l) => l.id));
+    } else if ((send.to === "tiers" || send.to === "caddies") && created.length > 0) {
+      let caddieIds: string[];
+      if (send.to === "tiers") {
+        const { data: inTiers, error: tierErr } = await supa
+          .from("caddies")
+          .select("id")
+          .eq("status", "Active")
+          .in("tier_id", send.tierIds);
+        if (tierErr) throw tierErr;
+        caddieIds = (inTiers ?? []).map((c) => String(c.id));
+      } else {
+        caddieIds = send.caddieIds;
+      }
+      const res = await offerBooking(created, caddieIds, name, courseTimezone, by, String(booking.id));
+      offered = res.caddies;
+      notified = res.notified;
     }
 
     revalidatePath(BOARD_PATH);
     revalidatePath("/caddie");
     return {
       ok: true,
-      value: { bookingId: String(booking.id), created: rows.length },
+      value: { bookingId: String(booking.id), created: rows.length, offered, notified },
     };
   } catch (e) {
     return fail(e, "Could not book the group.");
   }
+}
+
+/**
+ * Offer every loop of a new booking to the same caddies, telling each of
+ * them once.
+ *
+ * One notification per caddie for the whole booking, not one per tee time: a
+ * party across four tee times offered to eighteen caddies is eighteen pings,
+ * not seventy-two. Each loop is still its own offer — first to answer wins,
+ * per loop — and the overlap guard stops one caddie taking two of them.
+ */
+async function offerBooking(
+  loops: { id: string; teeTime: string }[],
+  caddieIds: string[],
+  partyName: string,
+  tz: string,
+  by: string | null,
+  bookingId: string,
+): Promise<{ caddies: number; notified: number }> {
+  const ids = [...new Set(caddieIds)];
+  if (ids.length === 0 || loops.length === 0) return { caddies: 0, notified: 0 };
+
+  const supa = createAdminClient("caddie");
+  const settings = await getSettings();
+  const broadcast = ids.length > 1;
+  const minutes = broadcast ? settings.broadcastExpiryMinutes : settings.offerExpiryMinutes;
+  const expires = new Date(Date.now() + minutes * 60_000).toISOString();
+
+  const rows = loops.flatMap((l) =>
+    ids.map((caddieId) => ({
+      loop_id: l.id,
+      caddie_id: caddieId,
+      offered_by: by,
+      offer_kind: broadcast ? "broadcast" : "direct",
+      offer_expires_at: expires,
+    })),
+  );
+
+  // One insert for the lot: these are brand-new loops and active caddies, so
+  // nothing should be refused. If something is, fall back to one at a time
+  // so the refusal costs one offer rather than all of them.
+  const reached = new Set<string>();
+  const { error: batchErr } = await supa.from("assignments").insert(rows);
+  if (!batchErr) {
+    ids.forEach((id) => reached.add(id));
+  } else {
+    for (const r of rows) {
+      const { error } = await supa.from("assignments").insert(r);
+      if (!error) reached.add(r.caddie_id);
+    }
+  }
+  if (reached.size === 0) return { caddies: 0, notified: 0 };
+
+  const first = [...loops].sort((a, b) => a.teeTime.localeCompare(b.teeTime))[0];
+  const when = `${new Date(first.teeTime).toLocaleDateString("en-US", {
+    timeZone: tz,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  })} ${formatTee(first.teeTime, tz)}`;
+  const more = loops.length > 1 ? ` (${loops.length} tee times)` : "";
+
+  const push = await notifyCaddies([...reached], {
+    title: broadcast ? "Loop offered — first to answer" : "Loop offered to you",
+    body: `${partyName} — ${when}${more}. Tap to accept or decline.`,
+    url: "/caddie",
+    tag: `booking-${bookingId}`,
+    loopId: first.id,
+  });
+
+  return { caddies: reached.size, notified: push.sent };
 }
 
 export async function setLoopStatus(
@@ -890,6 +1008,7 @@ export interface SettingsInput {
   sessionDays: number;
   availabilityMonths: number;
   release: JobRelease;
+  fairShareEnabled: boolean;
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -957,6 +1076,7 @@ export async function saveCaddieSettings(input: SettingsInput): Promise<Result> 
       invite_minutes: whole(input.inviteDays, 1, 60) * 1440,
       session_days: whole(input.sessionDays, 7, 365),
       availability_months: whole(input.availabilityMonths, 1, 12),
+      fair_share_enabled: input.fairShareEnabled === true,
       release: {
         enabled: r.enabled === true,
         daysBefore: whole(r.daysBefore, 0, 14),

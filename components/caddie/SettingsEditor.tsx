@@ -39,6 +39,18 @@ export default function SettingsEditor({
       {note && <p className={note.kind === "ok" ? "notice ok" : "notice err"}>{note.text}</p>}
 
       <Section
+        title="Fair share"
+        help="The record of who has worked what and earned what, and who is next up. Switching it off hides the tab; the history underneath is kept, so switching it back on loses nothing."
+      >
+        <Toggle
+          on={s.fairShareEnabled}
+          onChange={(v) => set("fairShareEnabled", v)}
+          label="Use Fair share"
+          hint="Next-up first refusal below depends on it — with Fair share off there is no next-up, so first refusal is off too."
+        />
+      </Section>
+
+      <Section
         title="When jobs open up"
         help="Applies to jobs posted to the job board. An offer you send a caddie directly, and Call all, always go out straight away."
       >
@@ -82,12 +94,17 @@ export default function SettingsEditor({
         </Line>
 
         <Toggle
-          on={r.priorityEnabled}
+          on={r.priorityEnabled && s.fairShareEnabled}
+          disabled={!s.fairShareEnabled}
           onChange={(v) => setR("priorityEnabled", v)}
           label="Next-up gets first refusal on jobs booked well ahead"
-          hint="Whoever is furthest behind on the Fair share list is offered the job alone first, with a notification. If they don't take it, it opens to everyone."
+          hint={
+            s.fairShareEnabled
+              ? "Whoever is furthest behind on the Fair share list is offered the job alone first, with a notification. If they don't take it, it opens to everyone."
+              : "Needs Fair share switched on — that list is how next-up is decided."
+          }
         />
-        <Line dim={!r.priorityEnabled}>
+        <Line dim={!r.priorityEnabled || !s.fairShareEnabled}>
           For jobs at least
           <Num
             value={r.priorityMinLeadHours}
@@ -289,17 +306,28 @@ function Toggle({
   onChange,
   label,
   hint,
+  disabled,
 }: {
   on: boolean;
   onChange: (v: boolean) => void;
   label: string;
   hint?: string;
+  disabled?: boolean;
 }) {
   return (
-    <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
+    <label
+      style={{
+        display: "flex",
+        gap: 10,
+        alignItems: "flex-start",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
       <input
         type="checkbox"
         checked={on}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
         style={{ marginTop: 4 }}
       />

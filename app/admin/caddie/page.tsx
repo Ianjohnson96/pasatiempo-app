@@ -99,6 +99,10 @@ export default async function CaddieDispatchPage({
           groupNames={Object.fromEntries(groups)}
           coverage={coverage}
           tiers={tiers}
+          roster={caddies
+            .filter((c) => c.status === "Active")
+            .sort((a, b) => a.fullName.localeCompare(b.fullName))
+            .map((c) => ({ id: c.id, fullName: c.fullName, tierId: c.tierId }))}
           rates={settings.rates}
           notifyReady={pushConfigured()}
         />

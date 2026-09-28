@@ -48,6 +48,7 @@ export default async function CaddieSettingsPage() {
             sessionDays: s.sessionDays,
             availabilityMonths: s.availabilityMonths,
             release: s.release,
+            fairShareEnabled: s.fairShareEnabled,
           }}
           alertRecipients={admins}
           mailReady={mailConfigured()}

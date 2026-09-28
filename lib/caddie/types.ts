@@ -249,6 +249,12 @@ export interface CaddieSettings {
   /** Addresses told when a caddie hands a loop back, on top of the admins. */
   dropAlertEmails: string[];
   release: JobRelease;
+  /**
+   * The fair-share ledger and everything that leans on it. Off hides the tab
+   * and stops next-up first refusal, because "next-up" IS the fair-share
+   * order — with the ledger off there is nobody to be next.
+   */
+  fairShareEnabled: boolean;
 }
 
 /**
