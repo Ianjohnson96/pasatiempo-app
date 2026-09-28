@@ -2,11 +2,13 @@ import "../hub.css";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createAdminClient, createHubClient } from "@/lib/supabase/admin";
+import { createAdminClient, createHubClient, createLessonsClient } from "@/lib/supabase/admin";
 import { getPerson, hasApp, isAppAdmin, roleIn, signedInEmail } from "@/lib/hub/access";
 import { APPS, type AppKey, type SiteKey } from "@/lib/hub/apps";
 import HubTile from "@/components/hub/HubTile";
 import SiteSwitch from "@/components/hub/SiteSwitch";
+import { bookTotals, pendingCount } from "@/lib/lessons/data";
+import { money } from "@/lib/lessons/types";
 import { reportStatus } from "@/lib/merch/reminders";
 import { pacificToday } from "@/lib/merch/schedule";
 
@@ -65,6 +67,23 @@ async function caddieStats() {
   }
 }
 
+// Ian's teaching book. Wrapped like the rest, and the catch earns its keep
+// here: the `lessons` schema has to be exposed in Supabase before PostgREST
+// will answer, and an unguarded throw would take the whole hub down with it.
+async function lessonStats() {
+  try {
+    const s = createLessonsClient();
+    const [{ count: students }, totals, waiting] = await Promise.all([
+      s.from("students").select("*", { count: "exact", head: true }).eq("active", true),
+      bookTotals(),
+      pendingCount(),
+    ]);
+    return { students: students ?? 0, ...totals, waiting, ok: true };
+  } catch {
+    return { students: 0, lessons: 0, unpriced: 0, owed: 0, paidTotal: 0, waiting: 0, ok: false };
+  }
+}
+
 async function siteSwitches(): Promise<Record<string, boolean>> {
   const { data } = await createHubClient().from("sites").select("key, enabled");
   return Object.fromEntries((data ?? []).map((s) => [s.key, s.enabled]));
@@ -84,6 +103,7 @@ const DENIED: Record<string, string> = {
   events: "You don't have access to the Event Planner.",
   caddie: "You don't have access to the Caddie Program.",
   merch: "You don't have access to the Merchandise Program.",
+  lessons: "The Lesson Book is the teaching pro's own.",
   super: "That page is for the super admin.",
   people: "Managing people is for app admins.",
 };
@@ -100,12 +120,14 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
   const isSuper = !!person?.isSuper;
   const managesPeople = !!person && (isSuper || (Object.keys(APPS) as AppKey[]).some((a) => isAppAdmin(person, a)));
 
-  const [ev, mhi, cad, sites, reports] = await Promise.all([
+  const [ev, mhi, cad, sites, reports, lsn] = await Promise.all([
     see("events") ? eventsStats() : null,
     isSuper ? mhiStats() : null,
     see("caddie") ? caddieStats() : null,
     isSuper ? siteSwitches() : Promise.resolve({} as Record<string, boolean>),
     see("merch") ? merchReports() : Promise.resolve([]),
+    // Nobody is granted `lessons`, so only a super admin gets this far.
+    see("lessons") ? lessonStats() : null,
   ]);
   const reportsLate = reports.some((r) => r.status === "overdue");
   const role = (app: AppKey) => {
@@ -263,6 +285,43 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
                   : null
               }
               cta={reports.length ? "Open reports" : "Open"}
+            />
+          )}
+
+          {lsn && (
+            <HubTile
+              index={order++}
+              href="/lessons"
+              title="Lesson Book"
+              desc="Who you taught, what it cost, and who still owes you."
+              tag="Teaching"
+              staffTag
+              // The 16th from above - the other three tiles have the green,
+              // the bunkers and the clubhouse, so this one needs its own view.
+              img="/sombrero/email/altshot.jpg"
+              focus="center 55%"
+              badge={
+                <>
+                  {role("lessons")}
+                  {lsn.waiting > 0 && (
+                    <span className="badge open">{lsn.waiting} to confirm</span>
+                  )}
+                </>
+              }
+              stats={[
+                { num: lsn.lessons, lbl: "lessons" },
+                { num: lsn.students, lbl: "students" },
+              ]}
+              meta={
+                <>
+                  {lsn.owed > 0 && <span>{money(lsn.owed)} outstanding</span>}
+                  {lsn.unpriced > 0 && <span>{lsn.unpriced} need a price</span>}
+                  {/* Says so plainly rather than showing a confident zero:
+                      before the first push the tables are simply empty. */}
+                  {!lsn.ok && <span className="warn">⚠︎ Couldn&apos;t reach the database</span>}
+                </>
+              }
+              cta="Open"
             />
           )}
 
