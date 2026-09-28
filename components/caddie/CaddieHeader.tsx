@@ -22,7 +22,12 @@ const TABS = [
   // which is the caddie master's business. The page enforces it as well —
   // hiding a tab is not a permission.
   { href: "/admin/caddie/ledger", key: "ledger", label: "Fair share" },
+  // The rules everything above runs under. Admins only, for the same reason.
+  { href: "/admin/caddie/settings", key: "settings", label: "Settings" },
 ] as const;
+
+// Tabs only a Caddie Program admin sees.
+const ADMIN_ONLY = new Set<string>(["ledger", "settings"]);
 
 export type CaddieTab = (typeof TABS)[number]["key"];
 
@@ -35,7 +40,7 @@ export default function CaddieHeader({
   active: CaddieTab;
   isGlobalAdmin?: boolean;
 }) {
-  const tabs = TABS.filter((t) => t.key !== "ledger" || isGlobalAdmin);
+  const tabs = TABS.filter((t) => !ADMIN_ONLY.has(t.key) || isGlobalAdmin);
   return (
     <>
       <div className="appbar">

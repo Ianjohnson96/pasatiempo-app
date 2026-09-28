@@ -17,6 +17,7 @@ import {
   type DefaultSlot,
   type ResolvedDay,
   type CaddieSettings,
+  type JobRelease,
   type CrewMember,
   type LoopRec,
   type LoopStatus,
@@ -74,6 +75,20 @@ export function zonedMidnight(day: string, tz: string = DEFAULT_TZ): Date {
   const naive = new Date(`${day}T00:00:00Z`);
   // Two passes: the first offset is read at UTC midnight, which can fall on the
   // wrong side of a DST change; re-reading at the corrected instant settles it.
+  const once = new Date(naive.getTime() + offsetMs(naive, tz));
+  return new Date(naive.getTime() + offsetMs(once, tz));
+}
+
+/**
+ * The UTC instant of a course-local wall-clock time, e.g. 6pm on the 31st.
+ *
+ * Same two-pass correction as zonedMidnight, and for the same reason: adding
+ * eighteen hours to midnight is an hour wrong on the day the clocks change,
+ * and a release time an hour out is the kind of bug nobody notices until the
+ * one night it matters.
+ */
+export function zonedTime(day: string, hhmm: string, tz: string = DEFAULT_TZ): Date {
+  const naive = new Date(`${day}T${hhmm}:00Z`);
   const once = new Date(naive.getTime() + offsetMs(naive, tz));
   return new Date(naive.getTime() + offsetMs(once, tz));
 }
@@ -173,6 +188,35 @@ export async function getSettings(): Promise<CaddieSettings> {
     smsEnabled: Boolean(d.sms_enabled ?? false),
     rates: (d.rates ?? {}) as RateCard,
     waterfall: readWaterfall(d.waterfall),
+    dropLateHours: num(d.drop_late_hours, 24),
+    dropSameDayHours: num(d.drop_same_day_hours, 4),
+    completeAfterHours: num(d.complete_after_hours, 6),
+    claimLimit: num(d.claim_limit, 0),
+    dropAlertEmails: Array.isArray(d.drop_alert_emails)
+      ? (d.drop_alert_emails as unknown[]).map(String).filter(Boolean)
+      : [],
+    release: readRelease(d.release),
+  };
+}
+
+/** A stored number, or the default when it is missing or not a number. */
+function num(v: unknown, fallback: number): number {
+  const n = Number(v);
+  return v == null || !Number.isFinite(n) ? fallback : n;
+}
+
+/** The job-release rules, every part off unless the shop has turned it on. */
+export function readRelease(v: unknown): JobRelease {
+  const r = (v ?? {}) as Record<string, unknown>;
+  const time = typeof r.time === "string" && /^\d{2}:\d{2}$/.test(r.time) ? r.time : "18:00";
+  return {
+    enabled: r.enabled === true,
+    daysBefore: num(r.daysBefore, 1),
+    time,
+    horizonDays: num(r.horizonDays, 0),
+    priorityEnabled: r.priorityEnabled === true,
+    priorityMinLeadHours: num(r.priorityMinLeadHours, 48),
+    priorityMinutes: num(r.priorityMinutes, 30),
   };
 }
 
@@ -626,6 +670,9 @@ export async function openBoardLoops(caddieId: string): Promise<LoopRec[]> {
     .from("loops")
     .select("*")
     .eq("open_board", true)
+    // Only jobs that have opened: past their release time, inside the
+    // horizon, and not being held for next-up. See lib/caddie/release.ts.
+    .not("board_announced_at", "is", null)
     .in("status", ["Unassigned", "Partially Assigned"])
     .gte("tee_time", new Date().toISOString())
     .order("tee_time", { ascending: true });
@@ -1035,7 +1082,10 @@ export async function caddieLedger(days = 60): Promise<Map<string, LedgerRow>> {
     };
   });
 
-  return summariseLedger(events, settings.rates);
+  return summariseLedger(events, settings.rates, {
+    lateHours: settings.dropLateHours,
+    sameDayHours: settings.dropSameDayHours,
+  });
 }
 
 // ---------------------------------------------------------------------------

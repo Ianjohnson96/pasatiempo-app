@@ -21,15 +21,27 @@ export const LATE_DROP_HOURS = 24;
 /** Inside this many, the shop is unlikely to fill it at all. */
 export const SAME_DAY_DROP_HOURS = 4;
 
+/** Where the lines fall. Adjustable in Settings; these are the defaults. */
+export interface DropThresholds {
+  lateHours: number;
+  sameDayHours: number;
+}
+
+export const DEFAULT_DROP_THRESHOLDS: DropThresholds = {
+  lateHours: LATE_DROP_HOURS,
+  sameDayHours: SAME_DAY_DROP_HOURS,
+};
+
 export function dropLateness(
   droppedAt: string | null,
   teeTime: string,
+  t: DropThresholds = DEFAULT_DROP_THRESHOLDS,
 ): DropLateness | null {
   if (!droppedAt) return null;
   const hours =
     (new Date(teeTime).getTime() - new Date(droppedAt).getTime()) / 3_600_000;
-  if (hours <= SAME_DAY_DROP_HOURS) return "same day";
-  if (hours <= LATE_DROP_HOURS) return "late";
+  if (hours <= t.sameDayHours) return "same day";
+  if (hours <= t.lateHours) return "late";
   return "early";
 }
 
@@ -80,6 +92,7 @@ const blank = (caddieId: string): LedgerRow => ({
 export function summariseLedger(
   events: LedgerEvent[],
   rates: RateCard,
+  thresholds: DropThresholds = DEFAULT_DROP_THRESHOLDS,
 ): Map<string, LedgerRow> {
   const out = new Map<string, LedgerRow>();
 
@@ -105,7 +118,7 @@ export function summariseLedger(
         break;
       case "Dropped":
         row.dropped += 1;
-        if (dropLateness(e.droppedAt, e.teeTime) !== "early") {
+        if (dropLateness(e.droppedAt, e.teeTime, thresholds) !== "early") {
           row.droppedLate += 1;
         }
         break;

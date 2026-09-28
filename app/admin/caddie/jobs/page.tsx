@@ -11,7 +11,7 @@ import {
   listCaddies,
   type JobRow,
 } from "@/lib/caddie/data";
-import { dropLateness } from "@/lib/caddie/ledger";
+import { dropLateness, type DropThresholds } from "@/lib/caddie/ledger";
 import type { CaddieRec, CrewMember, LoopStatus } from "@/lib/caddie/types";
 
 // Every job in date order, and who is filling it.
@@ -54,6 +54,11 @@ export default async function CaddieJobsPage({
 
   const settings = await getSettings();
   const tz = settings.courseTimezone;
+  // Where "late" and "same day" fall, as set in Settings.
+  const t: DropThresholds = {
+    lateHours: settings.dropLateHours,
+    sameDayHours: settings.dropSameDayHours,
+  };
   const today = courseToday(tz);
   // Upcoming reaches half a year out, because bookings do; past reaches back
   // two months, which is as far as anyone asks "who did that loop?".
@@ -153,7 +158,7 @@ export default async function CaddieJobsPage({
                 {focus.fullName} has no {when === "past" ? "loops in the last 60 days" : "upcoming loops"}.
               </p>
             ) : (
-              <JobList jobs={signedUp} tz={tz} isAdmin={isAdmin} focus={focus} />
+              <JobList jobs={signedUp} tz={tz} t={t} isAdmin={isAdmin} focus={focus} />
             )}
 
             {isAdmin && (
@@ -166,7 +171,7 @@ export default async function CaddieJobsPage({
                     {focus.fullName} hasn&apos;t given any {when === "past" ? "recent" : "upcoming"} loops back.
                   </p>
                 ) : (
-                  <JobList jobs={dropped} tz={tz} isAdmin={isAdmin} focus={focus} />
+                  <JobList jobs={dropped} tz={tz} t={t} isAdmin={isAdmin} focus={focus} />
                 )}
               </>
             )}
@@ -176,7 +181,7 @@ export default async function CaddieJobsPage({
             No {when === "past" ? "jobs in the last 60 days" : "upcoming jobs"}.
           </p>
         ) : (
-          <JobList jobs={jobs} tz={tz} isAdmin={isAdmin} focus={null} />
+          <JobList jobs={jobs} tz={tz} t={t} isAdmin={isAdmin} focus={null} />
         )}
       </main>
     </>
@@ -189,11 +194,13 @@ const accepted = (crew: CrewMember[]) => crew.filter((m) => m.confirmationStatus
 function JobList({
   jobs,
   tz,
+  t,
   isAdmin,
   focus,
 }: {
   jobs: JobRow[];
   tz: string;
+  t: DropThresholds;
   isAdmin: boolean;
   focus: CaddieRec | null;
 }) {
@@ -213,7 +220,7 @@ function JobList({
           </h4>
           <div className="evlist">
             {d.jobs.map((j) => (
-              <JobLine key={j.loop.id} job={j} tz={tz} isAdmin={isAdmin} focus={focus} />
+              <JobLine key={j.loop.id} job={j} tz={tz} t={t} isAdmin={isAdmin} focus={focus} />
             ))}
           </div>
         </section>
@@ -225,11 +232,13 @@ function JobList({
 function JobLine({
   job,
   tz,
+  t,
   isAdmin,
   focus,
 }: {
   job: JobRow;
   tz: string;
+  t: DropThresholds;
   isAdmin: boolean;
   focus: CaddieRec | null;
 }) {
@@ -288,7 +297,7 @@ function JobLine({
         {isAdmin && (handedBack.length > 0 || noShows.length > 0) && (
           <div className="ev-meta" style={{ marginTop: 8 }}>
             {handedBack.map((m) => (
-              <DropNote key={m.id} member={m} teeTime={loop.teeTime} tz={tz} />
+              <DropNote key={m.id} member={m} teeTime={loop.teeTime} tz={tz} t={t} />
             ))}
             {noShows.map((m) => (
               <span key={m.id} style={{ color: "var(--danger)", fontWeight: 600 }}>
@@ -304,8 +313,18 @@ function JobLine({
 }
 
 /** "Trevor handed back · within 24h · Oct 1, 3:12 PM · by the caddie" */
-function DropNote({ member, teeTime, tz }: { member: CrewMember; teeTime: string; tz: string }) {
-  const late = dropLateness(member.droppedAt, teeTime);
+function DropNote({
+  member,
+  teeTime,
+  tz,
+  t,
+}: {
+  member: CrewMember;
+  teeTime: string;
+  tz: string;
+  t: DropThresholds;
+}) {
+  const late = dropLateness(member.droppedAt, teeTime, t);
   const when = member.droppedAt
     ? new Date(member.droppedAt).toLocaleString("en-US", {
         timeZone: tz,

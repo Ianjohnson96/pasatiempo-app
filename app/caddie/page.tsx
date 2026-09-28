@@ -102,6 +102,10 @@ export default async function CaddiePortalHome({
       items={items}
       open={open}
       vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
+      dropThresholds={{
+        lateHours: settings.dropLateHours,
+        sameDayHours: settings.dropSameDayHours,
+      }}
     />
   );
 }

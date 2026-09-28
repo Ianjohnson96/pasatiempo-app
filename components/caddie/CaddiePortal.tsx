@@ -10,7 +10,7 @@ import {
   dropMyLoop,
   respondToMyOffer,
 } from "@/lib/caddie/actions";
-import { dropLateness } from "@/lib/caddie/ledger";
+import { dropLateness, type DropThresholds } from "@/lib/caddie/ledger";
 import type {
   CaddieRec,
   ConfirmationStatus,
@@ -54,11 +54,14 @@ export default function CaddiePortal({
   items,
   open,
   vapidKey,
+  dropThresholds,
 }: {
   caddie: CaddieRec;
   items: PortalLoop[];
   open: OpenLoop[];
   vapidKey: string | null;
+  /** Where the shop has set "late" and "same day" for a hand-back. */
+  dropThresholds: DropThresholds;
 }) {
   const router = useRouter();
   const [busy, start] = useTransition();
@@ -267,6 +270,7 @@ export default function CaddiePortal({
               {!b.started && (
                 <DropControl
                   loop={b}
+                  thresholds={dropThresholds}
                   busy={busy}
                   onDropped={(text) => {
                     setNote({ kind: "ok", text });
@@ -344,11 +348,13 @@ function LoopCard({
  */
 function DropControl({
   loop,
+  thresholds,
   busy,
   onDropped,
   onError,
 }: {
   loop: PortalLoop;
+  thresholds: DropThresholds;
   busy: boolean;
   onDropped: (text: string) => void;
   onError: (text: string) => void;
@@ -371,7 +377,7 @@ function DropControl({
     );
   }
 
-  const late = dropLateness(armedAt, loop.teeTime);
+  const late = dropLateness(armedAt, loop.teeTime, thresholds);
 
   return (
     <div
