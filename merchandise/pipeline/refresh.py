@@ -138,8 +138,11 @@ def warnings(reports, prior, summary):
                    "Check the reports are the latest before updating.")
     if not reports.get('daily_sales') and not any(model.fytd_by_category([c], int(summary['fy'][2:]), summary['actualThrough']) for c in reports.get('sales_by_category', [])):
         out.append('No Daily Sales Report or Sales by Category (May 1 to date), so this year\'s sales are estimated from the SKU Analysis and prices.')
+    if pb.get('fy') and summary.get('fy') and pb['fy'] < summary['fy']:
+        out.append(f"{pb['fy']} has closed: its months become last year's sales from the last upload. "
+                   f"Set {summary['fy']}'s monthly growth on the Forecast tab; until then the forecast repeats last year's months.")
     was = pb.get('asOf')
-    day = lambda d: f'{datetime.fromisoformat(d):%b} {int(d[8:10])}, {d[:4]}'
+    day =lambda d: f'{datetime.fromisoformat(d):%b} {int(d[8:10])}, {d[:4]}'
     if was and summary['asOf'] < was:
         out.append(f"These reports are older than the program's data (as of {day(was)}). Updating would take it back to {day(summary['asOf'])}.")
     elif was and summary['asOf'] == was:
