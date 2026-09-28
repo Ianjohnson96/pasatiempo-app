@@ -14,7 +14,9 @@ export type LoopType =
   | "Double Bag"
   | "Forecaddie 1-2"
   | "Forecaddie 3-4";
-export type OfferKind = "direct" | "broadcast";
+// "priority" is next-up's first refusal on an advance job: an offer like any
+// other, but the board holds the job back from everyone else while it is out.
+export type OfferKind = "direct" | "broadcast" | "priority";
 export type ResponseChannel = "sms" | "email" | "web" | "admin";
 
 export type LoopStatus =
@@ -29,7 +31,12 @@ export type ConfirmationStatus =
   | "Accepted"
   | "Declined"
   | "Expired"
-  | "Withdrawn";
+  // The shop pulled the offer.
+  | "Withdrawn"
+  // The caddie took the loop, then handed it back.
+  | "Dropped"
+  // The caddie took the loop and did not turn up. Staff mark this.
+  | "No Show";
 
 /** What a caddie normally does on a given weekday. "Off" is a standing no. */
 export type DefaultSlot = TimeSlot | "Off";
@@ -165,6 +172,10 @@ export interface AssignmentRec {
   confirmationStatus: ConfirmationStatus;
   respondedAt: string | null;
   responseChannel: ResponseChannel | null;
+  /** When the caddie handed the loop back. */
+  droppedAt: string | null;
+  /** Staff email, when a drop or no-show was recorded by the shop. */
+  markedBy: string | null;
 }
 
 // An assignment with its caddie attached, as the board renders it.
@@ -223,6 +234,53 @@ export interface CaddieSettings {
   smsEnabled: boolean;
   rates: RateCard;
   waterfall: Waterfall;
+  /** Inside this many hours of the tee time, a hand-back counts as late. */
+  dropLateHours: number;
+  /** Inside this many, it counts as same-day — the one hardest to refill. */
+  dropSameDayHours: number;
+  /** Hours after the tee time that a loop is closed out as played. */
+  completeAfterHours: number;
+  /**
+   * Most upcoming loops one caddie may hold when claiming off the open board.
+   * 0 means no limit. Offers the shop sends are never capped — this is about
+   * self-service grabbing, not about the shop's own choices.
+   */
+  claimLimit: number;
+  /** Addresses told when a caddie hands a loop back, on top of the admins. */
+  dropAlertEmails: string[];
+  release: JobRelease;
+  /**
+   * The fair-share ledger and everything that leans on it. Off hides the tab
+   * and stops next-up first refusal, because "next-up" IS the fair-share
+   * order — with the ledger off there is nobody to be next.
+   */
+  fairShareEnabled: boolean;
+}
+
+/**
+ * When a job on the open board becomes visible to caddies.
+ *
+ * All off by default: a posted job appears at once, to everyone, as it always
+ * has. Each piece is a separate answer to "the fastest phone wins" — a set
+ * release time so everyone sees tomorrow's work together, a horizon so a
+ * December booking is not grabbed in September, and a short first refusal for
+ * whoever is furthest behind.
+ */
+export interface JobRelease {
+  /** Hold posted jobs until a set time before their day. */
+  enabled: boolean;
+  /** 1 = the day before, 0 = the morning of. */
+  daysBefore: number;
+  /** Course-local "HH:mm". */
+  time: string;
+  /** Caddies only see jobs this many days ahead. 0 = no limit. */
+  horizonDays: number;
+  /** Next-up gets first refusal on jobs booked well in advance. */
+  priorityEnabled: boolean;
+  /** "Well in advance": at least this many hours between release and tee. */
+  priorityMinLeadHours: number;
+  /** How long next-up has before the job opens to everyone. */
+  priorityMinutes: number;
 }
 
 // Rate for a loop, in cents. Returns null when the Pro Shop has not set one —
@@ -290,6 +348,8 @@ export function rowToAssignment(r: Row): AssignmentRec {
       (r.confirmation_status as ConfirmationStatus) ?? "Pending",
     respondedAt: (r.responded_at as string | null) ?? null,
     responseChannel: (r.response_channel as ResponseChannel | null) ?? null,
+    droppedAt: r.dropped_at ? String(r.dropped_at) : null,
+    markedBy: (r.marked_by as string | null) ?? null,
   };
 }
 

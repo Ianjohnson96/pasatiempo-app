@@ -1,5 +1,17 @@
 import webpush, { type PushSubscription } from "web-push";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  availabilityFor,
+  caddieLedger,
+  formatTee,
+  getSettings,
+  listCaddies,
+  loopsForDay,
+  rankCandidates,
+} from "./data";
+import { nextUpOrder } from "./ledger";
+import { nextBoardStep } from "./release";
+import { rowToLoop, type LoopRec } from "./types";
 
 // Web push: the thing that makes this app worth opening.
 //
@@ -419,4 +431,209 @@ export async function notifyActiveCaddies(
   });
 
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// The open board: releasing jobs on the shop's schedule
+// ---------------------------------------------------------------------------
+
+function courseDay(iso: string, tz: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
+}
+
+/**
+ * Open posted jobs to caddies when their time comes.
+ *
+ * Runs on every housekeeping sweep and straight after a job is posted, so an
+ * urgent job never waits ten minutes for the next sweep. For each posted job
+ * nobody can see yet, the rules (lib/caddie/release.ts) say one of three
+ * things: not yet; give next-up first refusal; or open it to everyone. Jobs
+ * opened in the same pass share one notification — five pings for one evening's
+ * release is how a roster learns to ignore them.
+ *
+ * Visibility is recorded whether or not push is configured: the board must
+ * work without notifications, it is simply slower to be noticed.
+ */
+export async function processBoard(
+  loopIds?: string[],
+): Promise<{ announced: number; offered: number }> {
+  const out = { announced: 0, offered: 0 };
+  const supa = createAdminClient("caddie");
+  const settings = await getSettings();
+  // First refusal goes to whoever is furthest behind on Fair share. With Fair
+  // share off there is no such person, so first refusal is off too, whatever
+  // its own switch says.
+  const rules = {
+    ...settings.release,
+    priorityEnabled: settings.release.priorityEnabled && settings.fairShareEnabled,
+  };
+  const tz = settings.courseTimezone;
+
+  let q = supa
+    .from("loops")
+    .select("*")
+    .eq("open_board", true)
+    .is("board_announced_at", null)
+    .in("status", ["Unassigned", "Partially Assigned"])
+    .gt("tee_time", new Date().toISOString())
+    .order("tee_time", { ascending: true });
+  if (loopIds && loopIds.length > 0) q = q.in("id", loopIds);
+  const { data: rows, error } = await q;
+  if (error) throw error;
+  if (!rows || rows.length === 0) return out;
+
+  const nowMs = Date.now();
+  const { data: pending } = await supa
+    .from("assignments")
+    .select("loop_id, offer_expires_at")
+    .in("loop_id", rows.map((r) => String(r.id)))
+    .eq("offer_kind", "priority")
+    .eq("confirmation_status", "Pending");
+  const held = new Set(
+    (pending ?? [])
+      .filter((p) => !p.offer_expires_at || new Date(String(p.offer_expires_at)).getTime() > nowMs)
+      .map((p) => String(p.loop_id)),
+  );
+
+  const toOpen: string[] = [];
+  for (const r of rows) {
+    const step = nextBoardStep({
+      teeTimeIso: String(r.tee_time),
+      postedAtIso: String(r.board_posted_at ?? r.updated_at ?? r.created_at),
+      priorityOffered: !!r.priority_offered_at,
+      priorityPending: held.has(String(r.id)),
+      nowMs,
+      rules,
+      tz,
+    });
+    if (step === "wait") continue;
+    if (step === "announce") {
+      toOpen.push(String(r.id));
+      continue;
+    }
+
+    const given = await givePriority(rowToLoop(r), settings.overlapGuardHours, rules.priorityMinutes, tz);
+    // Nobody eligible for first refusal: no reason to hold the job back.
+    if (given === 0) toOpen.push(String(r.id));
+    else if (given > 0) out.offered += given;
+  }
+
+  if (toOpen.length > 0) {
+    // Conditional, so two sweeps that overlap announce a job once.
+    const { data: opened, error: upErr } = await supa
+      .from("loops")
+      .update({ board_announced_at: new Date().toISOString() })
+      .in("id", toOpen)
+      .is("board_announced_at", null)
+      .select("id, tee_time, player_name");
+    if (upErr) throw upErr;
+
+    const list = (opened ?? []).sort((a, b) =>
+      String(a.tee_time).localeCompare(String(b.tee_time)),
+    );
+    out.announced = list.length;
+    if (list.length > 0) {
+      const first = list[0];
+      const when = `${new Date(String(first.tee_time)).toLocaleDateString("en-US", {
+        timeZone: tz,
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      })} ${formatTee(String(first.tee_time), tz)}`;
+      await notifyActiveCaddies({
+        title: list.length === 1 ? "Loop available" : `${list.length} loops available`,
+        body:
+          list.length === 1
+            ? `${first.player_name} — ${when}. First to claim gets it.`
+            : `Earliest ${when}. First to claim gets each one.`,
+        url: "/caddie",
+        tag: `board-${list.map((l) => l.id).join("-").slice(0, 60)}`,
+        loopId: String(first.id),
+      });
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Give next-up first refusal on one job. Returns how many were offered it;
+ * 0 when nobody is eligible (so the job should open to everyone); -1 when
+ * another sweep got there first (so this one should leave it alone).
+ */
+async function givePriority(
+  loop: LoopRec,
+  overlapGuardHours: number,
+  minutes: number,
+  tz: string,
+): Promise<number> {
+  const supa = createAdminClient("caddie");
+
+  // Claim the job for first refusal before offering it, so two overlapping
+  // sweeps can never give it to next-up twice.
+  const now = new Date().toISOString();
+  const { data: claimed, error: claimErr } = await supa
+    .from("loops")
+    .update({ priority_offered_at: now })
+    .eq("id", loop.id)
+    .is("priority_offered_at", null)
+    .select("id");
+  if (claimErr) throw claimErr;
+  if (!claimed || claimed.length === 0) return -1;
+
+  const day = courseDay(loop.teeTime, tz);
+  const [dayLoops, caddies, availability, ledger] = await Promise.all([
+    loopsForDay(day, tz),
+    listCaddies(),
+    availabilityFor(day),
+    caddieLedger(60),
+  ]);
+
+  // The same eligible pool the dispatch board would offer from: free that
+  // day, not on another loop too close to this one, not already asked.
+  const eligible = rankCandidates(loop, caddies, dayLoops, availability, overlapGuardHours)
+    .filter((c) => !c.alreadyOffered && !c.conflict && c.availability !== "Unavailable")
+    .map((c) => c.caddie.id);
+
+  const accepted =
+    dayLoops
+      .find((d) => d.loop.id === loop.id)
+      ?.crew.filter((m) => m.confirmationStatus === "Accepted").length ?? 0;
+  const seats = Math.max(0, loop.caddiesRequired - accepted);
+  // Furthest behind on the fair-share list goes first.
+  const pick = nextUpOrder(ledger, eligible).slice(0, seats);
+  if (pick.length === 0) return 0;
+
+  const expires = new Date(Date.now() + minutes * 60_000).toISOString();
+  const { error } = await supa.from("assignments").insert(
+    pick.map((caddieId) => ({
+      loop_id: loop.id,
+      caddie_id: caddieId,
+      offer_kind: "priority",
+      offered_by: "next-up",
+      offer_expires_at: expires,
+    })),
+  );
+  if (error) throw error;
+
+  const when = `${new Date(loop.teeTime).toLocaleDateString("en-US", {
+    timeZone: tz,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  })} ${formatTee(loop.teeTime, tz)}`;
+  await notifyCaddies(pick, {
+    title: "You're next up",
+    body: `First refusal on ${loop.playerName}, ${when}. You have ${minutes} minutes before it opens to everyone.`,
+    url: "/caddie",
+    tag: `offer-${loop.id}`,
+    loopId: loop.id,
+  });
+
+  return pick.length;
 }

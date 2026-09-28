@@ -70,8 +70,9 @@ export default async function CaddiePortalHome({
     day: "numeric",
   });
 
-  const items: PortalLoop[] = work.map(({ assignment, loop }) => ({
+  const items: PortalLoop[] = work.map(({ assignment, loop, started }) => ({
     assignmentId: assignment.id,
+    started,
     status: assignment.confirmationStatus,
     offerExpiresAt: assignment.offerExpiresAt,
     teeLabel: formatTee(loop.teeTime, tz),
@@ -101,6 +102,10 @@ export default async function CaddiePortalHome({
       items={items}
       open={open}
       vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
+      dropThresholds={{
+        lateHours: settings.dropLateHours,
+        sameDayHours: settings.dropSameDayHours,
+      }}
     />
   );
 }

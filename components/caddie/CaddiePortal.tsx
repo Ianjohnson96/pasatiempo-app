@@ -7,8 +7,10 @@ import PushOptIn from "./PushOptIn";
 import {
   caddieSignOut,
   claimOpenLoop,
+  dropMyLoop,
   respondToMyOffer,
 } from "@/lib/caddie/actions";
+import { dropLateness, type DropThresholds } from "@/lib/caddie/ledger";
 import type {
   CaddieRec,
   ConfirmationStatus,
@@ -21,6 +23,8 @@ import type {
 
 export interface PortalLoop {
   assignmentId: string;
+  /** Tee time has passed: the loop is under way and can no longer be handed back. */
+  started: boolean;
   status: ConfirmationStatus;
   offerExpiresAt: string | null;
   teeLabel: string; // "7:42 AM"
@@ -50,11 +54,14 @@ export default function CaddiePortal({
   items,
   open,
   vapidKey,
+  dropThresholds,
 }: {
   caddie: CaddieRec;
   items: PortalLoop[];
   open: OpenLoop[];
   vapidKey: string | null;
+  /** Where the shop has set "late" and "same day" for a hand-back. */
+  dropThresholds: DropThresholds;
 }) {
   const router = useRouter();
   const [busy, start] = useTransition();
@@ -259,7 +266,20 @@ export default function CaddiePortal({
       ) : (
         <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
           {booked.map((b) => (
-            <LoopCard key={b.assignmentId} loop={b} />
+            <LoopCard key={b.assignmentId} loop={b}>
+              {!b.started && (
+                <DropControl
+                  loop={b}
+                  thresholds={dropThresholds}
+                  busy={busy}
+                  onDropped={(text) => {
+                    setNote({ kind: "ok", text });
+                    router.refresh();
+                  }}
+                  onError={(text) => setNote({ kind: "err", text })}
+                />
+              )}
+            </LoopCard>
           ))}
         </div>
       )}
@@ -314,6 +334,98 @@ function LoopCard({
       )}
 
       {children}
+    </div>
+  );
+}
+
+/**
+ * "Can't make it" — hand a booked loop back to the shop.
+ *
+ * Two taps, not one: a loop given back by a thumb brushing the screen is a
+ * loop the shop has to refill for nothing. The second step says plainly when
+ * it is late, because inside a day the shop may not find anyone, and a caddie
+ * should know that before choosing.
+ */
+function DropControl({
+  loop,
+  thresholds,
+  busy,
+  onDropped,
+  onError,
+}: {
+  loop: PortalLoop;
+  thresholds: DropThresholds;
+  busy: boolean;
+  onDropped: (text: string) => void;
+  onError: (text: string) => void;
+}) {
+  // Set at the moment of the first tap, not during render: how late a drop is
+  // depends on when it happens, and render is not "when".
+  const [armedAt, setArmedAt] = useState<string | null>(null);
+  const [working, start] = useTransition();
+
+  if (!armedAt) {
+    return (
+      <button
+        className="btn ghost small"
+        style={{ marginTop: 12 }}
+        disabled={busy}
+        onClick={() => setArmedAt(new Date().toISOString())}
+      >
+        Can&apos;t make it
+      </button>
+    );
+  }
+
+  const late = dropLateness(armedAt, loop.teeTime, thresholds);
+
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        padding: "10px 12px",
+        borderRadius: 10,
+        background: "var(--green-tint)",
+      }}
+    >
+      <div style={{ fontSize: 14 }}>
+        Give this loop back to the Pro Shop?
+        {late === "same day" && (
+          <strong style={{ display: "block", marginTop: 4, color: "var(--danger)" }}>
+            It tees off within a few hours — the shop may not find anyone.
+          </strong>
+        )}
+        {late === "late" && (
+          <strong style={{ display: "block", marginTop: 4, color: "var(--warn)" }}>
+            It is within a day of the tee time, so it is hard to replace you.
+          </strong>
+        )}
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <button
+          className="btn danger small"
+          style={{ flex: 1 }}
+          disabled={working}
+          onClick={() =>
+            start(async () => {
+              const res = await dropMyLoop(loop.assignmentId);
+              setArmedAt(null);
+              if (res.ok) onDropped("Loop given back. The shop can see it's open again.");
+              else onError(res.error);
+            })
+          }
+        >
+          {working ? "Giving back…" : "Yes, give it back"}
+        </button>
+        <button
+          className="btn secondary small"
+          style={{ flex: 1 }}
+          disabled={working}
+          onClick={() => setArmedAt(null)}
+        >
+          Keep it
+        </button>
+      </div>
     </div>
   );
 }

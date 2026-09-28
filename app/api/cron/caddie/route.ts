@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { escalateTierOffers, remindUpcomingLoops } from "@/lib/caddie/push";
+import { getSettings } from "@/lib/caddie/data";
+import { escalateTierOffers, processBoard, remindUpcomingLoops } from "@/lib/caddie/push";
 
 // Housekeeping for the caddie section, run by Vercel Cron (see vercel.json).
 //
@@ -58,7 +59,11 @@ export async function GET(request: NextRequest) {
     // what provoked the failure, and nothing here is time-critical.
     // Close out played loops first: a completed loop is no longer live, so
     // nothing below should treat it as if it were.
-    const completedLoops = await sweep("complete_past_loops");
+    // How long after the tee time a loop counts as played, as set in Settings.
+    const { completeAfterHours } = await getSettings();
+    const completedLoops = await sweep("complete_past_loops", {
+      p_grace_hours: completeAfterHours,
+    });
     const expiredOffers = await sweep("expire_stale_offers");
     const purgedSessions = await sweep("purge_expired_sessions");
     const purgedInvites = await sweep("purge_expired_invites");
@@ -68,6 +73,10 @@ export async function GET(request: NextRequest) {
     // send is not wasted against phones that are already gone.
     const reminders = await remindUpcomingLoops();
     const escalated = await escalateTierOffers();
+    // Open posted jobs whose release time, horizon or first-refusal window has
+    // now passed. After expire_stale_offers above, so a next-up offer that has
+    // just run out is seen as over on this same pass.
+    const board = await processBoard();
 
     return NextResponse.json({
       completedLoops,
@@ -78,6 +87,8 @@ export async function GET(request: NextRequest) {
       remindedLoops: reminders.reminded,
       reminderDevices: reminders.devices,
       widenedLoops: escalated.widened,
+      boardOpened: board.announced,
+      firstRefusals: board.offered,
       widenedDevices: escalated.notified,
       ranAt: new Date().toISOString(),
     });

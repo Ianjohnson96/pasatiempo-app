@@ -1,10 +1,14 @@
 import Link from "next/link";
+import { getSettings } from "@/lib/caddie/data";
 
 // Shared chrome for the three caddie admin screens. A server component — it
 // only needs the signed-in email, which the page already has.
 
 const TABS = [
   { href: "/admin/caddie", key: "dispatch", label: "Dispatch" },
+  // Every job in date order and who is filling it. Visible to all caddie
+  // staff; the page itself keeps drop history to Caddie Program admins.
+  { href: "/admin/caddie/jobs", key: "jobs", label: "Jobs" },
   { href: "/admin/caddie/calendar", key: "calendar", label: "Calendar" },
   {
     href: "/admin/caddie/availability",
@@ -19,11 +23,16 @@ const TABS = [
   // which is the caddie master's business. The page enforces it as well —
   // hiding a tab is not a permission.
   { href: "/admin/caddie/ledger", key: "ledger", label: "Fair share" },
+  // The rules everything above runs under. Admins only, for the same reason.
+  { href: "/admin/caddie/settings", key: "settings", label: "Settings" },
 ] as const;
+
+// Tabs only a Caddie Program admin sees.
+const ADMIN_ONLY = new Set<string>(["ledger", "settings"]);
 
 export type CaddieTab = (typeof TABS)[number]["key"];
 
-export default function CaddieHeader({
+export default async function CaddieHeader({
   email,
   active,
   isGlobalAdmin = false,
@@ -32,7 +41,14 @@ export default function CaddieHeader({
   active: CaddieTab;
   isGlobalAdmin?: boolean;
 }) {
-  const tabs = TABS.filter((t) => t.key !== "ledger" || isGlobalAdmin);
+  // Read here rather than threaded through nine pages: whether Fair share is
+  // switched on decides whether its tab exists at all.
+  const { fairShareEnabled } = await getSettings();
+  const tabs = TABS.filter(
+    (t) =>
+      (!ADMIN_ONLY.has(t.key) || isGlobalAdmin) &&
+      (t.key !== "ledger" || fairShareEnabled),
+  );
   return (
     <>
       <div className="appbar">

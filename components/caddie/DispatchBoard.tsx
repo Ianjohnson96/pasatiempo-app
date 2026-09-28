@@ -12,6 +12,7 @@ import {
   nudgePending,
   respondForCaddie,
   createGroupBooking,
+  type BookingSend,
   deleteLoop,
   setLoopStatus,
   setOpenBoard,
@@ -44,6 +45,13 @@ export interface BoardCandidate {
   conflict: boolean;
 }
 
+/** One active caddie, as the new-job form needs them. */
+export interface RosterEntry {
+  id: string;
+  fullName: string;
+  tierId: string | null;
+}
+
 interface Props {
   day: string; // "yyyy-mm-dd"
   dayLabel: string;
@@ -59,6 +67,8 @@ interface Props {
   coverage: { reachable: number; total: number };
   /** Tiers, in dispatch order, for offering to a whole tier at once. */
   tiers: TierRec[];
+  /** Active caddies, for choosing who hears about a new job. */
+  roster: RosterEntry[];
   rates: RateCard;
   notifyReady: boolean;
 }
@@ -111,6 +121,7 @@ export default function DispatchBoard({
   groupNames,
   coverage,
   tiers,
+  roster,
   rates,
   notifyReady,
 }: Props) {
@@ -216,7 +227,7 @@ export default function DispatchBoard({
         </p>
       )}
 
-      <QuickAdd day={day} busy={pending} />
+      <QuickAdd day={day} busy={pending} tiers={tiers} roster={roster} />
 
       {loops.length === 0 ? (
         <div className="empty" style={{ marginTop: 18 }}>
@@ -1000,9 +1011,13 @@ function OfferPanel({
 function QuickAdd({
   day,
   busy,
+  tiers,
+  roster,
 }: {
   day: string;
   busy: boolean;
+  tiers: TierRec[];
+  roster: RosterEntry[];
 }) {
   const router = useRouter();
   // Defaults to the day on screen but editable, so a Saturday party can be
@@ -1016,7 +1031,13 @@ function QuickAdd({
     [{ loopType: "Single Bag", count: 1 }],
   ]);
   const [notes, setNotes] = useState("");
-  const [announce, setAnnounce] = useState(false);
+  // Who hears about it. Nobody, by default: typing up tomorrow's sheet should
+  // not set off a phone in every pocket.
+  const [sendTo, setSendTo] = useState<"none" | "everyone" | "tiers" | "caddies">("none");
+  const [sendTiers, setSendTiers] = useState<string[]>([]);
+  const [sendCaddies, setSendCaddies] = useState<string[]>([]);
+  const [pickFilter, setPickFilter] = useState("");
+  const [done, setDone] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [saving, start] = useTransition();
 
@@ -1095,6 +1116,13 @@ function QuickAdd({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
+    setDone(null);
+    const send: BookingSend =
+      sendTo === "tiers"
+        ? { to: "tiers", tierIds: sendTiers }
+        : sendTo === "caddies"
+          ? { to: "caddies", caddieIds: sendCaddies }
+          : { to: sendTo };
     start(async () => {
       const res = await createGroupBooking({
         day: date,
@@ -1102,12 +1130,22 @@ function QuickAdd({
         name,
         groups,
         notes,
-        announce,
+        send,
       });
       if (!res.ok) {
         setErr(res.error);
         return;
       }
+      const booked = `Booked ${res.value.created} ${res.value.created === 1 ? "loop" : "loops"}`;
+      setDone(
+        sendTo === "everyone"
+          ? `${booked} and posted to the job board.`
+          : sendTo === "tiers" || sendTo === "caddies"
+            ? res.value.offered > 0
+              ? `${booked} and offered to ${res.value.offered} ${res.value.offered === 1 ? "caddie" : "caddies"}.`
+              : `${booked}, but nobody could be offered it — check they're active.`
+            : `${booked}. Nobody has been told yet.`,
+      );
       setName("");
       setNotes("");
       setGroups([[{ loopType: "Single Bag", count: 1 }]]);
@@ -1323,16 +1361,24 @@ function QuickAdd({
         <button
           className="btn"
           type="submit"
-          disabled={saving || busy || totalLoops === 0}
+          disabled={
+            saving ||
+            busy ||
+            totalLoops === 0 ||
+            (sendTo === "tiers" && sendTiers.length === 0) ||
+            (sendTo === "caddies" && sendCaddies.length === 0)
+          }
           style={{ marginLeft: "auto" }}
         >
           {saving
             ? "Booking…"
             : totalLoops === 0
               ? "Add a caddie first"
-              : totalLoops === 1
-                ? "Add loop"
-                : `Book ${totalLoops} loops`}
+              : sendTo === "tiers" && sendTiers.length === 0
+                ? "Pick a tier"
+                : sendTo === "caddies" && sendCaddies.length === 0
+                  ? "Pick caddies"
+                  : `${sendTo === "none" ? "Book" : "Book & send"} ${totalLoops} ${totalLoops === 1 ? "loop" : "loops"}`}
         </button>
       </div>
 
@@ -1350,30 +1396,146 @@ function QuickAdd({
         </p>
       )}
 
-      <label
-        style={{
-          display: "flex",
-          gap: 8,
-          alignItems: "flex-start",
-          marginTop: 12,
-          fontSize: 14,
-        }}
-      >
-        <input
-          type="checkbox"
-          checked={announce}
-          onChange={(e) => setAnnounce(e.target.checked)}
-          style={{ marginTop: 3 }}
-        />
-        <span>
-          Put it on the job board and alert every caddie now.
-          <span className="muted">
-            {" "}
-            One notification for the whole booking, not one per loop. Leave this
-            off when you are typing up a sheet in advance.
-          </span>
-        </span>
-      </label>
+      {/* Who hears about it — decided in the same step as booking it. */}
+      <div style={{ marginTop: 14 }}>
+        <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+          Send it to
+        </div>
+        <div className="seg" role="radiogroup" aria-label="Send it to">
+          {(
+            [
+              ["none", "Just add it"],
+              ["everyone", "Everyone"],
+              ["tiers", "Tiers"],
+              ["caddies", "Pick caddies"],
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              role="radio"
+              aria-checked={sendTo === k}
+              className={sendTo === k ? "segbtn on" : "segbtn"}
+              onClick={() => setSendTo(k)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <p className="muted" style={{ fontSize: 13, margin: "8px 0 0" }}>
+          {sendTo === "none" &&
+            "On the sheet only — nobody is told. Offer it from the board when you're ready."}
+          {sendTo === "everyone" &&
+            "Posted to the job board for anyone to claim, following your release settings. One notification for the whole booking."}
+          {sendTo === "tiers" &&
+            "Offered to everyone in the tiers you pick — first to answer gets each loop. Each caddie is told once for the whole booking."}
+          {sendTo === "caddies" &&
+            "Offered only to the caddies you pick — first to answer gets each loop. Each is told once for the whole booking."}
+        </p>
+
+        {sendTo === "tiers" && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+            {tiers.length === 0 && <span className="muted">No tiers set up yet.</span>}
+            {tiers.map((t) => {
+              const on = sendTiers.includes(t.id);
+              const n = roster.filter((c) => c.tierId === t.id).length;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  aria-pressed={on}
+                  className={on ? "btn small" : "btn secondary small"}
+                  onClick={() =>
+                    setSendTiers((p) => (on ? p.filter((x) => x !== t.id) : [...p, t.id]))
+                  }
+                >
+                  {t.name} ({n})
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {sendTo === "caddies" && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              <button
+                type="button"
+                className="btn ghost small"
+                onClick={() => setSendCaddies(roster.map((c) => c.id))}
+              >
+                All ({roster.length})
+              </button>
+              {tiers.map((t) => {
+                const ids = roster.filter((c) => c.tierId === t.id).map((c) => c.id);
+                if (ids.length === 0) return null;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className="btn ghost small"
+                    onClick={() => setSendCaddies((p) => [...new Set([...p, ...ids])])}
+                  >
+                    + {t.name}
+                  </button>
+                );
+              })}
+              {sendCaddies.length > 0 && (
+                <button type="button" className="btn ghost small" onClick={() => setSendCaddies([])}>
+                  Clear
+                </button>
+              )}
+              <input
+                value={pickFilter}
+                onChange={(e) => setPickFilter(e.target.value)}
+                placeholder="Find a name"
+                aria-label="Filter caddies by name"
+                style={{ ...inputStyle, width: 130, marginLeft: "auto" }}
+              />
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+                gap: 4,
+                marginTop: 8,
+                maxHeight: 220,
+                overflowY: "auto",
+              }}
+            >
+              {roster.length === 0 && <span className="muted">No active caddies yet.</span>}
+              {roster
+                .filter((c) =>
+                  c.fullName.toLowerCase().includes(pickFilter.trim().toLowerCase()),
+                )
+                .map((c) => (
+                  <label
+                    key={c.id}
+                    style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14, cursor: "pointer" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={sendCaddies.includes(c.id)}
+                      onChange={() =>
+                        setSendCaddies((p) =>
+                          p.includes(c.id) ? p.filter((x) => x !== c.id) : [...p, c.id],
+                        )
+                      }
+                    />
+                    {c.fullName}
+                  </label>
+                ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {done && (
+        <p className="notice ok" style={{ marginBottom: 0 }}>
+          {done}
+        </p>
+      )}
 
       {err && (
         <p className="notice err" style={{ marginBottom: 0 }}>

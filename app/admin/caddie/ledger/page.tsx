@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { requireCaddieStaff } from "@/lib/caddie/auth";
 import CaddieHeader from "@/components/caddie/CaddieHeader";
-import { caddieLedger, listCaddies } from "@/lib/caddie/data";
+import Link from "next/link";
+import { caddieLedger, getSettings, listCaddies } from "@/lib/caddie/data";
 import { nextUpOrder } from "@/lib/caddie/ledger";
 
 // Who has had what, and how they have behaved getting it.
@@ -18,6 +19,24 @@ const money = (cents: number) =>
 export default async function CaddieLedgerPage() {
   const viewer = await requireCaddieStaff();
   if (!viewer.isGlobalAdmin) redirect("/admin/caddie");
+
+  // Switched off in Settings: say so, rather than a bookmark showing numbers
+  // nobody has asked for.
+  const { fairShareEnabled } = await getSettings();
+  if (!fairShareEnabled) {
+    return (
+      <>
+        <CaddieHeader email={viewer.email} active="ledger" isGlobalAdmin />
+        <main className="container">
+          <p className="notice" style={{ marginTop: 18 }}>
+            Fair share is switched off. Turn it back on in{" "}
+            <Link href="/admin/caddie/settings">Settings</Link> to see it — the record is kept
+            either way.
+          </p>
+        </main>
+      </>
+    );
+  }
 
   const [caddies, ledger] = await Promise.all([listCaddies(), caddieLedger(60)]);
 

@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { after } from "next/server";
+import { alertShopOfDrop } from "./alerts";
 import QRCode from "qrcode";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -13,6 +15,7 @@ import { assertCaddieStaff } from "./auth";
 import {
   notifyActiveCaddies,
   notifyCaddies,
+  processBoard,
   removePushSubscription,
   savePushSubscription,
 } from "./push";
@@ -27,6 +30,7 @@ import {
   type ContactMethod,
   type DefaultSlot,
   type GroupNeed,
+  type JobRelease,
   type LoopRec,
   type LoopType,
   type Waterfall,
@@ -160,15 +164,27 @@ export interface GroupInput {
   /** Minutes between tee times. Defaults to the course's ten. */
   intervalMinutes?: number;
   /**
-   * Put the loops straight on the job board and tell every active caddie.
+   * Who hears about it, in the same step as booking it.
    *
    * The whole point of this app is not ringing eighteen people one at a time,
-   * and booking then hunting for a Post button is two steps where the shop
-   * only ever meant one. Off by default, because entering tomorrow's sheet in
-   * bulk should not set off a phone in every pocket.
+   * and booking then hunting for an offer button is two steps where the shop
+   * only ever meant one. Defaults to nobody, because entering tomorrow's sheet
+   * in bulk should not set off a phone in every pocket.
    */
-  announce?: boolean;
+  send?: BookingSend;
 }
+
+/**
+ * Who a new job goes to.
+ *
+ * "everyone" posts it to the job board under the release rules; "tiers" and
+ * "caddies" send a real offer — first to answer wins — to just those people.
+ */
+export type BookingSend =
+  | { to: "none" }
+  | { to: "everyone" }
+  | { to: "tiers"; tierIds: string[] }
+  | { to: "caddies"; caddieIds: string[] };
 
 /**
  * Book a party across consecutive tee times in one go.
@@ -186,11 +202,23 @@ export interface GroupInput {
  */
 export async function createGroupBooking(
   input: GroupInput,
-): Promise<Result<{ bookingId: string; created: number }>> {
+): Promise<
+  Result<{ bookingId: string; created: number; offered: number; notified: number }>
+> {
   try {
     await assertCaddieStaff();
     const name = input.name.trim();
     if (!name) return { ok: false, error: "The group needs a name." };
+
+    const send: BookingSend = input.send ?? { to: "none" };
+    // Checked before anything is booked, so a missed choice never leaves a
+    // half-made booking behind.
+    if (send.to === "tiers" && send.tierIds.length === 0) {
+      return { ok: false, error: "Pick at least one tier to send it to." };
+    }
+    if (send.to === "caddies" && send.caddieIds.length === 0) {
+      return { ok: false, error: "Pick at least one caddie to send it to." };
+    }
 
     const groups = (input.groups ?? []).slice(0, 20);
     if (groups.length === 0) {
@@ -241,7 +269,10 @@ export async function createGroupBooking(
       notes: input.notes.trim(),
       booking_id: String(booking.id),
       created_by: by,
-      open_board: input.announce === true,
+      // Only "everyone" goes on the open board. An offer to chosen tiers or
+      // caddies is theirs to answer, not a job anyone can claim.
+      open_board: send.to === "everyone",
+      board_posted_at: send.to === "everyone" ? new Date().toISOString() : null,
     }));
 
     const { data: inserted, error } = await supa
@@ -250,31 +281,117 @@ export async function createGroupBooking(
       .select("id, tee_time");
     if (error) throw error;
 
-    // One alert for the booking, not one per loop. Four pushes for a party
-    // that occupies four tee times is how a roster learns to ignore the
-    // notification, which is the single failure this channel cannot recover
-    // from.
-    if (input.announce && (inserted?.length ?? 0) > 0) {
-      const when = formatTee(String(inserted![0].tee_time), courseTimezone);
-      const n = inserted!.length;
-      await notifyActiveCaddies({
-        title: n === 1 ? "Loop available" : `${n} loops available`,
-        body: `${name} — first tee ${when}. Tap to claim.`,
-        url: "/caddie",
-        tag: `booking-${booking.id}`,
-        loopId: String(inserted![0].id),
-      });
+    const created = (inserted ?? []).map((r) => ({
+      id: String(r.id),
+      teeTime: String(r.tee_time),
+    }));
+    let offered = 0;
+    let notified = 0;
+
+    if (send.to === "everyone" && created.length > 0) {
+      // Through the board's release rules rather than straight to everyone: a
+      // job for next month should wait for its release time or go to next-up
+      // first, exactly as if it had been posted from the board. With every
+      // rule off it opens now, with one notification for the whole booking.
+      await processBoard(created.map((l) => l.id));
+    } else if ((send.to === "tiers" || send.to === "caddies") && created.length > 0) {
+      let caddieIds: string[];
+      if (send.to === "tiers") {
+        const { data: inTiers, error: tierErr } = await supa
+          .from("caddies")
+          .select("id")
+          .eq("status", "Active")
+          .in("tier_id", send.tierIds);
+        if (tierErr) throw tierErr;
+        caddieIds = (inTiers ?? []).map((c) => String(c.id));
+      } else {
+        caddieIds = send.caddieIds;
+      }
+      const res = await offerBooking(created, caddieIds, name, courseTimezone, by, String(booking.id));
+      offered = res.caddies;
+      notified = res.notified;
     }
 
     revalidatePath(BOARD_PATH);
     revalidatePath("/caddie");
     return {
       ok: true,
-      value: { bookingId: String(booking.id), created: rows.length },
+      value: { bookingId: String(booking.id), created: rows.length, offered, notified },
     };
   } catch (e) {
     return fail(e, "Could not book the group.");
   }
+}
+
+/**
+ * Offer every loop of a new booking to the same caddies, telling each of
+ * them once.
+ *
+ * One notification per caddie for the whole booking, not one per tee time: a
+ * party across four tee times offered to eighteen caddies is eighteen pings,
+ * not seventy-two. Each loop is still its own offer — first to answer wins,
+ * per loop — and the overlap guard stops one caddie taking two of them.
+ */
+async function offerBooking(
+  loops: { id: string; teeTime: string }[],
+  caddieIds: string[],
+  partyName: string,
+  tz: string,
+  by: string | null,
+  bookingId: string,
+): Promise<{ caddies: number; notified: number }> {
+  const ids = [...new Set(caddieIds)];
+  if (ids.length === 0 || loops.length === 0) return { caddies: 0, notified: 0 };
+
+  const supa = createAdminClient("caddie");
+  const settings = await getSettings();
+  const broadcast = ids.length > 1;
+  const minutes = broadcast ? settings.broadcastExpiryMinutes : settings.offerExpiryMinutes;
+  const expires = new Date(Date.now() + minutes * 60_000).toISOString();
+
+  const rows = loops.flatMap((l) =>
+    ids.map((caddieId) => ({
+      loop_id: l.id,
+      caddie_id: caddieId,
+      offered_by: by,
+      offer_kind: broadcast ? "broadcast" : "direct",
+      offer_expires_at: expires,
+    })),
+  );
+
+  // One insert for the lot: these are brand-new loops and active caddies, so
+  // nothing should be refused. If something is, fall back to one at a time
+  // so the refusal costs one offer rather than all of them.
+  const reached = new Set<string>();
+  const { error: batchErr } = await supa.from("assignments").insert(rows);
+  if (!batchErr) {
+    ids.forEach((id) => reached.add(id));
+  } else {
+    for (const r of rows) {
+      const { error } = await supa.from("assignments").insert(r);
+      if (!error) reached.add(r.caddie_id);
+    }
+  }
+  if (reached.size === 0) return { caddies: 0, notified: 0 };
+
+  const first = [...loops].sort((a, b) => a.teeTime.localeCompare(b.teeTime))[0];
+  const when = `${new Date(first.teeTime).toLocaleDateString("en-US", {
+    timeZone: tz,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  })} ${formatTee(first.teeTime, tz)}`;
+  const more = loops.length > 1 ? ` (${loops.length} tee times)` : "";
+
+  const push = await notifyCaddies([...reached], {
+    title: broadcast ? "Loop offered — first to answer" : "Loop offered to you",
+    body: `${partyName} — ${when}${more}. Tap to accept or decline.`,
+    url: "/caddie",
+    tag: `booking-${bookingId}`,
+    loopId: first.id,
+  });
+
+  return { caddies: reached.size, notified: push.sent };
 }
 
 export async function setLoopStatus(
@@ -324,12 +441,26 @@ export async function setOpenBoard(
   try {
     await assertCaddieStaff();
     const supa = createAdminClient("caddie");
-    const { error } = await supa
-      .from("loops")
-      .update({ open_board: on })
-      .eq("id", loopId);
+    // Posting starts the job's release from scratch: it is posted now, not
+    // yet open, and next-up has not been offered it. Taking it down leaves
+    // those alone — it is simply off the board.
+    const update = on
+      ? {
+          open_board: true,
+          board_posted_at: new Date().toISOString(),
+          board_announced_at: null,
+          priority_offered_at: null,
+        }
+      : { open_board: false };
+    const { error } = await supa.from("loops").update(update).eq("id", loopId);
     if (error) throw error;
+
+    // Run the release rules now rather than waiting for the next sweep, so a
+    // job with every rule off opens the moment it is posted.
+    if (on) await processBoard([loopId]);
+
     revalidatePath(BOARD_PATH);
+    revalidatePath("/caddie");
     return { ok: true, value: undefined };
   } catch (e) {
     return fail(e, "Could not update the job board.");
@@ -745,6 +876,229 @@ export async function withdrawOffer(assignmentId: string): Promise<Result> {
   }
 }
 
+const JOBS_PATH = "/admin/caddie/jobs";
+
+/**
+ * A caddie hands back a loop they accepted — from their own portal.
+ *
+ * Recorded as Dropped rather than quietly deleted: the loop reopens for
+ * someone else (refresh_loop_status only counts Accepted), and the caddie
+ * master can see who hands work back, and how late. That record is the whole
+ * point; a drop that left no trace would reward exactly the habit of taking
+ * every loop and letting go of the ones that did not suit.
+ */
+export async function dropMyLoop(assignmentId: string): Promise<Result> {
+  try {
+    const caddie = await getCaddieSession();
+    if (!caddie) {
+      return { ok: false, error: "You are signed out. Ask the shop for a new link." };
+    }
+    const res = await recordDrop(assignmentId, {
+      caddieId: caddie.id,
+      channel: "web",
+      markedBy: null,
+    });
+    // Tell the shop — after the caddie has their answer, so a slow mail
+    // server never keeps them waiting. The shop recording a drop itself
+    // (markDropped) already knows, so only the caddie's own drop alerts.
+    if (res.ok) after(() => alertShopOfDrop(assignmentId));
+    return res;
+  } catch (e) {
+    return fail(e, "Could not give the loop back.");
+  }
+}
+
+/**
+ * The shop records a drop for a caddie who phoned in.
+ *
+ * Carries the staff member's name, so a mark against a caddie's record always
+ * says who put it there.
+ */
+export async function markDropped(assignmentId: string): Promise<Result> {
+  try {
+    const staff = await assertCaddieStaff();
+    return await recordDrop(assignmentId, {
+      caddieId: null,
+      channel: "admin",
+      markedBy: staff.email,
+    });
+  } catch (e) {
+    return fail(e, "Could not record the drop.");
+  }
+}
+
+async function recordDrop(
+  assignmentId: string,
+  opts: { caddieId: string | null; channel: "web" | "admin"; markedBy: string | null },
+): Promise<Result> {
+  const supa = createAdminClient("caddie");
+
+  let q = supa
+    .from("assignments")
+    .select("id, confirmation_status, loops!inner(tee_time, status)")
+    .eq("id", assignmentId);
+  // A caddie may only give back their own loop; the shop may record any.
+  if (opts.caddieId) q = q.eq("caddie_id", opts.caddieId);
+
+  const { data: row, error } = await q.maybeSingle();
+  if (error) throw error;
+  if (!row) {
+    return {
+      ok: false,
+      error: opts.caddieId ? "That loop is not yours." : "That assignment no longer exists.",
+    };
+  }
+  if (row.confirmation_status !== "Accepted") {
+    return { ok: false, error: "Only a loop that has been accepted can be handed back." };
+  }
+
+  const loop = row.loops as unknown as { tee_time: string; status: string };
+  if (loop.status === "Cancelled" || loop.status === "Completed") {
+    return { ok: false, error: "That loop is no longer on." };
+  }
+  // After the tee time it is not a drop, it is a no-show — a different thing,
+  // and not one a caddie gets to record against himself.
+  if (new Date(loop.tee_time).getTime() <= Date.now()) {
+    return { ok: false, error: "That loop has already teed off." };
+  }
+
+  const now = new Date().toISOString();
+  // Conditional on still being Accepted, so a double tap or two people acting
+  // at once records one drop, not two.
+  const { data: updated, error: upErr } = await supa
+    .from("assignments")
+    .update({
+      confirmation_status: "Dropped",
+      dropped_at: now,
+      responded_at: now,
+      response_channel: opts.channel,
+      marked_by: opts.markedBy,
+    })
+    .eq("id", assignmentId)
+    .eq("confirmation_status", "Accepted")
+    .select("id")
+    .maybeSingle();
+  if (upErr) throw upErr;
+  if (!updated) {
+    return { ok: false, error: "That loop changed while you were looking. Refresh and try again." };
+  }
+
+  revalidatePath("/caddie");
+  revalidatePath(BOARD_PATH);
+  revalidatePath(JOBS_PATH);
+  return { ok: true, value: undefined };
+}
+
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+
+export interface SettingsInput {
+  dropLateHours: number;
+  dropSameDayHours: number;
+  offerExpiryMinutes: number;
+  broadcastExpiryMinutes: number;
+  overlapGuardHours: number;
+  reminderHoursBefore: number;
+  completeAfterHours: number;
+  claimLimit: number;
+  /** Comma- or line-separated. */
+  dropAlertEmails: string;
+  inviteDays: number;
+  sessionDays: number;
+  availabilityMonths: number;
+  release: JobRelease;
+  fairShareEnabled: boolean;
+}
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Save the Caddie Program's rules. Caddie Program admins only — the counter
+ * dispatches under these rules and does not get to change them, and the page
+ * hiding its tab is not a permission.
+ *
+ * Every number is held to a sensible range rather than trusted: a zero-minute
+ * offer window, or a same-day line longer than the "late" one, would quietly
+ * break the thing it controls.
+ */
+export async function saveCaddieSettings(input: SettingsInput): Promise<Result> {
+  try {
+    const staff = await assertCaddieStaff();
+    if (!staff.isGlobalAdmin) {
+      return { ok: false, error: "Only Caddie Program admins can change settings." };
+    }
+
+    const whole = (v: number, lo: number, hi: number) =>
+      Math.min(hi, Math.max(lo, Math.round(Number(v) || 0)));
+
+    const sameDay = whole(input.dropSameDayHours, 1, 48);
+    const late = whole(input.dropLateHours, 1, 336);
+    if (late < sameDay) {
+      return {
+        ok: false,
+        error: "The “late” line has to be at least as long as the “same day” one.",
+      };
+    }
+
+    const emails = input.dropAlertEmails
+      .split(/[\s,;]+/)
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    const bad = emails.find((e) => !EMAIL.test(e));
+    if (bad) return { ok: false, error: `“${bad}” doesn't look like an email address.` };
+
+    const r = input.release;
+    if (!/^\d{2}:\d{2}$/.test(r.time)) {
+      return { ok: false, error: "Pick a release time." };
+    }
+
+    const supa = createAdminClient("caddie");
+    const { data: row, error: readErr } = await supa
+      .from("settings")
+      .select("data")
+      .eq("id", 1)
+      .maybeSingle();
+    if (readErr) throw readErr;
+    const current = (row?.data ?? {}) as Record<string, unknown>;
+
+    const next = {
+      ...current,
+      drop_late_hours: late,
+      drop_same_day_hours: sameDay,
+      offer_expiry_minutes: whole(input.offerExpiryMinutes, 5, 1440),
+      broadcast_expiry_minutes: whole(input.broadcastExpiryMinutes, 5, 1440),
+      overlap_guard_hours: whole(input.overlapGuardHours, 1, 12),
+      reminder_hours_before: whole(input.reminderHoursBefore, 1, 72),
+      complete_after_hours: whole(input.completeAfterHours, 1, 48),
+      claim_limit: whole(input.claimLimit, 0, 20),
+      drop_alert_emails: [...new Set(emails)].slice(0, 10),
+      invite_minutes: whole(input.inviteDays, 1, 60) * 1440,
+      session_days: whole(input.sessionDays, 7, 365),
+      availability_months: whole(input.availabilityMonths, 1, 12),
+      fair_share_enabled: input.fairShareEnabled === true,
+      release: {
+        enabled: r.enabled === true,
+        daysBefore: whole(r.daysBefore, 0, 14),
+        time: r.time,
+        horizonDays: whole(r.horizonDays, 0, 365),
+        priorityEnabled: r.priorityEnabled === true,
+        priorityMinLeadHours: whole(r.priorityMinLeadHours, 1, 336),
+        priorityMinutes: whole(r.priorityMinutes, 5, 240),
+      },
+    };
+
+    const { error } = await supa.from("settings").update({ data: next }).eq("id", 1);
+    if (error) throw error;
+
+    revalidatePath("/admin/caddie", "layout");
+    revalidatePath("/caddie");
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not save the settings.");
+  }
+}
+
 /**
  * Answer on a caddie's behalf — they rang the shop instead of tapping.
  *
@@ -853,12 +1207,40 @@ export async function claimOpenLoop(loopId: string): Promise<Result> {
     // this check the loop id alone would be enough to jump onto any job.
     const { data: loop, error: loopErr } = await supa
       .from("loops")
-      .select("id, open_board, status")
+      .select("id, open_board, status, board_announced_at")
       .eq("id", loopId)
       .maybeSingle();
     if (loopErr) throw loopErr;
     if (!loop || !loop.open_board) {
       return { ok: false, error: "That loop is no longer on the job board." };
+    }
+    // The same rule the board shows: a job not yet released, beyond the
+    // horizon, or held for next-up cannot be claimed by knowing its id.
+    if (!loop.board_announced_at) {
+      return { ok: false, error: "That loop isn't open yet." };
+    }
+
+    // The claim limit, when the shop has set one. Only self-service claims
+    // off the board count against it: an offer the shop sends is the shop's
+    // own choice, and capping it would stop the shop giving work to the
+    // caddie it wants.
+    const { claimLimit } = await getSettings();
+    if (claimLimit > 0) {
+      const { data: held, error: heldErr } = await supa
+        .from("assignments")
+        .select("id, loops!inner(tee_time, status)")
+        .eq("caddie_id", caddie.id)
+        .eq("confirmation_status", "Accepted")
+        .gte("loops.tee_time", new Date().toISOString())
+        .neq("loops.status", "Cancelled");
+      if (heldErr) throw heldErr;
+      const n = held?.length ?? 0;
+      if (n >= claimLimit) {
+        return {
+          ok: false,
+          error: `You're already holding ${n} upcoming ${n === 1 ? "loop" : "loops"} — the most anyone can take from the board at once. Once one is played or handed back you can claim another.`,
+        };
+      }
     }
 
     const { error } = await supa.from("assignments").insert({
@@ -963,7 +1345,13 @@ export async function callAllCaddies(loopId: string): Promise<Result<number>> {
     // people to go and look.
     const { error: postErr } = await supa
       .from("loops")
-      .update({ open_board: true })
+      // Call all overrides the release rules on purpose: the shop is telling
+      // everyone now, so the job opens now, whatever the release time says.
+      .update({
+        open_board: true,
+        board_posted_at: new Date().toISOString(),
+        board_announced_at: new Date().toISOString(),
+      })
       .eq("id", loopId);
     if (postErr) throw postErr;
 

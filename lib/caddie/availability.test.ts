@@ -294,6 +294,8 @@ describe("rankCandidates ordering rules", () => {
             confirmationStatus: "Accepted",
             respondedAt: null,
             responseChannel: null,
+            droppedAt: null,
+            markedBy: null,
             caddie: busy,
           },
         ],
