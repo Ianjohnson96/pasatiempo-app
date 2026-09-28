@@ -19,13 +19,19 @@ import {
   removePushSubscription,
   savePushSubscription,
 } from "./push";
+import { sendText, smsConfigured } from "./sms";
 import {
   DEFAULT_HOLES,
+  LOOP_TYPES,
+  SMS_CONSENT_TEXT,
   TEE_INTERVAL_MINUTES,
   rateFor,
+  readJobPrefs,
   rowToCaddie,
   rowToLoop,
   type CaddieRec,
+  type JobPrefs,
+  type SmsChannels,
   type CaddieStatus,
   type ContactMethod,
   type DefaultSlot,
@@ -389,9 +395,11 @@ async function offerBooking(
     url: "/caddie",
     tag: `booking-${bookingId}`,
     loopId: first.id,
+    sms: "offers",
+    reply: true,
   });
 
-  return { caddies: reached.size, notified: push.sent };
+  return { caddies: reached.size, notified: push.sent + push.texted };
 }
 
 export async function setLoopStatus(
@@ -715,7 +723,7 @@ export async function offerLoop(
         offeredIds,
         await offerAlert(loopId, broadcast),
       );
-      notified = push.sent;
+      notified = push.sent + push.texted;
     }
 
     revalidatePath(BOARD_PATH);
@@ -799,6 +807,8 @@ async function offerAlert(loopId: string, broadcast: boolean) {
     url: "/caddie",
     tag: `offer-${loopId}`,
     loopId,
+    sms: "offers" as const,
+    reply: true,
   };
 }
 
@@ -848,7 +858,7 @@ export async function nudgePending(loopId: string): Promise<Result<number>> {
     });
 
     revalidatePath(BOARD_PATH);
-    return { ok: true, value: push.sent };
+    return { ok: true, value: push.sent + push.texted };
   } catch (e) {
     return fail(e, "Could not send the nudge.");
   }
@@ -1009,6 +1019,8 @@ export interface SettingsInput {
   availabilityMonths: number;
   release: JobRelease;
   fairShareEnabled: boolean;
+  smsEnabled: boolean;
+  sms: SmsChannels;
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1077,6 +1089,12 @@ export async function saveCaddieSettings(input: SettingsInput): Promise<Result> 
       session_days: whole(input.sessionDays, 7, 365),
       availability_months: whole(input.availabilityMonths, 1, 12),
       fair_share_enabled: input.fairShareEnabled === true,
+      sms_enabled: input.smsEnabled === true,
+      sms: {
+        offers: input.sms?.offers === true,
+        reminders: input.sms?.reminders === true,
+        board: input.sms?.board === true,
+      },
       release: {
         enabled: r.enabled === true,
         daysBefore: whole(r.daysBefore, 0, 14),
@@ -1391,7 +1409,7 @@ export async function callAllCaddies(loopId: string): Promise<Result<number>> {
 
     revalidatePath(BOARD_PATH);
     revalidatePath("/caddie");
-    return { ok: true, value: result.sent };
+    return { ok: true, value: result.sent + result.texted };
   } catch (e) {
     return fail(e, "Could not send the caddie call.");
   }
@@ -1786,6 +1804,108 @@ export async function saveWaterfall(input: Waterfall): Promise<Result> {
 }
 
 // ---------------------------------------------------------------------------
+// The caddie's own preferences
+// ---------------------------------------------------------------------------
+
+/** A caddie saying what kind of work they would rather not be offered. */
+export async function saveMyPreferences(prefs: JobPrefs): Promise<Result> {
+  try {
+    const caddie = await getCaddieSession();
+    if (!caddie) return { ok: false, error: "You are signed out. Ask the shop for a new link." };
+
+    const supa = createAdminClient("caddie");
+    const { error } = await supa
+      .from("caddies")
+      .update({ job_prefs: cleanPrefs(prefs) })
+      .eq("id", caddie.id);
+    if (error) throw error;
+
+    revalidatePath("/caddie", "layout");
+    revalidatePath(ROSTER_PATH);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not save your preferences.");
+  }
+}
+
+/**
+ * A caddie switching texts on or off, from their own phone.
+ *
+ * On records the number, the moment and the exact words they agreed to, and
+ * sends the confirmation text the carriers expect after an opt-in. Off takes
+ * effect at once. The shop has no way to switch texts on for someone.
+ */
+export async function setMyTexts(input: {
+  on: boolean;
+  phone: string;
+  agreed: boolean;
+}): Promise<Result<{ confirmed: boolean }>> {
+  try {
+    const caddie = await getCaddieSession();
+    if (!caddie) return { ok: false, error: "You are signed out. Ask the shop for a new link." };
+    const supa = createAdminClient("caddie");
+
+    if (!input.on) {
+      const { error } = await supa
+        .from("caddies")
+        .update({ sms_opt_in: false, sms_opt_out_at: new Date().toISOString() })
+        .eq("id", caddie.id);
+      if (error) throw error;
+      revalidatePath("/caddie", "layout");
+      revalidatePath(ROSTER_PATH);
+      return { ok: true, value: { confirmed: false } };
+    }
+
+    if (!input.agreed) {
+      return { ok: false, error: "Tick the box to agree to texts first." };
+    }
+    const phone = normalisePhone(input.phone);
+    if (!phone) {
+      return { ok: false, error: "That number does not look right. Use 10 digits, e.g. 831 459 9155." };
+    }
+
+    const { error } = await supa
+      .from("caddies")
+      .update({
+        phone,
+        sms_opt_in: true,
+        sms_opt_in_at: new Date().toISOString(),
+        sms_opt_out_at: null,
+        sms_consent: SMS_CONSENT_TEXT,
+      })
+      .eq("id", caddie.id);
+    if (error) {
+      if (error.code === "23505") {
+        return {
+          ok: false,
+          error: "Another caddie already has that number. Check it, or ask the Pro Shop.",
+        };
+      }
+      throw error;
+    }
+
+    // Only when texting is actually live — a confirmation that cannot be sent
+    // would be logged as a failure against a caddie who did nothing wrong.
+    let confirmed = false;
+    const settings = await getSettings();
+    if (settings.smsEnabled && smsConfigured()) {
+      const sent = await sendText(
+        phone,
+        "Pasatiempo Caddies: You're signed up for texts about caddie job offers and loop reminders. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out.",
+        { caddieId: caddie.id, template: "opt_in" },
+      );
+      confirmed = sent.ok;
+    }
+
+    revalidatePath("/caddie", "layout");
+    revalidatePath(ROSTER_PATH);
+    return { ok: true, value: { confirmed } };
+  } catch (e) {
+    return fail(e, "Could not save that.");
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Roster
 // ---------------------------------------------------------------------------
 
@@ -1798,6 +1918,22 @@ export interface CaddieInput {
   status: CaddieStatus;
   preferredContactMethod: ContactMethod;
   notes: string;
+  /** What they would rather not be offered. Left alone when omitted. */
+  jobPrefs?: JobPrefs;
+  /**
+   * The shop can stop texts for someone (they asked at the counter) but can
+   * never start them — only the caddie can agree to be texted.
+   */
+  stopTexts?: boolean;
+}
+
+/** Clean a preferences object from the browser into one worth storing. */
+function cleanPrefs(p: JobPrefs | undefined): JobPrefs {
+  const read = readJobPrefs(p);
+  return {
+    avoid: LOOP_TYPES.filter((t) => read.avoid.includes(t)),
+    note: read.note.trim().slice(0, 200),
+  };
 }
 
 export async function saveCaddie(input: CaddieInput): Promise<Result<CaddieRec>> {
@@ -1830,7 +1966,7 @@ export async function saveCaddie(input: CaddieInput): Promise<Result<CaddieRec>>
     }
 
     const supa = createAdminClient("caddie");
-    const fields = {
+    const fields: Record<string, unknown> = {
       full_name: fullName,
       phone,
       email,
@@ -1839,6 +1975,21 @@ export async function saveCaddie(input: CaddieInput): Promise<Result<CaddieRec>>
       preferred_contact_method: input.preferredContactMethod,
       notes: input.notes.trim(),
     };
+    if (input.jobPrefs) fields.job_prefs = cleanPrefs(input.jobPrefs);
+
+    // Consent to texts was given for a number. A new number, or the shop being
+    // asked to stop, ends it; the caddie can agree again from their phone.
+    if (input.id) {
+      const { data: before } = await supa
+        .from("caddies")
+        .select("phone, sms_opt_in")
+        .eq("id", input.id)
+        .maybeSingle();
+      if (before?.sms_opt_in && (input.stopTexts || before.phone !== phone)) {
+        fields.sms_opt_in = false;
+        fields.sms_opt_out_at = new Date().toISOString();
+      }
+    }
 
     const q = input.id
       ? supa.from("caddies").update(fields).eq("id", input.id).select("*").single()

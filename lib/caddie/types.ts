@@ -115,9 +115,65 @@ export interface CaddieRec {
   tierOrder: number;
   status: CaddieStatus;
   preferredContactMethod: ContactMethod;
+  /** Agreed, from their own phone, to be texted. Only the caddie turns it on. */
   smsOptIn: boolean;
+  smsOptInAt: string | null;
   lastWorkedOn: string | null; // "yyyy-mm-dd"
   notes: string;
+  jobPrefs: JobPrefs;
+}
+
+/**
+ * What kind of work a caddie would rather not be offered.
+ *
+ * Written as the exceptions rather than the list of yeses, because most
+ * caddies take anything and "no preference" should be the empty default, not
+ * four ticked boxes someone forgot to untick. Soft by design: it ranks, it
+ * never hides — on a short-handed Saturday the shop still needs to see the
+ * caddie who would rather not carry doubles.
+ */
+export interface JobPrefs {
+  avoid: LoopType[];
+  /** In their own words, for the shop: "knee — no doubles after 2pm". */
+  note: string;
+}
+
+export const NO_PREFS: JobPrefs = { avoid: [], note: "" };
+
+export function readJobPrefs(v: unknown): JobPrefs {
+  const r = (v ?? {}) as Record<string, unknown>;
+  const avoid = Array.isArray(r.avoid)
+    ? (r.avoid as unknown[]).filter((t): t is LoopType =>
+        LOOP_TYPES.includes(t as LoopType),
+      )
+    : [];
+  return { avoid, note: typeof r.note === "string" ? r.note : "" };
+}
+
+/** True when this caddie has said they would rather not take this kind of loop. */
+export function prefersNot(prefs: JobPrefs, loopType: LoopType): boolean {
+  return prefs.avoid.includes(loopType);
+}
+
+/**
+ * The words a caddie agrees to when they switch texts on.
+ *
+ * Stored verbatim against their row at the moment they agree, so if this ever
+ * changes the record still says what each person actually saw. The shape —
+ * who is sending, what about, how often, cost, STOP and HELP — is what the
+ * carriers ask to see on an opt-in.
+ */
+export const SMS_CONSENT_TEXT =
+  "I agree to receive automated text messages from Pasatiempo Golf Club about caddie job offers and loop reminders at this number. Message frequency varies. Message and data rates may apply. Consent is not a condition of working. Reply STOP to opt out, HELP for help.";
+
+/** Which messages go by text as well as by app notification. */
+export interface SmsChannels {
+  /** Offers made to a caddie by name, by tier, or as next-up. */
+  offers: boolean;
+  /** "You're on tomorrow." */
+  reminders: boolean;
+  /** Job-board announcements, to everyone who has texts on. */
+  board: boolean;
 }
 
 export interface LoopRec {
@@ -231,7 +287,9 @@ export interface CaddieSettings {
   /** How far ahead the caddie availability planner runs. */
   availabilityMonths: number;
   emailEnabled: boolean;
+  /** The master switch for texting. Off until the number is registered. */
   smsEnabled: boolean;
+  sms: SmsChannels;
   rates: RateCard;
   waterfall: Waterfall;
   /** Inside this many hours of the tee time, a hand-back counts as late. */
@@ -310,9 +368,12 @@ export function rowToCaddie(r: Row): CaddieRec {
     status: (r.status as CaddieStatus) ?? "Active",
     preferredContactMethod:
       (r.preferred_contact_method as ContactMethod) ?? "Both",
-    smsOptIn: Boolean(r.sms_opt_in),
+    // Opted in AND not opted out since: a STOP always wins.
+    smsOptIn: Boolean(r.sms_opt_in) && !r.sms_opt_out_at,
+    smsOptInAt: r.sms_opt_in_at ? String(r.sms_opt_in_at) : null,
     lastWorkedOn: (r.last_worked_on as string | null) ?? null,
     notes: String(r.notes ?? ""),
+    jobPrefs: readJobPrefs(r.job_prefs),
   };
 }
 

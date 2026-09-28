@@ -17,6 +17,8 @@ import {
   type DefaultSlot,
   type ResolvedDay,
   type CaddieSettings,
+  type SmsChannels,
+  prefersNot,
   type JobRelease,
   type CrewMember,
   type LoopRec,
@@ -186,6 +188,7 @@ export async function getSettings(): Promise<CaddieSettings> {
     availabilityMonths: Number(d.availability_months ?? 3),
     emailEnabled: Boolean(d.email_enabled ?? true),
     smsEnabled: Boolean(d.sms_enabled ?? false),
+    sms: readSmsChannels(d.sms),
     rates: (d.rates ?? {}) as RateCard,
     waterfall: readWaterfall(d.waterfall),
     dropLateHours: num(d.drop_late_hours, 24),
@@ -219,6 +222,16 @@ export function readRelease(v: unknown): JobRelease {
     priorityEnabled: r.priorityEnabled === true,
     priorityMinLeadHours: num(r.priorityMinLeadHours, 48),
     priorityMinutes: num(r.priorityMinutes, 30),
+  };
+}
+
+/** Offers and reminders by text unless switched off; board blasts only if asked. */
+function readSmsChannels(v: unknown): SmsChannels {
+  const r = (v ?? {}) as Record<string, unknown>;
+  return {
+    offers: r.offers !== false,
+    reminders: r.reminders !== false,
+    board: r.board === true,
   };
 }
 
@@ -304,6 +317,8 @@ export interface CaddieReach {
   devices: number;
   hasPhone: boolean;
   hasEmail: boolean;
+  /** Has a number and has agreed to texts, and has not replied STOP since. */
+  texts: boolean;
   /** Last time they opened the portal, or null if they never have. */
   lastSeenAt: string | null;
 }
@@ -312,7 +327,10 @@ export async function caddieReach(): Promise<Map<string, CaddieReach>> {
   const supa = createAdminClient("caddie");
 
   const [caddies, subs, sessions] = await Promise.all([
-    supa.from("caddies").select("id, phone, email").eq("status", "Active"),
+    supa
+      .from("caddies")
+      .select("id, phone, email, sms_opt_in, sms_opt_out_at")
+      .eq("status", "Active"),
     supa.from("push_subscriptions").select("caddie_id"),
     supa
       .from("sessions")
@@ -345,19 +363,30 @@ export async function caddieReach(): Promise<Map<string, CaddieReach>> {
       devices: deviceCount.get(id) ?? 0,
       hasPhone: Boolean(row.phone),
       hasEmail: Boolean(row.email),
+      texts: Boolean(row.phone) && Boolean(row.sms_opt_in) && !row.sms_opt_out_at,
       lastSeenAt: lastSeen.get(id) ?? null,
     });
   }
   return out;
 }
 
-/** How many active caddies a posted loop would actually notify. */
-export function alertCoverage(reach: Map<string, CaddieReach>): {
+/**
+ * How many active caddies a posted loop would actually notify.
+ *
+ * Texts count only when texting is live for job-board posts — a caddie who
+ * agreed to texts but whose texts are switched off is not reached by a post.
+ */
+export function alertCoverage(
+  reach: Map<string, CaddieReach>,
+  textsReachBoard = false,
+): {
   reachable: number;
   total: number;
 } {
   let reachable = 0;
-  for (const r of reach.values()) if (r.devices > 0) reachable += 1;
+  for (const r of reach.values()) {
+    if (r.devices > 0 || (textsReachBoard && r.texts)) reachable += 1;
+  }
   return { reachable, total: reach.size };
 }
 
@@ -978,15 +1007,20 @@ export interface Candidate {
   alreadyOffered: boolean;
   /** Holds an accepted loop close enough to collide with this tee time. */
   conflict: boolean;
+  /** Has said they would rather not take this kind of loop. */
+  prefersNot: boolean;
 }
 
 /**
  * Who to offer a loop to, best first.
  *
- * Order: caddies who said they are Available, then by seniority tier, then by
- * who has waited longest for work. Conflicts and caddies already asked sink to
- * the bottom rather than disappearing — the shop should be able to see them and
- * override.
+ * Order: caddies who said they are Available, then those happy with this kind
+ * of loop, then by seniority tier, then by who has waited longest for work.
+ * Conflicts and caddies already asked sink to the bottom rather than
+ * disappearing — the shop should be able to see them and override. A
+ * preference is weighed inside availability, not above it: a caddie who is
+ * free but would rather not carry doubles is a better call than one who never
+ * said whether they are free at all.
  */
 export function rankCandidates(
   loop: LoopRec,
@@ -1022,6 +1056,7 @@ export function rankCandidates(
       availability: verdict(availability.get(caddie.id), loopSlot),
       alreadyOffered: offeredHere.has(caddie.id),
       conflict: conflicted.has(caddie.id),
+      prefersNot: prefersNot(caddie.jobPrefs, loop.loopType),
     }))
     .sort((a, b) => {
       if (a.alreadyOffered !== b.alreadyOffered) return a.alreadyOffered ? 1 : -1;
@@ -1030,6 +1065,8 @@ export function rankCandidates(
       const av = (c: Candidate) =>
         c.availability === "Available" ? 0 : c.availability == null ? 1 : 2;
       if (av(a) !== av(b)) return av(a) - av(b);
+
+      if (a.prefersNot !== b.prefersNot) return a.prefersNot ? 1 : -1;
 
       const tier = a.caddie.tierOrder - b.caddie.tierOrder;
       if (tier !== 0) return tier;

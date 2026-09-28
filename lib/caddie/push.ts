@@ -11,7 +11,8 @@ import {
 } from "./data";
 import { nextUpOrder } from "./ledger";
 import { nextBoardStep } from "./release";
-import { rowToLoop, type LoopRec } from "./types";
+import { smsConfigured, textCaddies } from "./sms";
+import { rowToLoop, type LoopRec, type SmsChannels } from "./types";
 
 // Web push: the thing that makes this app worth opening.
 //
@@ -84,6 +85,13 @@ export interface JobAlert {
   /** Collapses repeat alerts about the same loop instead of stacking them. */
   tag?: string;
   loopId?: string;
+  /**
+   * Also text it, to caddies who agreed to texts, under this Settings switch.
+   * Unset means app notification only.
+   */
+  sms?: keyof SmsChannels;
+  /** The text asks for a Y/N answer. Only for offers the caddie can answer. */
+  reply?: boolean;
 }
 
 /**
@@ -125,6 +133,12 @@ export interface PushResult {
   failed: number;
   /** Devices the push service said are gone; deleted as we go. */
   pruned: number;
+  /** Texts Twilio accepted. */
+  texted: number;
+}
+
+function emptyResult(): PushResult {
+  return { sent: 0, failed: 0, pruned: 0, texted: 0 };
 }
 
 /**
@@ -142,7 +156,7 @@ export async function remindUpcomingLoops(): Promise<{
   reminded: number;
   devices: number;
 }> {
-  if (!ready()) return { reminded: 0, devices: 0 };
+  if (!ready() && !smsConfigured()) return { reminded: 0, devices: 0 };
 
   const supa = createAdminClient("caddie");
 
@@ -217,8 +231,9 @@ export async function remindUpcomingLoops(): Promise<{
       url: "/caddie",
       tag: `reminder-${loop.id}`,
       loopId: loop.id,
+      sms: "reminders",
     });
-    devices += result.sent;
+    devices += result.sent + result.texted;
 
     // Stamped whether or not a device answered. A caddie with no phone signed
     // up cannot be reminded, and retrying them every night for ever would just
@@ -250,7 +265,7 @@ export async function escalateTierOffers(): Promise<{
   notified: number;
 }> {
   const out = { widened: 0, notified: 0 };
-  if (!ready()) return out;
+  if (!ready() && !smsConfigured()) return out;
 
   const supa = createAdminClient("caddie");
 
@@ -352,10 +367,12 @@ export async function escalateTierOffers(): Promise<{
       url: "/caddie",
       tag: `offer-${loop.id}`,
       loopId: String(loop.id),
+      sms: "offers",
+      reply: true,
     });
 
     out.widened += 1;
-    out.notified += push.sent;
+    out.notified += push.sent + push.texted;
   }
 
   return out;
@@ -372,19 +389,29 @@ export async function notifyCaddies(
   caddieIds: string[],
   alert: JobAlert,
 ): Promise<PushResult> {
-  const result: PushResult = { sent: 0, failed: 0, pruned: 0 };
-  if (!ready() || caddieIds.length === 0) return result;
+  const result = emptyResult();
+  if (caddieIds.length === 0) return result;
 
-  const supa = createAdminClient("caddie");
-  const { data, error } = await supa
-    .from("push_subscriptions")
-    .select("endpoint, p256dh, auth")
-    .in("caddie_id", caddieIds);
-  if (error) throw error;
+  // Texts go out alongside the push, not after it: a slow Twilio call must
+  // not hold up the notification that costs nothing.
+  const texting = alert.sms
+    ? textCaddies(caddieIds, alert, alert.sms).catch(() => 0)
+    : Promise.resolve(0);
 
-  await Promise.all(
-    (data ?? []).map((row) => deliver(row, alert, result)),
-  );
+  if (ready()) {
+    const supa = createAdminClient("caddie");
+    const { data, error } = await supa
+      .from("push_subscriptions")
+      .select("endpoint, p256dh, auth")
+      .in("caddie_id", caddieIds);
+    if (error) throw error;
+
+    await Promise.all(
+      (data ?? []).map((row) => deliver(row, alert, result)),
+    );
+  }
+
+  result.texted = await texting;
   return result;
 }
 
@@ -400,8 +427,16 @@ export async function notifyActiveCaddies(
   alert: JobAlert,
   options: { excludeCaddieIds?: string[] } = {},
 ): Promise<PushResult> {
-  const result: PushResult = { sent: 0, failed: 0, pruned: 0 };
-  if (!ready()) return result;
+  const result = emptyResult();
+
+  // Job-board texts have their own switch, off by default: a text to the whole
+  // roster for every posted job is the fastest way to get STOP back.
+  const texting = textCaddies(null, alert, "board", options).catch(() => 0);
+
+  if (!ready()) {
+    result.texted = await texting;
+    return result;
+  }
 
   const supa = createAdminClient("caddie");
 
@@ -413,9 +448,9 @@ export async function notifyActiveCaddies(
 
   const exclude = new Set(options.excludeCaddieIds ?? []);
   const targets = (data ?? []).filter((r) => !exclude.has(String(r.caddie_id)));
-  if (targets.length === 0) return result;
-
   await Promise.all(targets.map((row) => deliver(row, alert, result)));
+  result.texted = await texting;
+  if (targets.length === 0) return result;
 
   // One row per blast rather than per device: the shop cares that the call went
   // out, not which handset acknowledged it.
@@ -596,9 +631,15 @@ async function givePriority(
 
   // The same eligible pool the dispatch board would offer from: free that
   // day, not on another loop too close to this one, not already asked.
-  const eligible = rankCandidates(loop, caddies, dayLoops, availability, overlapGuardHours)
-    .filter((c) => !c.alreadyOffered && !c.conflict && c.availability !== "Unavailable")
-    .map((c) => c.caddie.id);
+  const pool = rankCandidates(loop, caddies, dayLoops, availability, overlapGuardHours).filter(
+    (c) => !c.alreadyOffered && !c.conflict && c.availability !== "Unavailable",
+  );
+  // First refusal is a favour. Handing it to someone who said they would
+  // rather not carry this kind of loop wastes the window for everyone, so they
+  // are passed over — unless nobody else is free, when a preference is only a
+  // preference.
+  const willing = pool.filter((c) => !c.prefersNot);
+  const eligible = (willing.length > 0 ? willing : pool).map((c) => c.caddie.id);
 
   const accepted =
     dayLoops
@@ -633,6 +674,8 @@ async function givePriority(
     url: "/caddie",
     tag: `offer-${loop.id}`,
     loopId: loop.id,
+    sms: "offers",
+    reply: true,
   });
 
   return pick.length;
