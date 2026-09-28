@@ -49,6 +49,58 @@ export default function CaddieTextTermsPage() {
       </blockquote>
       <p>A confirmation text is sent straight away.</p>
 
+      {/* A faithful, inert copy of the sign-up form. The real one needs a
+          caddie's sign-in, and the carrier's reviewer needs to see it. */}
+      <p className="muted" style={{ fontSize: 13, marginTop: 18, marginBottom: 6 }}>
+        This is the sign-up form as caddies see it on their phone:
+      </p>
+      <div
+        className="card"
+        aria-label="Example of the caddie text sign-up form"
+        style={{ maxWidth: 420, pointerEvents: "none" }}
+      >
+        <div className="section-title" style={{ marginTop: 0 }}>
+          Text messages
+        </div>
+        <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+          Get job offers and reminders by text, and answer an offer by replying Y or N — no need
+          to open the app.
+        </p>
+        <div style={{ fontSize: 14, marginTop: 10 }}>Mobile number</div>
+        <input
+          disabled
+          value="(831) 555-0123"
+          readOnly
+          style={{
+            display: "block",
+            width: "100%",
+            marginTop: 6,
+            padding: "10px 12px",
+            borderRadius: 8,
+            border: "1px solid var(--line)",
+            background: "var(--panel)",
+            color: "var(--ink)",
+            fontSize: 16,
+          }}
+        />
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 12 }}>
+          <input type="checkbox" disabled style={{ width: 22, height: 22, flex: "0 0 auto", marginTop: 2 }} />
+          <span style={{ fontSize: 13, lineHeight: 1.5 }}>{SMS_CONSENT_TEXT}</span>
+        </div>
+        <div style={{ fontSize: 12, marginTop: 6, textDecoration: "underline" }}>
+          Texting terms and privacy
+        </div>
+        <div
+          className="btn"
+          style={{ display: "block", textAlign: "center", marginTop: 12, opacity: 0.6 }}
+        >
+          Text me job offers
+        </div>
+        <p className="muted" style={{ fontSize: 12, margin: "8px 0 0" }}>
+          The box starts unticked, and the button does nothing until it is ticked.
+        </p>
+      </div>
+
       <h2 className="section-title">What we send</h2>
       <ul>
         <li>A job offer: the date, tee time, party name and type of loop.</li>
