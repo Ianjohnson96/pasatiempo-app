@@ -166,8 +166,8 @@ document.addEventListener('click', async e => {
   if (ds.bupd) return updateBrands();
   if (ds.sccat){ SC.cat = ds.sccat; return render(); }
   if (ds.subrow != null) return openSubcat(ds.subrow);
-  if (ds.ssopen){ if (ds.ssopen !== '1'){ SS.cat = ds.ssopen; SS.filter = 'all'; SS.q = ''; } return openSortSkus(); }
-  if (ds.ssfilt){ SS.filter = ds.ssfilt; SS.q = ''; return openSortSkus(); }
+  if (ds.ssopen){ SS.keep.clear(); if (ds.ssopen !== '1'){ SS.cat = ds.ssopen; SS.filter = 'all'; SS.q = ''; } if (ds.ssfiltgo){ SS.filter = ds.ssfiltgo; SS.cat = 'all'; SS.q = ''; } return openSortSkus(); }
+  if (ds.ssfilt){ SS.filter = ds.ssfilt; SS.q = ''; SS.keep.clear(); return openSortSkus(); }
   if (ds.beopen){ BE.edit = null; return openBrandList(); }
   if (ds.benew) return beStart('');
   if (ds.beedit) return beStart(ds.beedit);
@@ -271,8 +271,10 @@ document.addEventListener('change', e => {
   if (t.id === 'aCat'){ afilt.cat = t.value; return render(); }
   if (t.id === 'aRes'){ afilt.showResolved = t.checked; return render(); }
   if (t.id === 'otbCat'){ OTBV.cat = t.value; saveOTBV(); return render(); }
-  if (t.id === 'ssCat'){ SS.cat = t.value; return openSortSkus(); }
+  if (t.id === 'ssCat'){ SS.cat = t.value; SS.keep.clear(); return openSortSkus(); }
   if (t.dataset.sssku){ return ssSave(t.dataset.sssku, t.value); }
+  if (t.dataset.sscatsku){ return ssSaveCat(t.dataset.sscatsku, t.value); }
+  if (t.dataset.ssso){ return ssSaveSo(t.dataset.ssso, t.value); }
   if (t.dataset.wi){ if (t.value === '' || !isFinite(+t.value)) return render(); const g = t.dataset.wi; setWhatIf(g, t.dataset.k, g === 'wos' ? Math.max(1, Math.min(52, Math.round(+t.value))) : +t.value / 100); return; }
   if (t.dataset.chk){ return toggleCheck(t.dataset.chkm, t.dataset.chk, t.checked); }
   if (t.id === 'upFiles'){ UP.files = [...t.files]; UP.error = null; UP.found = null; return render(); }

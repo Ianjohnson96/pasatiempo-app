@@ -73,7 +73,7 @@ function openBrandMap(){
       <div class="chips" style="margin-bottom:10px">${seg('unknown', 'Unknown brand', unknown.length)}${changed.length || BM.filter === 'changed' ? seg('changed', 'New description', changed.length) : ''}${seg('mine', 'Assigned here', mine.length)}${seg('all', 'All SKUs', all.length)}
         <input id="bmQ" type="search" placeholder="Find a SKU, description or brand" value="${esc(BM.q)}" style="margin-left:auto;padding:5px 10px;border:1px solid var(--rule2);border-radius:4px;background:var(--card);min-width:210px"></div>
       ${shown.length ? `<div style="overflow-x:auto"><table class="mini"><thead><tr><th>SKU</th><th>Description</th><th class="r">12-mo sales</th><th class="r">On hand</th><th>Brand</th><th></th></tr></thead><tbody>
-        ${shown.map(r => `<tr${BM.edit === r[0] ? ' style="background:var(--hover)"' : ''}><td class="num">${esc(r[0])}</td><td>${esc(r[1])}<br><span style="color:var(--muted);font-size:11.5px">${esc(CAT(r[2]).name)}${r[2] === '640' ? ' · special order, not on the scorecard' : ''}${bmRc(r[0]) ? ` · number reused from ${monthLabel(bmRc(r[0]).from)}` : ''}</span>${bmChanged(r[0]) ? `<br><span class="neg" style="font-size:11.5px">New description; was “${esc(bmChanged(r[0]).was)}”</span>` : ''}</td>
+        ${shown.map(r => `<tr${BM.edit === r[0] ? ' style="background:var(--hover)"' : ''}><td class="num">${esc(r[0])}</td><td>${esc(r[1])}<br><span style="color:var(--muted);font-size:11.5px">${esc(CAT(r[2]).name)}${r[2] === '640' ? (ssCat(r) !== '640' ? ` · special order, on the scorecard in ${esc(CAT(ssCat(r)).name)}` : ' · special order with no category yet, not on the scorecard (Subcategories → Sort SKUs)') : ''}${bmRc(r[0]) ? ` · number reused from ${monthLabel(bmRc(r[0]).from)}` : ''}</span>${bmChanged(r[0]) ? `<br><span class="neg" style="font-size:11.5px">New description; was “${esc(bmChanged(r[0]).was)}”</span>` : ''}</td>
           <td class="r num">${money(r[4])}</td><td class="r num">${money(r[5])}</td><td>${bmLabel(r)}</td>
           <td>${ro ? '' : `<button class="btn sm" type="button" data-bmedit="${esc(r[0])}">${bmFor(r[0]) || !bmEff(r) ? 'Edit' : 'Change'}</button>`}</td></tr>`).join('')}</tbody></table></div>
         ${list.length > shown.length ? `<div class="note">Showing the ${shown.length} biggest of ${list.length}. Search to find others.</div>` : ''}` : `<div class="note">${q ? 'No SKUs match.' : BM.filter === 'unknown' ? 'Every SKU has a brand.' : 'Nothing assigned here yet.'}</div>`}
@@ -240,7 +240,8 @@ async function beUndo(a){
 }
 
 /* ---------- update brands (owner) ----------
-   Rebuilds brands/current and brandskus/current from the stored documents with today's assignments and brand list,
+   Rebuilds brands/current, brandskus/current, assort/current and base/current's special orders from the stored
+   documents with today's assignments, brand list and SKU sorting,
    the same way a month-end upload does: the pass from {base}/api/refresh, the reader's "rebuild" mode, then /api/import. */
 const BUP = {busy: false};
 const bmPending = () => !!(BRANDS && BRANDMAP.updatedAt && BRANDMAP.updatedAt > (BRANDS.at || ''));  // a scorecard from before "at" was kept counts as older
@@ -253,7 +254,8 @@ async function updateBrands(){
     await upJSON(H.base + '/api/import', r.bundle);
     BRANDS = r.bundle.docs['brands/current']; BRANDSKUS = r.bundle.docs['brandskus/current'];
     if (r.bundle.docs['assort/current']) ASSORT = r.bundle.docs['assort/current'];
-    toast(`Brand scorecard and subcategories updated: ${r.summary.lines} brand lines, ${money(r.summary.unassigned)} of sales with no brand.`);
+    if (r.bundle.docs['base/current']){ BASE = r.bundle.docs['base/current']; derive(); }
+    toast(`Brand scorecard, subcategories and budgets updated: ${r.summary.lines} brand lines, ${money(r.summary.unassigned)} of sales with no brand.`);
   } catch (e){ toast(e.message); }
   BUP.busy = false; render();
 }

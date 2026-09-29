@@ -76,7 +76,7 @@ function renderTabs(S){
   const G = [
     ['Plan', [['overview','Overview'],['forecast','Forecast'],['otb','Open-to-buy']]],
     ['Buy', [['orders','Orders', POS.length],['vendors','Vendors']]],
-    ['Assortment', [['brands','Brands'],['subcats','Subcategories', ssUnsorted().length || null],['inventory','Inventory & counts'],['attention','To do', att.length, crit]]],
+    ['Assortment', [['brands','Brands'],['subcats','Subcategories', (ssUnsorted().length + ssPlace().length) || null],['inventory','Inventory & counts'],['attention','To do', att.length, crit]]],
     ['Close the month', [['monthend','Month-end', overdue ? '!' : null, overdue], ...(RPT ? [['reports', 'Reports', a.length ? a.reduce((n, x) => n + x.left, 0) : null, a.some(x => x.status === 'overdue')]] : [])]],
     ['', [['help','How it works']]],
   ];

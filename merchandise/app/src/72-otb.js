@@ -45,7 +45,7 @@ function renderOTB(){
       <tbody class="click">${rows}</tbody>
       <tfoot><tr><td><b>All categories</b></td>${colTot.map(v => `<td class="r num ${v < 0 ? 'neg' : ''}"><b>${moneyK(v)}</b></td>`).join('')}<td class="r num"><b>${moneyK(sum(colTot))}</b></td></tr>
       <tr><td style="color:var(--muted)">Running total</td>${cum.map(v => `<td class="r num ${v < 0 ? 'neg' : ''}" style="color:var(--muted)">${moneyK(v)}</td>`).join('')}<td></td></tr></tfoot></table></div>
-    ${so ? `<div class="note">Special Orders due in these months: ${money(so)} (not budgeted).</div>` : ''}</section>
+    <div class="note">Budgets count shelf sales and shelf stock. Special orders, in any category, are left out${so ? `; Special Orders due in these months: ${money(so)} (not budgeted)` : ''}.</div></section>
   ${carry.length && OTBV.view !== 'cur' ? `<section class="panel" style="margin-top:18px"><header><h2>What ${PLANS.next.fy} inherits</h2><span class="lab">Stock above plan on ${dateLabel(PLANS.next.start)}</span></header>
     <div class="note">Next year's budget starts from the stock this year is expected to end with. If a category is already overbought, or you order more than this year's budget, the extra is still on the shelf in May and comes out of next year's budget.</div>
     <table class="mini" style="margin:0 16px 14px;width:calc(100% - 32px)"><thead><tr><th>Category</th><th class="r">Extra stock carried in</th><th>Why</th></tr></thead><tbody>${carry.map(c => `<tr><td>${esc(BASE.cats[c].name)}</td><td class="r num">${money(PLANS.next.cats[c].carry)}</td><td>${PLANS.cur.cats[c].plan < 0 ? `Already ${money(-PLANS.cur.cats[c].plan)} over this year's plan` : 'Orders beyond this year\'s budget'}</td></tr>`).join('')}</tbody></table></section>` : ''}
@@ -54,7 +54,7 @@ function renderOTB(){
 function worksheet(ms, CM){
   const cats = OTBV.cat === 'all' ? otbCats() : [OTBV.cat];
   const pick = f => ms.map(k => sum(cats, c => { const r = ENG.cats[c].find(x => x.m === k); return r ? f(r) : 0; }));
-  const sales = pick(r => r.sales), cogs = pick(r => r.cogs), bom = pick(r => r.bom), eom = pick(r => r.eom), otb = pick(r => r.otb);
+  const sales = pick(r => r.sales), soS = pick(r => r.sales - r.shelf), cogs = pick(r => r.cogs), bom = pick(r => r.bom), eom = pick(r => r.eom), otb = pick(r => r.otb);
   const com = ms.map(k => sum(cats, c => num((CM[c] || {})[k])));
   const row = (lab, vs, cls = '', note = '') => `<tr class="${cls}"><td>${lab}${note ? `<div style="font-size:11.5px;color:var(--faint)">${note}</div>` : ''}</td>${vs.map(v => `<td class="r num ${v < -0.5 ? 'neg' : ''}">${moneyK(v)}</td>`).join('')}</tr>`;
   const part = BASE.partial && ms.includes(BASE.partial.m);
@@ -62,9 +62,10 @@ function worksheet(ms, CM){
     <select id="otbCat" aria-label="Category">${['all'].concat(otbCats()).map(c => `<option value="${c}" ${OTBV.cat === c ? 'selected' : ''}>${c === 'all' ? 'All budgeted categories' : c + ' ' + esc(BASE.cats[c].name)}</option>`).join('')}</select></header>
     <div class="tbl"><table class="mini" style="min-width:${220 + ms.length * 74}px"><thead><tr><th></th>${ms.map(k => `<th class="r">${monthShort(k)} ${k.slice(2, 4)}</th>`).join('')}</tr></thead><tbody>
       ${row('Planned sales (retail)', sales, '', part ? `${monthShort(BASE.partial.m)} is what's left after ${money(BASE.partial.actual)} sold so far` : '')}
-      ${row('Cost of those sales', cogs)}
-      ${row('Opening stock', bom, '', 'At cost. First month = on hand; then last month\'s target')}
-      ${row('Target closing stock', eom, '', 'Target weeks × next four months\' cost of sales ÷ 17.3')}
+      ${soS.some(v => v >= 0.5) ? row('Less special orders', soS.map(v => -v), '', 'Bought when a customer orders, so not budgeted') : ''}
+      ${row('Cost of shelf sales', cogs)}
+      ${row('Opening stock', bom, '', 'At cost. First month = shelf stock on hand (special orders left out); then last month\'s target')}
+      ${row('Target closing stock', eom, '', 'Target weeks × next four months\' cost of shelf sales ÷ 17.3')}
       ${row('<b>Budget = target − opening + cost of sales</b>', otb, 'tot')}
       ${row('On order / received', com)}
       ${row('<b>Left to buy</b>', otb.map((v, i) => v - com[i]), 'tot')}

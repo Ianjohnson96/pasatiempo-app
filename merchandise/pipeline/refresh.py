@@ -129,13 +129,20 @@ def prior_from_docs(docs):
 
 
 def rebuild_brands(docs):
-    """Brands -> Update brands: the brand scorecard and SKU list again from stored documents ({path: data}), with
-    today's brand assignments and brand list. Returns (bundle, summary); nothing else changes."""
+    """Brands -> Update brands (Subcategories -> Update subcategories): the brand scorecard, SKU list and
+    subcategory report again from stored documents ({path: data}), with today's brand assignments, brand list
+    and SKU sorting, and the special orders budgets leave out (base/current's so and soOnHand, and the category
+    calls that follow). Returns (bundle, summary); nothing else changes."""
     ctx = model.rebuild_ctx(docs)
+    model.special_budget(ctx)
+    base = ctx['base']
+    calls, _ = category_calls(base, {k: v for k, v in (docs.get('plan/assumptions') or {}).items() if k in ('g27', 'g27cat', 'g28', 'wos')})
+    for c, k in calls.items():
+        base['cats'][c]['call'] = k
     brands, bskus, assort = model.build_brands(ctx), model.brand_skus(ctx), model.build_subcats(ctx)
     brands['at'] = datetime.now(timezone.utc).isoformat(timespec='seconds')
-    bundle = dict(kind='pasatiempo-merch-bundle', version=1, note='Brand scorecard and subcategories updated',
-                  docs={'brands/current': brands, 'brandskus/current': bskus, 'assort/current': assort})
+    bundle = dict(kind='pasatiempo-merch-bundle', version=1, note='Brand scorecard, subcategories and special orders updated',
+                  docs={'base/current': base, 'brands/current': brands, 'brandskus/current': bskus, 'assort/current': assort})
     return bundle, dict(lines=len(brands['rows']), unassigned=sum(brands['unassigned'].values()),
                         noBrand=sum(1 for r in bskus['rows'] if not r[3]), descChanged=len(bskus['changed']))
 

@@ -31,20 +31,31 @@ function salesPlan(base, a){
   }
   return {S, m27, m28};
 }
+/* special orders' part of a category's sales in month k: that month's own when it has sales, else the same month's a year before */
+function soShare(v, k){
+  const so = v.so || {};
+  for (let i = 0; i < 4; i++){
+    const kk = addMonths(k, -12 * i), tot = num(v.act[kk]) || num(v.hist[kk]);
+    if (tot) return Math.min(Math.max(num(so[kk]) / tot, 0), 1);
+  }
+  return 0;
+}
+/* budgets are set on shelf sales and shelf stock: special orders are bought when a customer orders */
 function runEngine(base, a, carry = {}){
   const {S, m27, m28} = salesPlan(base, a), part = base.partial;
   const start = part ? part.m : addMonths(base.actualThrough, 1);
   const share = part ? 1 - part.actual / Object.keys(S).reduce((t, c) => t + S[c][part.m], 0) : 1;
   const months = m27.concat(m28).filter(k => k >= start), cats = {};
   for (const [c, v] of Object.entries(base.cats)){
-    const cr = 1 - v.gm, rows = [];
-    let bom = v.onHand;
+    const cr = 1 - v.gm, rows = [], shelf = {};
+    for (const k of Object.keys(S[c])) shelf[k] = S[c][k] * (1 - soShare(v, k));
+    let bom = v.onHand - num(v.soOnHand);
     for (const k of months){
       if (k === m28[0]) bom += num(carry[c]);
-      const sales = S[c][k] * (part && k === part.m ? share : 1), cogs = sales * cr;
-      let f = 0; for (let i = 1; i <= 4; i++) f += S[c][addMonths(k, i)];
+      const x = part && k === part.m ? share : 1, sales = S[c][k] * x, sh = shelf[k] * x, cogs = sh * cr;
+      let f = 0; for (let i = 1; i <= 4; i++) f += shelf[addMonths(k, i)];
       const eom = num(a.wos[c]) * f / 17.3 * cr;
-      rows.push({m: k, sales, cogs, bom, eom, otb: eom - bom + cogs});
+      rows.push({m: k, sales, shelf: sh, cogs, bom, eom, otb: eom - bom + cogs});
       bom = eom;
     }
     cats[c] = rows;
@@ -55,11 +66,11 @@ function planFor(E, fy, a, carry){
   const win = E.months.filter(k => fyOf(k) === fy), cats = {}, isCur = fy === curFY();
   for (const code of BASE.order){
     const v = BASE.cats[code], rows = E.cats[code].filter(r => win.includes(r.m));
-    const otb = sum(rows, r => r.otb), cogs = sum(rows, r => r.cogs), sales = sum(rows, r => r.sales);
+    const otb = sum(rows, r => r.otb), cogs = sum(rows, r => r.cogs), sales = sum(rows, r => r.sales), shelf = sum(rows, r => r.shelf);
     const excluded = (BASE.exclude || ['640']).includes(code);
     const call = excluded ? 'excluded' : otb < 0 ? 'stop' : (REPLENISH.has(code) || otb < cogs * .1) ? 'replenish' : 'buy';
     cats[code] = {name: v.name, call, plan: excluded ? null : otb, target: rows.length ? rows[rows.length - 1].eom : 0, cogs, sales,
-      wos: a.wos[code], gm: v.gm, onHand: rows.length ? rows[0].bom : v.onHand, carry: num((carry || {})[code]),
+      wos: a.wos[code], gm: v.gm, onHand: rows.length ? rows[0].bom : v.onHand - num(v.soOnHand), soOnHand: num(v.soOnHand), shelf, carry: num((carry || {})[code]),
       fySales: sum(fyMonths(fy), k => E.S[code][k]), mplan: Object.fromEntries(rows.map(r => [r.m, r.otb]))};
   }
   const start = isCur ? (() => { const d = new Date(BASE.asOf + 'T00:00:00'); d.setDate(d.getDate() + 1); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); })() : win[0] + '-01';
@@ -110,4 +121,4 @@ function withPlan(key, fn){
 }
 const planWeeks = (P = PLAN) => Math.max(1, daysBetween(P.start, P.window.to + '-' + pad(new Date(+P.window.to.slice(0,4), +P.window.to.slice(5,7), 0).getDate())) + 1) / 7;
 /* weeks the stock on hand lasts at this year's forecast pace */
-function wksNow(code, cost){ const P = PLANS.cur || PLAN, c = P.cats[code]; return c && c.cogs ? cost / (c.cogs / planWeeks(P)) : 0; }
+function wksNow(code, cost){ const P = PLANS.cur || PLAN, c = P.cats[code]; return c && c.cogs ? Math.max(cost - num(c.soOnHand), 0) / (c.cogs / planWeeks(P)) : 0; }

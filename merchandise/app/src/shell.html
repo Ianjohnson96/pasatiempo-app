@@ -223,6 +223,7 @@ td .sm{display:block;font-size:11.5px;color:var(--faint);font-family:var(--mono)
 
 /* drawers */
 .scrim{position:fixed;inset:0;background:rgba(10,16,12,.42);z-index:40}
+.drawer.wide{width:min(1060px,100%)}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:min(780px,100%);background:var(--card);z-index:41;box-shadow:var(--shadow);display:flex;flex-direction:column;border-left:1px solid var(--rule)}
 .drawer.narrow{width:min(560px,100%)}
 .drawer>header{padding:16px 20px 13px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
@@ -321,6 +322,8 @@ tr.tot td{font-weight:600;border-top:1px solid var(--rule2)}
 .chip.b-reduce{background:var(--tint-warn);color:var(--ochre)}
 .chip.b-drop{background:var(--tint-stop);color:var(--brick)}
 .chip.b-inactive{background:var(--sunk);color:var(--faint)}
+.chip.b-special{background:var(--card);color:var(--muted);box-shadow:inset 0 0 0 1px var(--rule2)}
+.sotag{display:inline-block;font-size:10.5px;line-height:1.5;padding:0 5px;border-radius:3px;background:var(--tint-warn);color:var(--ochre);font-weight:600;white-space:nowrap}
 .brandt td{vertical-align:middle}
 .checks{list-style:none;margin:0;padding:6px 16px}
 .checks li{border-bottom:1px solid var(--rule);padding:9px 0}
