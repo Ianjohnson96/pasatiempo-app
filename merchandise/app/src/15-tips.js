@@ -59,11 +59,12 @@ function decorateTips(root){
 const tipBox = (() => { const d = document.createElement('div'); d.id = 'tip'; d.setAttribute('role', 'tooltip'); d.hidden = true; document.body.appendChild(d); return d; })();
 let tipOn = null;
 function showTip(btn){
-  const t = TIPS[+btn.dataset.tip]; if (!t) return;
+  // A heading's (i) carries an index into TIPS; a chart mark carries its own title and readout (16-charts.js).
+  const t = btn.dataset.cv != null ? [null, btn.dataset.cvt || '', btn.dataset.cv] : TIPS[+btn.dataset.tip]; if (!t) return;
   if (tipOn && tipOn !== btn) tipOn.setAttribute('aria-expanded', 'false');
   tipOn = btn; btn.setAttribute('aria-expanded', 'true');
   const b = document.createElement('b'); b.textContent = t[1];
-  tipBox.replaceChildren(b, document.createTextNode(t[2]));
+  tipBox.replaceChildren(...(t[1] ? [b] : []), ...String(t[2]).split(' · ').flatMap((x, i) => i ? [document.createElement('br'), document.createTextNode(x)] : [document.createTextNode(x)]));
   tipBox.hidden = false;
   const r = btn.getBoundingClientRect(), w = tipBox.offsetWidth, h = tipBox.offsetHeight, cx = r.left + r.width / 2;
   const left = Math.max(12, Math.min(innerWidth - w - 12, cx - w / 2)), below = r.bottom + h + 14 < innerHeight;
@@ -72,11 +73,14 @@ function showTip(btn){
 }
 function hideTip(){ if (tipBox.hidden) return; tipBox.hidden = true; if (tipOn) tipOn.setAttribute('aria-expanded', 'false'); tipOn = null; }
 
-document.addEventListener('mouseover', e => { const b = e.target.closest && e.target.closest('.tipi'); if (b) showTip(b); else if (tipOn && document.activeElement !== tipOn) hideTip(); });
+const tipHost = t => t.closest && t.closest('.tipi, [data-cv]');
+document.addEventListener('mouseover', e => { const b = tipHost(e.target); if (b) showTip(b); else if (tipOn && document.activeElement !== tipOn) hideTip(); });
 document.addEventListener('focusin', e => { if (e.target.matches && e.target.matches('.tipi')) showTip(e.target); else hideTip(); });
 // A tap shows it (and never sorts the column the (i) sits in); a tap anywhere else puts it away.
 document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('.tipi');
-  if (b){ e.preventDefault(); e.stopImmediatePropagation(); showTip(b); } else hideTip(); }, true);
+  if (b){ e.preventDefault(); e.stopImmediatePropagation(); showTip(b); return; }
+  const c = e.target.closest && e.target.closest('[data-cv]');   // a chart mark: show its readout, and let its own click run
+  if (c) showTip(c); else hideTip(); }, true);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') hideTip(); });
 addEventListener('scroll', hideTip, {passive: true, capture: true});
 addEventListener('resize', hideTip);
