@@ -26,7 +26,7 @@ Roles are granted per app on the hub's **People & access** page (`/admin/people`
 
 1. Run `supabase/migration-merch-schema.sql` in the hub project. Then add `merch` under Settings → API → Exposed schemas.
 2. For now the program is served by path at `pasatiempo-app.vercel.app/merch`. To give it its own domain later, add the domain to the Vercel project and list it under the `merch` entry in `lib/sections.ts`.
-3. Sign in at that address. Open **More → Load month-end data** and load the latest data file. Add staff on `/admin/people`. After that, each month's reports are uploaded on the Month-end page.
+3. Sign in at that address. Open your name (top right) → **Load month-end data** and load the latest data file. Add staff on `/admin/people`. After that, each month's reports are uploaded on the Month-end page.
 
 ## Pages
 
@@ -147,7 +147,7 @@ To run the refresh by hand instead:
    python pipeline/refresh.py data/reports data/out --prior data/prior --note "October close"
    ```
    On a first build with no prior folder, include the full-year Sales by Category, Sales by Item and April SKU Analysis for last fiscal year.
-3. Load `data/out/Merchandise_Program_Data_<asOf>.json` on **More → Load month-end data** (`/merch/admin`).
+3. Load `data/out/Merchandise_Program_Data_<asOf>.json` on your name (top right) → **Load month-end data** (`/merch/admin`).
 
 Either way, a data file can only replace `base`, `inventory`, `insights`, `brands`, `refreshes` and `skuhist`. Orders, vendors, counts, budget changes and brand calls are never touched. Items marked done or dismissed stay that way, because `istate` is keyed by item id.
 

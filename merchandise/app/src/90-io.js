@@ -147,7 +147,10 @@ function applyMode(){
 }
 
 /* ---------- events ---------- */
-document.addEventListener('click', e => { if (!e.target.closest('.menu')) $('#morePop').hidden = true; }, true);
+const POPS = [['#morePop', '#btnMore'], ['#acctPop', '#btnAcct'], ['#tabPop', '#btnTabMore']];
+function closePops(except){ for (const [p, b] of POPS){ if (p === except || !$(p)) continue; $(p).hidden = true; $(b)?.setAttribute('aria-expanded', 'false'); } }
+function togglePop(p, b){ closePops(p); const el = $(p); el.hidden = !el.hidden; $(b).setAttribute('aria-expanded', String(!el.hidden)); }
+document.addEventListener('click', e => { const m = e.target.closest('.menu'); closePops(m ? '#' + (m.querySelector('.pop') || {}).id : null); }, true);
 document.addEventListener('click', async e => {
   const t = e.target.closest('button,[data-cat],[data-po],[data-count],tr[data-po],tr[data-brand],tr[data-subrow]'); if (!t) return;
   const ds = t.dataset;
@@ -192,8 +195,11 @@ document.addEventListener('click', async e => {
   if (ds.brand && !D) return openBrand(ds.brand);
   if (ds.month){ SEL = ds.month; try { localStorage.setItem('ob.month', SEL); } catch (_) {} return render(); }
   if (ds.sccatgo) SC.cat = ds.sccatgo;
-  if (ds.tab){ TAB = ds.tab; try { localStorage.setItem('ob.tab', TAB); } catch (_) {} closeOverlay(); render(); return window.scrollTo({top: 0}); }
-  if (t.id === 'btnMore'){ const p = $('#morePop'); p.hidden = !p.hidden; t.setAttribute('aria-expanded', String(!p.hidden)); return; }
+  if (ds.tab){ TAB = ds.tab; try { localStorage.setItem('ob.tab', TAB); } catch (_) {} closePops(); closeOverlay(); render();
+    const top = $('#tabsAnchor').getBoundingClientRect().top + scrollY; return scrollY > top ? window.scrollTo({top}) : undefined; }
+  if (t.id === 'btnMore') return togglePop('#morePop', '#btnMore');
+  if (t.id === 'btnAcct') return togglePop('#acctPop', '#btnAcct');
+  if (t.id === 'btnTabMore') return togglePop('#tabPop', '#btnTabMore');
   if (ds.act === 'import'){ $('#morePop').hidden = true; return openImport(); }
   if (ds.act === 'exportOrders'){ $('#morePop').hidden = true; return exportOrders(); }
   if (ds.act === 'exportLines'){ $('#morePop').hidden = true; return exportLines(); }
@@ -249,7 +255,7 @@ document.addEventListener('click', e => {
   ssTick(t.dataset.sssel, t.checked, e.shiftKey);
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape'){ if ($('#overlay').innerHTML) closeOverlay(); $('#morePop').hidden = true; }
+  if (e.key === 'Escape'){ if ($('#overlay').innerHTML) closeOverlay(); closePops(); }
   if (e.key === 'Enter' && e.target.matches && e.target.matches('tr[data-po],[data-cat][tabindex],tr[data-brand],tr[data-subrow]')){ e.preventDefault(); e.target.click(); }
 });
 document.addEventListener('input', e => {
@@ -307,9 +313,15 @@ document.addEventListener('change', e => {
 
 /* ---------- start ---------- */
 if (window.MERCH_HOST){
-  const H = window.MERCH_HOST, pop = $('#morePop');
-  pop.insertAdjacentHTML('beforeend', `<hr>${H.base ? '<a href="/admin">All Pasatiempo apps</a>' : ''}${H.me.role === 'owner' ? `<a href="${esc(H.base)}/admin">Load month-end data</a>` : ''}<a href="${esc(H.base)}/account">Change your password</a>
-    <form method="post" action="${esc(H.base)}/signout"><button type="submit">Sign out (${esc(H.me.name || H.me.email)})</button></form>`);
+  // The band: back to the Club Hub (the program runs at /merch on the club app) and your account.
+  const H = window.MERCH_HOST, who = H.me.name || H.me.email;
+  $('#backHub').hidden = !H.base;
+  $('#acct').hidden = false;
+  $('#acctNm').textContent = who;
+  $('#acctAv').textContent = who.split(/[\s@.]+/).filter(Boolean).slice(0, 2).map(x => x[0].toUpperCase()).join('');
+  $('#acctPop').innerHTML = `<div class="lab" style="padding:8px 10px 4px">Signed in as</div><div style="padding:0 10px 8px;font-size:13px;font-weight:600;overflow-wrap:anywhere">${esc(who)}</div><hr>
+    ${H.base ? '<a href="/admin">All Pasatiempo apps</a>' : ''}${H.me.role === 'owner' ? `<a href="${esc(H.base)}/admin">Load month-end data</a>` : ''}<a href="${esc(H.base)}/account">Change your password</a>
+    <form method="post" action="${esc(H.base)}/signout"><button type="submit">Sign out</button></form>`;
 }
 render(); applyMode();
 (async () => {

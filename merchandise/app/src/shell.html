@@ -9,6 +9,7 @@
   --cypress:#2E6B4F; --cypress-ink:#FFFFFF; --fog:#46707F; --ochre:#8F6A1A; --brick:#A4402C;
   --tint-go:#E1ECE4; --tint-warn:#F4EBD6; --tint-stop:#F5E2DD; --tint-fog:#DFE9EC;
   --shadow:0 18px 50px rgba(22,32,27,.18);
+  --band:#1C4332; --band-soft:#BFD8C9;
   --ui:'Archivo',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
 }
@@ -40,10 +41,25 @@ button,input,select,textarea{font:inherit;color:inherit}
 .neg{color:var(--brick)}
 
 /* header */
-.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;padding-block:26px 16px}
-.top .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--cypress);margin-bottom:6px}
-.top h1{font-size:30px;font-weight:700;letter-spacing:-.02em;margin:0;line-height:1.05}
-.top .sub{color:var(--muted);margin-top:6px;font-size:13.5px;max-width:64ch}
+/* the green band: back to the Club Hub, the program's name, your account. Full width, whatever the page padding. */
+.band{background:var(--band);color:#fff;margin-inline:-20px;padding-inline:20px;box-shadow:0 2px 14px rgba(0,0,0,.18)}
+.band-in{max-width:1260px;margin:0 auto;display:flex;align-items:center;gap:14px;min-height:64px}
+.band a{color:inherit;text-decoration:none}
+.back{display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:0 14px 0 10px;border-radius:999px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);font-weight:600;font-size:13.5px;white-space:nowrap}
+.back:hover{background:rgba(255,255,255,.2)}
+.back svg{flex:none}
+.brandmark{display:flex;align-items:center;gap:11px;min-width:0;flex:1}
+.brandmark .seal{flex:none;width:40px;height:40px;border-radius:50%;background:#F6F2E9;display:grid;place-items:center;overflow:hidden;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08)}
+.brandmark .seal img{width:34px;height:34px;object-fit:contain}
+.brandmark .k{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--band-soft);line-height:1.2}
+.brandmark .t{font-size:18px;font-weight:700;letter-spacing:-.01em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acctbtn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 10px 0 4px;border-radius:999px;background:transparent;border:1px solid rgba(255,255,255,.22);color:#fff;cursor:pointer;font-weight:600;font-size:13px}
+.acctbtn:hover{background:rgba(255,255,255,.12)}
+.acctbtn .av{width:32px;height:32px;border-radius:50%;background:var(--band-soft);color:var(--band);display:grid;place-items:center;font-size:12px;font-weight:700}
+.band .menu .pop{color:var(--ink)}
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 16px;padding-block:22px 16px}
+.top h1{font-size:26px;font-weight:700;letter-spacing:-.02em;margin:0;line-height:1.1}
+.top .sub{color:var(--muted);margin-top:4px;font-size:13px}
 .actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .btn{border:1px solid var(--rule2);background:var(--card);border-radius:4px;padding:8px 14px;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;text-decoration:none}
 .btn:hover{background:var(--hover)}
@@ -64,10 +80,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 .banner{margin-top:4px;padding:10px 14px;border:1px solid var(--rule);border-left:4px solid var(--ochre);background:var(--card);font-size:13px;color:var(--muted)}
 
 /* month bar */
-.monthbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;border-top:2px solid var(--ink);padding-top:14px}
-.months{display:flex;flex-wrap:wrap;border:1px solid var(--rule2);border-radius:5px;overflow:hidden;background:var(--card)}
-.months button{border:none;background:transparent;padding:8px 13px;font-weight:600;font-size:13px;cursor:pointer;border-right:1px solid var(--rule);color:var(--muted);position:relative}
-.months button:last-child{border-right:none}
+.monthbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;border-top:1px solid var(--rule2);padding-top:14px}
+.months{display:flex;flex-wrap:wrap;gap:4px;padding:3px;border:1px solid var(--rule2);border-radius:10px;background:var(--card)}
+.months button{border:none;background:transparent;min-height:38px;padding:4px 13px;font-weight:600;font-size:13px;cursor:pointer;border-radius:7px;color:var(--muted);position:relative}
+.months button:hover{background:var(--hover);color:var(--ink)}
 .months button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
 .months button .now{display:block;font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--cypress);line-height:1;margin-top:2px}
 .months button[aria-pressed="true"] .now{color:var(--paper);opacity:.8}
@@ -88,18 +104,28 @@ button,input,select,textarea{font:inherit;color:inherit}
 .kpi .meter i{display:block;height:100%;background:var(--cypress)}
 
 /* tabs */
-.tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;margin:14px 0 16px;border-bottom:1px solid var(--rule2);position:sticky;top:0;z-index:25;background:var(--paper)}
-.tabs button{white-space:nowrap}
-.tabs .tg{display:flex;flex-direction:column;padding-right:6px;margin-right:6px;border-right:1px solid var(--rule)}
-.tabs .tg:last-child{border-right:none;margin-left:auto;justify-content:flex-end;padding-right:0;margin-right:0}
-.tabs .tgl{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);padding:8px 14px 0;white-space:nowrap}
-.tabs .tg:last-child .tgl{display:none}
-.tabs .tgb{display:flex}
+/* Five main tabs plus More. Pinned while you scroll; on a phone a 3-across grid, never a sideways scroll. */
+.tabs{position:sticky;top:0;z-index:25;display:flex;gap:4px;margin:4px -20px 16px;padding:8px 20px 0;background:color-mix(in srgb,var(--paper) 94%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--rule2)}
+.tabs>button,.tabs>.menu>button{border:none;background:none;min-height:44px;padding:0 16px;font-weight:600;font-size:14px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px;display:inline-flex;gap:7px;align-items:center;justify-content:center;white-space:nowrap;border-radius:6px 6px 0 0}
+.tabs>button:hover,.tabs>.menu>button:hover{color:var(--ink);background:var(--hover)}
 .linklike{border:none;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-decoration:underline;text-decoration-color:var(--rule2);text-underline-offset:3px}
-.tabs button{border:none;background:none;padding:10px 14px;font-weight:600;font-size:14px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px;display:inline-flex;gap:7px;align-items:center}
 .tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--cypress)}
+.tabs .menu{display:flex}
+.tabs .menu{position:relative}.tabs .menu .pop{right:auto;left:0;min-width:220px}
+.tabs .menu .pop button{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:40px;border-bottom:none}
+.tabs .menu .pop button[aria-selected="true"]{background:var(--tint-go);color:var(--ink);font-weight:600}
+.tabs .dot{width:8px;height:8px;border-radius:50%;background:var(--brick)}
 .tabs .cnt{font-family:var(--mono);font-size:10.5px;background:var(--sunk);color:var(--muted);border-radius:10px;padding:1px 7px}
 .tabs .cnt.hot{background:var(--tint-stop);color:var(--brick)}
+/* explanations for column headings (15-tips.js) */
+.tipi{display:inline-grid;place-items:center;width:15px;height:15px;margin-left:5px;padding:0;border-radius:50%;border:1px solid currentColor;background:none;font:600 9.5px/1 var(--ui);color:var(--faint);cursor:help;vertical-align:1px;letter-spacing:0;text-transform:none;flex:none}
+th.withtip{white-space:nowrap}th.withtip>button:not(.tipi),th.withtip>span.h{display:inline-block;padding-right:0}th.withtip>span.h>.tipi,th.withtip>.tipi{margin-right:10px}
+.tipi:hover,.tipi:focus-visible,.tipi[aria-expanded="true"]{color:var(--cypress)}
+#tip{position:fixed;z-index:70;max-width:min(300px,calc(100vw - 24px));background:var(--ink);color:var(--paper);padding:10px 12px;border-radius:6px;font-size:12.5px;line-height:1.45;box-shadow:var(--shadow);pointer-events:none;text-transform:none;letter-spacing:0;font-family:var(--ui);font-weight:400;text-align:left;white-space:normal}
+#tip b{display:block;font-weight:700;margin-bottom:2px}
+#tip::after{content:"";position:absolute;left:var(--ax,50%);width:10px;height:10px;background:inherit;transform:translateX(-50%) rotate(45deg)}
+#tip[data-side="below"]::after{top:-5px}
+#tip[data-side="above"]::after{bottom:-5px}
 .pane{margin-top:16px}
 
 /* panels */
@@ -339,18 +365,28 @@ tr.tot td{font-weight:600;border-top:1px solid var(--rule2)}
 .checks .d{display:block;font-size:12.5px;color:var(--muted)}
 .checks .who{display:inline-flex;gap:4px;align-items:center;font-size:11.5px;color:var(--cypress);margin-top:2px}
 .checks .who img{width:16px;height:16px;border-radius:50%}
-@media (max-width:640px){.tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}.tabs button{white-space:nowrap}.tabs .tg:last-child{margin-left:0}.monthbar{align-items:stretch}.months.years{width:100%}.months.years button{flex:1}}
+@media (max-width:760px){.band-in{min-height:58px;gap:10px}.back{padding:0 12px 0 8px}.brandmark .k{display:none}.brandmark .t{font-size:16px}.acctbtn .nm{display:none}.acctbtn{padding:0 8px 0 4px}}
+@media (max-width:640px){.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 4px;padding-top:6px}.tabs>button,.tabs>.menu>button{padding:0 6px;font-size:13px;gap:5px;width:100%;min-width:0}.tabs .menu .pop{left:auto;right:0}
+  .top .actions{width:100%}.top .actions>.btn,.top .actions>.menu{flex:1}.top .actions .menu>.btn{width:100%}.top .actions .btn{justify-content:center;min-height:42px}
+  .monthbar{align-items:stretch}.months,.months.years{width:100%}.months button{flex:1 0 auto}}
+@media (max-width:420px){.back span{display:none}.back{padding:0 10px}.brandmark .seal{width:34px;height:34px}.brandmark .seal img{width:28px;height:28px}}
 </style>
 
 <div class="wrap">
+  <div class="band">
+    <div class="band-in">
+      <a class="back" id="backHub" href="/admin" hidden><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Club Hub</span></a>
+      <div class="brandmark"><span class="seal"><img src="/logo-mark.png" alt="" onerror="this.remove()"></span><div style="min-width:0"><div class="k">Pasatiempo Pro Shop</div><div class="t">Merchandise Program</div></div></div>
+      <div class="menu" id="acct" hidden><button class="acctbtn" id="btnAcct" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Your account"><span class="av" id="acctAv"></span><span class="nm" id="acctNm"></span><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="m2 3.5 3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button><div class="pop" id="acctPop" hidden></div></div>
+    </div>
+  </div>
   <header class="top">
     <div>
-      <div class="kicker">Pasatiempo Pro Shop · Merchandise Program</div>
-      <h1>Merchandise Program</h1>
-      <div class="sub">Forecast, open-to-buy, orders and brand scorecard in one place. Orders are checked against the budget for the year they arrive in, as you type.</div>
+      <h1 id="pageTitle">Overview</h1>
+      <div class="sub" id="pageSub"></div>
     </div>
     <div class="actions">
-      <div class="menu"><button class="btn" id="btnMore" type="button" aria-haspopup="true" aria-expanded="false">More ▾</button><div class="pop" id="morePop" hidden>
+      <div class="menu"><button class="btn" id="btnMore" type="button" aria-haspopup="true" aria-expanded="false">Tools ▾</button><div class="pop" id="morePop" hidden>
         <button type="button" data-act="import">Paste orders from a spreadsheet</button>
         <button type="button" data-act="exportOrders">Download orders (CSV)</button>
         <button type="button" data-act="exportLines">Download order lines by size (CSV)</button>
@@ -358,7 +394,8 @@ tr.tot td{font-weight:600;border-top:1px solid var(--rule2)}
       <button class="btn primary" id="btnNew" type="button">+ New order</button>
     </div>
   </header>
-  <nav class="tabs" role="tablist" id="tabs" aria-label="Pages"></nav>
+  <div id="tabsAnchor"></div>
+  <nav class="tabs" role="tablist" aria-label="Pages" id="tabs"></nav>
   <div id="banner" class="banner" hidden></div>
   <div id="wibar" class="banner wibar" hidden></div>
   <div class="monthbar">

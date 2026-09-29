@@ -18,7 +18,9 @@ ALIAS = [
     ('Oakley', r'oakley'), ('Maui Jim', r'maui jim'), ('YETI', r'yeti'), ('Tervis', r'tervis'), ('Sterling', r'sterling'),
     ('STRACKA', r'stracka'), ('Wallaroo', r'wallaroo'), ('Ahead', r'\bahead\b'), ('Sloop', r'sloop'), ('Vimhue', r'vimhue'),
     ('Donald Ross', r'donald ross'), ('Bobby Jones', r'bobby jones'), ('J. Lindeberg', r'lindeberg'),
-    ('Greg Norman', r'greg norman'), ('Kradul', r'kradul'),
+    ('Greg Norman', r'greg norman'), ('Kradul', r'kradul'), ('LAB', r'\blab\b'), ('Squid Designs', r'squid'),
+    # The club's own goods (stickers, crest, note cards, flags). Last, so a vendor named in the description wins.
+    ('Pasatiempo', r'\bpasa\b|\bpasatiempo\b'),
 ]
 _RX = [(b, re.compile(rx)) for b, rx in ALIAS]
 HAT = re.compile(r'^(hat|hats|visor|beanie|bucket)|\bhat\b|\bbeanie\b|\bvisor\b|bucket', re.I)

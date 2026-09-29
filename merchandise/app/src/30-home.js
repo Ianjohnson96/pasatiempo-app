@@ -72,18 +72,36 @@ function renderKpis(S){
 function renderTabs(S){
   const att = openAttention(S), crit = att.filter(i => i.sev === 'crit').length;
   const due = BASE ? nextRefreshMonth() : null, overdue = due && todayISO > due + '-' + pad(new Date(+due.slice(0,4), +due.slice(5,7), 0).getDate());
-  const a = RPT ? rptAlerts() : [];
-  const G = [
-    ['Plan', [['overview','Overview'],['forecast','Forecast'],['otb','Open-to-buy']]],
-    ['Buy', [['orders','Orders', POS.length],['vendors','Vendors']]],
-    ['Assortment', [['brands','Brands'],['subcats','Subcategories', (ssUnsorted().length + ssPlace().length) || null],['inventory','Inventory & counts'],['attention','To do', att.length, crit]]],
-    ['Close the month', [['monthend','Month-end', overdue ? '!' : null, overdue], ...(RPT ? [['reports', 'Reports', a.length ? a.reduce((n, x) => n + x.left, 0) : null, a.some(x => x.status === 'overdue')]] : [])]],
-    ['', [['help','How it works']]],
-  ];
-  const btn = ([id,l,c,hot]) => id === 'vendors' ? `<button type="button" data-vendors="1" title="Vendor contacts, terms and lead times">${l}</button>`
-    : `<button type="button" role="tab" data-tab="${id}" aria-selected="${TAB === id}">${l}${c != null ? `<span class="cnt ${hot ? 'hot' : ''}">${c}</span>` : ''}</button>`;
-  $('#tabs').innerHTML = G.map(([g, T]) => `<div class="tg" role="group" ${g ? `aria-label="${g}"` : ''}><span class="tgl">${g || '&nbsp;'}</span><div class="tgb">${T.map(btn).join('')}</div></div>`).join('');
+  // Five main tabs; the rest sit under More, which takes the name of whichever of them is open.
+  const T = [['overview','Overview'],['orders','Orders', POS.length],['otb','Open-to-buy'],['brands','Brands'],['attention','To do', att.length, crit]];
+  const M = [['forecast','Forecast'],['vendors','Vendors'],['subcats','Subcategories', (ssUnsorted().length + ssPlace().length) || null],['inventory','Inventory & counts'],['monthend','Month-end', overdue ? '!' : null, overdue]];
+  if (RPT){ const a = rptAlerts(); M.push(['reports', 'Reports', a.length ? a.reduce((n, x) => n + x.left, 0) : null, a.some(x => x.status === 'overdue')]); }
+  M.push(['help','How it works']);
+  const cnt = (c, hot) => c != null ? `<span class="cnt ${hot ? 'hot' : ''}">${c}</span>` : '';
+  const inMore = M.find(t => t[0] === TAB), moreHot = M.some(t => t[3] && t[0] !== TAB);
+  const moreOpen = !!$('#tabPop') && !$('#tabPop').hidden;
+  $('#tabs').innerHTML = T.map(([id,l,c,hot]) => `<button type="button" role="tab" data-tab="${id}" aria-selected="${TAB === id}">${l}${cnt(c, hot)}</button>`).join('')
+    + `<div class="menu"><button type="button" id="btnTabMore" aria-haspopup="true" aria-expanded="${moreOpen}" aria-selected="${!!inMore}"><span style="overflow:hidden;text-overflow:ellipsis">${inMore ? (TABSHORT[inMore[0]] || inMore[1]) : 'More'}</span>${moreHot ? '<span class="dot" title="Something here needs attention"></span>' : ''}<span aria-hidden="true">▾</span></button>
+      <div class="pop" id="tabPop" ${moreOpen ? '' : 'hidden'}>${M.map(([id,l,c,hot]) => id === 'vendors'
+        ? `<button type="button" data-vendors="1" title="Vendor contacts, terms and lead times"><span>${l}</span></button>`
+        : `<button type="button" role="tab" data-tab="${id}" aria-selected="${TAB === id}"><span>${l}</span>${cnt(c, hot)}</button>`).join('')}</div></div>`;
+  const [title, sub] = TABHEAD[TAB] || [(inMore || T.find(t => t[0] === TAB) || [, 'Overview'])[1], ''];
+  $('#pageTitle').textContent = title; $('#pageSub').textContent = sub;
 }
+const TABSHORT = {inventory: 'Inventory', help: 'Help'};
+const TABHEAD = {
+  overview: ['Overview', 'Budget left by category for the year and month you pick.'],
+  orders: ['Orders', 'Purchase orders, each checked against the budget for the year it arrives in.'],
+  otb: ['Open-to-buy', 'How much each category can receive, month by month.'],
+  brands: ['Brands', 'How each brand sells, earns and turns, with a suggested call.'],
+  attention: ['To do', 'Order problems and item suggestions to work through.'],
+  forecast: ['Forecast', 'Sales by month for this year and next.'],
+  subcats: ['Subcategories', 'Sort SKUs into subcategories, and see how each one sells.'],
+  inventory: ['Inventory & counts', 'Stock on hand by category, and the quarterly counts.'],
+  monthend: ['Month-end', 'Upload the reports, work the checklist, and see forecast against actual.'],
+  reports: ['Reports', 'What is due, and who has done it.'],
+  help: ['How it works', 'The monthly routine, and the words used on this page.']
+};
 
 /* ---------- overview ---------- */
 function catRow(c, S){

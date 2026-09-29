@@ -4,12 +4,21 @@ from brands import brand_of, brand_split
 
 def test_description_when_nothing_is_assigned():
     assert brand_split({}, '480100', 'Shirt Peter Millar') == [('Peter Millar', 1.0)]
-    assert brand_split(None, '628100', 'Misc. Pasatiempo Flags') == []
+    assert brand_split(None, '620600', 'Misc UV Sleeve') == []
 
 
 def test_assignment_beats_the_description():
     m = {'628100': [{'b': 'Pasatiempo Logo', 's': 100}]}
     assert brand_split(m, '628100', 'Misc. Pasatiempo Flags') == [('Pasatiempo Logo', 1.0)]
+
+
+def test_lab_squid_and_the_clubs_own_goods():
+    assert brand_of('Putter LAB 486') == 'LAB'
+    assert brand_of('Misc Squid Sticks') == 'Squid Designs'
+    assert brand_of('Misc. Pasa Stickers') == 'Pasatiempo'
+    assert brand_of('Misc. Pasatiempo Holiday') == 'Pasatiempo'
+    assert brand_of('Hat Titleist Pasatiempo Logo') == 'Titleist'
+    assert brand_of('Misc. Label Maker') is None
 
 
 def test_a_sku_split_between_brands():

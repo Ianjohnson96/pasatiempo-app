@@ -40,7 +40,7 @@ function renderOrders(S){
       <td>${catSummary(p)}</td><td>${itemsSummary(p)}</td><td>${monthLabel(p.deliveryMonth)}</td><td class="num">${p.cancelDate ? dateLabel(p.cancelDate) : '—'}</td>
       <td class="r num">${money(poTotal(p))}</td><td class="r num">${onOrder(p) ? money(onOrder(p)) : '—'}</td>
       <td><span class="pill ${esc(p.status)}">${STATUS[p.status] || esc(p.status)}</span></td><td><span class="person" data-uid="${esc(p.createdBy || '')}"></span></td></tr>`).join('')}</tbody></table></div>
-    ${!POS.length ? `<div class="empty"><h3>No purchase orders yet</h3><p>Click <b>+ New order</b> to write one, or use <b>More → Paste orders from a spreadsheet</b> to load your current open orders all at once.</p>${canAct() ? '<button class="btn primary" type="button" data-act="new">+ New order</button>' : ''}</div>` : !rows.length ? '<div class="empty"><p>No orders match these filters.</p></div>' : ''}
+    ${!POS.length ? `<div class="empty"><h3>No purchase orders yet</h3><p>Click <b>+ New order</b> to write one, or use <b>Tools → Paste orders from a spreadsheet</b> to load your current open orders all at once.</p>${canAct() ? '<button class="btn primary" type="button" data-act="new">+ New order</button>' : ''}</div>` : !rows.length ? '<div class="empty"><p>No orders match these filters.</p></div>' : ''}
   </section>`;
   fillPeople();
 }
