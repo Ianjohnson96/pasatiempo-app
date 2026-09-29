@@ -36,16 +36,20 @@ function measures(rows, base, ctx){
   const series = sumSeries(rows);
   const t12 = rows.reduce((a, r) => a + nz(r.t12), 0);
   const cmpTY = ctx.cmp.reduce((a, j) => a + nz(series[j]), 0), prior12 = ctx.cmp.reduce((a, j) => a + nz(series[j - 12]), 0);
-  const oh = rows.reduce((a, r) => a + nz(r.oh), 0), aged = rows.reduce((a, r) => a + nz(r.aged), 0);
+  // Special orders filed in a category (so, soOh) count in its sales, but never sat on the shelf: stock, turns,
+  // weeks and GMROI use shelf sales and shelf stock only.
+  const so = rows.reduce((a, r) => a + Math.min(nz(r.so), nz(r.t12)), 0);
+  const oh = rows.reduce((a, r) => a + Math.max(0, nz(r.oh) - nz(r.soOh)), 0), aged = rows.reduce((a, r) => a + nz(r.aged), 0);
   const gp = rows.reduce((a, r) => a + nz(r.t12) * nz(r.gm), 0), mdS = rows.reduce((a, r) => a + nz(r.t12) * nz(r.md), 0);
+  const gpShelf = rows.reduce((a, r) => a + (nz(r.t12) - Math.min(nz(r.so), nz(r.t12))) * nz(r.gm), 0);
   const ty = rows.reduce((a, r) => a + nz(r.ty), 0), ly = rows.reduce((a, r) => a + nz(r.ly), 0);
-  const cogs = t12 - gp, stocked = oh > 0 && cogs > 0;
-  return {...base, t12, prior12, cmpTY, series, oh, aged, gp,
+  const cogs = t12 - so - gpShelf, stocked = oh > 0 && cogs > 0;
+  return {...base, t12, so, prior12, cmpTY, series, oh, aged, gp, gpShelf, cogsWk: cogs / 52,
     growth: prior12 >= 500 ? cmpTY / prior12 - 1 : null,
     trend3: ly >= 10 ? ty / ly - 1 : null,
     gm: t12 > 0 ? gp / t12 : null, md: t12 > 0 ? mdS / t12 : null,
     agedPct: oh > 0 ? aged / oh : null,
-    turns: stocked ? cogs / oh : null, wks: stocked ? oh / (cogs / 52) : null, gmroi: stocked ? gp / oh : null,
+    turns: stocked ? cogs / oh : null, wks: stocked ? oh / (cogs / 52) : null, gmroi: stocked ? gpShelf / oh : null,
     agedSkus: rows.flatMap(r => (r.agedSkus || []).map(s => ({...s, cat: r.cat, sub: r.sub})))};
 }
 
@@ -88,7 +92,7 @@ function seasonality(ana){
   return out;
 }
 
-const target16 = M => (M.t12 - M.gp) / 52 * BENCH.wks.hi;   // stock needed for 16 weeks at the last year's pace
+const target16 = M => M.cogsWk * BENCH.wks.hi;   // stock needed for 16 weeks of shelf sales at the last year's pace
 /** Stock over target, aged stock, markdown candidates and lines to reorder. Subcategory level. */
 function stuckMoney(ana){
   const subs = ana.cats.flatMap(c => c.subs);
@@ -97,7 +101,8 @@ function stuckMoney(ana){
     aged: subs.filter(M => M.aged > 0).map(M => ({M, aged: M.aged})).sort((a, b) => b.aged - a.aged),
     agedSkus: subs.flatMap(M => M.agedSkus).sort((a, b) => nz(b.value) - nz(a.value)),
     markdown: subs.filter(M => M.aged > 0).map(M => ({M, cashAt30: M.aged / (1 - Math.min(nz(M.gm), 0.9)) * 0.7})).sort((a, b) => b.cashAt30 - a.cashAt30),
-    reorder: subs.filter(M => M.wks != null && M.wks < 4 && M.t12 >= 2000).sort((a, b) => b.t12 - a.t12)
+    // Selling off the shelf, and out of stock or under 4 weeks of it.
+    reorder: subs.filter(M => M.t12 - M.so >= 2000 && (M.oh <= 0 || (M.wks != null && M.wks < 4))).sort((a, b) => b.t12 - a.t12)
   };
 }
 
@@ -105,7 +110,7 @@ function stuckMoney(ana){
 function suggest(ana){
   if (!ana) return [];
   const out = [], pctS = v => Math.round(v * 100) + '%', usd = v => '$' + Math.round(v).toLocaleString('en-US');
-  const add = (M, kind, impact, title, why, action, page) => { if (impact >= 250) out.push({id: kind + ':' + M.key, kind, title, why, impact: Math.round(impact), action, page, cat: M.cat, sub: M.sub || null, name: M.name, catName: M.catName || M.name}); };
+  const add = (M, kind, impact, title, why, action, page) => { if (impact >= 250) out.push({id: kind + ':' + M.key, key: M.key, kind, title, why, impact: Math.round(impact), action, page, cat: M.cat, sub: M.sub == null ? null : M.sub, name: M.name, catName: M.catName || M.name}); };
   for (const c of ana.cats){
     if (c.stockShare - c.share > 0.05 && c.oh > 5000)
       add(c, 'share', c.oh - c.share * ana.shop.oh, `${c.name}: hold back open-to-buy`,
@@ -120,8 +125,8 @@ function suggest(ana){
       add(s, 'aged', s.aged, `${nm}: clear aged stock`, `${usd(s.aged)} (${pctS(s.agedPct)}) hasn't sold in 12 months.`, 'Mark down, bundle or return to the vendor', 'stuck');
     if (s.wks != null && s.wks > 30)
       add(s, 'wks', s.oh - target16(s), `${nm}: too much stock`, `${Math.round(s.wks)} weeks of supply at the last year's pace; 12–16 is the rule of thumb.`, 'Pause orders until it sells down', 'stuck');
-    if (s.growth != null && s.growth > 0.15 && s.wks != null && s.wks < 8)
-      add(s, 'short', s.t12 / 52 * (12 - s.wks), `${nm}: buy deeper`, `Sales up ${pctS(s.growth)} on last year with only ${Math.round(s.wks)} weeks of stock.`, 'Reorder before it runs out', 'scorecard');
+    if (s.growth != null && s.growth > 0.15 && s.t12 - s.so >= 2000 && (s.oh <= 0 || (s.wks != null && s.wks < 8)))
+      add(s, 'short', (s.t12 - s.so) / 52 * (12 - (s.wks || 0)), `${nm}: buy deeper`, `Sales up ${pctS(s.growth)} on last year with ${s.oh <= 0 ? 'nothing in stock' : 'only ' + Math.round(s.wks) + ' weeks of stock'}.`, 'Reorder before it runs out', 'scorecard');
     if (s.gmroi != null && s.gmroi < g && s.oh > 5000)
       add(s, 'gmroi', s.oh - s.gp / g, `${nm}: stock isn't earning its keep`, `GMROI ${s.gmroi.toFixed(2)} against a rule of thumb of ${g}.`, 'Carry less of it, or buy it at a better margin', 'scorecard');
     if (s.trend3 != null && s.trend3 <= -0.25 && s.oh > 2000)
@@ -130,7 +135,7 @@ function suggest(ana){
   // One suggestion per line: the biggest, with the others' reasons folded in.
   const best = new Map();
   for (const x of out.sort((a, b) => b.impact - a.impact)){
-    const k = x.cat + '|' + x.sub, b = best.get(k);
+    const k = x.key, b = best.get(k);
     if (b) b.also.push(x.why); else best.set(k, {...x, also: []});
   }
   return [...best.values()];

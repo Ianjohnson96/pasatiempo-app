@@ -54,7 +54,7 @@ let PLAN = FALLBACK.plan, INV = FALLBACK.inventory, INS = FALLBACK.insights;
 let ADJ = [], POS = [], VENDORS = [], SUBCATS = [], COUNTS = [], ISTATE = {};
 let db = null, userNS = null, canWrite = null, isAdmin = false, myId = null, dbState = 'connecting', readOnly = false;
 let SEL = (() => { try { return localStorage.getItem('ob.month') || null; } catch (_) { return null; } })();
-let TAB = (() => { try { return localStorage.getItem('ob.tab2') || 'summary'; } catch (_) { return 'overview'; } })();
+let TAB = (() => { try { return localStorage.getItem('ob.tab2') || localStorage.getItem('ob.tab') || 'summary'; } catch (_) { return 'summary'; } })();
 let filt = {status:'active', cat:'all', q:'', arriving:false}, sort = {key:'deliveryMonth', dir:1};
 let afilt = {kind:'all', showResolved:false, cat:'all'};
 

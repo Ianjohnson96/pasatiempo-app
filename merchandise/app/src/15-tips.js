@@ -4,8 +4,8 @@
    picks the explanation up without touching its markup. */
 const TIPS = [
   [/^gmroi$/, 'GMROI', 'Gross margin earned in the last 12 months for every $1 of stock at cost. Above 2 is strong for apparel; under 1 means the stock isn\'t paying its way. Equipment runs lower because margins are thin.'],
-  [/^aged$|^not sold 12\+ mo(nths)?$/, 'Aged', 'Share of the stock on hand (at cost) that hasn\'t sold in 12 months. Over 30% is shown in red: clear it before buying more.'],
-  [/^weeks( of supply)?$/, 'Weeks of supply', 'How many weeks the stock on hand lasts at the last 12 months\' selling pace. Twelve to sixteen is healthy for most categories; over 40 is too much stock.'],
+  [/^aged$|^not sold 12\+ mo(nths)?$/, 'Aged', 'Stock on hand (at cost) that hasn\'t sold in 12 months, as a share of the stock or in dollars. Over 10% is more than a pro shop should carry; the analysis pages shade it red above 15%.'],
+  [/^weeks( of supply)?$/, 'Weeks of supply', 'How many weeks the stock on hand lasts at the last 12 months\' selling pace. Twelve to sixteen is healthy for most categories; over 30 is too much stock.'],
   [/^trend$/, 'Trend', 'Units sold in the last 3 months against the same 3 months a year earlier.'],
   [/^24 months$/, '24 months', 'Sales for each of the last 24 months, oldest on the left.'],
   [/^call$/, 'Call', 'What to do with the brand next season: Grow, Keep, Watch, Reduce or Drop. Suggested from its sales, GMROI, stock and trend; the owner can set their own (✎).'],

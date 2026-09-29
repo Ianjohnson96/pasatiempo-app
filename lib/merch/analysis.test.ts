@@ -113,6 +113,32 @@ describe("merchandise analysis", () => {
     expect(a.cats[0].subs[1].name).toBe("Other");
   });
 
+  it("keeps a category's own suggestion apart from its unsorted subcategory's", () => {
+    const a = M.analyze({ months, rows: [
+      row("480", "", { series: flat(100, 100), t12: 1200, oh: 60000, gm: 0.45 }),
+      row("200", "s-200-putters", { series: flat(1000, 1000), t12: 12000, oh: 3000, gm: 0.2 }),
+    ] }, NAMES);
+    const s = M.suggest(a);
+    expect(s.some((x: { kind: string; sub: string | null }) => x.kind === "share" && x.sub === null)).toBe(true);
+    expect(s.some((x: { kind: string; sub: string | null }) => x.kind === "wks" && x.sub === "")).toBe(true);
+  });
+
+  it("leaves special orders out of turns, weeks and GMROI", () => {
+    // Half the sales are special orders that never sat on the shelf; 500 of the stock waits for pickup.
+    const a = M.analyze({ months, rows: [row("480", "s-480-polos", { series: flat(1000, 1000), t12: 12000, so: 6000, oh: 3500, soOh: 500, gm: 0.5 })] }, NAMES);
+    const p = a.cats[0].subs[0];
+    expect(p.t12).toBe(12000); // sales still count them
+    expect(p.so).toBe(6000);
+    expect(p.oh).toBe(3000); // shelf stock
+    expect(p.gmroi).toBeCloseTo(3000 / 3000); // shelf margin 3,000 on 3,000 of stock
+    expect(p.wks).toBeCloseTo(3000 / (3000 / 52));
+  });
+
+  it("lists a line that is out of stock but selling as a reorder", () => {
+    const a = M.analyze({ months, rows: [row("400", "s-400-polos", { series: flat(2000, 2000), t12: 24000, oh: 0, gm: 0.5 })] }, NAMES);
+    expect(M.stuckMoney(a).reorder.map((m: { sub: string }) => m.sub)).toEqual(["s-400-polos"]);
+  });
+
   it("ranks the suggestions by dollars, the aged-heavy line first, one per line", () => {
     const s = M.suggest(M.analyze(ASSORT, NAMES));
     expect(s[0].sub).toBe("s-480-other");

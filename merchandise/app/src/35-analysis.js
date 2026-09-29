@@ -29,7 +29,7 @@ function anaCmpText(a){
 }
 const anaTile = (lab, v, sub, extra = '', x = '') => `<div class="tile"><div class="lab">${lab}</div><div class="v">${v}</div>${sub ? `<div class="d">${sub}</div>` : ''}${extra}${x ? `<div class="x">${x}</div>` : ''}</div>`;
 const anaEmpty = () => `<section class="panel"><div class="note" style="font-size:14px">The analysis appears after the next month-end upload${isAdmin ? ', or press <b>Update brands</b> on the Brands page' : ''}. It needs the category and subcategory report the upload builds.</div></section>`;
-const anaBench = () => `<div class="bench"><b>Rules of thumb</b> (general guidelines for a private-club pro shop, not the club's own targets): ${[BENCH.agedPct, BENCH.md, BENCH.wks, BENCH.gmroi, BENCH.turns, BENCH.gm].map(b => b.text).join(' · ')}. Sales are at retail and stock at cost; special orders are left out.</div>`;
+const anaBench = () => `<div class="bench"><b>Rules of thumb</b> (general guidelines for a private-club pro shop, not the club's own targets): ${[BENCH.agedPct, BENCH.md, BENCH.wks, BENCH.gmroi, BENCH.turns, BENCH.gm].map(b => b.text).join(' · ')}. Sales are at retail and stock at cost. Special orders in 640 are left out; special orders filed in a category count in its sales but not in its stock, turns, weeks or GMROI.</div>`;
 function anaSugList(list, empty){
   if (!list.length) return `<div class="note">${empty || 'Nothing stands out against the rules of thumb.'}</div>`;
   return `<ul class="sug">${list.map(x => `<li><span class="t">${esc(x.title)}</span><span class="i">${moneyK(x.impact)}<small>${x.kind === 'short' ? 'sales at risk' : x.kind === 'md' ? 'given away' : 'of stock'}</small></span>
@@ -59,7 +59,7 @@ function renderSummaryPage(){
   $('#pane').innerHTML = `<div class="astack">
     <div class="noprint" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:12.5px;color:var(--muted)">Data through ${monthLabel(a.through)}. Growth compares ${anaCmpText(a)}.</span><button class="btn sm" type="button" data-print="1">Print this page</button></div>
     <section class="tiles" aria-label="Headline figures">
-      ${anaTile('Sales, last 12 months', moneyK(s.t12), s.growth == null ? '' : aDelta(s.growth) + ' growth', '', 'Retail sales; special orders left out.')}
+      ${anaTile('Sales, last 12 months', moneyK(s.t12), s.growth == null ? '' : aDelta(s.growth) + ' growth', '', 'Retail sales, with special orders filed in a category.')}
       ${anaTile('Gross margin', aPct(s.gm), `${moneyK(s.gp)} earned`, aGrade(grade('gm', s.gm, SHOPSEG)))}
       ${anaTile('Stock turns', aX(s.turns), `${aWk(s.wks)} weeks of supply`, aGrade(grade('turns', s.turns, SHOPSEG)))}
       ${anaTile('GMROI', aX(s.gmroi, 2), 'margin per $1 of stock', aGrade(grade('gmroi', s.gmroi, SHOPSEG)))}
