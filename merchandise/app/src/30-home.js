@@ -72,25 +72,37 @@ function renderKpis(S){
 function renderTabs(S){
   const att = openAttention(S), crit = att.filter(i => i.sev === 'crit').length;
   const due = BASE ? nextRefreshMonth() : null, overdue = due && todayISO > due + '-' + pad(new Date(+due.slice(0,4), +due.slice(5,7), 0).getDate());
-  // Five main tabs; the rest sit under More, which takes the name of whichever of them is open.
-  const T = [['overview','Overview'],['orders','Orders', POS.length],['otb','Open-to-buy'],['brands','Brands'],['attention','To do', att.length, crit]];
-  const M = [['forecast','Forecast'],['vendors','Vendors'],['subcats','Subcategories', (ssUnsorted().length + ssPlace().length) || null],['inventory','Inventory & counts'],['monthend','Month-end', overdue ? '!' : null, overdue]];
-  if (RPT){ const a = rptAlerts(); M.push(['reports', 'Reports', a.length ? a.reduce((n, x) => n + x.left, 0) : null, a.some(x => x.status === 'overdue')]); }
-  M.push(['help','How it works']);
-  const cnt = (c, hot) => c != null ? `<span class="cnt ${hot ? 'hot' : ''}">${c}</span>` : '';
-  const inMore = M.find(t => t[0] === TAB), moreHot = M.some(t => t[3] && t[0] !== TAB);
-  const moreOpen = !!$('#tabPop') && !$('#tabPop').hidden;
-  $('#tabs').innerHTML = T.map(([id,l,c,hot]) => `<button type="button" role="tab" data-tab="${id}" aria-selected="${TAB === id}">${l}${cnt(c, hot)}</button>`).join('')
-    + `<div class="menu"><button type="button" id="btnTabMore" aria-haspopup="true" aria-expanded="${moreOpen}" aria-selected="${!!inMore}"><span style="overflow:hidden;text-overflow:ellipsis">${inMore ? (TABSHORT[inMore[0]] || inMore[1]) : 'More'}</span>${moreHot ? '<span class="dot" title="Something here needs attention"></span>' : ''}<span aria-hidden="true">▾</span></button>
-      <div class="pop" id="tabPop" ${moreOpen ? '' : 'hidden'}>${M.map(([id,l,c,hot]) => id === 'vendors'
-        ? `<button type="button" data-vendors="1" title="Vendor contacts, terms and lead times"><span>${l}</span></button>`
-        : `<button type="button" role="tab" data-tab="${id}" aria-selected="${TAB === id}"><span>${l}</span>${cnt(c, hot)}</button>`).join('')}</div></div>`;
-  const [title, sub] = TABHEAD[TAB] || [(inMore || T.find(t => t[0] === TAB) || [, 'Overview'])[1], ''];
+  // Four sections in one row; the section's pages as a wrapping row of pills under it. Nothing scrolls sideways.
+  const badge = {orders: [POS.length], attention: [att.length, crit], subcats: [(ssUnsorted().length + ssPlace().length) || null], monthend: [overdue ? '!' : null, overdue]};
+  if (RPT){ const a = rptAlerts(); badge.reports = [a.length ? a.reduce((n, x) => n + x.left, 0) : null, a.some(x => x.status === 'overdue')]; }
+  const cnt = id => { const [c, hot] = badge[id] || []; return c != null ? `<span class="cnt ${hot ? 'hot' : ''}">${c}</span>` : ''; };
+  const sec = SECTIONS.find(x => x[2].includes(TAB)) || SECTIONS[0];
+  const hotIn = x => x[2].some(id => id !== TAB && badge[id] && badge[id][1]);
+  $('#tabs').innerHTML = `<div class="secs">${SECTIONS.map(x => `<button type="button" role="tab" data-tab="${x[2][0]}" aria-selected="${x === sec}">${x[1]}${x !== sec && hotIn(x) ? '<span class="dot" title="Something here needs attention"></span>' : ''}</button>`).join('')}</div>`
+    + (sec[2].length > 1 ? `<div class="subnav" role="group" aria-label="${sec[1]} pages">${sec[2].map(id => id === 'vendors'
+      ? `<button type="button" class="snav" data-vendors="1" title="Vendor contacts, terms and lead times">Vendors</button>`
+      : `<button type="button" class="snav" data-tab="${id}" aria-pressed="${TAB === id}">${PAGENAME[id] || id}${cnt(id)}</button>`).join('')}</div>` : '');
+  const [title, sub] = TABHEAD[TAB] || [PAGENAME[TAB] || 'Summary', ''];
   $('#pageTitle').textContent = title; $('#pageSub').textContent = sub;
 }
-const TABSHORT = {inventory: 'Inventory', help: 'Help'};
+// [section id, name, its pages (the first opens when the section is picked)]
+const SECTIONS = [
+  ['summary', 'Summary', ['summary']],
+  ['analysis', 'Analysis', ['scorecard', 'rounds', 'trends', 'stuck', 'brands']],
+  ['buying', 'Buying', ['overview', 'otb', 'forecast', 'orders', 'vendors', 'attention']],
+  ['ops', 'Operations', ['monthend', 'reports', 'inventory', 'subcats', 'help']]
+];
+const ANALYSIS_TABS = new Set(['summary', 'scorecard', 'rounds', 'trends', 'stuck']);
+const PAGENAME = {summary: 'Summary', scorecard: 'Scorecard', rounds: 'Spend per round', trends: 'Trends', stuck: 'Stuck money', brands: 'Brands',
+  overview: 'Budget', otb: 'Open-to-buy', forecast: 'Forecast', orders: 'Orders', attention: 'To do',
+  monthend: 'Month-end', reports: 'Reports', inventory: 'Inventory & counts', subcats: 'Subcategories', help: 'How it works'};
 const TABHEAD = {
-  overview: ['Overview', 'Budget left by category for the year and month you pick.'],
+  summary: ['Summary', 'The shop at a glance: the last 12 months against the year before, and what to do next.'],
+  scorecard: ['Scorecard', 'Every category and subcategory side by side, graded against the rules of thumb.'],
+  rounds: ['Spend per round', 'Shop sales for every round played, member, guest and public.'],
+  trends: ['Trends', 'Two years of sales by month, and when the shop sells.'],
+  stuck: ['Stuck money', 'Stock that is over target or not selling, and lines about to run out.'],
+  overview: ['Budget', 'Budget left by category for the year and month you pick.'],
   orders: ['Orders', 'Purchase orders, each checked against the budget for the year it arrives in.'],
   otb: ['Open-to-buy', 'How much each category can receive, month by month.'],
   brands: ['Brands', 'How each brand sells, earns and turns, with a suggested call.'],

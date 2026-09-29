@@ -110,7 +110,7 @@ function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = fals
 function closeOverlay(){ $('#overlay').innerHTML = ''; D = null; DX = null; }
 
 /* ---------- render + mode ---------- */
-const PAGES = {overview: renderOverview, forecast: renderForecast, otb: renderOTB, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
+const PAGES = {summary: renderSummaryPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, otb: renderOTB, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
 if (location.hash === '#reports' && RPT){ TAB = 'reports'; history.replaceState(null, '', location.pathname + location.search); }  // the reminder email's link
 function render(){
   if (!BASE && !LEGACY_PLAN){
@@ -119,7 +119,7 @@ function render(){
     return;
   }
   derive();
-  if (!PAGES[TAB]) TAB = 'overview';
+  if (!PAGES[TAB]) TAB = 'summary';
   const S = stats(), bar = TAB === 'overview' || TAB === 'orders';
   $('.monthbar').hidden = !bar; $('#summary').hidden = TAB !== 'overview'; $('#kpis').hidden = TAB !== 'overview';
   if (bar) renderMonths();
@@ -147,7 +147,7 @@ function applyMode(){
 }
 
 /* ---------- events ---------- */
-const POPS = [['#morePop', '#btnMore'], ['#acctPop', '#btnAcct'], ['#tabPop', '#btnTabMore']];
+const POPS = [['#morePop', '#btnMore'], ['#acctPop', '#btnAcct']];
 function closePops(except){ for (const [p, b] of POPS){ if (p === except || !$(p)) continue; $(p).hidden = true; $(b)?.setAttribute('aria-expanded', 'false'); } }
 function togglePop(p, b){ closePops(p); const el = $(p); el.hidden = !el.hidden; $(b).setAttribute('aria-expanded', String(!el.hidden)); }
 document.addEventListener('click', e => { const m = e.target.closest('.menu'); closePops(m ? '#' + (m.querySelector('.pop') || {}).id : null); }, true);
@@ -195,11 +195,10 @@ document.addEventListener('click', async e => {
   if (ds.brand && !D) return openBrand(ds.brand);
   if (ds.month){ SEL = ds.month; try { localStorage.setItem('ob.month', SEL); } catch (_) {} return render(); }
   if (ds.sccatgo) SC.cat = ds.sccatgo;
-  if (ds.tab){ TAB = ds.tab; try { localStorage.setItem('ob.tab', TAB); } catch (_) {} closePops(); closeOverlay(); render();
+  if (ds.tab){ TAB = ds.tab; try { localStorage.setItem('ob.tab2', TAB); } catch (_) {} closePops(); closeOverlay(); render();
     const top = $('#tabsAnchor').getBoundingClientRect().top + scrollY; return scrollY > top ? window.scrollTo({top}) : undefined; }
   if (t.id === 'btnMore') return togglePop('#morePop', '#btnMore');
   if (t.id === 'btnAcct') return togglePop('#acctPop', '#btnAcct');
-  if (t.id === 'btnTabMore') return togglePop('#tabPop', '#btnTabMore');
   if (ds.act === 'import'){ $('#morePop').hidden = true; return openImport(); }
   if (ds.act === 'exportOrders'){ $('#morePop').hidden = true; return exportOrders(); }
   if (ds.act === 'exportLines'){ $('#morePop').hidden = true; return exportLines(); }

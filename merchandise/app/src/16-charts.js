@@ -86,8 +86,10 @@ function chLine({labels, series, fmt = moneyK, h = 230, w = chWidth(), label, ze
 }
 
 /** Scatter with reference lines and quadrant names. points: [{x, y, r, label, k, cvt, cv, attrs}]. */
-function chScatter({points, xFmt, yFmt, xRef = 0, yRef, quads = [], h = 340, w = chWidth(), label, xName, yName, named = 7}){
+function chScatter({points, xFmt, yFmt, xRef = 0, yRef, quads = [], h = 340, w = chWidth(), label, xName, yName, named = 7, xClamp}){
   if (!points.length) return '';
+  // An outlier past xClamp sits on the edge (its readout keeps the real figure) rather than squashing everything else.
+  if (xClamp) points = points.map(p => p.x < xClamp[0] || p.x > xClamp[1] ? {...p, x: Math.max(xClamp[0], Math.min(xClamp[1], p.x)), edge: true} : p);
   const pad = (a, b) => { const s = (b - a) || 1; return [a - s * .1, b + s * .1]; };
   const [x0, x1] = pad(Math.min(xRef, ...points.map(p => p.x)), Math.max(xRef, ...points.map(p => p.x)));
   const [y0, y1] = pad(Math.min(0, yRef ?? 0, ...points.map(p => p.y)), Math.max(yRef ?? 0, ...points.map(p => p.y)));
@@ -103,7 +105,13 @@ function chScatter({points, xFmt, yFmt, xRef = 0, yRef, quads = [], h = 340, w =
   const rmax = Math.max(...points.map(p => p.r || 1)), rr = p => 5 + 12 * Math.sqrt(Math.max(0, p.r || 1) / rmax);
   const bySize = points.slice().sort((a, b) => (b.r || 0) - (a.r || 0)), big = bySize.slice(0, named);
   for (const p of bySize) g += `<circle class="k${p.k || 1} pt" cx="${X(p.x)}" cy="${Y(p.y)}" r="${rr(p)}"${chCv(p.cvt || p.label, p.cv || '')}${p.attrs || ''}/>`;
-  for (const p of big) g += `<text class="plab" x="${Math.max(L + 30, Math.min(R - 30, X(p.x)))}" y="${Math.max(T + 22, Y(p.y) - rr(p) - 4)}" text-anchor="middle">${chEsc(p.label)}</text>`;
+  const placed = [];   // skip a name that would sit on top of one already drawn
+  for (const p of big){
+    const lx = Math.max(L + 40, Math.min(R - 40, X(p.x))), ly = Math.max(T + 22, Y(p.y) - rr(p) - 4), hw = String(p.label).length * 3.1 + 4;
+    if (placed.some(q => Math.abs(q.y - ly) < 13 && Math.abs(q.x - lx) < q.hw + hw)) continue;
+    placed.push({x: lx, y: ly, hw});
+    g += `<text class="plab" x="${lx}" y="${ly}" text-anchor="middle">${chEsc(p.label + (p.edge ? ' ›' : ''))}</text>`;
+  }
   if (xName) g += `<text class="axn" x="${R}" y="${h - 2}" text-anchor="end">${chEsc(xName)} →</text>`;
   if (yName) g += `<text class="axn" x="${L}" y="${CHP.t - 2}">↑ ${chEsc(yName)}</text>`;
   return `<svg class="ch" role="img" aria-label="${chEsc(label || 'Chart')}" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${g}</svg>`;
