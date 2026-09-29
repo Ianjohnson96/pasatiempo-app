@@ -443,13 +443,15 @@ td.h-bad{background:color-mix(in srgb,var(--tint-stop) 90%,transparent);color:va
 .ch .pt:focus-visible{outline:none;stroke:var(--ink);stroke-width:3}
 .bench{font-size:12px;color:var(--muted);padding:10px 16px;border:1px dashed var(--rule2);background:var(--card)}
 .bench b{color:var(--ink)}
-/* Tables fit their card on a computer: no forced minimum width, tighter cells, headings that may wrap. */
-@media (min-width:1100px){.tbl table,.atbl table,table.fc,table.brandt{min-width:0!important}td{padding:8px 9px}th button,th span.h{padding:9px 9px;white-space:normal}th,table.fc th,table.fc th span.h,table.fc th button,.brandt th,.brandt th button{white-space:normal}th.withtip{white-space:normal}.atbl td:first-child,.atbl th:first-child{min-width:170px}}
-/* On a phone every read-only table turns each row into a card of label/value pairs (15-tips.js labelTables). */
-@media (max-width:640px){
+/* Tables fit their card from 901px up: no forced minimum width, tighter cells, headings that may wrap. */
+@media (min-width:901px){.tbl table,.atbl table,table.fc,table.brandt{min-width:0!important}td{padding:8px 9px}th button,th span.h{padding:9px 9px;white-space:normal}th,table.fc th,table.fc th span.h,table.fc th button,.brandt th,.brandt th button{white-space:normal}th.withtip{white-space:normal}.atbl td:first-child,.atbl th:first-child{min-width:170px}}
+/* Small laptops: compact cells so wide tables still fit; the 24-month sparkline column steps aside. */
+@media (min-width:901px) and (max-width:1199px){.tbl table,.atbl table{font-size:12px}td{padding:6px 7px}th button,th span.h{padding:7px 7px;letter-spacing:.04em}.gin,input.gin{width:50px}.atbl td:first-child,.atbl th:first-child{min-width:140px}.atbl td.sp,.atbl th.sp{display:none}}
+/* Up to 900px (phones, tablets) each table row becomes a card of label/value pairs (15-tips.js labelTables). */
+@media (max-width:900px){
   table.rt{min-width:0!important;width:100%}
   table.rt thead{display:none}
-  table.rt,table.rt tbody{display:block}
+  table.rt,table.rt tbody,table.rt tfoot{display:block}
   table.rt tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:3px 14px;padding:10px 12px;border-bottom:1px solid var(--rule)}
   table.rt td{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:3px 6px;border:none;border-radius:4px;white-space:normal!important;overflow-wrap:break-word;text-align:right;min-width:0!important;max-width:none!important;position:static!important;box-shadow:none!important}
   table.rt td::before{content:attr(data-l);font:600 9.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--faint);text-align:left;flex:0 1 auto;white-space:normal;line-height:1.25}
@@ -461,6 +463,21 @@ td.h-bad{background:color-mix(in srgb,var(--tint-stop) 90%,transparent);color:va
   table.rt tr.tot{background:var(--sunk)}
   .atbl tr.asub td:first-child{padding-left:0}
   .atbl tr.asub{padding-left:24px}
+}
+/* The forecast's category table has 12 columns and three what-if boxes: cards until there is room. */
+@media (min-width:901px) and (max-width:1199px){
+  table.fc.rt{min-width:0!important;width:100%}
+  table.fc.rt thead{display:none}
+  table.fc.rt,table.fc.rt tbody,table.fc.rt tfoot{display:block}
+  table.fc.rt tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px 14px;padding:10px 12px;border-bottom:1px solid var(--rule)}
+  table.fc.rt td{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:3px 6px;border:none;border-radius:4px;white-space:normal!important;overflow-wrap:break-word;text-align:right;min-width:0!important;max-width:none!important;position:static!important;box-shadow:none!important}
+  table.fc.rt td::before{content:attr(data-l);font:600 9.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--faint);text-align:left;flex:0 1 auto;white-space:normal;line-height:1.25}
+  table.fc.rt td:first-child,table.fc.rt td.rt-wide{grid-column:1/-1;justify-content:flex-start;text-align:left;font-weight:600;white-space:normal!important;padding-left:0}
+  table.fc.rt td:first-child::before,table.fc.rt td.rt-wide::before,table.fc.rt td:not([data-l])::before{content:none}
+  table.fc.rt td:empty{display:none}
+  table.fc.rt td.num,table.fc.rt td.r{white-space:nowrap!important}
+  table.fc.rt .sharebar{width:80px}table.fc.rt td.sp{grid-column:1/-1}
+  table.fc.rt tr.tot{background:var(--sunk)}
 }
 @media (max-width:440px){table.rt tr{grid-template-columns:minmax(0,1fr)}}
 @media print{body{padding:0;background:#fff}.band,.tabs,.subnav,.top .actions,#banner,#wibar,.noprint{display:none!important}.ccard,.tiles,.panel{break-inside:avoid}}

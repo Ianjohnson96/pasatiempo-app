@@ -89,7 +89,8 @@ addEventListener('resize', hideTip);
 function labelTables(root){
   for (const t of root.querySelectorAll('table:not([data-lab])')){
     t.dataset.lab = '1';
-    if (t.querySelector('input, select, textarea') || t.closest('.sizegrid, .prev')) continue;
+    // The forecast's what-if boxes work fine in a card; order lines and size grids need their columns.
+    if ((t.querySelector('input, select, textarea') && !t.matches('.fc')) || t.closest('.sizegrid, .prev')) continue;
     const heads = [];
     for (const th of t.querySelectorAll('thead tr:last-child th')){
       const h = th.querySelector('button.sorth, button[data-sort], .h');
@@ -98,7 +99,7 @@ function labelTables(root){
     }
     if (!heads.length) continue;
     t.classList.add('rt');
-    for (const tr of t.querySelectorAll('tbody tr')){
+    for (const tr of t.querySelectorAll('tbody tr, tfoot tr')){
       let i = 0;
       for (const td of tr.children){ if (!td.dataset.l && heads[i] && (td.colSpan || 1) === 1) td.dataset.l = heads[i]; if ((td.colSpan || 1) > 1) td.classList.add('rt-wide'); i += td.colSpan || 1; }
     }
