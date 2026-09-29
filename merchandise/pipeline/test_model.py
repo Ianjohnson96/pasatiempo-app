@@ -170,6 +170,11 @@ def test_budgets_count_shelf_sales_and_reports_show_special_orders_in_their_cate
     special_budget(ctx)
     assert ctx['base']['cats']['480']['so'] == {} and ctx['base']['cats']['480']['soOnHand'] == 0
     assert [r[7:] for r in brand_skus(b['ctx'])['rows']] == [['480', ''], ['480', 'member'], ['490', 'member']]
+    # a SKU rung to the wrong category reports where Sort SKUs puts it; its budget stays with the POS category
+    ctx = rebuild_ctx(dict(docs, **{'submap/current': {'cat': {'A1': '620'}}}))
+    assert {r['cat'] for r in build_subcats(ctx)['rows'] if r['sub'] == 's-620-other-accessories'} == {'620'}
+    special_budget(ctx)
+    assert ctx['base']['cats']['480']['so'] == v['so']
 
 if __name__ == '__main__':
     for name, fn in list(globals().items()):

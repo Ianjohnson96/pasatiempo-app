@@ -567,7 +567,7 @@ def sub_of(ctx, sku, cat, desc):
 
 def sort_sets(sm):
     """What was set in Subcategories -> Sort SKUs (submap/current): subcategory {sku: id}, special order
-    {sku: kind or 'shelf'} and, for Special Orders items, the category each sells as {sku: code}."""
+    {sku: kind or 'shelf'} and the category a SKU sells as when it isn't its POS one {sku: code}."""
     sm = sm or {}
     return dict(submap=sm.get('skus') or {}, soset=sm.get('so') or {}, sellset=sm.get('cat') or {})
 
@@ -599,8 +599,8 @@ def so_auto(cat, desc, sub=''):
 
 
 def sells_as(ctx, sku, cat, desc):
-    if cat not in OTB_EXCLUDE:
-        return cat
+    """The category a SKU reports in: the one set in Sort SKUs (any SKU, e.g. one rung to the wrong category),
+    else sells_auto. Budgets stay on the POS category."""
     v = (ctx.get('sellset') or {}).get(sku)
     return v if v in MERCH and v not in OTB_EXCLUDE else sells_auto(cat, desc)
 
