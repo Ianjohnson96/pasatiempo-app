@@ -24,8 +24,8 @@ const uid = () => Math.random().toString(36).slice(2,10);
 const STATUS = {open:'Open', partial:'Partly received', received:'Received', cancelled:'Cancelled'};
 const CALLTXT = {buy:'Buy', replenish:'Replenish', stop:'Stop', excluded:'Not in OTB'};
 const CALLHELP = {buy:'Growing and productive — buy within budget.', replenish:'Reorder proven sellers only; no new lines.', stop:'Already overbought — order only against a customer commitment.', excluded:'Customer-ordered; tracked but not budgeted.'};
-const BCALL = {grow:'Grow', keep:'Keep', watch:'Watch', reduce:'Reduce', drop:'Drop', inactive:'Not stocked'};
-const BCALLHELP = {grow:'Earning well and turning — give it more of the budget.', keep:'Doing its job — buy at the current level.', watch:'New or changing fast — judge after another season.', reduce:'Carry less: buy tighter and deeper on the winners only.', drop:'Stop buying; sell through what is left.', inactive:'Not in stock now.'};
+const BCALL = {grow:'Grow', keep:'Keep', watch:'Watch', reduce:'Reduce', drop:'Drop', inactive:'Not stocked', special:'Special orders'};
+const BCALLHELP = {grow:'Earning well and turning — give it more of the budget.', keep:'Doing its job — buy at the current level.', watch:'New or changing fast — judge after another season.', reduce:'Carry less: buy tighter and deeper on the winners only.', drop:'Stop buying; sell through what is left.', inactive:'Not in stock now.', special:'Bought when a member or a group orders; nothing to stock or budget.'};
 const SEGS = {mens:"Men's apparel", ladies:"Ladies' apparel", hats:'Hats', accessories:'Accessories', equipment:'Equipment & shoes'};
 const RISK_VENDORS = /winston|vanto|seamus|\bprg\b/i;
 const RUNS = {

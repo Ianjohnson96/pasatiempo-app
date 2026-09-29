@@ -1,6 +1,10 @@
 """python merchandise/pipeline/test_model.py"""
 from config import CATS
-from model import brand_inputs, brand_skus, build, build_brands, build_subcats, sub_auto, desc_changes, fy_months, fytd_by_category, open_desc_changes, rebuild_ctx
+import copy
+
+import engine
+from model import (brand_inputs, brand_skus, build, build_brands, build_subcats, sub_auto, desc_changes, fy_months, fytd_by_category,
+                   open_desc_changes, rebuild_ctx, sells_auto, so_auto, special_budget)
 
 
 def cat_report(start, end, sales):
@@ -120,6 +124,52 @@ def test_subcategories_from_descriptions_and_the_programs_choice():
     assert rows['s-480-junior']['units12'] == 10  # set in the program
     assert rows['s-480-other']['units12'] == 3  # from the description
 
+
+
+def test_special_orders_are_flagged_from_the_description():
+    assert so_auto('200', 'Woods Tit GT1 (Margerum)') == 'member'  # a customer's name
+    assert so_auto('480', 'Shirt Sip-N-Shop 25 Summit') == 'group'
+    assert so_auto('640', 'Rental Clubs Callaway') == 'notretail'
+    assert so_auto('640', 'Misc. Straight Down') == 'member'  # anything in Special Orders
+    assert so_auto('300', 'Shoes FJ Fitting Shoes') == ''  # fitting stock is shelf stock
+    assert so_auto('160', 'Balls Tit 26 Imprint', 's-160-custom-imprint') == 'member'
+    assert so_auto('480', 'Polo Peter Millar (Solid)') == 'member' and so_auto('480', 'Polo Peter Millar') == ''
+    assert sells_auto('640', 'Woods TM Qi4d (J Bogard)') == '200'
+    assert sells_auto('640', 'Sip-N-Shop 25 Summit') == ''  # the description doesn't say what was sold
+    assert sells_auto('480', 'Woods anything') == '480'  # only Special Orders items move
+
+
+def test_budgets_count_shelf_sales_and_reports_show_special_orders_in_their_category():
+    ly = {k: 1000.0 for k in fy_months(2026)}
+    units = {k: 10 for k in fy_months(2026)[3:] + ['2026-05', '2026-06']}
+    rep = sku_report('2026-06', units)
+    rep['rows'] += [dict(sku='B2', cat_no='480', desc='Polo FJ (Smith)', oh=1, cost=40.0, last_sale='Jun02/26', mo=dict(units)),
+                    dict(sku='C3', cat_no='640', desc='Hoodie Logo (Jones)', oh=0, cost=30.0, last_sale='Jun02/26', mo={'2026-06': 2})]
+    meta = {'A1': ['480', 'Polo', 50.0], 'B2': ['480', 'Polo FJ (Smith)', 50.0], 'C3': ['640', 'Hoodie Logo (Jones)', 60.0]}
+    prior = dict(base=prior_base(2027, ly, {}), skuhist={'meta': meta})
+    b = build({'sku_analysis': [rep]}, prior)
+    v = b['base']['cats']['480']
+    assert v['so']['2026-05'] == round(v['act']['2026-05'] / 2, 2) and v['so']['2025-11'] == 500.0  # half the category's sales
+    assert v['soOnHand'] == 40.0
+    shelf, full = engine.run(b['base']), engine.run(dict(b['base'], cats={c: dict(x, so={}, soOnHand=0) for c, x in b['base']['cats'].items()}))
+    r0, r1 = full['cats']['480'][1], shelf['cats']['480'][1]  # August: last August's split carries forward
+    assert r1['m'] == '2026-08' and abs(r1['cogs'] - r0['cogs'] / 2) < 0.01 and r1['sales'] == r0['sales']
+    assert shelf['cats']['480'][0]['bom'] == full['cats']['480'][0]['bom'] - 40  # special-order stock isn't shelf stock
+    # the report: C3 (Special Orders) sells as a sweater, flagged; the call and weeks count the shelf only
+    rows = {(r['cat'], r['sub']): r for r in build_subcats(b['ctx'])['rows']}
+    assert rows[('490', 's-490-hoodies')]['so'] == 120 and rows[('490', 's-490-hoodies')]['call'] == 'special'
+    polo = rows[('480', 's-480-men-s-polos')]
+    assert polo['so'] == polo['t12'] / 2 and polo['soOh'] == 40
+    # Update subcategories gives the same, and marking B2 shelf stock in Sort SKUs puts its sales back in the budget
+    docs = {'base/current': copy.deepcopy(b['base']), 'brandin/current': brand_inputs(b['ctx']), 'submap/current': {'so': {'B2': 'shelf'}}}
+    docs.update({f'skuhist/{k}': x for k, x in b['skuhist'].items()})
+    ctx = rebuild_ctx(dict(docs, **{'submap/current': {}}))
+    special_budget(ctx)
+    assert ctx['base']['cats']['480']['so'] == v['so']
+    ctx = rebuild_ctx(docs)
+    special_budget(ctx)
+    assert ctx['base']['cats']['480']['so'] == {} and ctx['base']['cats']['480']['soOnHand'] == 0
+    assert [r[7:] for r in brand_skus(b['ctx'])['rows']] == [['480', ''], ['480', 'member'], ['490', 'member']]
 
 if __name__ == '__main__':
     for name, fn in list(globals().items()):

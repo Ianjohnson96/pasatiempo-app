@@ -2,7 +2,9 @@
 
   sales      FY27 closed months = actual; open months = last year x (1 + growth for that month [+ category tweak])
              FY28 = FY27 x (1 + FY28 growth for the category); beyond FY28 repeats FY28
-  cost       sales x (1 - realized margin)
+  shelf      sales less special orders (cats[c].so: the month's own share, else the same month's a year earlier);
+             budgets are set on shelf sales and shelf stock (on hand less soOnHand)
+  cost       shelf sales x (1 - realized margin)
   target EOM weeks of supply x next four months' cost / 17.3 weeks
   OTB        target EOM - opening inventory + cost of sales for the month  (the current month counts only what is left)
 """
@@ -31,6 +33,18 @@ def sales_plan(base, a):
     return out, m27, m28
 
 
+def so_share(v, k):
+    """Special orders' part of a category's sales in month k: that month's own when it has sales, else the same
+    month's in the nearest year before that does."""
+    so = v.get('so') or {}
+    for i in range(4):
+        kk = add_months(k, -12 * i)
+        tot = v['act'].get(kk) or v['hist'].get(kk)
+        if tot:
+            return min(max(so.get(kk, 0) / tot, 0), 1)
+    return 0
+
+
 def run(base, a=None, carry=None):
     """Monthly OTB by category from the current month through the end of next fiscal year.
     carry: {cat: $} inventory above plan entering next year (committed orders beyond this year's budget)."""
@@ -47,15 +61,17 @@ def run(base, a=None, carry=None):
     res = {}
     for c, v in base['cats'].items():
         cr = 1 - v['gm']
-        bom = v['onHand']
+        shelf = {k: x * (1 - so_share(v, k)) for k, x in S[c].items()}
+        bom = v['onHand'] - v.get('soOnHand', 0)
         rows = []
         for k in months:
             if k == m28[0]:
                 bom += carry.get(c, 0)
-            sales = S[c][k] * (share if part and k == part['m'] else 1)
-            cogs = sales * cr
-            eom = wos[c] * sum(S[c][add_months(k, i + 1)] for i in range(4)) / 17.3 * cr
-            rows.append(dict(m=k, sales=sales, cogs=cogs, bom=bom, eom=eom, otb=eom - bom + cogs))
+            f = share if part and k == part['m'] else 1
+            sales, sh = S[c][k] * f, shelf[k] * f
+            cogs = sh * cr
+            eom = wos[c] * sum(shelf[add_months(k, i + 1)] for i in range(4)) / 17.3 * cr
+            rows.append(dict(m=k, sales=sales, shelf=sh, cogs=cogs, bom=bom, eom=eom, otb=eom - bom + cogs))
             bom = eom
         res[c] = rows
     return dict(sales=S, months=months, cats=res, share=share, m27=m27, m28=m28)

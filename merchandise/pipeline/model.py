@@ -16,7 +16,8 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 
 from brands import _SEG, brand_of, brand_split, segment_of, is_hat
-from config import (CATS, OTB_EXCLUDE, TARGET_WOS, MARKDOWN, G27_DEFAULT, G28_DEFAULT, COMBINED, DAILY_NAMES, SUB_RULES)
+from config import (CATS, OTB_EXCLUDE, TARGET_WOS, MARKDOWN, G27_DEFAULT, G28_DEFAULT, COMBINED, DAILY_NAMES, SUB_RULES,
+                    SO_KINDS, SO_NOT_RETAIL, SO_GROUP, SO_SHELF, SO_MEMBER, SO_MEMBER_SUBS, SELLS_AS)
 
 MERCH = set(CATS)
 MON = {'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6, 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12}
@@ -381,7 +382,8 @@ def build(reports, prior=None):
     ctx = dict(as_of=as_of, cur=cur, actual_through=actual_through, fy=fy, snap=snap, sku_month=snap_rep['as_of'], hist=hist, px=px, sku_gm=sku_gm,
                bmap=brand_assignments(prior.get('brandmap')), blist=prior.get('brandmap') or {},
                desc_of=desc_of, cat_of=cat_of, items=reports.get('sales_by_item', []), base=base, changed=changed,
-               submap=(prior.get('submap') or {}).get('skus') or {}, subids=prior.get('subids'))
+               subids=prior.get('subids'), **sort_sets(prior.get('submap')))
+    special_budget(ctx)
     return dict(base=base, inventory=inventory, skuhist=skuhist, ctx=ctx)
 
 
@@ -563,6 +565,85 @@ def sub_of(ctx, sku, cat, desc):
     return sub_auto(cat, desc, ctx.get('subids'))
 
 
+def sort_sets(sm):
+    """What was set in Subcategories -> Sort SKUs (submap/current): subcategory {sku: id}, special order
+    {sku: kind or 'shelf'} and, for Special Orders items, the category each sells as {sku: code}."""
+    sm = sm or {}
+    return dict(submap=sm.get('skus') or {}, soset=sm.get('so') or {}, sellset=sm.get('cat') or {})
+
+
+_SO = {k: re.compile(v, re.I) for k, v in dict(notretail=SO_NOT_RETAIL, group=SO_GROUP, shelf=SO_SHELF, member=SO_MEMBER).items()}
+_SELLS = [(re.compile(rx), c) for rx, c in SELLS_AS]
+
+
+def sells_auto(cat, desc):
+    """The category a SKU sells as: its own, or for a Special Orders item the one its description names ('' if none)."""
+    if cat not in OTB_EXCLUDE:
+        return cat
+    d = (desc or '').lower()
+    return next((c for rx, c in _SELLS if rx.search(d)), '')
+
+
+def so_auto(cat, desc, sub=''):
+    """Special-order kind from the description (config SO_*): 'member', 'group', 'notretail' or '' for shelf stock."""
+    d = desc or ''
+    if cat in OTB_EXCLUDE and _SO['notretail'].search(d):
+        return 'notretail'
+    if _SO['group'].search(d):
+        return 'group'
+    if _SO['shelf'].search(d):
+        return ''
+    if cat in OTB_EXCLUDE or _SO['member'].search(d) or sub in SO_MEMBER_SUBS:
+        return 'member'
+    return ''
+
+
+def sells_as(ctx, sku, cat, desc):
+    if cat not in OTB_EXCLUDE:
+        return cat
+    v = (ctx.get('sellset') or {}).get(sku)
+    return v if v in MERCH and v not in OTB_EXCLUDE else sells_auto(cat, desc)
+
+
+def classify(ctx, sku, cat, desc):
+    """(category it sells as, subcategory, special-order kind) with what was set in Sort SKUs. A Special Orders
+    item with no category yet stays in Special Orders."""
+    sc = sells_as(ctx, sku, cat, desc) or cat
+    sub = sub_of(ctx, sku, sc, desc)
+    v = (ctx.get('soset') or {}).get(sku)
+    return sc, sub, '' if v == 'shelf' else v if v in SO_KINDS else so_auto(cat, desc, sub)
+
+
+def special_budget(ctx):
+    """Budgets count shelf sales and shelf stock: each category's special-order sales by month (cats[c].so, the
+    category's own figures split the way its SKUs' sales split) and special-order stock on hand (soOnHand), for
+    the engine to leave out. Special Orders (640) itself stays outside the budgets altogether."""
+    base, hist, px, snap = ctx['base'], ctx['hist'], ctx['px'], ctx['snap']
+    est, eso, soh = defaultdict(lambda: defaultdict(float)), defaultdict(lambda: defaultdict(float)), defaultdict(float)
+    for s, mo in hist.items():
+        c = ctx['cat_of'].get(s)
+        if c not in MERCH or c in OTB_EXCLUDE:
+            continue
+        p = px(s)
+        r = snap.get(s)
+        so = classify(ctx, s, c, ctx['desc_of'].get(s, '') or (r['desc'] if r else ''))[2]
+        for k, u in mo.items():
+            est[c][k] += u * p
+            if so:
+                eso[c][k] += u * p
+    for s, r in snap.items():
+        c = ctx['cat_of'].get(s) or r.get('cat_no')
+        if c in MERCH and c not in OTB_EXCLUDE and r['oh'] > 0 and classify(ctx, s, c, ctx['desc_of'].get(s, '') or r['desc'])[2]:
+            soh[c] += r['oh'] * r['cost']
+    for c, v in base['cats'].items():
+        so = {}
+        for src in (v['hist'], v['act']):
+            for k, x in src.items():
+                if eso[c].get(k) and est[c].get(k):
+                    so[k] = round(x * min(eso[c][k] / est[c][k], 1), 2)
+        v['so'], v['soOnHand'] = dict(sorted(so.items())), round(soh[c], 2)
+
+
 def _windows(ctx):
     at = ctx['actual_through']
     t12m = [add_months(at, -i) for i in range(12)][::-1]
@@ -572,23 +653,38 @@ def _windows(ctx):
 
 
 def _aggregate(ctx, W, groups_of):
-    """Sales, stock and margin by group over every merchandise SKU outside special orders.
-    groups_of(sku, cat, desc, snapshot row) -> ([(key, share)], assigned, key for sales that fit no group)."""
+    """Sales, stock and margin by group over every merchandise SKU, Special Orders items in the category they sell
+    as (not-retail items left out), with the special-order part kept apart (so*). groups_of(sku, category it sells
+    as, desc, snapshot row, subcategory) -> ([(key, share)], assigned, key for sales that fit no group), or None
+    to leave the SKU out. Returns (groups, unassigned, special): special = {kind: {n, t12, oh}} over every SKU."""
     as_of, snap, hist, px, sku_gm = ctx['as_of'], ctx['snap'], ctx['hist'], ctx['px'], ctx['sku_gm']
     desc_of, cat_of = ctx['desc_of'], ctx['cat_of']
     B = defaultdict(lambda: dict(skus=0, t12=0.0, cogs12=0.0, oh=0.0, aged=0.0, ly=0, ty=0, g=0.0, c=0.0, md=0.0, units12=0,
-                                 ytd=0.0, ytdly=0.0, series=defaultdict(float), cats=defaultdict(float), top=[], agedList=[], assigned=False))
+                                 ytd=0.0, ytdly=0.0, series=defaultdict(float), cats=defaultdict(float), top=[], agedList=[], assigned=False,
+                                 so12=0.0, so_cogs12=0.0, so_oh=0.0, so_ly=0, so_ty=0, soKinds=defaultdict(float)))
     unassigned = defaultdict(float)
+    special = defaultdict(lambda: dict(n=0, t12=0.0, oh=0.0))
     for s in sorted(set(hist) | set(snap)):  # sorted: ties in the top lists come out the same every run
-        c = cat_of.get(s)
-        if c not in MERCH or c in OTB_EXCLUDE:
+        c0 = cat_of.get(s)
+        if c0 not in MERCH:
             continue
         desc = desc_of.get(s, '')
         r = snap.get(s)
-        splits, assigned, miss = groups_of(s, c, desc, r)
+        c, sub, so = classify(ctx, s, c0, desc or (r['desc'] if r else ''))
         mo = hist.get(s, {})
         p = px(s)
         t12 = sum(mo.get(k, 0) for k in W['t12m']) * p
+        if so:
+            k = special[so]
+            k['n'] += 1
+            k['t12'] += t12
+            k['oh'] += max(r['oh'], 0) * r['cost'] if r else 0
+        if so == 'notretail':
+            continue
+        g = groups_of(s, c, desc, r, sub)
+        if g is None:
+            continue
+        splits, assigned, miss = g
         if not splits:
             unassigned[miss] += t12
             continue
@@ -611,11 +707,18 @@ def _aggregate(ctx, W, groups_of):
             a['ytd'] += sum(mo.get(k, 0) for k in W['fyc']) * p * sh
             a['ytdly'] += sum(mo.get(k, 0) for k in W['fyl']) * p * sh
             a['cats'][c] += t12 * sh
+            if so:
+                a['so12'] += t12 * sh
+                a['so_cogs12'] += u12 * cost * sh
+                a['so_oh'] += v * sh
+                a['so_ty'] += sum(mo.get(k, 0) for k in W['last3']) * sh
+                a['so_ly'] += sum(mo.get(k, 0) for k in W['ly3']) * sh
+                a['soKinds'][so] += t12 * sh
             for k in W['series_m']:
                 if mo.get(k):
                     a['series'][k] += mo[k] * p * sh
             a['oh'] += v * sh
-            part = {} if sh >= 0.9995 else dict(share=round(sh, 3))
+            part = {**({} if sh >= 0.9995 else dict(share=round(sh, 3))), **(dict(so=so) if so else {})}
             if aged:
                 a['aged'] += v * sh
                 a['agedList'].append(dict(sku=s, desc=desc, oh=round(r['oh'] * sh), value=round(v * sh), last=r['last_sale'], **part))
@@ -626,15 +729,19 @@ def _aggregate(ctx, W, groups_of):
             if t12 > 0 or v > 0:
                 a['top'].append(dict(sku=s, desc=desc, cat=c, t12=round(t12 * sh), units=round(u12 * sh), oh=round((r['oh'] if r else 0) * sh),
                                      value=round(v * sh), **part))
-    return B, unassigned
+    return B, unassigned, special
 
 
 def _metrics(a, base, W):
-    cat_gm = sum(base['cats'][c]['gm'] * v for c, v in a['cats'].items()) / a['t12'] if a['t12'] else None
+    """Sales measures count everything sold; the stock measures (weeks of supply, GMROI) and the call count shelf
+    sales against shelf stock, since special orders are bought when a customer orders."""
+    cat_gm = sum(base['cats'].get(c, {}).get('gm', 0.4) * v for c, v in a['cats'].items()) / a['t12'] if a['t12'] else None
     gm = (a['g'] - a['c']) / a['g'] if a['g'] > 0 else cat_gm
     md = a['md'] / (a['g'] + a['md']) if a['g'] + a['md'] > 0 else None
-    wks = a['oh'] / (a['cogs12'] / 52) if a['cogs12'] > 0 else (None if a['oh'] <= 0 else 999)
-    gmroi = (a['t12'] * gm) / a['oh'] if a['oh'] > 0 and gm is not None else None
+    t12, cogs, oh = a['t12'] - a['so12'], a['cogs12'] - a['so_cogs12'], a['oh'] - a['so_oh']
+    wks = oh / (cogs / 52) if cogs > 0.005 else (None if oh <= 0.005 else 999)
+    gmroi = (t12 * gm) / oh if oh > 0.005 and gm is not None else None
+    so = dict(so=round(a['so12']), soOh=round(a['so_oh']), soKinds={k: round(v) for k, v in a['soKinds'].items() if v >= 0.5}) if a['so12'] or a['so_oh'] else {}
     return dict(skus=a['skus'], t12=round(a['t12']),
                 units12=round(a['units12']), ytd=round(a['ytd']), ytdly=round(a['ytdly']), oh=round(a['oh']), aged=round(a['aged']),
                 agedPct=round(a['aged'] / a['oh'], 3) if a['oh'] else 0, gm=round(gm, 3) if gm is not None else None,
@@ -642,7 +749,16 @@ def _metrics(a, base, W):
                 gmroi=round(gmroi, 2) if gmroi is not None else None, ly=round(a['ly']), ty=round(a['ty']),
                 cats={c: round(v) for c, v in sorted(a['cats'].items(), key=lambda x: -x[1]) if v > 0},
                 series=[round(a['series'].get(k, 0)) for k in W['series_m']],
-                top=sorted(a['top'], key=lambda x: -x['t12'])[:8], agedSkus=sorted(a['agedList'], key=lambda x: -x['value'])[:6])
+                top=sorted(a['top'], key=lambda x: -x['t12'])[:8], agedSkus=sorted(a['agedList'], key=lambda x: -x['value'])[:6], **so)
+
+
+def _call(m, a):
+    """call_for on the shelf part of the sales and stock; a line that is nearly all special orders with nothing on
+    the shelf is 'special'."""
+    shelf_oh = a['oh'] - a['so_oh']
+    if a['so12'] > 0 and a['so12'] >= 0.8 * a['t12'] and shelf_oh <= 0.5:
+        return 'special', 'Special orders: bought when a customer orders, so there is no stock to manage.'
+    return call_for(dict(m, t12=round(a['t12'] - a['so12']), ty=round(a['ty'] - a['so_ty']), ly=round(a['ly'] - a['so_ly']), oh=round(shelf_oh)))
 
 
 def _header(ctx, W):
@@ -654,18 +770,20 @@ def build_brands(ctx):
     W = _windows(ctx)
     bmap = ctx.get('bmap') or {}
 
-    def groups(s, c, desc, r):
+    def groups(s, c, desc, r, sub):
+        if c in OTB_EXCLUDE:  # a special order with no category yet stays off the scorecard
+            return None
         seg = segment_of(c, desc)
         splits = brand_split(bmap, s, desc, r['desc'] if r else '', bl=ctx.get('blist'))
         return [((seg, b), sh) for b, sh in splits], bool(bmap.get(s)), seg
 
-    B, unassigned = _aggregate(ctx, W, groups)
+    B, unassigned, _ = _aggregate(ctx, W, groups)
     rows = []
     for (seg, b), a in B.items():
         if a['t12'] < 100 and a['oh'] <= 0 and not a['assigned']:  # a brand someone assigned always gets its line
             continue
         m = dict(seg=seg, brand=b, id=re.sub(r'[^a-z0-9]+', '-', f'{seg}-{b}'.lower()).strip('-'), **_metrics(a, ctx['base'], W))
-        m['call'], m['why'] = call_for(m)
+        m['call'], m['why'] = _call(m, a)
         rows.append(m)
     rows.sort(key=lambda r: -r['t12'])
     return dict(_header(ctx, W), unassigned={k: round(v) for k, v in unassigned.items()}, rows=rows)
@@ -673,23 +791,25 @@ def build_brands(ctx):
 
 def build_subcats(ctx):
     """Subcategory report (assort/current): the brand scorecard's measures by category and subcategory, sub ''
-    for SKUs no subcategory fits. Reporting only: budgets stay by category."""
+    for SKUs no subcategory fits, Special Orders items in the category they sell as (cat 640 for those with none
+    yet). special: special-order sales and stock by kind. Reporting only: budgets stay by category."""
     W = _windows(ctx)
 
-    def groups(s, c, desc, r):
-        return [((c, sub_of(ctx, s, c, desc or (r['desc'] if r else ''))), 1.0)], False, c
+    def groups(s, c, desc, r, sub):
+        return [((c, sub), 1.0)], False, c
 
-    B, _ = _aggregate(ctx, W, groups)
+    B, _, special = _aggregate(ctx, W, groups)
     rows = []
     for (c, sub), a in B.items():
         if a['t12'] <= 0 and a['oh'] <= 0:
             continue
         m = dict(cat=c, sub=sub, seg=_SEG.get(c, 'other'), **_metrics(a, ctx['base'], W))
-        m['call'], m['why'] = call_for(m)
+        m['call'], m['why'] = _call(m, a)
         del m['seg']
         rows.append(m)
     rows.sort(key=lambda r: (r['cat'], -r['t12']))
-    return dict(_header(ctx, W), at=datetime.now(timezone.utc).isoformat(timespec='seconds'), rows=rows)
+    return dict(_header(ctx, W), at=datetime.now(timezone.utc).isoformat(timespec='seconds'), rows=rows,
+                special={k: dict(n=v['n'], t12=round(v['t12']), oh=round(v['oh'])) for k, v in special.items()})
 
 
 def brand_inputs(ctx):
@@ -742,13 +862,15 @@ def rebuild_ctx(docs):
     return dict(as_of=date.fromisoformat(base['asOf']), actual_through=base['actualThrough'], fy=int(base['fy'][2:]), snap=snap,
                 hist=hist, px=lambda s: px.get(s, 0), sku_gm=sku_gm, desc_of=desc_of, cat_of=cat_of, base=base,
                 bmap=brand_assignments(bm), blist=bm, changed=open_desc_changes(bi.get('changed'), bm),
-                submap=(docs.get('submap/current') or {}).get('skus') or {}, subids=subcat_ids(docs))
+                subids=subcat_ids(docs), **sort_sets(docs.get('submap/current')))
 
 
 def brand_skus(ctx):
-    """Every SKU with stock or sales in the last 12 months, for assigning brands in the program:
+    """Every SKU with stock or sales in the last 12 months, for assigning brands and sorting SKUs in the program:
     [sku, description, category, brand from the description ('' if none), 12-month sales $, on hand $ at cost,
-    subcategory from the description ('' if none)]."""
+    subcategory from the description in the category it sells as ('' if none), category a Special Orders item
+    sells as from its description ('' if none; the SKU's own category otherwise), special-order kind from the
+    description ('' for shelf stock)]."""
     at, snap, hist, px = ctx['actual_through'], ctx['snap'], ctx['hist'], ctx['px']
     t12m = [add_months(at, -i) for i in range(12)]
     rows = []
@@ -761,6 +883,7 @@ def brand_skus(ctx):
         t12 = sum(hist.get(s, {}).get(k, 0) for k in t12m) * px(s)
         oh = max(r['oh'], 0) * r['cost'] if r else 0
         if t12 > 0 or oh > 0:
+            sc = sells_as(ctx, s, c, desc) or c
             rows.append([s, desc, c, brand_of(desc, ctx.get('blist')) or (brand_of(r['desc'], ctx.get('blist')) if r else None) or '', round(t12), round(oh),
-                         sub_auto(c, desc, ctx.get('subids'))])
+                         sub_auto(sc, desc, ctx.get('subids')), sells_auto(c, desc), so_auto(c, desc, sub_of(ctx, s, sc, desc))])
     return dict(asOf=ctx['as_of'].isoformat(), rows=rows, changed=ctx.get('changed') or {})

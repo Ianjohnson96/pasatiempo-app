@@ -47,13 +47,14 @@ Fiscal year: May 1 – Apr 30. Sales are at retail. Stock and budgets are at cos
 
 - **Sales, this year:** closed months are actual. Each open month = the same month last year × (1 + month growth + category extra growth).
 - **Sales, next year:** this year × (1 + next-year growth for the category). Beyond that, next year repeats.
-- **Cost of sales** = sales × (1 − realized margin from the cost & margin report).
-- **Target end-of-month stock** = target weeks × (next four months' cost of sales) ÷ 17.3.
+- **Shelf sales** = sales less special orders. Budgets count shelf sales and shelf stock only (see Special orders below).
+- **Cost of sales** = shelf sales × (1 − realized margin from the cost & margin report).
+- **Target end-of-month stock** = target weeks × (next four months' cost of shelf sales) ÷ 17.3. Opening stock is on hand less special-order stock.
 - **OTB for a month** = target EOM − opening stock + cost of sales. In the current month, cost of sales covers only the part not yet sold.
 - **Next year's opening stock** = this year's April target + carry. Carry = max(this year's budget with changes, committed, 0) − this year's plan budget.
 - Special Orders (640) count in sales but never get a budget.
 
-`pipeline/engine.py` and `app/src/20-engine.js` implement the same model. They must agree. With the Sep 11, 2026 reports, the FY2027 remaining budget comes to $717,316 with default FY2028 growth, or $702,037 with FY2028 growth set to 0. The second figure is the original published plan's $701,996, give or take rounding in SKU prices.
+`pipeline/engine.py` and `app/src/20-engine.js` implement the same model. They must agree. With the Sep 11, 2026 reports, before special orders were left out, the FY2027 remaining budget came to $717,316 with default FY2028 growth, or $702,037 with FY2028 growth set to 0. The second figure matched the original published plan's $701,996, give or take rounding in SKU prices. With the Sep 30, 2026 data, leaving special orders out takes the FY2027 budget from $670,381 to $556,232 and Golf Clubs from $64,485 to −$15,266.
 
 ## Brands
 
@@ -80,11 +81,21 @@ The page shows new names and words at once (brand labels, the SKU list's "no bra
 
 ## Subcategories
 
-Inside each category, the **Subcategories** page shows where the sales and the stock are, with the brand scorecard's measures: 12-month sales and share of the category, trend, on hand, weeks of supply, margin, GMROI, aged stock, what the Order Book has committed this year, and a call. Special orders are left out. It is reporting only: budgets stay by category.
+Inside each category, the **Subcategories** page shows where the sales and the stock are, with the brand scorecard's measures: 12-month sales and share of the category, trend, on hand, weeks of supply, margin, GMROI, aged stock, what the Order Book has committed this year, and a call. Special orders show in the category they sell as, flagged (see below). It is reporting only: budgets stay by category.
 
 - The subcategory list is the program's own (`subcats/{id}`, the same list order lines use).
 - A SKU's subcategory comes from its description (`config.SUB_RULES`, checked in order; `model.sub_auto`), unless someone sets it under **Sort SKUs** (`submap/current`: `{skus: {sku: subcat id}}`, where `""` means not sorted). Choosing the one the description gives removes the override. A rule for a subcategory that was removed is skipped.
 - The report is `assort/current` (`model.build_subcats`), built at every month-end upload and by **Update brands** / **Update subcategories** (both rebuild the scorecard and the report). The category panel on the Overview shows the same split.
+
+## Special orders
+
+Items bought for one member (custom clubs, a named order, imprinted balls) or one group (an invitational, member-guest, an outside group's logo order) sell as ordinary categorized items. They are not a category of their own:
+
+- **Reports** show them in the category they sell as, with a *Special order* tag and their share of sales (Subcategories, the brand scorecard, the Forecast's by-category table). Weeks of supply, GMROI and the call count shelf sales against shelf stock; a line that is nearly all special orders with nothing on the shelf gets the call *Special orders*.
+- **Budgets** count shelf sales and shelf stock only. `model.special_budget` stores each category's special-order sales by month (`base/current` `cats[c].so`, the category's own figures split the way its SKUs' sales split) and its special-order stock (`soOnHand`); the engine leaves out the month's own share, or the same month's a year earlier for a month that hasn't happened.
+- **Which SKUs** come from the description (`config.SO_*`, `model.so_auto`): a customer's name in brackets, a group or event word, the custom-fitting and custom-imprint subcategories, and everything rung to Special Orders (640), except rentals, repairs and fees there, which are *Not retail* and left out of the reports. Fitting stock stays shelf stock.
+- **Special Orders (640) items** report in the category their description names (`config.SELLS_AS`, `model.sells_auto`); the ones it doesn't (Sip-N-Shop and logo orders) wait under **Needs a category**. 640 itself stays outside the budgets.
+- **Sort SKUs** corrects any of it (`submap/current` `so: {sku: "member" | "group" | "notretail" | "shelf"}`, `cat: {sku: category}` for 640 items). **Update subcategories** (or **Update brands**, or a month-end upload) puts the changes into the reports and the budgets (`refresh.rebuild_brands` also rewrites `base/current`'s `so`, `soOnHand` and category calls).
 
 ## Navigation
 

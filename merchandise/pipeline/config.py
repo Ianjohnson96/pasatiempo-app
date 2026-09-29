@@ -55,8 +55,8 @@ COMBINED = {
 # "." catches the rest of the category. Brands -> Subcategories -> Sort SKUs corrects any SKU.
 SUB_RULES = {
     '160': [('s-160-custom-imprint', r'(?<!no )imprint|custom|\('), ('s-160-logo-balls', r'logo|pasatiempo|\bind\b'), ('s-160-stock-balls', r'.')],
-    '200': [('s-200-custom-fitting-orders', r'\('), ('s-200-putters', r'putter'), ('s-200-drivers-woods', r'wood|driver|\bdr\b|fwy|hyb'),
-            ('s-200-irons-wedges', r'iron|wedge|\bsm\d|vokey')],
+    '200': [('s-200-putters', r'putter'), ('s-200-drivers-woods', r'wood|driver|\bdr\b|fwy|hyb'),
+            ('s-200-irons-wedges', r'iron|wedge|\bsm\d|vokey'), ('s-200-custom-fitting-orders', r'\(')],
     '220': [('s-220-demo-clubs', r'.')],
     '300': [('s-300-junior-shoes', r'\bjr\b|junior'), ('s-300-shoe-accessories', r'spike|lace|shoe bag|tree'),
             ("s-300-women-s-shoes", r'\bw\b|wmn|women|ladies'), ("s-300-men-s-shoes", r'.')],
@@ -85,3 +85,24 @@ SUB_RULES = {
     '640': [('s-640-customer-special-order', r'.')],
     '660': [('s-660-greens-yardage-books', r'.')],
 }
+
+# Special orders: items bought for one customer or one group rather than for the shelf. They sell as ordinary
+# categorized items, so reports show them in their category (flagged), while budgets count shelf sales and
+# stock only. model.so_auto sets the flag from the description; Subcategories -> Sort SKUs corrects any SKU.
+SO_KINDS = {'member': 'Member special order', 'group': 'Group & event order', 'notretail': 'Not retail'}
+SO_NOT_RETAIL = r'rental|\bdemo\b|fit cart|scoring kit|caddie bib|tee prize|sanford|clean up|exchange|repair|replace'  # only in 640
+SO_GROUP = (r'sip-n-|invitational|\binv\b|mack? ?g\b|mem/mem|member.?guest|mac cup|team play|gathering|ucsc|bay cit|ymca|lutz ?-|'
+            r'lnp[cg]|rutan|mauna kea|\bmc\b|staff uni')
+SO_SHELF = r'fitting (shoes|putter)|sm11 fitting|fitting$'  # fitting stock, bought for the shelf
+SO_MEMBER = r"\((?!\d)[A-Za-z .&'/-]{2,}"  # a customer's name in brackets
+SO_MEMBER_SUBS = {'s-200-custom-fitting-orders', 's-160-custom-imprint'}
+
+# The category a Special Orders (640) item sells as, from its description. Checked in order, first match wins;
+# no match leaves it in Special Orders until someone picks one in Sort SKUs.
+SELLS_AS = [(r'push cart|mgi|remote|motor|legs', '620'), (r'sunglass|maui jim|\bmj\b|oakley|meta glasses', '620'),
+            (r'tote|bag tag|towel|marker', '620'),
+            (r'\bputters?\b|\bwoods?\b|\birons?\b|\bwedges?\b|\bdriver\b|\bfwy\b|\bhyb\b|\bgts\b|\bsm1\d\b|fairway wood', '200'),
+            (r'\bballs?\b|pro-?v1', '160'), (r'\bshoes?\b', '300'), (r'\bgloves?\b', '320'), (r'\bbag staff\b|^bag\b|cart bag|stand bag', '350'),
+            (r'\bhats?\b|visor|beanie|belt', '440'), (r'skort|skirt|ladies|women', '500'),
+            (r'hood|sweater|cashmere|1/4|quarter|crew|\bvests?\b', '490'), (r'jacket|pullover|rain', '470'),
+            (r'pants|shorts?\b|tegging', '430'), (r'shirts?|polo|\btee\b|t-shirt', '480')]

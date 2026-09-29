@@ -137,7 +137,7 @@ function renderHelp(){
     <dt>Orders</dt><dd>Every purchase order. Each one counts against the fiscal year it arrives in.</dd>
     <dt>Brands</dt><dd>A scorecard for every brand, by men's, ladies', hats, accessories and equipment, with a call: Grow, Keep, Watch, Reduce or Drop.</dd>
     <dt>Vendors</dt><dd>Vendor contacts, account numbers, terms and lead times.</dd>
-    <dt>Subcategories</dt><dd>Inside each category, where the sales and the stock are: headcovers against towels, polos against quarter-zips. Sales, trend, weeks of supply, margin, GMROI, aged stock and what's on order, with a call for each. SKUs are sorted from their descriptions; <b>Sort SKUs</b> fixes any that land in the wrong place. Budgets stay by category.</dd>
+    <dt>Subcategories</dt><dd>Inside each category, where the sales and the stock are: headcovers against towels, polos against quarter-zips. Sales, trend, weeks of supply, margin, GMROI, aged stock and what's on order, with a call for each. Special orders show in the category they sell as, with their share of sales; weeks of supply, GMROI and the call count shelf sales and shelf stock only. SKUs are sorted from their descriptions; <b>Sort SKUs</b> fixes any that land in the wrong place, marks what is a special order, and places Special Orders items in a category. Budgets stay by category.</dd>
     <dt>Inventory &amp; counts</dt><dd>Stock by category, aging, and the quarterly count.</dd>
     <dt>To do</dt><dd>Order problems and item-level suggestions: reorders, stock-outs, aged stock, combined SKUs, data errors.</dd>
     <dt>Month-end</dt><dd>The checklist, the refresh history, and how each month came in against the forecast.</dd></dl>
@@ -147,10 +147,10 @@ function renderHelp(){
       <div class="ln"><span class="op">+</span><span>What you're expected to sell, at cost</span><span>forecast</span></div>
       <div class="ln"><span class="op">−</span><span>What's on the shelf at the start</span><span>on hand</span></div>
       <div class="ln tot"><span class="op">=</span><span>What you can still bring in</span><span>budget</span></div></div>
-    <p><b>It's based on sales.</b> This year's open months are last year's sales for the month plus a growth rate, and next year is this year plus a growth rate for each category. All of it is on the Forecast page, converted to cost at each category's real margin.</p>
+    <p><b>It's based on sales.</b> This year's open months are last year's sales for the month plus a growth rate, and next year is this year plus a growth rate for each category. All of it is on the Forecast page, converted to cost at each category's real margin. <b>Only shelf sales count:</b> special orders — a member's custom clubs, an event's logo order — are bought when the customer orders, so their sales and the stock waiting for them are left out of every budget.</p>
     <h3 style="margin-top:14px">Worked example: General Accessories, ${P.fy}</h3>
-    <div class="formula"><div class="ln"><span class="op"></span><span>Target stock at the end of ${monthLabel(P.window.to)}</span><span>${money(ga.target || 0)}</span></div><div class="sub">${ga.wos || 14} weeks of the cost of sales forecast for the four months after</div>
-      <div class="ln"><span class="op">+</span><span>Forecast cost of sales</span><span>${money(ga.cogs || 0)}</span></div><div class="sub">${money(ga.sales || 0)} of sales at retail, at ${Math.round((ga.gm || 0) * 100)}% margin</div>
+    <div class="formula"><div class="ln"><span class="op"></span><span>Target stock at the end of ${monthLabel(P.window.to)}</span><span>${money(ga.target || 0)}</span></div><div class="sub">${ga.wos || 14} weeks of the cost of shelf sales forecast for the four months after</div>
+      <div class="ln"><span class="op">+</span><span>Forecast cost of shelf sales</span><span>${money(ga.cogs || 0)}</span></div><div class="sub">${money(ga.shelf || 0)} of shelf sales at retail, at ${Math.round((ga.gm || 0) * 100)}% margin</div>
       <div class="ln"><span class="op">−</span><span>On hand ${dateLabel(P.asOf)}</span><span>${money(ga.onHand || 0)}</span></div>
       <div class="ln tot"><span class="op">=</span><span>${P.fy} budget</span><span>${money(ga.plan || 0)}</span></div></div>
   </div></section>
