@@ -75,7 +75,7 @@ function hideTip(){ if (tipBox.hidden) return; tipBox.hidden = true; if (tipOn) 
 
 const tipHost = t => t.closest && t.closest('.tipi, [data-cv]');
 document.addEventListener('mouseover', e => { const b = tipHost(e.target); if (b) showTip(b); else if (tipOn && document.activeElement !== tipOn) hideTip(); });
-document.addEventListener('focusin', e => { if (e.target.matches && e.target.matches('.tipi')) showTip(e.target); else hideTip(); });
+document.addEventListener('focusin', e => { if (e.target.matches && e.target.matches('.tipi, [data-cv][tabindex]')) showTip(e.target); else hideTip(); });
 // A tap shows it (and never sorts the column the (i) sits in); a tap anywhere else puts it away.
 document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('.tipi');
   if (b){ e.preventDefault(); e.stopImmediatePropagation(); showTip(b); return; }

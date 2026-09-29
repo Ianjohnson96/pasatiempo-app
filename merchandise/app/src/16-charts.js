@@ -22,7 +22,7 @@ function chRange(vals, zeroBase = true){
   const v = vals.filter(x => x != null && isFinite(x));
   if (!v.length) return [0, 1];
   let lo = zeroBase ? Math.min(0, ...v) : Math.min(...v), hi = Math.max(zeroBase ? 0 : -Infinity, ...v);
-  if (!zeroBase){ const span = chNice((hi - lo) || Math.abs(hi) || 1), st = span / 4; lo = Math.floor(lo / st) * st; hi = lo + Math.ceil((hi - lo) / st) * st || lo + span; return [lo, hi]; }
+  if (!zeroBase){ const span = chNice((hi - lo) || Math.abs(hi) || 1), st = span / 4; lo = Math.floor(lo / st) * st; hi = Math.max(lo + st, lo + Math.ceil((hi - lo) / st) * st); return [lo, hi]; }
   hi = chNice(hi); if (lo < 0) lo = -chNice(-lo);
   return [lo, hi];
 }
@@ -128,7 +128,7 @@ function chSpark(values, {w = 120, h = 28, k = 1} = {}){
 }
 
 /** A legend: a swatch and the series name, in ink. */
-const chLegend = series => `<div class="lg">${series.map(s => `<span><i class="sw k${s.k}${s.dash ? ' dash' : ''}"></i>${chEsc(s.name)}</span>`).join('')}</div>`;
+const chLegend = series => `<div class="lg">${series.map(s => `<span><i class="csw k${s.k}${s.dash ? ' dash' : ''}"></i>${chEsc(s.name)}</span>`).join('')}</div>`;
 
 // Redraw charts when the page width really changes (not on every resize event).
 let chLastW = 0;

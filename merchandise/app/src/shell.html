@@ -369,7 +369,7 @@ tr.tot td{font-weight:600;border-top:1px solid var(--rule2)}
 .checks .d{display:block;font-size:12.5px;color:var(--muted)}
 .checks .who{display:inline-flex;gap:4px;align-items:center;font-size:11.5px;color:var(--cypress);margin-top:2px}
 .checks .who img{width:16px;height:16px;border-radius:50%}
-/* analysis pages: headline tiles, chart cards, grades, heat cells (35-summary.js, 36-analysis.js) */
+/* analysis pages: headline tiles, chart cards, grades, heat cells (35-analysis.js) */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .tile{background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:14px 15px 13px;min-width:0}
 .tile .v{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-top:4px;font-variant-numeric:tabular-nums;line-height:1.15}
@@ -405,9 +405,9 @@ td.h-bad{background:color-mix(in srgb,var(--tint-stop) 90%,transparent);color:va
 .ch.spark{display:inline-block;vertical-align:middle}
 .lg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted);margin:0 0 8px}
 .lg span{display:inline-flex;align-items:center;gap:6px}
-.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
-.sw.k1{background:var(--c1)}.sw.k2{background:var(--c2)}.sw.k3{background:var(--c3)}.sw.kly{background:var(--c-ly)}
-.sw.dash{height:3px;border-radius:2px}
+.csw{width:12px;height:12px;border-radius:3px;display:inline-block}
+.csw.k1{background:var(--c1)}.csw.k2{background:var(--c2)}.csw.k3{background:var(--c3)}.csw.kly{background:var(--c-ly)}
+.csw.dash{height:3px;border-radius:2px}
 .sug{list-style:none;margin:0;padding:0}
 .sug li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 14px;padding:11px 16px;border-bottom:1px solid var(--rule)}
 .sug li:last-child{border-bottom:none}
@@ -439,6 +439,8 @@ td.h-bad{background:color-mix(in srgb,var(--tint-stop) 90%,transparent);color:va
 .atbl tr.acat:hover td{background:var(--hover)}
 .atbl .caret{display:inline-block;width:14px;color:var(--faint);transition:transform .15s}
 .atbl tr.open .caret{transform:rotate(90deg)}
+.tview{margin-top:8px;font-size:12.5px}.tview>summary{cursor:pointer;color:var(--cypress);font-weight:600;width:max-content}.tview .atbl{margin-top:6px;border:1px solid var(--rule)}
+.ch .pt:focus-visible{outline:none;stroke:var(--ink);stroke-width:3}
 .bench{font-size:12px;color:var(--muted);padding:10px 16px;border:1px dashed var(--rule2);background:var(--card)}
 .bench b{color:var(--ink)}
 @media print{body{padding:0;background:#fff}.band,.tabs,.subnav,.top .actions,#banner,#wibar,.noprint{display:none!important}.ccard,.tiles,.panel{break-inside:avoid}}

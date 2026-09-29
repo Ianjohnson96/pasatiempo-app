@@ -134,6 +134,15 @@ describe("merchandise analysis", () => {
     expect(p.wks).toBeCloseTo(3000 / (3000 / 52));
   });
 
+  it("weights markdowns over the lines that have them, not as 0% for the rest", () => {
+    const a = M.analyze({ months, rows: [
+      row("480", "s-480-polos", { series: flat(500, 500), t12: 6000, oh: 1000, gm: 0.5, md: 0.2 }),
+      row("480", "s-480-other", { series: flat(500, 500), t12: 6000, oh: 1000, gm: 0.5, md: null }),
+    ] }, NAMES);
+    expect(a.cats[0].md).toBeCloseTo(0.2);
+    expect(a.cats[0].subs[1].md).toBeNull();
+  });
+
   it("lists a line that is out of stock but selling as a reorder", () => {
     const a = M.analyze({ months, rows: [row("400", "s-400-polos", { series: flat(2000, 2000), t12: 24000, oh: 0, gm: 0.5 })] }, NAMES);
     expect(M.stuckMoney(a).reorder.map((m: { sub: string }) => m.sub)).toEqual(["s-400-polos"]);

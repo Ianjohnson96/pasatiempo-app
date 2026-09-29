@@ -79,7 +79,7 @@ function renderTabs(S){
   const sec = SECTIONS.find(x => x[2].includes(TAB)) || SECTIONS[0];
   const hotIn = x => x[2].some(id => id !== TAB && badge[id] && badge[id][1]);
   $('#tabs').innerHTML = `<div class="secs">${SECTIONS.map(x => `<button type="button" role="tab" data-tab="${x[2][0]}" aria-selected="${x === sec}">${x[1]}${x !== sec && hotIn(x) ? '<span class="dot" title="Something here needs attention"></span>' : ''}</button>`).join('')}</div>`
-    + (sec[2].length > 1 ? `<div class="subnav" role="group" aria-label="${sec[1]} pages">${sec[2].map(id => id === 'vendors'
+    + (sec[2].length > 1 ? `<div class="subnav" role="group" aria-label="${sec[1]} pages">${sec[2].filter(id => id !== 'reports' || RPT).map(id => id === 'vendors'
       ? `<button type="button" class="snav" data-vendors="1" title="Vendor contacts, terms and lead times">Vendors</button>`
       : `<button type="button" class="snav" data-tab="${id}" aria-pressed="${TAB === id}">${PAGENAME[id] || id}${cnt(id)}</button>`).join('')}</div>` : '');
   const [title, sub] = TABHEAD[TAB] || [PAGENAME[TAB] || 'Summary', ''];

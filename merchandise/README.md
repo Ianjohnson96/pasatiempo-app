@@ -112,7 +112,7 @@ Items bought for one member (custom clubs, a named order, imprinted balls) or on
 
 ## Navigation
 
-The tabs are grouped the way a buying month runs, **Plan** (Overview, Forecast, Open-to-buy), **Buy** (Orders, Vendors), **Assortment** (Brands, Subcategories, Inventory & counts, To do) and **Close the month** (Month-end, Reports), and stay pinned at the top as the page scrolls.
+Four sections sit in one row at the top, **Summary**, **Analysis**, **Buying** and **Operations**, with the chosen section's pages as a wrapping row of pills underneath (`SECTIONS` in `app/src/30-home.js`). The bar stays pinned as the page scrolls and never scrolls sideways. Vendors opens as a drawer. The open page is remembered in the browser (`ob.tab2`).
 
 ## Deliveries
 

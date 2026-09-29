@@ -4,7 +4,8 @@
 let ANA = null, ANA_KEY = null;
 const AN = {open: new Set(), level: 'cats'};
 function anaNow(){
-  const key = ASSORT ? (ASSORT.at || '') + '|' + SUBCATS.length : null;
+  // Redo the analysis when the upload, a subcategory's name or a category's name changes.
+  const key = ASSORT ? [ASSORT.at || '', SUBCATS.map(s => s.id + ':' + s.name).join(','), BASE ? Object.values(BASE.cats || {}).map(c => c.name).join(',') : ''].join('|') : null;
   if (key !== ANA_KEY){
     ANA_KEY = key;
     const names = Object.fromEntries(Object.entries((BASE && BASE.cats) || (PLAN && PLAN.cats) || {}).map(([k, v]) => [k, v.name]));
@@ -47,6 +48,8 @@ function anaSpr(a){
   return {pr, ok, spr: R(ok) ? S(ok) / R(ok) : null, sprNow: R(both) ? S(both) / R(both) : null, sprLY: R(lyRows) ? S(lyRows) / R(lyRows) : null,
     perMember: Mb(ok) ? S(ok) / Mb(ok) : null, rounds: R(ok), roundsLY: R(lyRows), roundsNow: R(both)};
 }
+// The chart's figures as a table, for reading exactly, printing or a screen reader.
+const anaNumbers = (head, rows) => `<details class="tview"><summary>Show the numbers</summary><div class="atbl"><table class="mini" style="min-width:0"><thead><tr>${head.map((h, i) => `<th class="${i ? 'r' : ''}"><span class="h">${esc(h)}</span></th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map((c, i) => `<td class="${i ? 'r num' : ''}">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>`;
 const badOf = c => ['agedPct', 'gmroi', 'md', 'wks', 'gm'].filter(k => grade(k, c[k], c.seg, c.cat) === 'bad');
 const BADNAME = {agedPct: 'aged stock', gmroi: 'GMROI', md: 'markdowns', wks: 'weeks of supply', gm: 'margin'};
 
@@ -69,10 +72,11 @@ function renderSummaryPage(){
     <section class="ccard"><h3>Sales by month</h3><div class="cs">The last 12 months against the same months a year earlier.</div>
       ${chLegend([{name: 'This year', k: 1}, {name: 'A year earlier', k: 'ly'}])}
       ${chBars({labels: labs, series: [{name: 'This year', values: ty, k: 1}, {name: 'A year earlier', values: ly, k: 'ly'}], label: 'Sales by month, this year against a year earlier',
-        tips: i => `This year: ${money(ty[i])} · A year earlier: ${ly[i] == null ? '—' : money(ly[i])}${ly[i] ? ' · Change: ' + aChg(ty[i] / ly[i] - 1) : ''}`})}</section>
+        tips: i => `This year: ${money(ty[i])} · A year earlier: ${ly[i] == null ? '—' : money(ly[i])}${ly[i] ? ' · Change: ' + aChg(ty[i] / ly[i] - 1) : ''}`})}
+      ${anaNumbers(['Month', 'This year', 'A year earlier', 'Change'], labs.map((l, i) => [l, money(ty[i]), ly[i] == null ? '—' : money(ly[i]), ly[i] ? aChg(ty[i] / ly[i] - 1) : '—']))}</section>
     <section class="panel"><header><h2>Category health</h2><span class="lab">Graded on margin, markdowns, weeks, GMROI and aged stock</span></header>
       <div class="health">${a.cats.map(c => { const b = badOf(c), h = b.length >= 2 ? 'bad' : b.length ? 'near' : 'good';
-        return `<button type="button" class="h-${h}" data-anaopen="${c.cat}" title="${b.length ? 'Outside the rule of thumb on ' + b.map(k => BADNAME[k]).join(', ') : 'Within the rules of thumb'}"><span class="n">${esc(c.name)}</span><span class="s">${moneyK(c.t12)} · ${aChg(c.growth)}</span><span class="s">${b.length ? b.length + ' to fix' : 'healthy'}</span></button>`; }).join('')}</div></section>
+        return `<button type="button" class="h-${h}" data-anaopen="${esc(c.cat)}" title="${b.length ? 'Outside the rule of thumb on ' + b.map(k => BADNAME[k]).join(', ') : 'Within the rules of thumb'}"><span class="n">${esc(c.name)}</span><span class="s">${moneyK(c.t12)} · ${aChg(c.growth)}</span><span class="s">${b.length ? b.length + ' to fix' : 'healthy'}</span></button>`; }).join('')}</div></section>
     <section class="panel"><header><h2>Top suggestions</h2><span class="lab">${sug.length} in all · ranked by dollars</span></header>${anaSugList(sug.slice(0, 5))}
       ${sug.length > 5 ? `<div class="note noprint"><button class="btn sm" type="button" data-tab="scorecard">All suggestions on the scorecard</button> <button class="btn sm" type="button" data-tab="stuck">Stuck money</button></div>` : ''}</section>
     ${anaBench()}</div>`;
@@ -82,8 +86,8 @@ function renderSummaryPage(){
 function anaRow(M, isSub, open){
   const g = k => grade(k, M[k], M.seg || SHOPSEG, M.cat);
   const first = isSub ? `<td>${esc(M.name)}</td>` : `<td><span class="caret" aria-hidden="true">▸</span>${esc(M.name)} <span style="color:var(--faint);font-weight:400;font-size:11.5px">${M.subs.length}</span></td>`;
-  return `<tr class="${isSub ? 'asub' : 'acat' + (open ? ' open' : '')}" ${isSub ? '' : `data-anacat="${M.cat}" tabindex="0" aria-expanded="${open}"`}>${first}
-    <td class="r num">${money(M.t12)}</td><td class="r num ${M.growth == null ? '' : M.growth >= 0 ? 'up' : 'dn'}">${aChg(M.growth)}</td>
+  return `<tr class="${isSub ? 'asub' : 'acat' + (open ? ' open' : '')}" ${isSub ? '' : `data-anacat="${esc(M.cat)}" tabindex="0" aria-expanded="${open}"`}>${first}
+    <td class="r num">${money(M.t12)}</td><td class="r num ${M.growth == null ? '' : M.growth >= 0 ? 'up' : 'dn'}">${aChg(M.growth)}</td><td class="r num ${M.trend3 == null ? '' : M.trend3 >= 0 ? 'up' : 'dn'}">${aChg(M.trend3)}</td>
     <td><div class="sharebar" title="Sales ${aPct(M.share)} · stock ${aPct(M.stockShare)}"><i class="sb-s" style="width:${Math.min(100, M.share * 250)}%"></i><i class="sb-o" style="width:${Math.min(100, M.stockShare * 250)}%"></i></div><span class="num" style="font-size:11px;color:var(--muted)">${aPct(M.share)} / ${aPct(M.stockShare)}</span></td>
     <td${aHeat(g('gm'))}>${aPct(M.gm)}</td><td${aHeat(g('md'))}>${aPct(M.md)}</td><td${aHeat(g('turns'))}>${aX(M.turns)}</td><td${aHeat(g('gmroi'))}>${aX(M.gmroi, 2)}</td>
     <td${aHeat(g('wks'))}>${aWk(M.wks)}</td><td${aHeat(g('agedPct'))}>${aPct(M.agedPct)}</td><td class="r num">${money(M.oh)}</td><td>${chSpark(M.series.map((v, i) => i >= ANA.first ? v : null), {w: 96, h: 24})}</td></tr>`;
@@ -103,11 +107,11 @@ function renderScorecard(){
     <section class="ccard"><h3>Growth against return on stock</h3><div class="cs">Each bubble is a ${AN.level === 'subs' ? 'subcategory (over $3k of sales)' : 'category'}, sized by sales. Growth compares ${anaCmpText(a)}. The dashed lines are no growth and a GMROI of 2.</div>
       <div class="subnav" style="margin:0 0 10px"><button type="button" class="snav" data-analevel="cats" aria-pressed="${AN.level === 'cats'}">Categories</button><button type="button" class="snav" data-analevel="subs" aria-pressed="${AN.level === 'subs'}">Subcategories</button></div>
       ${chScatter({points: pts.map(m => ({x: m.growth, y: m.gmroi, r: m.t12, label: m.name, k: AN.level === 'subs' ? 2 : 1,
-        cvt: m.sub ? m.catName + ' › ' + m.name : m.name, cv: `Sales ${moneyK(m.t12)} · Growth ${aChg(m.growth)} · GMROI ${aX(m.gmroi, 2)} · Weeks ${aWk(m.wks)}`, attrs: ` data-anaopen="${m.cat}"`})),
+        cvt: m.sub ? m.catName + ' › ' + m.name : m.name, cv: `Sales ${moneyK(m.t12)} · Growth ${aChg(m.growth)} · GMROI ${aX(m.gmroi, 2)} · Weeks ${aWk(m.wks)}`, attrs: ` data-anaopen="${esc(m.cat)}" tabindex="0" role="button"`})),
         xFmt: aChg, yFmt: v => v.toFixed(1), xRef: 0, yRef: 2, xClamp: [-0.6, 1.2], quads: ['Harvest', 'Grow', 'Exit or fix', 'Fix the margin'], xName: 'Growth', yName: 'GMROI', label: 'Growth against GMROI'})}
       <div class="cs" style="margin:6px 0 0"><b>Grow</b>: growing and earning, so give it budget. <b>Harvest</b>: earning but flat, so keep it lean. <b>Fix the margin</b>: selling more but earning little on the stock. <b>Exit or fix</b>: neither.</div></section>
     <section class="panel"><header><h2>Categories and subcategories</h2><span style="display:flex;gap:8px;align-items:center"><span class="lab">Tap a category to open it</span><button class="btn sm" type="button" data-anaall="1">${AN.open.size >= a.cats.length ? 'Close all' : 'Open all'}</button></span></header>
-      <div class="atbl"><table style="min-width:1060px"><thead><tr><th><span class="h">Category</span></th><th class="r"><span class="h">Sales, 12 mo</span></th><th class="r"><span class="h">Growth</span></th><th><span class="h">Share: sales / stock</span></th><th class="r"><span class="h">Margin</span></th><th class="r"><span class="h">Markdowns</span></th><th class="r"><span class="h">Turns</span></th><th class="r"><span class="h">GMROI</span></th><th class="r"><span class="h">Weeks</span></th><th class="r"><span class="h">Aged</span></th><th class="r"><span class="h">On hand</span></th><th><span class="h">24 months</span></th></tr></thead>
+      <div class="atbl"><table style="min-width:1140px"><thead><tr><th><span class="h">Category</span></th><th class="r"><span class="h">Sales, 12 mo</span></th><th class="r"><span class="h">Growth</span></th><th class="r"><span class="h">Last 3 mo</span></th><th><span class="h">Share: sales / stock</span></th><th class="r"><span class="h">Margin</span></th><th class="r"><span class="h">Markdowns</span></th><th class="r"><span class="h">Turns</span></th><th class="r"><span class="h">GMROI</span></th><th class="r"><span class="h">Weeks</span></th><th class="r"><span class="h">Aged</span></th><th class="r"><span class="h">On hand</span></th><th><span class="h">24 months</span></th></tr></thead>
       <tbody>${a.cats.map(c => { const o = AN.open.has(c.cat); return anaRow(c, false, o) + (o ? c.subs.map(s => anaRow(s, true)).join('') : ''); }).join('')}
       ${anaRow(a.shop, true).replace('<tr class="asub"', '<tr class="tot"')}</tbody></table></div>
       <div class="note">Shaded cells are graded against the rules of thumb: green within, amber close, red outside. The blue bar is the share of sales, the orange bar the share of stock; orange longer than blue means the stock is heavier than the sales.</div></section>
@@ -118,7 +122,7 @@ function renderScorecard(){
 /* ---------- Spend per round ---------- */
 function renderRounds(){
   const a = anaNow(); if (!a) return $('#pane').innerHTML = anaEmpty();
-  const sp = anaSpr(a), last = sp.pr.slice(-12), best = sp.ok.slice().sort((x, y) => y.spr - x.spr)[0];
+  const sp = anaSpr(a), last = sp.pr.slice(-12), byS = sp.ok.slice().sort((x, y) => y.spr - x.spr), best = byS[0], worst = byS[byS.length - 1];
   if (!sp.ok.length) return $('#pane').innerHTML = `<section class="panel"><div class="note">Rounds haven't been loaded yet. They come with the month-end upload.</div></section>`;
   const labs = last.map(p => mLab(p.month));
   $('#pane').innerHTML = `<div class="astack">
@@ -126,7 +130,7 @@ function renderRounds(){
       ${anaTile('Sales per round', money2(sp.spr), sp.sprNow && sp.sprLY ? `${aDelta(sp.sprNow / sp.sprLY - 1)} · ${money2(sp.sprLY)} a year earlier` : '', '', `Over the ${sp.ok.length} months with rounds.`)}
       ${anaTile('Sales per member round', sp.perMember == null ? '—' : money2(sp.perMember), 'all retail sales ÷ member rounds', '', 'What the shop takes for every member round.')}
       ${anaTile('Rounds', int(sp.rounds), sp.roundsLY ? aDelta(sp.roundsNow / sp.roundsLY - 1) + ' on the same months' : '')}
-      ${anaTile('Best month', best ? mLab(best.month) : '—', best ? money2(best.spr) + ' a round' : '')}
+      ${anaTile('Best month', best ? mLab(best.month) : '—', best ? money2(best.spr) + ' a round' : '', '', worst && worst !== best ? `Weakest: ${mLab(worst.month)}, ${money2(worst.spr)} a round.` : '')}
     </section>
     <section class="ccard"><h3>Sales per round by month</h3><div class="cs">Retail sales divided by all rounds played, against the same month a year earlier.</div>
       ${chLegend([{name: 'This year', k: 1}, {name: 'A year earlier', k: 'ly', dash: true}])}
@@ -150,9 +154,10 @@ function renderTrends(){
     <section class="ccard"><h3>Shop sales, month by month</h3><div class="cs">Retail sales for the months in the data${a.first ? ` (it starts in ${monthLabel(a.months[a.first])})` : ''}.</div>
       ${chLine({labels: labs, series: [{name: 'Sales', values: shop, k: 1}], label: 'Shop sales by month'})}</section>
     <section class="ccard"><h3>When the shop sells</h3><div class="cs">Each month's share of the last 12 months' sales. Busiest: ${top.map(i => MFULL[i]).join(', ')}. Have that stock landing a month ahead, so order for ${top.map(i => MN[(i + 11) % 12]).join(', ')} delivery.</div>
-      ${chBars({labels: MN, series: [{name: 'Share of the year', values: sea, k: 1}], fmt: v => Math.round(v * 100) + '%', label: 'Seasonality'})}</section>
+      ${chBars({labels: MN, series: [{name: 'Share of the year', values: sea, k: 1}], fmt: v => Math.round(v * 100) + '%', label: 'Seasonality'})}
+      ${anaNumbers(['Month', 'Share of the year'], MN.map((m, i) => [MFULL[i], (sea[i] * 100).toFixed(1) + '%']))}</section>
     <section class="panel"><header><h2>By category</h2><span class="lab">Growth compares ${esc(anaCmpText(a))}</span></header>
-      <div class="health">${a.cats.map(c => `<button type="button" data-anaopen="${c.cat}" title="Open ${esc(c.name)} on the scorecard"><span class="n">${esc(c.name)}</span><span class="s">${moneyK(c.t12)} · <span class="${c.growth == null ? '' : c.growth >= 0 ? 'up' : 'dn'}">${aChg(c.growth)}</span> · ${aPct(c.share)} of sales</span>${chSpark(c.series.map((v, i) => i >= a.first ? v : null), {w: 150, h: 34})}</button>`).join('')}</div></section>
+      <div class="health">${a.cats.map(c => `<button type="button" data-anaopen="${esc(c.cat)}" title="Open ${esc(c.name)} on the scorecard"><span class="n">${esc(c.name)}</span><span class="s">${moneyK(c.t12)} · <span class="${c.growth == null ? '' : c.growth >= 0 ? 'up' : 'dn'}">${aChg(c.growth)}</span> · ${aPct(c.share)} of sales</span>${chSpark(c.series.map((v, i) => i >= a.first ? v : null), {w: 150, h: 34})}</button>`).join('')}</div></section>
     <section class="panel"><header><h2>Falling lines</h2><span class="lab">${sug.length}</span></header>${anaSugList(sug, 'No subcategory is down 25% or more with stock behind it.')}</section>
     ${anaBench()}</div>`;
 }
@@ -176,7 +181,7 @@ function renderStuck(){
     <section class="panel"><header><h2>Where it's stuck</h2><span class="lab">At cost</span></header>
       <div style="padding:10px 16px 0">${chLegend([{name: 'Over the 16-week target', k: 2}, {name: 'Aged 12+ months', k: 1}])}</div>
       <div class="atbl"><table style="min-width:640px"><thead><tr><th><span class="h">Category</span></th><th class="r"><span class="h">On hand</span></th><th class="r"><span class="h">Weeks</span></th><th class="r"><span class="h">Over target</span></th><th class="r"><span class="h">Aged</span></th><th style="width:34%"><span class="h">&nbsp;</span></th></tr></thead>
-      <tbody>${byCat.map(x => `<tr class="acat" data-anaopen="${x.c.cat}"><td>${esc(x.c.name)}</td><td class="r num">${money(x.c.oh)}</td><td${aHeat(grade('wks', x.c.wks, x.c.seg))}>${aWk(x.c.wks)}</td><td class="r num">${money(x.over)}</td><td class="r num">${money(x.aged)}</td><td><div style="display:grid;gap:3px" data-cvt="${esc(x.c.name)}" data-cv="Over target: ${money(x.over)} · Aged: ${money(x.aged)}">${bar(x.over, 2)}${bar(x.aged, 1)}</div></td></tr>`).join('')}</tbody></table></div></section>
+      <tbody>${byCat.map(x => `<tr class="acat" data-anaopen="${esc(x.c.cat)}"><td>${esc(x.c.name)}</td><td class="r num">${money(x.c.oh)}</td><td${aHeat(grade('wks', x.c.wks, x.c.seg))}>${aWk(x.c.wks)}</td><td class="r num">${money(x.over)}</td><td class="r num">${money(x.aged)}</td><td><div style="display:grid;gap:3px" data-cvt="${esc(x.c.name)}" data-cv="Over target: ${money(x.over)} · Aged: ${money(x.aged)}">${bar(x.over, 2)}${bar(x.aged, 1)}</div></td></tr>`).join('')}</tbody></table></div></section>
     <section class="panel"><header><h2>Suggestions</h2><span class="lab">${sug.length} · ranked by dollars</span></header>${anaSugList(sug)}</section>
     <div class="ccols">
       <section class="panel"><header><h2>Markdown candidates</h2><span class="lab">Aged stock by subcategory</span></header><div class="atbl"><table style="min-width:480px"><thead><tr><th><span class="h">Subcategory</span></th><th class="r"><span class="h">Aged</span></th><th class="r"><span class="h">Aged share</span></th><th class="r"><span class="h">Cash at 30% off</span></th></tr></thead>
@@ -196,7 +201,7 @@ document.addEventListener('click', e => {
   if (d.print) return window.print();
   if (d.anacat){ AN.open.has(d.anacat) ? AN.open.delete(d.anacat) : AN.open.add(d.anacat); return render(); }
   if (d.anaopen){ AN.open.add(d.anaopen); TAB = 'scorecard'; try { localStorage.setItem('ob.tab2', TAB); } catch (_) {} render();
-    return setTimeout(() => document.querySelector(`tr[data-anacat="${d.anaopen}"]`)?.scrollIntoView({block: 'center'}), 0); }
+    return setTimeout(() => document.querySelector(`tr[data-anacat="${CSS.escape(d.anaopen)}"]`)?.scrollIntoView({block: 'center'}), 0); }
   if (d.analevel){ AN.level = d.analevel; return render(); }
   if (d.anaall){ const a = anaNow(); if (!a) return; if (AN.open.size >= a.cats.length) AN.open.clear(); else a.cats.forEach(c => AN.open.add(c.cat)); return render(); }
 });

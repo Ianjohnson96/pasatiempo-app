@@ -155,7 +155,7 @@ function renderHelp(){
       <div class="ln tot"><span class="op">=</span><span>${P.fy} budget</span><span>${money(ga.plan || 0)}</span></div></div>
   </div></section>
   <section class="panel"><div class="in"><h3>Buying for next year</h3>
-    <p>Pick <b>${PLANS.next ? PLANS.next.fy : 'next year'}</b> at the top of the Overview, or enter any order with a delivery month from May on. It's checked against next year's budget automatically.</p>
+    <p>Pick <b>${PLANS.next ? PLANS.next.fy : 'next year'}</b> at the top of the Budget page (Buying), or enter any order with a delivery month from May on. It's checked against next year's budget automatically.</p>
     <p>Next year's budget starts from the stock this year is expected to end with. If a category is overbought now, or you order more than this year's budget, the extra comes out of next year's budget. The Open-to-buy page lists what next year inherits.</p>
     <p>The brand scorecard warns you when you order from a brand marked Drop or Reduce.</p>
     <h3 style="margin-top:14px">Months</h3>

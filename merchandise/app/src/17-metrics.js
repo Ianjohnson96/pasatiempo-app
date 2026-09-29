@@ -40,14 +40,16 @@ function measures(rows, base, ctx){
   // weeks and GMROI use shelf sales and shelf stock only.
   const so = rows.reduce((a, r) => a + Math.min(nz(r.so), nz(r.t12)), 0);
   const oh = rows.reduce((a, r) => a + Math.max(0, nz(r.oh) - nz(r.soOh)), 0), aged = rows.reduce((a, r) => a + nz(r.aged), 0);
-  const gp = rows.reduce((a, r) => a + nz(r.t12) * nz(r.gm), 0), mdS = rows.reduce((a, r) => a + nz(r.t12) * nz(r.md), 0);
+  const gp = rows.reduce((a, r) => a + nz(r.t12) * nz(r.gm), 0);
+  // Markdowns are weighted over the lines the cost & margin report covers; a line without one isn't 0%.
+  const mdRows = rows.filter(r => r.md != null && isFinite(+r.md)), mdBase = mdRows.reduce((a, r) => a + nz(r.t12), 0), mdS = mdRows.reduce((a, r) => a + nz(r.t12) * nz(r.md), 0);
   const gpShelf = rows.reduce((a, r) => a + (nz(r.t12) - Math.min(nz(r.so), nz(r.t12))) * nz(r.gm), 0);
   const ty = rows.reduce((a, r) => a + nz(r.ty), 0), ly = rows.reduce((a, r) => a + nz(r.ly), 0);
   const cogs = t12 - so - gpShelf, stocked = oh > 0 && cogs > 0;
   return {...base, t12, so, prior12, cmpTY, series, oh, aged, gp, gpShelf, cogsWk: cogs / 52,
     growth: prior12 >= 500 ? cmpTY / prior12 - 1 : null,
     trend3: ly >= 10 ? ty / ly - 1 : null,
-    gm: t12 > 0 ? gp / t12 : null, md: t12 > 0 ? mdS / t12 : null,
+    gm: t12 > 0 ? gp / t12 : null, md: mdBase > 0 ? mdS / mdBase : null,
     agedPct: oh > 0 ? aged / oh : null,
     turns: stocked ? cogs / oh : null, wks: stocked ? oh / (cogs / 52) : null, gmroi: stocked ? gpShelf / oh : null,
     agedSkus: rows.flatMap(r => (r.agedSkus || []).map(s => ({...s, cat: r.cat, sub: r.sub})))};
