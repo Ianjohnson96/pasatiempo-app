@@ -112,6 +112,10 @@ def test_subcategories_from_descriptions_and_the_programs_choice():
     assert sub_auto('620', 'Misc. Sunglasses Maui Jim') == 's-620-sunglasses-rangefinders'  # not drinkware ("glass")
     assert sub_auto('620', 'Misc Flag Bag Duffel') == 's-620-totes-pouches'
     assert sub_auto('620', 'Misc. Winston Cutting Board') == 's-620-other-accessories'
+    assert sub_auto('620', 'Misc. MGI Halo (Millslagle)') == 's-620-push-carts-electronics'
+    assert sub_auto('620', 'Misc. Push Cart (Wood)') == 's-620-push-carts-electronics'
+    assert sub_auto('620', 'Misc. Single Lithium Battery') == 's-620-push-carts-electronics'
+    assert sub_auto('620', 'Misc. Putter Grip') == 's-620-grips-training-aids'  # "putt" is also a headcover word
     assert sub_auto('160', 'Balls Tit 26 No Imprint') == 's-160-stock-balls'
     assert sub_auto('620', 'Misc Headcover PRG', subids={'s-620-towels'}) == ''  # a removed subcategory is skipped
     ly = {k: 100.0 for k in fy_months(2026)}
