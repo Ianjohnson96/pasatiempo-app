@@ -44,7 +44,12 @@ function bmLabel(row){
   if (m[0].how === 'set') return m.map(x => m.length > 1 ? `${esc(x.b)} ${num(x.s)}%` : esc(x.b)).join(' · ');
   return `${esc(m[0].b)} <span style="color:var(--faint);font-size:11.5px">${m[0].how === 'words' ? 'from brand words' : 'from the description'}</span>`;
 }
-function openBrandMap(){
+/* back: after saving or cancelling an edit, return to where the list was when the edit started */
+function openBrandMap(back){
+  bmDraw();
+  const b = back && $('.drawer .body'); if (b) b.scrollTop = back;
+}
+function bmDraw(){
   if (!BRANDSKUS){ $('#overlay').innerHTML = `<div class="scrim" data-close="1"></div><aside class="drawer" role="dialog" aria-modal="true"><header><div><h2>Assign brands</h2></div><button class="x" type="button" data-close="1" aria-label="Close">×</button></header><div class="body"><div class="note">The SKU list arrives with the next month-end upload.</div></div></aside>`; return; }
   const ro = !canAct(), all = BRANDSKUS.rows, q = BM.q.trim().toLowerCase();
   const unknown = bmUnknown(), mine = all.filter(r => bmFor(r[0])), changed = bmChangedRows();
@@ -82,8 +87,9 @@ function openBrandMap(){
 function bmStartEdit(sku){
   const row = BRANDSKUS.rows.find(r => r[0] === sku), m = bmFor(sku);
   const e = row && bmEff(row);
+  if (!BM.edit){ const b = $('#bmTitle') && $('.drawer .body'); BM.back = b ? b.scrollTop : 0; }
   BM.edit = sku; BM.rc = null; BM.draft = m ? m.map(x => ({b: bmRen(x.b), s: num(x.s)})) : [{b: e ? e[0].b : '', s: 100}];
-  openBrandMap(); setTimeout(() => $('#bmB0')?.focus(), 0);
+  openBrandMap(); setTimeout(() => { const d = $('.drawer .body'); if (d) d.scrollTop = 0; $('#bmB0')?.focus(); }, 0);
 }
 async function bmSave(clear){
   const sku = BM.edit; if (!sku) return;
@@ -107,7 +113,7 @@ async function bmSave(clear){
     BRANDMAP = {...BRANDMAP, skus, recycled}; BM.edit = null; BM.draft = []; BM.rc = null;
     toast((clear ? `SKU ${sku} goes back to its description` : `SKU ${sku}: ${rows.map(x => rows.length > 1 ? `${x.b} ${x.s}%` : x.b).join(', ')}`)
       + (rc ? `; sales before ${monthLabel(rc.from)} stay with ${recycled[sku].brand}` : ''));
-    openBrandMap();
+    openBrandMap(BM.back);
   }
 }
 
@@ -133,7 +139,7 @@ async function bmSame(){
   const sku = BM.edit, ch = bmChanged(sku); if (!ch) return;
   const checked = {...(BRANDMAP.checked || {}), [sku]: ch.now};
   if (await write('brandmap/current', {...BRANDMAP, checked, updatedBy: myId, updatedAt: new Date().toISOString()})){
-    BRANDMAP = {...BRANDMAP, checked}; toast(`SKU ${sku}: same product, new description`); openBrandMap();
+    BRANDMAP = {...BRANDMAP, checked}; toast(`SKU ${sku}: same product, new description`); openBrandMap(BM.back);
   }
 }
 async function bmRcDelete(){

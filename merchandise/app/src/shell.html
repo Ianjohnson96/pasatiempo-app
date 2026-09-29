@@ -229,6 +229,7 @@ td .sm{display:block;font-size:11.5px;color:var(--faint);font-family:var(--mono)
 .drawer>header{padding:16px 20px 13px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .drawer h2{margin:0;font-size:19px;letter-spacing:-.01em}
 .drawer .body{padding:16px 20px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px}
+.drawer .body>*{flex-shrink:0}  /* the body scrolls, not a squeezed table inside it */
 .drawer>footer{padding:13px 20px;border-top:1px solid var(--rule);display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;align-items:center}
 .x{background:none;border:none;font-size:22px;line-height:1;color:var(--muted);cursor:pointer;padding:2px 6px}
 .sec{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--cypress);font-weight:600;border-bottom:1px solid var(--rule);padding-bottom:5px;margin-top:4px}
@@ -323,6 +324,11 @@ tr.tot td{font-weight:600;border-top:1px solid var(--rule2)}
 .chip.b-drop{background:var(--tint-stop);color:var(--brick)}
 .chip.b-inactive{background:var(--sunk);color:var(--faint)}
 .chip.b-special{background:var(--card);color:var(--muted);box-shadow:inset 0 0 0 1px var(--rule2)}
+.ssbulk{position:sticky;top:-16px;z-index:3;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:9px 12px;margin:0 -4px;background:var(--tint-fog);border:1px solid var(--rule2);border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,.06);font-size:13px}
+.ssbulk.idle{position:static;background:none;border-style:dashed;box-shadow:none;color:var(--muted);font-size:12.5px}
+.ssbulk label{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:12px}
+.sst tr.on td{background:color-mix(in srgb,var(--tint-fog) 70%,transparent)}
+.sst input[type=checkbox]{width:16px;height:16px;cursor:pointer}
 .sotag{display:inline-block;font-size:10.5px;line-height:1.5;padding:0 5px;border-radius:3px;background:var(--tint-warn);color:var(--ochre);font-weight:600;white-space:nowrap}
 .brandt td{vertical-align:middle}
 .checks{list-style:none;margin:0;padding:6px 16px}

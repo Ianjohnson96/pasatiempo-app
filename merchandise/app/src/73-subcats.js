@@ -6,7 +6,8 @@
    category a 640 item sells as, [8] special-order kind) unless someone set it here (submap/current: skus
    {sku: subcat id}, cat {sku: category}, so {sku: kind or 'shelf'}). Budgets stay by category. */
 let ASSORT = null, SUBMAP = {skus: {}};
-const SC = {cat: 'all'}, SS = {filter: 'unsorted', cat: 'all', q: '', keep: new Set()};  // keep: SKUs changed in this view stay in it
+// keep: SKUs changed in this view stay in it; sel: ticked SKUs; bulk: the change to make to all of them ('*' = leave as is)
+const SC = {cat: 'all'}, SS = {filter: 'unsorted', cat: 'all', q: '', keep: new Set(), sel: new Set(), bulk: {cat: '*', sub: '*', so: '*'}, shown: [], list: [], last: null};
 const SOK = {member: 'Member special order', group: 'Group & event order', notretail: 'Not retail'};
 const soTag = k => k && SOK[k] ? ` <span class="sotag" title="${SOK[k]}">${k === 'notretail' ? 'Not retail' : 'Special order'}</span>` : '';
 const soLine = r => r.so >= 1 ? `<div style="font-size:11px;color:var(--muted)">${Math.max(1, Math.round(r.so / (r.t12 || r.so) * 100))}% special orders</div>` : '';
@@ -100,8 +101,14 @@ function openSubcat(key){
 }
 /* Sort SKUs: a SKU's subcategory, whether it is a special order, and the category a Special Orders item sells as.
    Choosing what the description gives removes the override. */
-const SSSEL = 'padding:4px 6px;border:1px solid var(--rule2);border-radius:4px;background:var(--card);max-width:200px';
-function openSortSkus(){
+const SSSEL = 'padding:4px 6px;border:1px solid var(--rule2);border-radius:4px;background:var(--card);max-width:172px';
+/* keepScroll: redraw in place (after a change) instead of starting again at the top */
+function openSortSkus(keepScroll){
+  const b0 = keepScroll && $('#ssTitle') ? $('.drawer .body') : null, top = b0 ? b0.scrollTop : 0;
+  ssDraw();
+  const b1 = top && $('.drawer .body'); if (b1) b1.scrollTop = top;
+}
+function ssDraw(){
   if (!BRANDSKUS){ $('#overlay').innerHTML = `<div class="scrim" data-close="1"></div><aside class="drawer" role="dialog" aria-modal="true"><header><div><h2>Sort SKUs</h2></div><button class="x" type="button" data-close="1" aria-label="Close">×</button></header><div class="body"><div class="note">The SKU list arrives with the next month-end upload.</div></div></aside>`; return; }
   const ro = !canAct(), all = ssRows(), q = SS.q.trim().toLowerCase(), old = BRANDSKUS.rows.length && BRANDSKUS.rows[0].length < 9;
   const inCat = all.filter(r => SS.cat === 'all' || ssCat(r) === SS.cat);
@@ -112,7 +119,8 @@ function openSortSkus(){
   if (SS.keep.size) list = list.concat(inCat.filter(r => SS.keep.has(r[0]) && !list.includes(r)));
   if (q) list = inCat.filter(r => r[0].toLowerCase().includes(q) || String(r[1]).toLowerCase().includes(q) || scSubName(ssCat(r), ssSub(r)).toLowerCase().includes(q));
   list = list.slice().sort((a, b) => (b[4] + b[5]) - (a[4] + a[5]));
-  const shown = list.slice(0, 150), cats = [...new Set(all.map(ssCat))].sort((a, b) => CAT(a).name.localeCompare(CAT(b).name));
+  const shown = list.slice(0, 150); SS.shown = shown.map(r => r[0]); SS.list = list.map(r => r[0]);
+  const allOn = shown.length && shown.every(r => SS.sel.has(r[0])), cats = [...new Set(all.map(ssCat))].sort((a, b) => CAT(a).name.localeCompare(CAT(b).name));
   const sellCats = BASE ? BASE.order.filter(c => c !== '640') : [...new Set(all.map(r => r[2]).filter(c => c !== '640'))];
   const seg = (k, l, n) => `<button type="button" class="fchip" data-ssfilt="${k}" aria-pressed="${SS.filter === k && !q}">${l}<span class="c">${n}</span></button>`;
   const subOpts = r => { const cur = ssSub(r), a = ssSubAuto(r);
@@ -140,17 +148,63 @@ function openSortSkus(){
       <div class="chips">${seg('unsorted', 'Not sorted', uns.length)}${seg('place', 'Needs a category', place.length)}${seg('special', 'Special orders', spec.length)}${seg('auto', 'From the description', auto.length)}${seg('set', 'Set here', set.length)}${seg('all', 'All', inCat.length)}</div>
       <div class="chips" style="gap:8px"><select id="ssCat" style="padding:5px 8px;border:1px solid var(--rule2);border-radius:4px;background:var(--card)"><option value="all">All categories</option>${cats.map(c => `<option value="${c}" ${SS.cat === c ? 'selected' : ''}>${c === '640' ? 'Special Orders, no category yet' : esc(CAT(c).name)} (${c})</option>`).join('')}</select>
         <input id="ssQ" type="search" placeholder="Find a SKU, description or subcategory" value="${esc(SS.q)}" style="margin-left:auto;padding:5px 10px;border:1px solid var(--rule2);border-radius:4px;background:var(--card);min-width:230px"></div>
-      ${shown.length ? `<div style="overflow-x:auto"><table class="mini" style="min-width:980px"><thead><tr><th>SKU</th><th>Description</th><th class="r">12-mo sales</th><th class="r">On hand</th><th style="min-width:110px">Sells as</th><th>Subcategory</th><th>Shelf or special order</th></tr></thead><tbody>
-        ${shown.map(r => `<tr><td class="num">${esc(r[0])}</td><td style="min-width:230px">${esc(r[1])}${soTag(ssSo(r))}<br><span style="color:var(--muted);font-size:11.5px">${where(r)}</span></td>
+      ${ro ? '' : ssBulkBar(sellCats)}
+      ${shown.length ? `<div style="overflow-x:auto"><table class="mini sst" style="min-width:1010px"><thead><tr>${ro ? '' : `<th style="width:28px"><input type="checkbox" id="ssAll" ${allOn ? 'checked' : ''} aria-label="Tick every SKU shown"></th>`}<th>SKU</th><th>Description</th><th class="r">12-mo sales</th><th class="r">On hand</th><th style="min-width:110px">Sells as</th><th>Subcategory</th><th>Shelf or special order</th></tr></thead><tbody>
+        ${shown.map(r => `<tr class="${SS.sel.has(r[0]) ? 'on' : ''}">${ro ? '' : `<td><input type="checkbox" data-sssel="${esc(r[0])}" ${SS.sel.has(r[0]) ? 'checked' : ''} aria-label="Tick SKU ${esc(r[0])}"></td>`}<td class="num">${esc(r[0])}</td><td style="min-width:230px">${esc(r[1])}${soTag(ssSo(r))}<br><span style="color:var(--muted);font-size:11.5px">${where(r)}</span></td>
           <td class="r num">${money(r[4])}</td><td class="r num">${money(r[5])}</td>
           <td>${cell(r, 'cat')}</td><td>${cell(r, 'sub')}</td><td>${cell(r, 'so')}</td></tr>`).join('')}</tbody></table></div>
-        ${list.length > shown.length ? `<div class="note">Showing the ${shown.length} biggest of ${list.length}. Search or pick a category to find others.</div>` : ''}` : `<div class="note">${q ? 'No SKUs match.' : SS.filter === 'unsorted' ? 'Every SKU here has a subcategory.' : SS.filter === 'place' ? 'Every special order has a category.' : 'Nothing here.'}</div>`}
+        ${list.length > shown.length ? `<div class="note">Showing the ${shown.length} biggest of ${list.length}. Search or pick a category to find others${ro ? '' : `, or <button type="button" class="linklike" data-ssbulk="all">tick all ${list.length}</button>`}.</div>` : ''}` : `<div class="note">${q ? 'No SKUs match.' : SS.filter === 'unsorted' ? 'Every SKU here has a subcategory.' : SS.filter === 'place' ? 'Every special order has a category.' : 'Nothing here.'}</div>`}
     </div></aside>`;
 }
 async function ssWrite(sku, patch, msg){
-  SS.keep.add(sku);
+  [].concat(sku).forEach(s => SS.keep.add(s));
   const next = {...SUBMAP, ...patch, updatedBy: myId, updatedAt: new Date().toISOString()};
-  if (await write('submap/current', next)){ SUBMAP = next; toast(msg); openSortSkus(); }
+  if (await write('submap/current', next)){ SUBMAP = next; toast(msg); openSortSkus(true); return true; }
+  return false;
+}
+/* ticking: a click ticks one, shift-click ticks the run from the last one ticked */
+function ssTick(sku, on, shift){
+  if (shift && SS.last && SS.shown.includes(SS.last)){
+    const a = SS.shown.indexOf(SS.last), b = SS.shown.indexOf(sku);
+    SS.shown.slice(Math.min(a, b), Math.max(a, b) + 1).forEach(s => on ? SS.sel.add(s) : SS.sel.delete(s));
+  } else on ? SS.sel.add(sku) : SS.sel.delete(sku);
+  SS.last = sku; openSortSkus(true);
+}
+function ssTickAll(on, ids = SS.shown){ ids.forEach(s => on ? SS.sel.add(s) : SS.sel.delete(s)); openSortSkus(true); }
+function ssClear(){ SS.sel.clear(); SS.bulk = {cat: '*', sub: '*', so: '*'}; SS.last = null; openSortSkus(true); }
+/* the bar that changes every ticked SKU at once, pinned at the top of the list */
+function ssBulkBar(sellCats){
+  if (!SS.sel.size) return `<div class="ssbulk idle">Tick SKUs to change several at once — shift-click ticks a run of them.</div>`;
+  const rows = ssRows().filter(r => SS.sel.has(r[0])), B = SS.bulk, sales = sum(rows, r => r[4]);
+  const cats = [...new Set(rows.map(ssCat))], all640 = rows.every(r => r[2] === '640');
+  const target = B.cat !== '*' ? (B.cat || '640') : cats.length === 1 ? cats[0] : null;
+  const keep = v => `<option value="*" ${v === '*' ? 'selected' : ''}>Leave as is</option>`;
+  const catSel = `<select id="ssBCat" aria-label="Sells as, for every ticked SKU" style="${SSSEL}">${keep(B.cat)}${all640 ? `<option value="" ${B.cat === '' ? 'selected' : ''}>No category yet</option>` : ''}${sellCats.map(c => `<option value="${c}" ${B.cat === c ? 'selected' : ''}>${esc(CAT(c).name)}</option>`).join('')}</select>`;
+  const subSel = target && target !== '640'
+    ? `<select id="ssBSub" aria-label="Subcategory, for every ticked SKU" style="${SSSEL}">${keep(B.sub)}<option value="" ${B.sub === '' ? 'selected' : ''}>Not sorted</option>${subsFor(target).map(x => `<option value="${esc(x.id)}" ${B.sub === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>`
+    : `<span style="font-size:12px;color:var(--muted)">${target === '640' ? 'pick a category first' : `in ${cats.length} categories: pick one Sells as first`}</span>`;
+  const soSel = `<select id="ssBSo" aria-label="Shelf or special order, for every ticked SKU" style="${SSSEL}">${keep(B.so)}${[['', 'Shelf stock'], ['member', SOK.member], ['group', SOK.group], ['notretail', SOK.notretail]].map(([v, l]) => `<option value="${v}" ${B.so === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+  const any = B.cat !== '*' || B.sub !== '*' || B.so !== '*';
+  return `<div class="ssbulk"><b>${SS.sel.size} ticked</b><span style="color:var(--muted);font-size:12px">${money(sales)} of sales</span>
+    <label>Sells as ${catSel}</label><label>Subcategory ${subSel}</label><label>Shelf or special ${soSel}</label>
+    <span style="margin-left:auto;display:flex;gap:6px"><button type="button" class="btn sm primary" data-ssbulk="apply" ${any ? '' : 'disabled'}>Change ${SS.sel.size}</button><button type="button" class="btn sm" data-ssbulk="clear">Untick all</button></span></div>`;
+}
+async function ssBulkApply(){
+  const rows = ssRows().filter(r => SS.sel.has(r[0])), B = SS.bulk; if (!rows.length) return;
+  const cats = {...(SUBMAP.cat || {})}, skus = {...(SUBMAP.skus || {})}, so = {...(SUBMAP.so || {})};
+  for (const r of rows){
+    const s = r[0];
+    if (B.cat !== '*'){ if (B.cat === ssCatAuto(r)) delete cats[s]; else cats[s] = B.cat; delete skus[s]; }
+    const c = B.cat !== '*' ? (B.cat || (r[2] === '640' ? '640' : r[2])) : ssCat(r);
+    if (B.sub !== '*' && c !== '640' && (!B.sub || subsFor(c).some(x => x.id === B.sub))){
+      if (B.sub === r[6] && (B.cat === '*' || B.cat === ssCatAuto(r))) delete skus[s]; else skus[s] = B.sub;
+    }
+    if (B.so !== '*'){ if (B.so === (r[8] || '')) delete so[s]; else so[s] = B.so || 'shelf'; }
+  }
+  const what = [B.cat !== '*' && `sell as ${B.cat ? CAT(B.cat).name : 'no category yet'}`, B.sub !== '*' && `subcategory ${B.sub ? subName(B.sub) : 'not sorted'}`,
+    B.so !== '*' && (B.so ? SOK[B.so].toLowerCase() : 'shelf stock')].filter(Boolean).join(', ');
+  const ids = rows.map(r => r[0]);
+  if (await ssWrite(ids, {cat: cats, skus, so}, `${ids.length} SKU${ids.length === 1 ? '' : 's'}: ${what}`)){ SS.sel.clear(); SS.bulk = {cat: '*', sub: '*', so: '*'}; openSortSkus(true); }
 }
 function ssSave(sku, sub){
   const row = ssRows().find(r => r[0] === sku), skus = {...(SUBMAP.skus || {})};
