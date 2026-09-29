@@ -30,9 +30,16 @@ Roles are granted per app on the hub's **People & access** page (`/admin/people`
 
 ## Pages
 
+Four sections, each with its pages as a row of pills: **Summary**, **Analysis** (Scorecard, Spend per round, Trends, Stuck money, Brands), **Buying** (Budget, Open-to-buy, Forecast, Orders, Vendors, To do) and **Operations** (Month-end, Reports, Inventory & counts, Subcategories, How it works).
+
 | Page | What it shows |
 |---|---|
-| Overview | Budget left by category for the chosen fiscal year and month; top to-dos |
+| Summary | Six headline figures against a year earlier and the rules of thumb, sales by month, category health, and the top suggestions ranked by dollars. Prints on one page |
+| Scorecard | Every category, opening to its subcategories: sales, growth, share of sales against share of stock, margin, markdowns, turns, GMROI, weeks and aged stock, shaded against the rules of thumb; a growth-against-GMROI bubble chart |
+| Spend per round | Retail sales per round by month against a year earlier; rounds by member, guest, public and other |
+| Trends | Shop sales by month, seasonality (each month's share of the year), and each category's two years |
+| Stuck money | Stock over 16 weeks of sales, aged stock, the cash a 30% markdown would free, lines to reorder, and the oldest items |
+| Budget | Budget left by category for the chosen fiscal year and month; top to-dos |
 | Forecast | Sales by month for this year and next. Growth, extra category growth and target weeks can be edited as a what-if, and the owner can save them as the plan (`plan/assumptions`) |
 | Open-to-buy | Category × month grid (this FY, next FY, calendar year), the inherited-stock table, and the classic OTB worksheet |
 | Orders | Purchase orders with sizes. Each order is checked against the budget of the fiscal year it arrives in |
@@ -40,6 +47,12 @@ Roles are granted per app on the hub's **People & access** page (`/admin/people`
 | To do | Order alerts plus item suggestions (`insights/current`) |
 | Inventory & counts | On hand by category; quarterly counts |
 | Month-end | Checklist (`checklist/{YYYY-MM}`), refresh history (`refreshes/{asOf}`), forecast vs actual |
+
+## Analysis
+
+The Summary and Analysis pages are worked out in the browser from `assort/current` (`app/src/17-metrics.js`, tested in `lib/merch/analysis.test.ts`); charts are `app/src/16-charts.js`. Special orders are left out. Growth compares only months that have a year-earlier month in the data, so until there are 24 months it covers fewer than 12 (the page says which). Suggestions are rules, one per line, ranked by the dollars involved: stock heavier than sales, aged stock over 10%, markdowns over 15%, more than 30 weeks of supply, fast growth with under 8 weeks, GMROI under the guideline, and sales falling 25% with stock behind them.
+
+The rules of thumb (`BENCH` in `17-metrics.js`) are general guidelines for a private-club pro shop, not the club's own targets: aged stock under 10%, markdowns under 15%, 12–16 weeks of supply, GMROI above 2 for apparel and accessories and above 1 for equipment, 2–3 turns (3–4 for balls and gloves), and margins of 45% for apparel, 40% for accessories and 25% for equipment.
 
 ## The model
 
