@@ -96,10 +96,30 @@ describe("merchandise analysis", () => {
     expect(st.markdown[0].cashAt30).toBeCloseTo((3000 / 0.55) * 0.7);
   });
 
-  it("ranks the suggestions by dollars, the aged-heavy line first", () => {
+  it("compares growth only over months with data in both years", () => {
+    // Data starts in May 2025 (index 7): only May–Sep 2026 have a year-earlier month to compare with.
+    const late = { months, rows: [row("480", "s-480-polos", {
+      series: [...Array(7).fill(0), ...Array(5).fill(100), ...Array(7).fill(150), ...Array(5).fill(200)], t12: 2050, oh: 1000, gm: 0.5 })] };
+    const a = M.analyze(late, NAMES);
+    expect(a.cmpMonths).toBe(5);
+    expect(a.cats[0].growth).toBeCloseTo(1); // 1,000 (May–Sep 2026) against 500
+    const pr = M.perRound(a, { "2025": { total: Array(12).fill(10) } });
+    expect(pr.find((p: { month: string }) => p.month === "2026-03").sprLY).toBeNull(); // no sales data for Mar 2025
+  });
+
+  it("names subcategories from the list, or tidies the id", () => {
+    const a = M.analyze(ASSORT, NAMES, { "s-480-polos": "Men's polos" });
+    expect(a.cats[0].subs[0].name).toBe("Men's polos");
+    expect(a.cats[0].subs[1].name).toBe("Other");
+  });
+
+  it("ranks the suggestions by dollars, the aged-heavy line first, one per line", () => {
     const s = M.suggest(M.analyze(ASSORT, NAMES));
     expect(s[0].sub).toBe("s-480-other");
     expect(s[0].impact).toBe(3000);
+    expect(s[0].also.length).toBeGreaterThan(0); // its weeks and GMROI reasons folded in
+    const keys = s.map((x: { cat: string; sub: string | null }) => x.cat + "|" + x.sub);
+    expect(new Set(keys).size).toBe(keys.length);
     for (let i = 1; i < s.length; i++) expect(s[i - 1].impact).toBeGreaterThanOrEqual(s[i].impact);
     expect(s.every((x: { why: string; title: string }) => x.why && x.title)).toBe(true);
   });

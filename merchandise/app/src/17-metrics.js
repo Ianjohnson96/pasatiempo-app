@@ -30,16 +30,18 @@ function grade(metric, v, seg, cat){
 }
 
 const nz = v => { const n = +v; return isFinite(n) ? n : 0; };
-function measures(rows, base){
-  const series = (rows[0] && rows[0].series || []).map((_, i) => rows.reduce((a, r) => a + nz((r.series || [])[i]), 0));
+const sumSeries = rows => (rows[0] && rows[0].series || []).map((_, i) => rows.reduce((a, r) => a + nz((r.series || [])[i]), 0));
+// ctx.cmp: indexes of the last 12 months whose month a year earlier is inside the data, so growth compares like with like.
+function measures(rows, base, ctx){
+  const series = sumSeries(rows);
   const t12 = rows.reduce((a, r) => a + nz(r.t12), 0);
-  const prior12 = series.slice(0, Math.max(0, series.length - 12)).reduce((a, v) => a + v, 0);
+  const cmpTY = ctx.cmp.reduce((a, j) => a + nz(series[j]), 0), prior12 = ctx.cmp.reduce((a, j) => a + nz(series[j - 12]), 0);
   const oh = rows.reduce((a, r) => a + nz(r.oh), 0), aged = rows.reduce((a, r) => a + nz(r.aged), 0);
   const gp = rows.reduce((a, r) => a + nz(r.t12) * nz(r.gm), 0), mdS = rows.reduce((a, r) => a + nz(r.t12) * nz(r.md), 0);
   const ty = rows.reduce((a, r) => a + nz(r.ty), 0), ly = rows.reduce((a, r) => a + nz(r.ly), 0);
   const cogs = t12 - gp, stocked = oh > 0 && cogs > 0;
-  return {...base, t12, prior12, series, oh, aged, gp,
-    growth: prior12 >= 500 ? t12 / prior12 - 1 : null,
+  return {...base, t12, prior12, cmpTY, series, oh, aged, gp,
+    growth: prior12 >= 500 ? cmpTY / prior12 - 1 : null,
     trend3: ly >= 10 ? ty / ly - 1 : null,
     gm: t12 > 0 ? gp / t12 : null, md: t12 > 0 ? mdS / t12 : null,
     agedPct: oh > 0 ? aged / oh : null,
@@ -48,28 +50,31 @@ function measures(rows, base){
 }
 
 /** Categories (each with its subcategories), and the shop, measured the same way. Null before the first upload. */
-function analyze(assort, catNames){
+const tidySub = id => { const t = String(id || '').replace(/^s-\d+-/, '').replace(/-s-/g, "'s ").replace(/-/g, ' ').trim(); return t ? t[0].toUpperCase() + t.slice(1) : 'Not sorted'; };
+function analyze(assort, catNames, subNames){
   if (!assort || !Array.isArray(assort.rows)) return null;
   const rows = assort.rows.filter(r => r.cat && r.cat !== '640');
+  const all = sumSeries(rows), n = all.length, first = Math.max(0, all.findIndex(v => v > 0));
+  const ctx = {first, cmp: [...Array(Math.min(12, n)).keys()].map(k => n - 12 + k).filter(j => j - 12 >= first)};
   const byCat = new Map();
   for (const r of rows) (byCat.get(r.cat) || byCat.set(r.cat, []).get(r.cat)).push(r);
-  const shop = measures(rows, {key: 'shop', name: 'Pro shop', cat: null, sub: null});
+  const shop = measures(rows, {key: 'shop', name: 'Pro shop', cat: null, sub: null}, ctx);
   const share = m => { m.share = shop.t12 > 0 ? m.t12 / shop.t12 : 0; m.stockShare = shop.oh > 0 ? m.oh / shop.oh : 0; return m; };
   const cats = [...byCat].map(([cat, rs]) => {
     const name = (catNames && catNames[cat]) || cat, seg = SEGOF(cat);
-    const c = share(measures(rs, {key: cat, name, cat, sub: null, seg}));
-    c.subs = rs.map(r => share(measures([r], {key: cat + '|' + (r.sub || ''), name: r.sub || 'Not sorted', cat, sub: r.sub || '', seg, catName: name})))
+    const c = share(measures(rs, {key: cat, name, cat, sub: null, seg}, ctx));
+    c.subs = rs.map(r => share(measures([r], {key: cat + '|' + (r.sub || ''), name: (subNames && subNames[r.sub]) || tidySub(r.sub), cat, sub: r.sub || '', seg, catName: name}, ctx)))
       .sort((a, b) => b.t12 - a.t12);
     return c;
   }).sort((a, b) => b.t12 - a.t12);
   share(shop);
-  return {months: assort.months || [], through: assort.through || null, t12Months: assort.t12Months || null, shop, cats};
+  return {months: assort.months || [], first, cmpMonths: ctx.cmp.length, cmpFrom: assort.months ? assort.months[ctx.cmp[0]] : null, through: assort.through || null, t12Months: assort.t12Months || null, shop, cats};
 }
 
 /** Shop sales per round for each of the 24 months; rounds are {year: {total, member, guest, public: [Jan..Dec]}}. */
 function perRound(ana, rounds){
   const at = (m, k) => { const y = rounds && rounds[m.slice(0, 4)]; const v = y && y[k] ? y[k][+m.slice(5, 7) - 1] : null; return v == null ? null : nz(v); };
-  const sales = m => { const i = ana.months.indexOf(m); return i < 0 ? null : ana.shop.series[i]; };
+  const sales = m => { const i = ana.months.indexOf(m); return i < ana.first ? null : ana.shop.series[i]; };
   const ly = m => (+m.slice(0, 4) - 1) + m.slice(4);
   const spr = m => { const r = at(m, 'total'), s = sales(m); return r > 0 && s != null ? s / r : null; };
   return ana.months.map(m => ({month: m, sales: sales(m), rounds: at(m, 'total'), member: at(m, 'member'), guest: at(m, 'guest'), public: at(m, 'public'),
@@ -122,5 +127,11 @@ function suggest(ana){
     if (s.trend3 != null && s.trend3 <= -0.25 && s.oh > 2000)
       add(s, 'falling', s.oh, `${nm}: sales are falling`, `Units in the last 3 months down ${pctS(-s.trend3)} on a year ago, with ${usd(s.oh)} in stock.`, 'Cut the next buy and move what is left', 'trends');
   }
-  return out.sort((a, b) => b.impact - a.impact);
+  // One suggestion per line: the biggest, with the others' reasons folded in.
+  const best = new Map();
+  for (const x of out.sort((a, b) => b.impact - a.impact)){
+    const k = x.cat + '|' + x.sub, b = best.get(k);
+    if (b) b.also.push(x.why); else best.set(k, {...x, also: []});
+  }
+  return [...best.values()];
 }
