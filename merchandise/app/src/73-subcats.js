@@ -18,8 +18,11 @@ function soNote(r){
 const scSubName = (cat, sub) => sub ? (subName(sub) || sub.replace(/^s-\d+-/, '').replace(/-/g, ' ')) : 'Not sorted';
 const ssHas = (m, sku) => Object.prototype.hasOwnProperty.call(m || {}, sku);
 const ssSet = sku => ssHas(SUBMAP.skus, sku);
-/* the category a SKU sells as: its own, or for a Special Orders item the one set here or from its description ('640' when none yet) */
-const ssCat = row => row[2] !== '640' ? row[2] : (ssHas(SUBMAP.cat, row[0]) ? SUBMAP.cat[row[0]] : row[7]) || '640';
+/* the category a SKU reports in: the one set here, else its POS category, or for a Special Orders item the one its
+   description names ('640' when none yet). Budgets stay on the POS category. */
+const ssCatAuto = row => row[2] === '640' ? (row[7] || '') : row[2];
+const ssCat = row => { const v = ssHas(SUBMAP.cat, row[0]) ? SUBMAP.cat[row[0]] : null;
+  return v || (row[2] !== '640' ? row[2] : v === null ? row[7] || '640' : '640'); };
 const ssSo = row => ssHas(SUBMAP.so, row[0]) ? (SUBMAP.so[row[0]] === 'shelf' ? '' : SUBMAP.so[row[0]]) : (row[8] || '');
 const ssSubAuto = row => row[6] && subsFor(ssCat(row)).some(x => x.id === row[6]) ? row[6] : '';
 const ssSub = row => ssSet(row[0]) ? SUBMAP.skus[row[0]] : ssSubAuto(row);
@@ -114,23 +117,23 @@ function openSortSkus(){
   const seg = (k, l, n) => `<button type="button" class="fchip" data-ssfilt="${k}" aria-pressed="${SS.filter === k && !q}">${l}<span class="c">${n}</span></button>`;
   const subOpts = r => { const cur = ssSub(r), a = ssSubAuto(r);
     return `<option value="" ${!cur ? 'selected' : ''}>Not sorted</option>${subsFor(ssCat(r)).map(x => `<option value="${esc(x.id)}" ${x.id === cur ? 'selected' : ''}>${esc(x.name)}${x.id === a ? ' (from the description)' : ''}</option>`).join('')}`; };
-  const catOpts = r => { const cur = ssCat(r), a = r[7] || '';
-    return `<option value="" ${cur === '640' ? 'selected' : ''}>No category yet</option>${sellCats.map(c => `<option value="${c}" ${c === cur ? 'selected' : ''}>${esc(CAT(c).name)}${c === a ? ' (from the description)' : ''}</option>`).join('')}`; };
+  const catOpts = r => { const cur = ssCat(r), a = ssCatAuto(r), pos = r[2] !== '640';
+    return `${pos ? '' : `<option value="" ${cur === '640' ? 'selected' : ''}>No category yet</option>`}${sellCats.map(c => `<option value="${c}" ${c === cur ? 'selected' : ''}>${esc(CAT(c).name)}${c === a ? (pos ? ' (POS category)' : ' (from the description)') : ''}</option>`).join('')}`; };
   const soOpts = r => { const cur = ssSo(r), a = r[8] || '';
     return [['', 'Shelf stock'], ['member', SOK.member], ['group', SOK.group], ['notretail', SOK.notretail]].map(([v, l]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${l}${v === a ? ' (from the description)' : ''}</option>`).join(''); };
   const where = r => { const c = ssCat(r), notes = [];
-    notes.push(r[2] === '640' ? `Special Orders${c !== '640' ? ` · sells as ${esc(CAT(c).name)}` : ''}` : esc(CAT(r[2]).name));
+    notes.push(r[2] === '640' ? `Special Orders${c !== '640' ? ` · sells as ${esc(CAT(c).name)}` : ''}` : c !== r[2] ? `${esc(CAT(r[2]).name)} in the POS · sells as ${esc(CAT(c).name)}` : esc(CAT(r[2]).name));
     if (ssSet(r[0]) || ssHas(SUBMAP.so, r[0]) || ssHas(SUBMAP.cat, r[0])) notes.push('set here');
     return notes.join(' · '); };
   const cell = (r, kind) => {
-    if (kind === 'cat') return r[2] !== '640' ? `<span style="color:var(--muted)">${esc(CAT(r[2]).name)}</span>` : ro ? esc(ssCat(r) === '640' ? 'No category yet' : CAT(ssCat(r)).name) : `<select data-sscatsku="${esc(r[0])}" aria-label="Category SKU ${esc(r[0])} sells as" style="${SSSEL}">${catOpts(r)}</select>`;
+    if (kind === 'cat') return ro ? esc(ssCat(r) === '640' ? 'No category yet' : CAT(ssCat(r)).name) : `<select data-sscatsku="${esc(r[0])}" aria-label="Category SKU ${esc(r[0])} sells as" style="${SSSEL}">${catOpts(r)}</select>`;
     if (kind === 'sub') return ssCat(r) === '640' ? '<span style="color:var(--faint)">pick a category first</span>' : ro ? esc(scSubName(ssCat(r), ssSub(r))) : `<select data-sssku="${esc(r[0])}" aria-label="Subcategory for SKU ${esc(r[0])}" style="${SSSEL}">${subOpts(r)}</select>`;
     return ro ? (ssSo(r) ? SOK[ssSo(r)] : 'Shelf stock') : `<select data-ssso="${esc(r[0])}" aria-label="Special order or shelf stock, SKU ${esc(r[0])}" style="${SSSEL}">${soOpts(r)}</select>`;
   };
   $('#overlay').innerHTML = `<div class="scrim" data-close="1"></div>
   <aside class="drawer wide" role="dialog" aria-modal="true" aria-labelledby="ssTitle">
     <header><div><div class="lab">${ssUnsorted().length} SKUs not sorted · ${ssPlace().length} special orders need a category</div><h2 id="ssTitle">Sort SKUs</h2>
-      <div style="font-size:12.5px;color:var(--muted);margin-top:4px">Each SKU's subcategory, and whether it is shelf stock or a special order, comes from its description; change any that are wrong. Special Orders items also get the category they sell as, so they report with it. Choices save as you make them, and ${isAdmin ? '<b>Update subcategories</b>' : 'the owner’s <b>Update subcategories</b>'} puts them into the reports and the budgets (every month-end upload does too).</div></div>
+      <div style="font-size:12.5px;color:var(--muted);margin-top:4px">Each SKU's subcategory, and whether it is shelf stock or a special order, comes from its description; change any that are wrong. Special Orders items also get the category they sell as, so they report with it; so can a SKU rung to the wrong category (its budget stays with the POS category until it is moved in the POS). Choices save as you make them, and ${isAdmin ? '<b>Update subcategories</b>' : 'the owner’s <b>Update subcategories</b>'} puts them into the reports and the budgets (every month-end upload does too).</div></div>
       <button class="x" type="button" data-close="1" aria-label="Close">×</button></header>
     <div class="body">
       ${old ? '<div class="warnbox info">Special orders are marked from the next Update subcategories or month-end upload.</div>' : ''}
@@ -157,7 +160,7 @@ function ssSave(sku, sub){
 /* a Special Orders item's category; its subcategory starts again from the description */
 function ssSaveCat(sku, cat){
   const row = ssRows().find(r => r[0] === sku), cats = {...(SUBMAP.cat || {})}, skus = {...(SUBMAP.skus || {})};
-  if (row && (cat || '') === (row[7] || '')) delete cats[sku]; else cats[sku] = cat || '';
+  if (row && (cat || '') === ssCatAuto(row)) delete cats[sku]; else cats[sku] = cat || '';
   delete skus[sku];
   return ssWrite(sku, {cat: cats, skus}, `SKU ${sku} sells as ${cat ? CAT(cat).name : 'no category yet'}`);
 }
