@@ -84,5 +84,25 @@ document.addEventListener('click', e => { const b = e.target.closest && e.target
 document.addEventListener('keydown', e => { if (e.key === 'Escape') hideTip(); });
 addEventListener('scroll', hideTip, {passive: true, capture: true});
 addEventListener('resize', hideTip);
-new MutationObserver(() => decorateTips(document.body)).observe(document.body, {childList: true, subtree: true});
-decorateTips(document.body);
+/* Tables on a phone: each row becomes a small card of label and value pairs (shell.html, table.rt), so nothing scrolls
+   sideways. Every cell gets its column's heading as data-l. Tables you type into, and the size grids, keep their columns. */
+function labelTables(root){
+  for (const t of root.querySelectorAll('table:not([data-lab])')){
+    t.dataset.lab = '1';
+    if (t.querySelector('input, select, textarea') || t.closest('.sizegrid, .prev')) continue;
+    const heads = [];
+    for (const th of t.querySelectorAll('thead tr:last-child th')){
+      const h = th.querySelector('button.sorth, button[data-sort], .h');
+      const txt = [...(h || th).childNodes].filter(n => !(n.classList && n.classList.contains('tipi'))).map(n => n.textContent).join('').replace(/[▲▼]/g, '').replace(/\s+/g, ' ').trim();
+      for (let k = 0; k < (th.colSpan || 1); k++) heads.push(txt);
+    }
+    if (!heads.length) continue;
+    t.classList.add('rt');
+    for (const tr of t.querySelectorAll('tbody tr')){
+      let i = 0;
+      for (const td of tr.children){ if (!td.dataset.l && heads[i] && (td.colSpan || 1) === 1) td.dataset.l = heads[i]; if ((td.colSpan || 1) > 1) td.classList.add('rt-wide'); i += td.colSpan || 1; }
+    }
+  }
+}
+new MutationObserver(() => { decorateTips(document.body); labelTables(document.body); }).observe(document.body, {childList: true, subtree: true});
+decorateTips(document.body); labelTables(document.body);

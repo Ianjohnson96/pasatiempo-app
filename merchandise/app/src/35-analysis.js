@@ -90,7 +90,7 @@ function anaRow(M, isSub, open){
     <td class="r num">${money(M.t12)}</td><td class="r num ${M.growth == null ? '' : M.growth >= 0 ? 'up' : 'dn'}">${aChg(M.growth)}</td><td class="r num ${M.trend3 == null ? '' : M.trend3 >= 0 ? 'up' : 'dn'}">${aChg(M.trend3)}</td>
     <td><div class="sharebar" title="Sales ${aPct(M.share)} · stock ${aPct(M.stockShare)}"><i class="sb-s" style="width:${Math.min(100, M.share * 250)}%"></i><i class="sb-o" style="width:${Math.min(100, M.stockShare * 250)}%"></i></div><span class="num" style="font-size:11px;color:var(--muted)">${aPct(M.share)} / ${aPct(M.stockShare)}</span></td>
     <td${aHeat(g('gm'))}>${aPct(M.gm)}</td><td${aHeat(g('md'))}>${aPct(M.md)}</td><td${aHeat(g('turns'))}>${aX(M.turns)}</td><td${aHeat(g('gmroi'))}>${aX(M.gmroi, 2)}</td>
-    <td${aHeat(g('wks'))}>${aWk(M.wks)}</td><td${aHeat(g('agedPct'))}>${aPct(M.agedPct)}</td><td class="r num">${money(M.oh)}</td><td>${chSpark(M.series.map((v, i) => i >= ANA.first ? v : null), {w: 96, h: 24})}</td></tr>`;
+    <td${aHeat(g('wks'))}>${aWk(M.wks)}</td><td${aHeat(g('agedPct'))}>${aPct(M.agedPct)}</td><td class="r num">${money(M.oh)}</td><td class="sp">${chSpark(M.series.map((v, i) => i >= ANA.first ? v : null), {w: 96, h: 24})}</td></tr>`;
 }
 function renderScorecard(){
   const a = anaNow(); if (!a) return $('#pane').innerHTML = anaEmpty();

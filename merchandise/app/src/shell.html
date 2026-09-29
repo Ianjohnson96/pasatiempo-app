@@ -443,6 +443,26 @@ td.h-bad{background:color-mix(in srgb,var(--tint-stop) 90%,transparent);color:va
 .ch .pt:focus-visible{outline:none;stroke:var(--ink);stroke-width:3}
 .bench{font-size:12px;color:var(--muted);padding:10px 16px;border:1px dashed var(--rule2);background:var(--card)}
 .bench b{color:var(--ink)}
+/* Tables fit their card on a computer: no forced minimum width, tighter cells, headings that may wrap. */
+@media (min-width:1100px){.tbl table,.atbl table,table.fc,table.brandt{min-width:0!important}td{padding:8px 9px}th button,th span.h{padding:9px 9px;white-space:normal}th,table.fc th,table.fc th span.h,table.fc th button,.brandt th,.brandt th button{white-space:normal}th.withtip{white-space:normal}.atbl td:first-child,.atbl th:first-child{min-width:170px}}
+/* On a phone every read-only table turns each row into a card of label/value pairs (15-tips.js labelTables). */
+@media (max-width:640px){
+  table.rt{min-width:0!important;width:100%}
+  table.rt thead{display:none}
+  table.rt,table.rt tbody{display:block}
+  table.rt tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:3px 14px;padding:10px 12px;border-bottom:1px solid var(--rule)}
+  table.rt td{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:3px 6px;border:none;border-radius:4px;white-space:normal!important;overflow-wrap:break-word;text-align:right;min-width:0!important;max-width:none!important;position:static!important;box-shadow:none!important}
+  table.rt td::before{content:attr(data-l);font:600 9.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--faint);text-align:left;flex:0 1 auto;white-space:normal;line-height:1.25}
+  table.rt td:first-child,table.rt td.rt-wide{grid-column:1/-1;justify-content:flex-start;text-align:left;font-weight:600;white-space:normal!important;padding-left:0}
+  table.rt td:first-child::before,table.rt td.rt-wide::before,table.rt td:not([data-l])::before{content:none}
+  table.rt td:empty{display:none}
+  table.rt td.num,table.rt td.r{white-space:nowrap!important}
+  table.rt .sharebar{width:80px}table.rt td.sp{grid-column:1/-1}
+  table.rt tr.tot{background:var(--sunk)}
+  .atbl tr.asub td:first-child{padding-left:0}
+  .atbl tr.asub{padding-left:24px}
+}
+@media (max-width:440px){table.rt tr{grid-template-columns:minmax(0,1fr)}}
 @media print{body{padding:0;background:#fff}.band,.tabs,.subnav,.top .actions,#banner,#wibar,.noprint{display:none!important}.ccard,.tiles,.panel{break-inside:avoid}}
 @media (max-width:760px){.band-in{min-height:58px;gap:10px}.back{padding:0 12px 0 8px}.brandmark .k{display:none}.brandmark .t{font-size:16px}.acctbtn .nm{display:none}.acctbtn{padding:0 8px 0 4px}}
 @media (max-width:640px){.atbl td:first-child,.atbl th:first-child{min-width:0;max-width:46vw;white-space:normal}.atbl tr.asub td:first-child{padding-left:18px}
