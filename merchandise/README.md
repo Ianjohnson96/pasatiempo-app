@@ -84,7 +84,7 @@ The page shows new names and words at once (brand labels, the SKU list's "no bra
 Inside each category, the **Subcategories** page shows where the sales and the stock are, with the brand scorecard's measures: 12-month sales and share of the category, trend, on hand, weeks of supply, margin, GMROI, aged stock, what the Order Book has committed this year, and a call. Special orders show in the category they sell as, flagged (see below). It is reporting only: budgets stay by category.
 
 - The subcategory list is the program's own (`subcats/{id}`, the same list order lines use).
-- A SKU's subcategory comes from its description (`config.SUB_RULES`, checked in order; `model.sub_auto`), unless someone sets it under **Sort SKUs** (`submap/current`: `{skus: {sku: subcat id}}`, where `""` means not sorted). Choosing the one the description gives removes the override. A rule for a subcategory that was removed is skipped.
+- A SKU's subcategory comes from its description (`config.SUB_RULES`, checked in order; `model.sub_auto`), unless someone sets it under **Sort SKUs** (`submap/current`: `{skus: {sku: subcat id}}`, where `""` means not sorted). Choosing the one the description gives removes the override. A rule for a subcategory that was removed is skipped. Tick several SKUs (shift-click ticks a run) to change their category, subcategory or special-order mark at once; the list keeps its place after each change.
 - The report is `assort/current` (`model.build_subcats`), built at every month-end upload and by **Update brands** / **Update subcategories** (both rebuild the scorecard and the report). The category panel on the Overview shows the same split.
 
 ## Special orders

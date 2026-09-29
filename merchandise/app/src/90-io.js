@@ -168,6 +168,9 @@ document.addEventListener('click', async e => {
   if (ds.subrow != null) return openSubcat(ds.subrow);
   if (ds.ssopen){ SS.keep.clear(); if (ds.ssopen !== '1'){ SS.cat = ds.ssopen; SS.filter = 'all'; SS.q = ''; } if (ds.ssfiltgo){ SS.filter = ds.ssfiltgo; SS.cat = 'all'; SS.q = ''; } return openSortSkus(); }
   if (ds.ssfilt){ SS.filter = ds.ssfilt; SS.q = ''; SS.keep.clear(); return openSortSkus(); }
+  if (ds.ssbulk === 'apply') return ssBulkApply();
+  if (ds.ssbulk === 'clear') return ssClear();
+  if (ds.ssbulk === 'all') return ssTickAll(true, SS.list);
   if (ds.beopen){ BE.edit = null; return openBrandList(); }
   if (ds.benew) return beStart('');
   if (ds.beedit) return beStart(ds.beedit);
@@ -180,7 +183,7 @@ document.addEventListener('click', async e => {
   if (ds.bmdrop != null){ BM.draft.splice(+ds.bmdrop, 1); if (BM.draft.length === 1) BM.draft[0].s = 100; return openBrandMap(); }
   if (ds.bmsave) return bmSave(false);
   if (ds.bmclear) return bmSave(true);
-  if (ds.bmcancel){ BM.edit = null; BM.draft = []; BM.rc = null; return openBrandMap(); }
+  if (ds.bmcancel){ BM.edit = null; BM.draft = []; BM.rc = null; return openBrandMap(BM.back); }
   if (ds.bmrcon) return bmRcStart();
   if (ds.bmrcoff){ BM.rc = null; return openBrandMap(); }
   if (ds.bmrcdel) return bmRcDelete();
@@ -240,6 +243,11 @@ document.addEventListener('click', async e => {
   if (ds.po) return openOrder(ds.po);
   if (ds.cat && !D){ if (TAB === 'otb' && BASE){ const k = OTBV.view === 'next' ? 'next' : 'cur'; if (FYSEL !== k){ FYSEL = k; try { localStorage.setItem('mp.fy', FYSEL); } catch (_) {} render(); } } return openCategory(ds.cat); }
 });
+document.addEventListener('click', e => {
+  const t = e.target; if (!t.matches || !t.matches('input[data-sssel],#ssAll')) return;
+  if (t.id === 'ssAll') return ssTickAll(t.checked);
+  ssTick(t.dataset.sssel, t.checked, e.shiftKey);
+});
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape'){ if ($('#overlay').innerHTML) closeOverlay(); $('#morePop').hidden = true; }
   if (e.key === 'Enter' && e.target.matches && e.target.matches('tr[data-po],[data-cat][tabindex],tr[data-brand],tr[data-subrow]')){ e.preventDefault(); e.target.click(); }
@@ -275,6 +283,8 @@ document.addEventListener('change', e => {
   if (t.dataset.sssku){ return ssSave(t.dataset.sssku, t.value); }
   if (t.dataset.sscatsku){ return ssSaveCat(t.dataset.sscatsku, t.value); }
   if (t.dataset.ssso){ return ssSaveSo(t.dataset.ssso, t.value); }
+  if (t.id === 'ssBCat'){ SS.bulk = {...SS.bulk, cat: t.value, sub: '*'}; return openSortSkus(true); }
+  if (t.id === 'ssBSub' || t.id === 'ssBSo'){ SS.bulk = {...SS.bulk, [t.id === 'ssBSub' ? 'sub' : 'so']: t.value}; return openSortSkus(true); }
   if (t.dataset.wi){ if (t.value === '' || !isFinite(+t.value)) return render(); const g = t.dataset.wi; setWhatIf(g, t.dataset.k, g === 'wos' ? Math.max(1, Math.min(52, Math.round(+t.value))) : +t.value / 100); return; }
   if (t.dataset.chk){ return toggleCheck(t.dataset.chkm, t.dataset.chk, t.checked); }
   if (t.id === 'upFiles'){ UP.files = [...t.files]; UP.error = null; UP.found = null; return render(); }
