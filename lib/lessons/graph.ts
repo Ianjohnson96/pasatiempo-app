@@ -48,9 +48,26 @@ async function accessToken(): Promise<string> {
   });
 
   if (!res.ok) {
-    // Deliberately not echoing the body: a token error can quote the request
-    // back, client secret included, straight into the logs.
-    throw new Error(`Graph token request failed (HTTP ${res.status})`);
+    // Surface Microsoft's own error code. AADSTS700016 (app not found in this
+    // tenant), AADSTS7000215 (wrong client secret) and AADSTS900023 (bad
+    // tenant id) each point at a different fix, and "HTTP 400" points at none
+    // of them. The body carries a code, timestamp and correlation id - it
+    // never echoes the client secret back, so this is safe to surface.
+    let detail = "";
+    try {
+      const body = (await res.json()) as {
+        error?: string;
+        error_description?: string;
+      };
+      const code = /AADSTS\d+/.exec(body.error_description ?? "")?.[0];
+      detail = [body.error, code].filter(Boolean).join(" ");
+      if (!detail) detail = (body.error_description ?? "").slice(0, 160);
+    } catch {
+      // Non-JSON error body - the status alone will have to do.
+    }
+    throw new Error(
+      `Graph token request failed (HTTP ${res.status})${detail ? `: ${detail}` : ""}`,
+    );
   }
   const json = (await res.json()) as { access_token?: string };
   if (!json.access_token) throw new Error("Graph returned no access token");
