@@ -1,71 +1,84 @@
-// Shapes shared by the lesson book's server and client code.
+// Shapes for the lesson book. These mirror public.lesson_* and the three
+// views, but stay plain: they cross to the browser, so no Supabase types.
 //
-// These mirror the `lessons` schema (supabase/migration-lessons-schema.sql)
-// but are deliberately plain: they cross to the browser, so they carry no
-// Supabase types and no columns the client has no business seeing.
+// THE BILLING UNIT IS THE PACKAGE, not the lesson. Ian sells 3, 5 or 10
+// lessons and is paid once, up front. A lesson with no package_id is a genuine
+// one-off. Money therefore lives on the package and never on the lesson - the
+// earlier per-lesson model was wrong about how he actually works.
 
-export type LessonStatus = "scheduled" | "delivered" | "voided" | "removed";
+/** Submitted-but-not-posted member charges are real, so this is not a boolean. */
+export type PaymentStatus = "unpaid" | "pending" | "paid";
 
-export interface StudentRec {
+export type LessonStatus = "completed" | "scheduled" | "cancelled" | "no_show";
+
+export interface ClientRec {
   id: string;
   name: string;
+  /** Other spellings seen on the calendar; how the sync keeps matching. */
   aliases: string[];
   email: string | null;
   phone: string | null;
+  memberNumber: string | null;
+  isMember: boolean;
   active: boolean;
-  notes: string;
+  notes: string | null;
+}
+
+export interface PackageRec {
+  id: string;
+  clientId: string;
+  clientName: string;
+  label: string | null;
+  size: number;
+  /** Integer cents, or null when the price was never recorded. */
+  priceCents: number | null;
+  soldOn: string | null;
+  paymentMethod: string | null;
+  paymentStatus: PaymentStatus;
+  paidOn: string | null;
+  notes: string | null;
+  used: number;
+  remaining: number;
+  booked: number;
+  lastLessonAt: string | null;
+  isComplete: boolean;
 }
 
 export interface LessonRec {
   id: string;
-  studentId: string;
-  studentName: string;
-  eventKey: string;
-  /** ISO. Rendered in course time by `formatWhen`, never in the browser's zone. */
+  clientId: string | null;
+  clientName: string;
+  packageId: string | null;
   startsAt: string;
-  minutes: number;
-  title: string;
-  calendar: string;
+  endsAt: string;
   status: LessonStatus;
-  /** null means no price set yet - which the app surfaces as needing attention. */
-  amount: number | null;
-  paid: boolean;
-  paidAt: string | null;
-  series: string | null;
-  seq: number | null;
-  seqOf: number | null;
+  titleRaw: string | null;
+  calendarUid: string | null;
 }
 
-/** A student plus the numbers Ian actually asks about. */
-export interface StudentSummary extends StudentRec {
-  lessons: number;
-  /** Delivered lessons with no price on them yet. */
-  unpriced: number;
-  /** What they owe: the sum of priced, delivered, unpaid lessons. */
-  owed: number;
-  paidTotal: number;
-  lastLesson: string | null;
-}
-
-export interface PendingRec {
-  eventKey: string;
-  startsAt: string;
-  minutes: number;
-  title: string;
-  calendar: string;
-  guess: string | null;
+/** One row of lesson_client_summary - the roster screen. */
+export interface ClientSummary {
+  id: string;
+  name: string;
+  isMember: boolean;
+  active: boolean;
+  totalLessons: number;
+  lastLessonAt: string | null;
+  packageCount: number;
+  owedCents: number;
 }
 
 export type Result<T = void> =
   | { ok: true; value: T }
   | { ok: false; error: string };
 
-// The course runs on Pacific time. Lesson times are timestamptz and Vercel runs
-// in UTC, so anything rendered without this lands seven hours out - which here
-// would move an early-morning lesson onto the previous day.
+// Pacific. Lesson times are timestamptz and Vercel runs UTC, so anything
+// rendered without this lands seven hours out - which moves an early lesson
+// onto the previous day.
 export const COURSE_TZ = "America/Los_Angeles";
 
-export function formatWhen(iso: string): string {
+export function formatWhen(iso: string | null): string {
+  if (!iso) return "";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
   return d.toLocaleString("en-US", {
@@ -73,12 +86,28 @@ export function formatWhen(iso: string): string {
     weekday: "short",
     month: "short",
     day: "numeric",
+    year: "numeric",
     hour: "numeric",
     minute: "2-digit",
   });
 }
 
-export function formatDay(iso: string): string {
+export function formatDay(iso: string | null): string {
+  if (!iso) return "";
+  // A bare date (sold_on, paid_on) carries no timezone; pushing it through
+  // Date() and back can shift it a day, so take it apart instead.
+  const bare = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (bare) {
+    return new Date(
+      Number(bare[1]),
+      Number(bare[2]) - 1,
+      Number(bare[3]),
+    ).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
   return d.toLocaleDateString("en-US", {
@@ -89,17 +118,34 @@ export function formatDay(iso: string): string {
   });
 }
 
-export function money(n: number): string {
-  return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+/** Cents in, dollars out. Prices are integers so they never drift. */
+export function money(cents: number | null | undefined): string {
+  if (cents === null || cents === undefined) return "—";
+  return (cents / 100).toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: cents % 100 === 0 ? 0 : 2,
+  });
 }
 
-/** "3 of 5", "Series 2", or null for a one-off. */
-export function seriesLabel(l: {
-  series: string | null;
-  seq: number | null;
-  seqOf: number | null;
-}): string | null {
-  if (l.seq && l.seqOf) return `${l.seq} of ${l.seqOf}`;
-  if (l.seq) return `Lesson ${l.seq}`;
-  return l.series || null;
+export const PAYMENT_LABEL: Record<PaymentStatus, string> = {
+  unpaid: "Unpaid",
+  pending: "Pending",
+  paid: "Paid",
+};
+
+/** Maps onto badge classes already in globals.css. */
+export const PAYMENT_BADGE: Record<PaymentStatus, string> = {
+  unpaid: "badge closed",
+  pending: "badge draft",
+  paid: "badge full",
+};
+
+export function packageProgress(p: PackageRec): string {
+  return `${p.used} of ${p.size} used`;
+}
+
+/** Nearly finished is Ian's cue to sell the next one. */
+export function runningOut(p: PackageRec): boolean {
+  return !p.isComplete && p.remaining <= 1;
 }

@@ -2,13 +2,12 @@ import "../hub.css";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createAdminClient, createHubClient, createLessonsClient } from "@/lib/supabase/admin";
+import { createAdminClient, createHubClient } from "@/lib/supabase/admin";
 import { getPerson, hasApp, isAppAdmin, roleIn, signedInEmail } from "@/lib/hub/access";
 import { APPS, type AppKey, type SiteKey } from "@/lib/hub/apps";
 import HubTile from "@/components/hub/HubTile";
 import SiteSwitch from "@/components/hub/SiteSwitch";
-import { bookTotals, pendingCount } from "@/lib/lessons/data";
-import { money } from "@/lib/lessons/types";
+import { listClientSummaries, listPackages } from "@/lib/lessons/data";
 import { reportStatus } from "@/lib/merch/reminders";
 import { pacificToday } from "@/lib/merch/schedule";
 
@@ -67,20 +66,29 @@ async function caddieStats() {
   }
 }
 
-// Ian's teaching book. Wrapped like the rest, and the catch earns its keep
-// here: the `lessons` schema has to be exposed in Supabase before PostgREST
-// will answer, and an unguarded throw would take the whole hub down with it.
+// Ian's teaching book. Counts rather than money: most packages still have no
+// price recorded, so a total would read "$0 owed" and imply he is square when
+// he is not.
+//
+// Wrapped like the rest, and the catch matters here - these tables are
+// RLS-protected, so a reader outside lesson_owners gets nothing back, and an
+// unguarded throw would take the whole hub down rather than one tile.
 async function lessonStats() {
   try {
-    const s = createLessonsClient();
-    const [{ count: students }, totals, waiting] = await Promise.all([
-      s.from("students").select("*", { count: "exact", head: true }).eq("active", true),
-      bookTotals(),
-      pendingCount(),
+    const [packages, clients] = await Promise.all([
+      listPackages(),
+      listClientSummaries(),
     ]);
-    return { students: students ?? 0, ...totals, waiting, ok: true };
+    return {
+      clients: clients.filter((c) => c.active).length,
+      unpaid: packages.filter((p) => p.paymentStatus === "unpaid").length,
+      pending: packages.filter((p) => p.paymentStatus === "pending").length,
+      runningOut: packages.filter((p) => !p.isComplete && p.remaining <= 1)
+        .length,
+      ok: true,
+    };
   } catch {
-    return { students: 0, lessons: 0, unpriced: 0, owed: 0, paidTotal: 0, waiting: 0, ok: false };
+    return { clients: 0, unpaid: 0, pending: 0, runningOut: 0, ok: false };
   }
 }
 
@@ -303,21 +311,21 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
               badge={
                 <>
                   {role("lessons")}
-                  {lsn.waiting > 0 && (
-                    <span className="badge open">{lsn.waiting} to confirm</span>
+                  {lsn.unpaid > 0 && (
+                    <span className="badge open">{lsn.unpaid} unpaid</span>
                   )}
                 </>
               }
               stats={[
-                { num: lsn.lessons, lbl: "lessons" },
-                { num: lsn.students, lbl: "students" },
+                { num: lsn.unpaid, lbl: "unpaid" },
+                { num: lsn.clients, lbl: "clients" },
               ]}
               meta={
                 <>
-                  {lsn.owed > 0 && <span>{money(lsn.owed)} outstanding</span>}
-                  {lsn.unpriced > 0 && <span>{lsn.unpriced} need a price</span>}
-                  {/* Says so plainly rather than showing a confident zero:
-                      before the first push the tables are simply empty. */}
+                  {lsn.pending > 0 && <span>{lsn.pending} charges pending</span>}
+                  {lsn.runningOut > 0 && (
+                    <span>{lsn.runningOut} running out</span>
+                  )}
                   {!lsn.ok && <span className="warn">⚠︎ Couldn&apos;t reach the database</span>}
                 </>
               }
