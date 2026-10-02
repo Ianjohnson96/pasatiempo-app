@@ -12,15 +12,18 @@ The club app runs the same refresh when the owner uploads the reports on the Mon
 import argparse
 from datetime import datetime, timezone
 import glob
+import hashlib
 import json
 import os
+import re
 
 import engine
+import exports
 import model
 import parse
 import receipts
 from config import OTB_EXCLUDE, REPLENISH
-from extract import SHEETS, detect_kind, report_text
+from extract import SHEETS, detect_kind, is_sheet, pdf_text, rows_text, sheet_rows
 
 LISTS = ('sku_analysis', 'rounds', 'sales_by_item', 'sales_by_category', 'best100')
 
@@ -39,25 +42,54 @@ NAMES = {'sku_analysis': 'SKU Analysis', 'best100': 'Cost & margin (BEST 100)', 
          'sales_by_item': 'Sales by Item', 'daily_sales': 'Daily Sales Report', 'rounds': 'Rounds Summary'}
 
 
+TOPBEST = re.compile(r'top|best', re.I)
+
+
+def _day(d):
+    return f'{datetime.fromisoformat(d):%b} {int(d[8:10])}, {d[:4]}'
+
+
 def read_reports(files):
     """files: [(name, path or bytes)]. Returns (reports, found).
-    found: one dict per file: name, kind (None if not recognised), ok, and a note when it isn't used."""
-    reports, found = {}, []
+    found: one dict per file: name, kind (None if not recognised), ok, a note when it isn't used, and a
+    detail (the period or date it covers) when that's known."""
+    reports, found, seen, undated = {}, [], {}, []
     for name, src in files:
         if not name.lower().endswith(('.pdf',) + SHEETS):
             found.append(dict(name=name, kind=None, ok=False, note='Not a PDF, Excel or CSV file.'))
             continue
         try:
-            t = report_text(name, src)
+            if is_sheet(name):
+                if not isinstance(src, (bytes, bytearray)):
+                    with open(src, 'rb') as f:
+                        src = f.read()
+                rows = sheet_rows(name, src)
+                t = rows_text(rows)
+            else:
+                rows, t = None, pdf_text(src)
         except Exception:  # damaged, or not really that type
             found.append(dict(name=name, kind=None, ok=False, note="Couldn't be opened."))
             continue
         k = detect_kind(t)
+        export = not k and rows is not None and exports.detect(rows)
+        k = k or export or None
         if not k:
-            found.append(dict(name=name, kind=None, ok=False, note="Not one of the month-end reports."))
+            found.append(dict(name=name, kind=None, ok=False, note=(
+                "No report title, and the columns don't match any month-end report. Export it with its title and headings, or use the PDF."
+                if rows is not None else "Not one of the month-end reports.")))
             continue
+        h = hashlib.sha1(t.encode()).hexdigest()
+        if h in seen:
+            first = found[seen[h]]
+            if TOPBEST.search(first['name']) and not TOPBEST.search(name):
+                first['name'], name = name, first['name']  # report the one named like the cost report as the copy
+            hint = (' The cost & margin report (BEST 100) has cost and margin % columns; this file has only units and sales.'
+                    if TOPBEST.search(name) and k != 'best100' else '')
+            found.append(dict(name=name, kind=None, ok=False, note=f"The same rows as {first['name']}, so it is left out.{hint}"))
+            continue
+        seen[h] = len(found)
         try:
-            d = getattr(parse, 'parse_' + k)(t)
+            d = exports.PARSE[k](rows) if export else getattr(parse, 'parse_' + k)(t)
             ok = HAS_ROWS[k](d)
         except Exception:
             ok = False
@@ -67,11 +99,26 @@ def read_reports(files):
         if k not in LISTS and k in reports:
             found.append(dict(name=name, kind=k, ok=False, note=f'A second {NAMES[k]}; the first one is used.'))
             continue
-        found.append(dict(name=name, kind=k, ok=True, note=None))
+        f = dict(name=name, kind=k, ok=True, note=None)
+        if k == 'sku_analysis':
+            f['detail'] = (f"as of {_day(d['day'])}" if d.get('day') else f"as of {d['as_of']}") + f", {len(d['rows']):,} SKUs"
+        elif export:
+            undated.append((k, d, f))  # the period comes from the SKU Analysis, below
+        found.append(f)
         if k in LISTS:
             reports.setdefault(k, []).append(d)
         else:
             reports[k] = d
+    sku = max(reports.get('sku_analysis', []), key=lambda r: r['as_of'], default=None)
+    for k, d, f in undated:
+        per = exports.infer_period(exports.units_of(k, d), sku) if sku else None
+        if per:
+            if k == 'sales_by_category':
+                d['period'] = exports.period_text(*per)
+            f['detail'] = exports.period_label(*per) + ' (worked out from the SKU Analysis: the file has no dates)'
+        else:
+            f['detail'] = ('period unknown: the file has no dates and its units match no run of months in the SKU Analysis'
+                           + (', so it is kept for the record only' if k == 'sales_by_category' else ''))
     return reports, found
 
 
@@ -80,7 +127,7 @@ def load_reports(folder):
              if p.lower().endswith(('.pdf',) + SHEETS)]
     reports, found = read_reports(files)
     for f in found:
-        print(f"  {f['kind']:<18} {f['name']}" if f['ok'] else f"  skipped: {f['name']} ({f['note']})")
+        print(f"  {f['kind']:<18} {f['name']}" + (f"  ({f['detail']})" if f.get('detail') else '') if f['ok'] else f"  skipped: {f['name']} ({f['note']})")
     return reports
 
 
