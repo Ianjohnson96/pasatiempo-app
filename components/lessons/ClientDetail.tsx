@@ -240,6 +240,7 @@ function Editor({
     isMember?: boolean;
     active?: boolean;
     notes?: string | null;
+    aliases?: string[];
   }) => void;
 }) {
   const [name, setName] = useState(client.name);
@@ -248,6 +249,7 @@ function Editor({
   const [memberNumber, setMemberNumber] = useState(client.memberNumber ?? "");
   const [isMember, setIsMember] = useState(client.isMember);
   const [notes, setNotes] = useState(client.notes ?? "");
+  const [aliases, setAliases] = useState(client.aliases.join(", "));
 
   return (
     <div className="card" style={{ marginTop: 12 }}>
@@ -297,6 +299,19 @@ function Editor({
           Club member (can charge to their account)
         </label>
         <label>
+          <span style={LABEL}>Other spellings</span>
+          <input
+            className="field"
+            value={aliases}
+            onChange={(e) => setAliases(e.target.value)}
+            placeholder="e.g. Patsy, P Leung"
+          />
+          <span className="lb-fhint" style={{ display: "block" }}>
+            Names the calendar uses for this client, separated by commas. The
+            sync matches these as well as the name.
+          </span>
+        </label>
+        <label>
           <span style={LABEL}>Notes</span>
           <textarea
             className="field"
@@ -311,7 +326,15 @@ function Editor({
             className="btn small"
             disabled={busy}
             onClick={() =>
-              onSave({ name, email, phone, memberNumber, isMember, notes })
+              onSave({
+                name,
+                email,
+                phone,
+                memberNumber,
+                isMember,
+                notes,
+                aliases: aliases.split(","),
+              })
             }
           >
             {busy ? "Saving…" : "Save"}

@@ -1,4 +1,5 @@
 import { lessonBookClient } from "./db";
+import { matchExisting } from "./calc";
 import type {
   ClientRec,
   ClientSummary,
@@ -212,6 +213,50 @@ export async function listReview(): Promise<ReviewRec[]> {
     guessName: str(r.guess_name),
     seenAt: r.seen_at as string,
   }));
+}
+
+/**
+ * For each queued entry, the lesson already in the book that it is (if any):
+ * calendar uid -> that lesson's client. See matchExisting for the rule.
+ */
+export async function reviewMatches(
+  items: ReviewRec[],
+): Promise<Record<string, { lessonId: string; clientId: string; clientName: string }>> {
+  if (!items.length) return {};
+  const supa = await lessonBookClient();
+  const times = [...new Set(items.map((i) => i.startsAt))];
+  const { data, error } = await supa
+    .from("lesson_numbered")
+    .select("id, client_id, client_name, starts_at, calendar_uid")
+    .in("starts_at", times);
+  if (error) throw new Error(error.message);
+  const pool = (data ?? []).map((r) => ({
+    id: r.id as string,
+    clientId: (r.client_id as string) ?? "",
+    clientName: (r.client_name as string) ?? "",
+    startsAt: r.starts_at as string,
+    calendarUid: (r.calendar_uid as string | null) ?? null,
+  }));
+  const out: Record<string, { lessonId: string; clientId: string; clientName: string }> = {};
+  const claimed = new Set<string>();
+  for (const it of items) {
+    // A lesson can only be one entry; once claimed it leaves the pool, so
+    // two calendar entries at the same moment do not both show as matched.
+    const id = matchExisting(
+      it,
+      pool.filter((p) => !claimed.has(p.id)),
+    );
+    const hit = id ? pool.find((p) => p.id === id) : undefined;
+    if (hit && hit.clientId) {
+      claimed.add(hit.id);
+      out[it.calendarUid] = {
+        lessonId: hit.id,
+        clientId: hit.clientId,
+        clientName: hit.clientName,
+      };
+    }
+  }
+  return out;
 }
 
 /** Badge count for the Review tab. A head request - no rows come back. */

@@ -1,8 +1,12 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { assignLessonToPackage, assignLessons } from "@/lib/lessons/actions";
-import { seqLabel, suggestForPackage } from "@/lib/lessons/calc";
+import {
+  addLesson,
+  assignLessonToPackage,
+  assignLessons,
+} from "@/lib/lessons/actions";
+import { courseDay, seqLabel, suggestForPackage } from "@/lib/lessons/calc";
 import {
   formatWhen,
   type NumberedLesson,
@@ -98,10 +102,27 @@ export default function ClientLessons({
     });
   }
 
-  if (lessons.length === 0) return <p className="empty">No lessons recorded.</p>;
+  const adder = (
+    <AddLesson
+      clientId={clientId}
+      packages={packages}
+      defaultPackage={firstWithRoom}
+      onNote={onNote}
+    />
+  );
+
+  if (lessons.length === 0) {
+    return (
+      <>
+        {adder}
+        <p className="empty">No lessons recorded.</p>
+      </>
+    );
+  }
 
   return (
     <>
+      {adder}
       <div className="lb-sechead" style={{ marginTop: 0 }}>
         <p className="muted" style={{ fontSize: 13, margin: 0 }}>
           Newest first.{" "}
@@ -232,5 +253,133 @@ export default function ClientLessons({
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Log a lesson that is not on the calendar. Date and time are Pacific; a
+ * future one is saved as booked, a past one as taught. Goes straight into
+ * the package picked, which defaults to the first one with room.
+ */
+function AddLesson({
+  clientId,
+  packages,
+  defaultPackage,
+  onNote,
+}: {
+  clientId: string;
+  packages: PackageRec[];
+  defaultPackage: string;
+  onNote: (n: { kind: "ok" | "err"; text: string } | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [day, setDay] = useState(() => courseDay(new Date().toISOString()));
+  const [time, setTime] = useState("09:00");
+  const [minutes, setMinutes] = useState("60");
+  const [pkg, setPkg] = useState(defaultPackage);
+  const [busy, start] = useTransition();
+
+  if (!open) {
+    return (
+      <p style={{ margin: "0 0 12px" }}>
+        <button
+          type="button"
+          className="btn secondary small"
+          onClick={() => setOpen(true)}
+        >
+          + Add a lesson not on the calendar
+        </button>
+      </p>
+    );
+  }
+
+  function save() {
+    onNote(null);
+    start(async () => {
+      const r = await addLesson(clientId, {
+        day,
+        time,
+        minutes: Number(minutes),
+        packageId: pkg || null,
+      });
+      if (!r.ok) {
+        onNote({ kind: "err", text: r.error });
+        return;
+      }
+      onNote({ kind: "ok", text: "Lesson added." });
+      setOpen(false);
+    });
+  }
+
+  return (
+    <div className="card lb-addlesson" style={{ marginBottom: 12 }}>
+      <div className="lb-controls" style={{ marginTop: 0 }}>
+        <label className="lb-num">
+          Date
+          <input
+            className="field"
+            type="date"
+            value={day}
+            onChange={(e) => setDay(e.target.value)}
+          />
+        </label>
+        <label className="lb-num">
+          Time
+          <input
+            className="field"
+            type="time"
+            step={300}
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+          />
+        </label>
+        <label className="lb-num small">
+          Minutes
+          <input
+            className="field"
+            type="number"
+            min="10"
+            max="480"
+            step="15"
+            inputMode="numeric"
+            value={minutes}
+            onChange={(e) => setMinutes(e.target.value)}
+          />
+        </label>
+        <label className="lb-num lb-grow">
+          Package
+          <select
+            className="field"
+            value={pkg}
+            onChange={(e) => setPkg(e.target.value)}
+          >
+            <option value="">One-off</option>
+            {packages.map((p) => (
+              <option key={p.id} value={p.id}>
+                {pkgName(p)} · {p.used}/{p.size}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="lb-actions" style={{ marginTop: 12 }}>
+        <button
+          type="button"
+          className="btn small"
+          disabled={busy || !day || !time}
+          onClick={save}
+        >
+          {busy ? "Adding…" : "Add lesson"}
+        </button>
+        <button
+          type="button"
+          className="btn ghost small"
+          disabled={busy}
+          onClick={() => setOpen(false)}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }

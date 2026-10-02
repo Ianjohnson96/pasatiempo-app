@@ -1,5 +1,12 @@
 import { createClient as createSbClient } from "@supabase/supabase-js";
 import { fetchCalendarEvents, graphConfigured } from "./graph";
+import { normName } from "./calc";
+import {
+  isLessonTitle,
+  nameFromTitle,
+  planEntry,
+  type ReviewState,
+} from "./sync-plan";
 
 // Calendar -> book. Runs from a cron, so there is no signed-in user and RLS
 // cannot be the gate; this is the one place the lesson tables are reached with
@@ -18,49 +25,6 @@ function syncClient() {
   );
 }
 
-/** Must say "lesson" to count - this is Ian's work calendar, not a teaching one. */
-const LESSON_WORD = /\blessons?\b/i;
-
-// Group teaching, billed per head rather than per booking, so it belongs to no
-// single client. Out until there is a model for it.
-const NOT_BILLABLE = [
-  /\bclinic\b/i,
-  /\bcamp\b/i,
-  /\bacademy\b/i,
-  /\bjunior\s+golf\b/i,
-];
-
-const norm = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9 ]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-/** Strip the scaffolding so "Jon Davies lesson 2 of 5" leaves "jon davies". */
-function nameFromTitle(subject: string): string {
-  // Asides first, while the brackets still exist - norm() strips punctuation,
-  // and after that "[chrck with ken]" is indistinguishable from a surname.
-  // That is how "Patsy leung lesson [chrck with ken]" turned into a client
-  // called "Patsy Leung Chrck Ken". First line only, for the same reason.
-  const plain = subject
-    .split("\n")[0]
-    .replace(/\[[^\]]*\]/g, " ")
-    .replace(/\([^)]*\)/g, " ");
-
-  let s = norm(plain);
-  // "not paid" before bare "paid", or the "not" survives alone and
-  // "Jack Hutchinson lesson 2 of 5 not paid" reduces to "jack hutchinson not".
-  s = s.replace(/\bnot\s+paid\b|\bunpaid\b|\bno\s+pay\b|\bpaid\b/g, " ");
-  s = s.replace(/\blessons?\b/g, " ");
-  s = s.replace(
-    /\bseries\b|\bsession\b|\bpackage\b|\bpkg\b|\bof\b|\bwith\b|\bfor\b/g,
-    " ",
-  );
-  s = s.replace(/\b\d+\b/g, " ");
-  return s.replace(/\s+/g, " ").trim();
-}
-
 export interface SyncReport {
   ok: boolean;
   dryRun: boolean;
@@ -73,6 +37,8 @@ export interface SyncReport {
   queued: number;
   cancelled: number;
   skippedGroup: number;
+  /** Waiting Review entries whose title now matches, booked and cleared. */
+  resolved: number;
   unmatchedNames: string[];
   /** Writes that were rejected. A run with failures is not a clean run. */
   failed: number;
@@ -127,6 +93,7 @@ export async function syncLessons(opts?: {
     queued: 0,
     cancelled: 0,
     skippedGroup: 0,
+    resolved: 0,
     unmatchedNames: [],
     failed: 0,
     errors: [],
@@ -147,15 +114,15 @@ export async function syncLessons(opts?: {
       await Promise.all([
         supa.from("lesson_clients").select("id, name, aliases"),
         supa.from("lessons").select("id, client_id, starts_at, calendar_uid"),
-        supa.from("lesson_review").select("calendar_uid"),
+        supa.from("lesson_review").select("calendar_uid, dismissed"),
       ]);
 
     // name OR alias -> client id
     const byName = new Map<string, string>();
     for (const c of clients ?? []) {
-      byName.set(norm(c.name as string), c.id as string);
+      byName.set(normName(c.name as string), c.id as string);
       for (const a of (c.aliases as string[] | null) ?? []) {
-        if (a?.trim()) byName.set(norm(a), c.id as string);
+        if (a?.trim()) byName.set(normName(a), c.id as string);
       }
     }
 
@@ -172,17 +139,24 @@ export async function syncLessons(opts?: {
       }
     }
 
-    const seenReview = new Set(
-      (reviewed ?? []).map((r) => r.calendar_uid as string),
+    const reviewState = new Map<string, ReviewState>(
+      (reviewed ?? []).map((r) => [
+        r.calendar_uid as string,
+        r.dismissed ? "dismissed" : "waiting",
+      ]),
     );
+    // Waiting entries booked this run; removed from Review only after the
+    // lesson write has gone through.
+    const toClear: string[] = [];
 
     const toInsert: Record<string, unknown>[] = [];
     const toQueue: Record<string, unknown>[] = [];
     const unmatched = new Set<string>();
 
     for (const ev of events) {
-      if (!ev.subject || !LESSON_WORD.test(ev.subject)) continue;
-      if (NOT_BILLABLE.some((re) => re.test(ev.subject))) {
+      const kind = isLessonTitle(ev.subject);
+      if (kind === "no") continue;
+      if (kind === "group") {
         report.skippedGroup++;
         continue;
       }
@@ -190,11 +164,17 @@ export async function syncLessons(opts?: {
 
       const bare = nameFromTitle(ev.subject);
       const clientId = bare ? byName.get(bare) : undefined;
+      const plan = planEntry({
+        matched: !!clientId,
+        review: reviewState.get(ev.uid) ?? null,
+      });
 
-      if (!clientId) {
+      if (plan.action === "skip") {
+        if (!clientId) unmatched.add(bare || ev.subject);
+        continue;
+      }
+      if (plan.action === "queue" || !clientId) {
         unmatched.add(bare || ev.subject);
-        // Already answered, or already waiting - either way, do not re-queue.
-        if (seenReview.has(ev.uid)) continue;
         report.queued++;
         toQueue.push({
           calendar_uid: ev.uid,
@@ -213,6 +193,9 @@ export async function syncLessons(opts?: {
           ? "scheduled"
           : "completed";
       if (ev.isCancelled) report.cancelled++;
+      // A waiting Review entry that now matches leaves the queue once its
+      // lesson is written (cleared after the writes below, never before).
+      if (plan.clearReview) toClear.push(ev.uid);
 
       const known = byUid.get(ev.uid);
       if (known) {
@@ -280,12 +263,32 @@ export async function syncLessons(opts?: {
 
     report.unmatchedNames = [...unmatched].slice(0, 40);
 
+    if (dryRun) report.resolved = toClear.length;
+
     if (!dryRun) {
       if (toInsert.length) {
         const { error } = await supa
           .from("lessons")
           .upsert(toInsert, { onConflict: "calendar_uid" });
         if (error) throw error;
+      }
+      if (toClear.length) {
+        // Only entries whose lesson is now in the book by its calendar id:
+        // a rejected update above leaves its entry waiting, not lost.
+        const { data: booked, error: bErr } = await supa
+          .from("lessons")
+          .select("calendar_uid")
+          .in("calendar_uid", toClear);
+        if (bErr) throw bErr;
+        const done = (booked ?? []).map((b) => b.calendar_uid as string);
+        if (done.length) {
+          const { error } = await supa
+            .from("lesson_review")
+            .delete()
+            .in("calendar_uid", done);
+          if (error) throw error;
+        }
+        report.resolved = done.length;
       }
       if (toQueue.length) {
         const { error } = await supa

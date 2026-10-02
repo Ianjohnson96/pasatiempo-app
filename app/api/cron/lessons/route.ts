@@ -47,7 +47,10 @@ export async function GET(request: NextRequest) {
 
   // Worth a line in the hub log when it actually changes the book - a sync
   // that quietly rewrote history with nobody watching is the thing to avoid.
-  if (!dryRun && (report.inserted || report.adopted || report.queued)) {
+  if (
+    !dryRun &&
+    (report.inserted || report.adopted || report.queued || report.resolved)
+  ) {
     await logActivity({
       actor: null,
       app: "lessons",
@@ -57,6 +60,7 @@ export async function GET(request: NextRequest) {
         adopted: report.adopted,
         updated: report.updated,
         queued: report.queued,
+        resolved: report.resolved,
       },
     });
   }
