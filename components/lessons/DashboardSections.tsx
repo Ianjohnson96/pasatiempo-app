@@ -1,5 +1,6 @@
 import Link from "next/link";
 import BarChart from "./BarChart";
+import { SellNextItem, UnpaidItem } from "./QuickActions";
 import { courseDay, delta, seqLabel } from "@/lib/lessons/calc";
 import {
   formatDay,
@@ -172,14 +173,12 @@ function pkgName(p: PackageRec): string {
   return p.label || `${p.size}-lesson package`;
 }
 
-function PkgRow({ p, children }: { p: PackageRec; children: React.ReactNode }) {
+function PkgLink({ p, children }: { p: PackageRec; children: React.ReactNode }) {
   return (
-    <li>
-      <Link href={`/lessons/clients/${p.clientId}`} className="lb-frow">
-        <span className="lb-name">{p.clientName}</span>
-        <span className="lb-sub">{children}</span>
-      </Link>
-    </li>
+    <Link href={`/lessons/clients/${p.clientId}`} className="lb-frow">
+      <span className="lb-name">{p.clientName}</span>
+      <span className="lb-sub">{children}</span>
+    </Link>
   );
 }
 
@@ -197,11 +196,17 @@ export function FollowUps({ d }: { d: DashboardData }) {
           <Capped
             items={d.runningOut}
             render={(p) => (
-              <PkgRow key={p.id} p={p}>
-                {p.used} of {p.size} used
-                {p.booked > 0 && ` · ${p.booked} booked`}
-                {p.lastLessonAt && ` · last ${formatDay(p.lastLessonAt)}`}
-              </PkgRow>
+              <SellNextItem
+                key={p.id}
+                p={p}
+                standardCents={d.standardPrices[p.size]}
+              >
+                <PkgLink p={p}>
+                  {p.used} of {p.size} used
+                  {p.booked > 0 && ` · ${p.booked} booked`}
+                  {p.lastLessonAt && ` · last ${formatDay(p.lastLessonAt)}`}
+                </PkgLink>
+              </SellNextItem>
             )}
           />
         )}
@@ -218,11 +223,13 @@ export function FollowUps({ d }: { d: DashboardData }) {
           <Capped
             items={d.unpaid}
             render={(p) => (
-              <PkgRow key={p.id} p={p}>
-                {pkgName(p)} ·{" "}
-                {p.priceCents === null ? "no price" : money(p.priceCents)}
-                {p.soldOn && ` · sold ${formatDay(p.soldOn)}`}
-              </PkgRow>
+              <UnpaidItem key={p.id} p={p}>
+                <PkgLink p={p}>
+                  {pkgName(p)} ·{" "}
+                  {p.priceCents === null ? "no price" : money(p.priceCents)}
+                  {p.soldOn && ` · sold ${formatDay(p.soldOn)}`}
+                </PkgLink>
+              </UnpaidItem>
             )}
           />
         )}

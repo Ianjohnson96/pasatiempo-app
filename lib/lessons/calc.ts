@@ -199,3 +199,53 @@ export function delta(
   const diff = cur - prev;
   return { diff, pct: prev > 0 ? Math.round((diff / prev) * 100) : null };
 }
+
+const COUNTED = new Set(["completed", "scheduled"]);
+
+/**
+ * Which unassigned lessons most likely belong to a package: the oldest ones
+ * from the day it was sold (or, with no sale date, from its first lesson), up
+ * to the room it has left.
+ *
+ * Only a suggestion - the client screen pre-ticks these and Ian confirms.
+ * Cancelled lessons never use up a package, so they are never suggested.
+ */
+export function suggestForPackage(
+  pkg: { id: string; size: number; soldOn: string | null },
+  lessons: {
+    id: string;
+    startsAt: string;
+    status: string;
+    packageId: string | null;
+  }[],
+): string[] {
+  const mine = lessons.filter(
+    (l) => l.packageId === pkg.id && COUNTED.has(l.status),
+  );
+  const room = pkg.size - mine.length;
+  if (room <= 0) return [];
+  // From the sale date; failing that (every seeded package), from the
+  // package's own first lesson; failing that, from the beginning.
+  const from =
+    pkg.soldOn ??
+    (mine.length
+      ? courseDay(
+          mine.reduce((a, b) =>
+            new Date(a.startsAt) <= new Date(b.startsAt) ? a : b,
+          ).startsAt,
+        )
+      : null);
+  return lessons
+    .filter(
+      (l) =>
+        l.packageId === null &&
+        COUNTED.has(l.status) &&
+        (!from || courseDay(l.startsAt) >= from),
+    )
+    .sort(
+      (a, b) =>
+        new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+    )
+    .slice(0, room)
+    .map((l) => l.id);
+}

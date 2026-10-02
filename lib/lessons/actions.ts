@@ -527,3 +527,48 @@ export async function applyStandardPrices(
     return fail(e, "Could not apply the standard prices.");
   }
 }
+
+/**
+ * Move several of one client's lessons into a package (or back to one-offs)
+ * in a single write. Returns how many moved.
+ *
+ * Both sides are pinned to the client: the package must be theirs, and the
+ * update only touches lessons whose client_id matches. A stale screen can
+ * therefore never put somebody else's lesson in this package.
+ */
+export async function assignLessons(
+  lessonIds: string[],
+  packageId: string | null,
+  clientId: string,
+): Promise<Result<number>> {
+  try {
+    await assertLessonBook();
+    if (!lessonIds.length) return { ok: true, value: 0 };
+    const supa = await lessonBookClient();
+
+    if (packageId) {
+      const { data: pkg, error: pErr } = await supa
+        .from("lesson_packages")
+        .select("client_id")
+        .eq("id", packageId)
+        .maybeSingle();
+      if (pErr) throw pErr;
+      if (!pkg || pkg.client_id !== clientId) {
+        return { ok: false, error: "That package belongs to someone else." };
+      }
+    }
+
+    const { data, error } = await supa
+      .from("lessons")
+      .update({ package_id: packageId })
+      .in("id", lessonIds)
+      .eq("client_id", clientId)
+      .select("id");
+    if (error) throw error;
+
+    touched(clientId);
+    return { ok: true, value: data?.length ?? 0 };
+  } catch (e) {
+    return fail(e, "Could not move those lessons.");
+  }
+}

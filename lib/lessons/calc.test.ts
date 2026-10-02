@@ -12,6 +12,7 @@ import {
   scaleBars,
   seqLabel,
   shiftAnchor,
+  suggestForPackage,
   weekRange,
 } from "./calc";
 
@@ -167,5 +168,58 @@ describe("isUuid", () => {
     expect(isUuid("4a8735af-9be2-4e60-babf-c10a8ccd3e31")).toBe(true);
     expect(isUuid("not-an-id")).toBe(false);
     expect(isUuid("4a8735af-9be2-4e60-babf-c10a8ccd3e3")).toBe(false);
+  });
+});
+
+describe("suggestForPackage", () => {
+  const L = (id: string, startsAt: string, status = "completed", packageId: string | null = null) => ({
+    id,
+    startsAt,
+    status,
+    packageId,
+  });
+  const pkg = { id: "p", size: 3, soldOn: "2026-06-01" };
+
+  it("fills the package's room with the oldest unassigned lessons from the sale on", () => {
+    const lessons = [
+      L("in", "2026-06-02T17:00:00Z", "completed", "p"), // already 1 of 3
+      L("c", "2026-06-20T17:00:00Z"),
+      L("a", "2026-06-05T17:00:00Z"),
+      L("b", "2026-06-10T17:00:00Z"),
+    ];
+    expect(suggestForPackage(pkg, lessons)).toEqual(["a", "b"]);
+  });
+
+  it("skips cancelled lessons, other packages' lessons and lessons before the sale", () => {
+    const lessons = [
+      L("before", "2026-06-01T05:00:00Z"), // 10pm May 31 Pacific
+      L("x", "2026-06-03T17:00:00Z", "cancelled"),
+      L("other", "2026-06-04T17:00:00Z", "completed", "q"),
+      L("ok", "2026-06-05T17:00:00Z", "scheduled"),
+    ];
+    expect(suggestForPackage(pkg, lessons)).toEqual(["ok"]);
+  });
+
+  it("suggests nothing for a full package", () => {
+    const full = ["1", "2", "3"].map((i) =>
+      L(i, `2026-06-0${i}T17:00:00Z`, "completed", "p"),
+    );
+    expect(suggestForPackage(pkg, [...full, L("z", "2026-06-09T17:00:00Z")])).toEqual([]);
+  });
+
+  it("with no sale date, starts from the package's own first lesson", () => {
+    // Seeded packages have no sold_on; lessons before the series began are
+    // somebody else's story.
+    const lessons = [
+      L("before", "2025-03-01T17:00:00Z"),
+      L("first", "2026-02-01T17:00:00Z", "completed", "p"),
+      L("after", "2026-03-01T17:00:00Z"),
+    ];
+    expect(suggestForPackage({ ...pkg, soldOn: null }, lessons)).toEqual(["after"]);
+  });
+
+  it("uses every unassigned lesson when there is no date to go on at all", () => {
+    const lessons = [L("old", "2025-03-01T17:00:00Z"), L("new", "2026-03-01T17:00:00Z")];
+    expect(suggestForPackage({ ...pkg, soldOn: null }, lessons)).toEqual(["old", "new"]);
   });
 });

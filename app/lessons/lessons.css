@@ -656,3 +656,92 @@ a.lb-next:hover {
     min-height: 44px;
   }
 }
+
+/* ---- Bulk assign (ClientLessons) ---------------------------------------- */
+.lb-pick {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+.lb-pick input {
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  flex-shrink: 0;
+  accent-color: var(--green);
+}
+.lb-pick.on {
+  border-color: var(--green);
+  background: var(--green-tint);
+}
+/* Pinned to the bottom of the screen while selecting, so Move is always one
+   thumb away however far down the list Ian has scrolled. */
+.lb-bulkbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--green);
+  border-radius: var(--radius);
+  box-shadow: 0 -4px 18px rgba(20, 50, 35, 0.12);
+}
+.lb-bulkcount {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.lb-bulkbar select {
+  flex: 1 1 180px;
+  min-width: 0;
+  min-height: 44px;
+}
+@media (max-width: 560px) {
+  .lb-bulkbar .lb-actions {
+    width: 100%;
+  }
+  .lb-bulkbar .lb-actions .btn {
+    flex: 1;
+  }
+}
+
+/* ---- Dashboard quick actions (QuickActions.tsx) ------------------------- */
+.lb-qrow {
+  border-top: 1px solid var(--line);
+  padding-bottom: 10px;
+}
+.lb-qrow .lb-frow {
+  border-top: 0;
+  padding-bottom: 6px;
+}
+.lb-qacts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.lb-qacts .btn {
+  min-height: 40px;
+}
+.lb-qask {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--green-tint);
+}
+.lb-qerr {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+@media (max-width: 560px) {
+  .lb-qacts .btn {
+    flex: 1;
+    min-height: 44px;
+  }
+}
