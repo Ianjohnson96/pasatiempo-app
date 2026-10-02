@@ -249,3 +249,98 @@ export function suggestForPackage(
     .slice(0, room)
     .map((l) => l.id);
 }
+
+/** Compare names the way a person would: case and punctuation are not identity. */
+export function normName(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * The lesson already in the book that a queued calendar entry is, if any.
+ *
+ * The seeded lessons carry no calendar link, so the sync could not recognise
+ * them and queued their calendar entries as strangers. A lesson at the same
+ * instant with no link of its own is that entry. When two share the instant,
+ * the one whose client is named in the title wins; when the title does not
+ * settle it, no guess - billing the wrong person is worse than asking.
+ */
+export function matchExisting(
+  entry: { startsAt: string; titleRaw: string },
+  lessons: {
+    id: string;
+    clientName: string;
+    startsAt: string;
+    calendarUid: string | null;
+  }[],
+): string | null {
+  const t = new Date(entry.startsAt).getTime();
+  const free = lessons.filter(
+    (l) => !l.calendarUid && new Date(l.startsAt).getTime() === t,
+  );
+  if (free.length === 1) return free[0].id;
+  if (free.length === 0) return null;
+  const title = normName(entry.titleRaw);
+  const named = free
+    .filter((l) => l.clientName && title.includes(normName(l.clientName)))
+    .sort((a, b) => b.clientName.length - a.clientName.length);
+  if (named.length === 1) return named[0].id;
+  if (named.length > 1 && named[0].clientName.length > named[1].clientName.length) {
+    return named[0].id;
+  }
+  return null;
+}
+
+/** A Pacific wall-clock date and "HH:MM" as a UTC ISO instant. */
+export function courseLocalIso(day: string, time: string): string {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) {
+    throw new Error(`Not a time: ${time}`);
+  }
+  const [y, mo, d] = parts(day);
+  const local = Date.UTC(y, mo - 1, d, Number(m[1]), Number(m[2]));
+  // Same two-step as courseMidnightIso: guess with the offset at the wall
+  // time read as UTC, then re-read the offset at the guess.
+  const guess = local - offsetAt(local);
+  return new Date(local - offsetAt(guess)).toISOString();
+}
+
+/** Other spellings, tidied: trimmed, no blanks, no repeats, not the name itself. */
+export function cleanAliases(input: string[], ownName: string): string[] {
+  const seen = new Set([normName(ownName)]);
+  const out: string[] = [];
+  for (const raw of input) {
+    const a = raw.trim();
+    const k = normName(a);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(a);
+  }
+  return out;
+}
+
+/**
+ * Why these spellings cannot be added, or null if they can.
+ *
+ * The sync looks clients up by name or spelling; two clients sharing one
+ * would make it file lessons under whichever it met last.
+ */
+export function aliasClash(
+  aliases: string[],
+  clientId: string,
+  others: { id: string; name: string; aliases: string[] }[],
+): string | null {
+  const owner = new Map<string, string>();
+  for (const o of others) {
+    if (o.id === clientId) continue;
+    for (const n of [o.name, ...o.aliases]) owner.set(normName(n), o.name);
+  }
+  for (const a of aliases) {
+    const who = owner.get(normName(a));
+    if (who) return `"${a.trim()}" already points to ${who}.`;
+  }
+  return null;
+}

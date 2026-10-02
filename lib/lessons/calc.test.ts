@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   addDays,
+  aliasClash,
+  cleanAliases,
   courseDay,
   courseMidnightIso,
   delta,
   groupByDay,
+  courseLocalIso,
   isUuid,
+  matchExisting,
   monthRange,
   parseDollars,
   parseScheduleParams,
@@ -221,5 +225,86 @@ describe("suggestForPackage", () => {
   it("uses every unassigned lesson when there is no date to go on at all", () => {
     const lessons = [L("old", "2025-03-01T17:00:00Z"), L("new", "2026-03-01T17:00:00Z")];
     expect(suggestForPackage({ ...pkg, soldOn: null }, lessons)).toEqual(["old", "new"]);
+  });
+});
+
+describe("matchExisting", () => {
+  const at = "2026-06-05T17:00:00Z";
+  const C = (id: string, clientName: string, startsAt = at, calendarUid: string | null = null) => ({
+    id,
+    clientName,
+    startsAt,
+    calendarUid,
+  });
+
+  it("links to the one un-linked lesson at the same moment", () => {
+    expect(
+      matchExisting({ startsAt: at, titleRaw: "Adrian Moreno lesson +wife" }, [
+        C("a", "Adrian Moreno"),
+        C("other-time", "Adrian Moreno", "2026-06-06T17:00:00Z"),
+      ]),
+    ).toBe("a");
+  });
+
+  it("never re-links a lesson that already has a calendar entry", () => {
+    expect(
+      matchExisting({ startsAt: at, titleRaw: "x" }, [C("a", "X", at, "uid-1")]),
+    ).toBeNull();
+  });
+
+  it("picks the client named in the title when two lessons share the moment", () => {
+    expect(
+      matchExisting(
+        { startsAt: "2026-06-05T17:00:00.000Z", titleRaw: "Hoffman kids group lesson 4 [Nico]" },
+        [C("m", "Meredith Hoffman"), C("k", "Hoffman kids group")],
+      ),
+    ).toBe("k");
+  });
+
+  it("refuses to guess between two lessons the title does not tell apart", () => {
+    expect(
+      matchExisting({ startsAt: at, titleRaw: "group lesson" }, [C("a", "Ann"), C("b", "Bob")]),
+    ).toBeNull();
+  });
+});
+
+describe("courseLocalIso", () => {
+  it("turns a Pacific wall time into the right instant", () => {
+    expect(courseLocalIso("2026-10-01", "14:30")).toBe("2026-10-01T21:30:00.000Z");
+  });
+  it("uses the offset after the change on DST days", () => {
+    expect(courseLocalIso("2026-11-01", "10:00")).toBe("2026-11-01T18:00:00.000Z");
+    expect(courseLocalIso("2026-03-08", "10:00")).toBe("2026-03-08T17:00:00.000Z");
+  });
+  it("refuses a malformed time", () => {
+    expect(() => courseLocalIso("2026-10-01", "25:00")).toThrow();
+  });
+});
+
+describe("cleanAliases", () => {
+  it("trims, drops blanks, repeats and the client's own name", () => {
+    expect(cleanAliases(["  Max ", "max", "", "Max Miceli", "M. Miceli"], "Max Miceli")).toEqual([
+      "Max",
+      "M. Miceli",
+    ]);
+  });
+});
+
+describe("aliasClash", () => {
+  const others = [
+    { id: "a", name: "Patsy Leung", aliases: ["Patsy"] },
+    { id: "b", name: "Max Miceli", aliases: [] },
+  ];
+  it("refuses a spelling that is another client's name", () => {
+    expect(aliasClash(["max miceli"], "me", others)).toMatch(/Max Miceli/);
+  });
+  it("refuses a spelling another client already uses", () => {
+    expect(aliasClash(["PATSY"], "me", others)).toMatch(/Patsy Leung/);
+  });
+  it("ignores the client's own record", () => {
+    expect(aliasClash(["Patsy"], "a", others)).toBeNull();
+  });
+  it("allows a new spelling", () => {
+    expect(aliasClash(["Jonny D"], "me", others)).toBeNull();
   });
 });

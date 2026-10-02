@@ -4,7 +4,15 @@ import { revalidatePath } from "next/cache";
 import { lessonBookClient } from "./db";
 import { assertLessonBook } from "./auth";
 import { standardPrices } from "./data";
-import { parseDollars } from "./calc";
+import { syncLessons } from "./sync";
+import { logActivity } from "@/lib/hub/log";
+import {
+  aliasClash,
+  cleanAliases,
+  courseLocalIso,
+  matchExisting,
+  parseDollars,
+} from "./calc";
 import type { PaymentStatus, Result } from "./types";
 
 // Write-side for the lesson book.
@@ -234,6 +242,8 @@ export async function updateClient(
     isMember?: boolean;
     active?: boolean;
     notes?: string | null;
+    /** Other spellings the calendar uses for this client. */
+    aliases?: string[];
   },
 ): Promise<Result> {
   try {
@@ -251,9 +261,35 @@ export async function updateClient(
     if (patch.isMember !== undefined) fields.is_member = patch.isMember;
     if (patch.active !== undefined) fields.active = patch.active;
     if (patch.notes !== undefined) fields.notes = patch.notes?.trim() || null;
-    if (!Object.keys(fields).length) return { ok: true, value: undefined };
+    if (!Object.keys(fields).length && patch.aliases === undefined) {
+      return { ok: true, value: undefined };
+    }
 
     const supa = await lessonBookClient();
+
+    if (patch.aliases !== undefined) {
+      // Checked against everyone else: a spelling two clients share would
+      // make the sync file lessons under whichever it met last.
+      const { data: all, error: aErr } = await supa
+        .from("lesson_clients")
+        .select("id, name, aliases");
+      if (aErr) throw aErr;
+      const me = (all ?? []).find((c) => c.id === id);
+      const ownName = (fields.name as string) ?? (me?.name as string) ?? "";
+      const aliases = cleanAliases(patch.aliases, ownName);
+      const clash = aliasClash(
+        aliases,
+        id,
+        (all ?? []).map((c) => ({
+          id: c.id as string,
+          name: c.name as string,
+          aliases: (c.aliases as string[] | null) ?? [],
+        })),
+      );
+      if (clash) return { ok: false, error: clash };
+      fields.aliases = aliases;
+    }
+
     const { error } = await supa
       .from("lesson_clients")
       .update(fields)
@@ -318,18 +354,41 @@ export async function resolveReview(
     }
 
     const startsAt = row.starts_at as string;
-    const { error: lErr } = await supa.from("lessons").upsert(
-      {
-        client_id: clientId,
-        starts_at: startsAt,
-        ends_at: row.ends_at,
-        status: new Date(startsAt) > new Date() ? "scheduled" : "completed",
-        calendar_uid: calendarUid,
-        calendar_source: "m365",
-        title_raw: row.title_raw,
-      },
-      { onConflict: "calendar_uid" },
-    );
+
+    // The seeded lessons carry no calendar link, so most queued entries are
+    // lessons already in the book. Inserting would count them twice: adopt
+    // the existing one for this client at this moment instead.
+    const { data: seeded, error: sErr } = await supa
+      .from("lessons")
+      .select("id")
+      .eq("client_id", clientId)
+      .eq("starts_at", startsAt)
+      .is("calendar_uid", null)
+      .limit(1);
+    if (sErr) throw sErr;
+
+    const { error: lErr } = seeded?.length
+      ? await supa
+          .from("lessons")
+          .update({
+            calendar_uid: calendarUid,
+            calendar_source: "m365",
+            ends_at: row.ends_at,
+            title_raw: row.title_raw,
+          })
+          .eq("id", seeded[0].id)
+      : await supa.from("lessons").upsert(
+          {
+            client_id: clientId,
+            starts_at: startsAt,
+            ends_at: row.ends_at,
+            status: new Date(startsAt) > new Date() ? "scheduled" : "completed",
+            calendar_uid: calendarUid,
+            calendar_source: "m365",
+            title_raw: row.title_raw,
+          },
+          { onConflict: "calendar_uid" },
+        );
     if (lErr) throw lErr;
 
     // Only now. If the insert had failed, the entry must stay in the queue
@@ -570,5 +629,204 @@ export async function assignLessons(
     return { ok: true, value: data?.length ?? 0 };
   } catch (e) {
     return fail(e, "Could not move those lessons.");
+  }
+}
+
+/**
+ * Link queued calendar entries to the lessons already in the book.
+ *
+ * Each entry is matched to the un-linked lesson at the same moment (see
+ * matchExisting); the lesson gets the calendar link - so the nightly sync
+ * recognises it from now on - and the entry leaves the queue. Nothing is
+ * inserted, so nothing is counted twice. An entry with no clear match is
+ * left in the queue and reported as skipped.
+ */
+export async function linkReviews(
+  calendarUids: string[],
+): Promise<Result<{ linked: number; skipped: number }>> {
+  try {
+    await assertLessonBook();
+    if (!calendarUids.length) {
+      return { ok: true, value: { linked: 0, skipped: 0 } };
+    }
+    const supa = await lessonBookClient();
+
+    const { data: rows, error: rErr } = await supa
+      .from("lesson_review")
+      .select("calendar_uid, starts_at, ends_at, title_raw")
+      .in("calendar_uid", calendarUids);
+    if (rErr) throw rErr;
+
+    const times = [...new Set((rows ?? []).map((r) => r.starts_at as string))];
+    const { data: cands, error: cErr } = times.length
+      ? await supa
+          .from("lesson_numbered")
+          .select("id, client_name, starts_at, calendar_uid")
+          .in("starts_at", times)
+      : { data: [], error: null };
+    if (cErr) throw cErr;
+    const pool = (cands ?? []).map((c) => ({
+      id: c.id as string,
+      clientName: (c.client_name as string) ?? "",
+      startsAt: c.starts_at as string,
+      calendarUid: (c.calendar_uid as string | null) ?? null,
+    }));
+
+    let linked = 0;
+    let skipped = 0;
+    for (const r of rows ?? []) {
+      const id = matchExisting(
+        { startsAt: r.starts_at as string, titleRaw: (r.title_raw as string) ?? "" },
+        pool,
+      );
+      if (!id) {
+        skipped++;
+        continue;
+      }
+      // Guarded on calendar_uid is null, so two entries can never both claim
+      // one lesson, even across two taps from two screens.
+      const { data: done, error } = await supa
+        .from("lessons")
+        .update({
+          calendar_uid: r.calendar_uid,
+          calendar_source: "m365",
+          ends_at: r.ends_at,
+          title_raw: r.title_raw,
+        })
+        .eq("id", id)
+        .is("calendar_uid", null)
+        .select("id");
+      if (error) throw error;
+      if (!done?.length) {
+        skipped++;
+        continue;
+      }
+      // Claimed: take it out of the pool for the rest of this batch.
+      const used = pool.find((p) => p.id === id);
+      if (used) used.calendarUid = r.calendar_uid as string;
+
+      const { error: dErr } = await supa
+        .from("lesson_review")
+        .delete()
+        .eq("calendar_uid", r.calendar_uid);
+      if (dErr) throw dErr;
+      linked++;
+    }
+
+    revalidatePath(REVIEW);
+    touched();
+    return { ok: true, value: { linked, skipped } };
+  } catch (e) {
+    return fail(e, "Could not link those entries.");
+  }
+}
+
+/**
+ * Log a lesson that is not on the calendar - a walk-up, a moved lesson.
+ *
+ * Date and time are Pacific wall clock; status follows the clock (a future
+ * one is booked, a past one taught). Marked calendar_source = manual and left
+ * without a calendar link, so the sync never touches it.
+ */
+export async function addLesson(
+  clientId: string,
+  input: { day: string; time: string; minutes: number; packageId: string | null },
+): Promise<Result<string>> {
+  try {
+    await assertLessonBook();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.day)) {
+      return { ok: false, error: "Pick a date." };
+    }
+    let startsAt: string;
+    try {
+      startsAt = courseLocalIso(input.day, input.time);
+    } catch {
+      return { ok: false, error: "Pick a time." };
+    }
+    const minutes = Math.round(input.minutes);
+    if (!Number.isFinite(minutes) || minutes < 10 || minutes > 480) {
+      return { ok: false, error: "A lesson runs between 10 minutes and 8 hours." };
+    }
+    const endsAt = new Date(
+      new Date(startsAt).getTime() + minutes * 60000,
+    ).toISOString();
+
+    const supa = await lessonBookClient();
+    if (input.packageId) {
+      const { data: pkg, error: pErr } = await supa
+        .from("lesson_packages")
+        .select("client_id")
+        .eq("id", input.packageId)
+        .maybeSingle();
+      if (pErr) throw pErr;
+      if (!pkg || pkg.client_id !== clientId) {
+        return { ok: false, error: "That package belongs to someone else." };
+      }
+    }
+
+    const { data, error } = await supa
+      .from("lessons")
+      .insert({
+        client_id: clientId,
+        package_id: input.packageId,
+        starts_at: startsAt,
+        ends_at: endsAt,
+        status: new Date(startsAt) > new Date() ? "scheduled" : "completed",
+        calendar_source: "manual",
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+
+    touched(clientId);
+    return { ok: true, value: data.id as string };
+  } catch (e) {
+    return fail(e, "Could not add that lesson.");
+  }
+}
+
+export interface SyncSummary {
+  inserted: number;
+  adopted: number;
+  updated: number;
+  queued: number;
+  resolved: number;
+}
+
+/**
+ * Run the calendar sync now instead of waiting for the 2am cron - for right
+ * after fixing titles in Outlook. Same code path as the cron, so the same
+ * rules: never invents a client, never touches money.
+ */
+export async function syncCalendarNow(): Promise<Result<SyncSummary>> {
+  try {
+    const viewer = await assertLessonBook();
+    const report = await syncLessons();
+    if (!report.ok) {
+      return {
+        ok: false,
+        error:
+          report.error ??
+          `${report.failed} change${report.failed === 1 ? "" : "s"} rejected: ${report.errors[0] ?? "unknown"}`,
+      };
+    }
+    const summary: SyncSummary = {
+      inserted: report.inserted,
+      adopted: report.adopted,
+      updated: report.updated,
+      queued: report.queued,
+      resolved: report.resolved,
+    };
+    await logActivity({
+      actor: viewer.email,
+      app: "lessons",
+      action: "calendar sync (manual)",
+      detail: { ...summary },
+    });
+    touched();
+    revalidatePath(REVIEW);
+    return { ok: true, value: summary };
+  } catch (e) {
+    return fail(e, "The calendar sync did not run.");
   }
 }

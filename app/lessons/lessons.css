@@ -745,3 +745,77 @@ a.lb-next:hover {
     min-height: 44px;
   }
 }
+
+/* ---- Sync now ---------------------------------------------------------- */
+.lb-syncline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 26px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.lb-syncline .lb-sync {
+  margin: 0;
+  text-align: left;
+  flex: 1 1 200px;
+}
+.lb-syncline .lb-sync span {
+  font-size: 11px;
+}
+.lb-syncnow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.lb-syncnow .btn {
+  min-height: 40px;
+}
+.lb-syncmsg {
+  font-size: 13px;
+  color: var(--green-dark);
+  font-weight: 600;
+}
+.lb-syncmsg.bad {
+  color: var(--danger);
+}
+.lb-linkgroup {
+  border-left: 4px solid var(--green);
+}
+
+/* ---- Add a lesson ------------------------------------------------------ */
+.lb-addlesson input[type="date"],
+.lb-addlesson input[type="time"] {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  min-height: 40px;
+}
+.lb-addlesson .lb-num input[type="date"] {
+  width: 160px;
+}
+.lb-addlesson .lb-num input[type="time"] {
+  width: 120px;
+}
+.lb-grow {
+  flex: 1 1 180px;
+}
+.lb-grow select {
+  width: 100%;
+  min-height: 40px;
+}
+@media (max-width: 560px) {
+  .lb-addlesson .lb-num input[type="date"],
+  .lb-addlesson .lb-num input[type="time"] {
+    width: 100%;
+    min-height: 44px;
+  }
+}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import BarChart from "./BarChart";
 import { SellNextItem, UnpaidItem } from "./QuickActions";
+import SyncNow from "./SyncNow";
 import { courseDay, delta, seqLabel } from "@/lib/lessons/calc";
 import {
   formatDay,
@@ -393,14 +394,17 @@ export function Volume({ d }: { d: DashboardData }) {
 
 export function SyncLine({ d }: { d: DashboardData }) {
   const s = d.sync;
-  if (!s || !s.lastSyncedAt) {
-    return <p className="lb-sync">Calendar sync has not run yet.</p>;
-  }
-  const ok = s.lastStatus === "ok";
+  const ok = s?.lastStatus === "ok";
   return (
-    <p className={ok ? "lb-sync" : "lb-sync bad"}>
-      Calendar synced {ago(s.lastSyncedAt, d.now)} ·{" "}
-      {ok ? "ok" : s.lastStatus}
-    </p>
+    <div className="lb-syncline">
+      <p className={!s?.lastSyncedAt || ok ? "lb-sync" : "lb-sync bad"}>
+        {!s?.lastSyncedAt
+          ? "Calendar sync has not run yet."
+          : `Calendar synced ${ago(s.lastSyncedAt, d.now)} · ${ok ? "ok" : s.lastStatus}`}
+        <br />
+        <span>Runs nightly at 2am; tap to pull it now.</span>
+      </p>
+      <SyncNow />
+    </div>
   );
 }

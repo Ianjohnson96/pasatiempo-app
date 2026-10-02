@@ -17,6 +17,9 @@ import { dashboardData } from "@/lib/lessons/data";
 // is this week, what money is out, who needs a follow-up, how much he is
 // teaching. One database call (lesson_dashboard) feeds all of it.
 export const dynamic = "force-dynamic";
+// "Sync now" runs the calendar sync from this page; a busy year of events
+// takes longer than the default limit.
+export const maxDuration = 60;
 
 export default async function LessonBookHome() {
   const [viewer, d] = await gateFirst(requireLessonBook(), dashboardData());
