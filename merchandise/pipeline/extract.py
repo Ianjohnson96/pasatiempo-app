@@ -90,15 +90,16 @@ def _lines(rows):
     return '\n'.join(out)
 
 
-def sheet_text(name, data):
-    """name: the file name (for its type); data: the file's bytes."""
+def sheet_rows(name, data):
+    """Every row of a spreadsheet, as lists of (value, number format). name: the file name (for its type);
+    data: the file's bytes. CSV cells are strings with no format."""
     n = name.lower()
     if n.endswith('.csv'):
         try:
             txt = data.decode('utf-8-sig')
         except UnicodeDecodeError:
             txt = data.decode('latin-1')
-        return _lines([_cell(c) for c in r] for r in csv.reader(io.StringIO(txt)))
+        return [[(c, '') for c in r] for r in csv.reader(io.StringIO(txt))]
     if n.endswith('.xls'):
         import xlrd
         book = xlrd.open_workbook(file_contents=data, formatting_info=True)
@@ -109,22 +110,31 @@ def sheet_text(name, data):
                 for c in range(sh.ncols):
                     cell = sh.cell(r, c)
                     if cell.ctype in (xlrd.XL_CELL_EMPTY, xlrd.XL_CELL_BLANK):
-                        row.append('')
+                        row.append((None, ''))
                     elif cell.ctype == xlrd.XL_CELL_DATE:
-                        row.append(_cell(xlrd.xldate.xldate_as_datetime(cell.value, book.datemode)))
+                        row.append((xlrd.xldate.xldate_as_datetime(cell.value, book.datemode), ''))
                     else:
                         fmt = book.format_map.get(book.xf_list[cell.xf_index].format_key)
-                        row.append(_cell(cell.value, fmt.format_str if fmt else ''))
+                        row.append((cell.value, fmt.format_str if fmt else ''))
                 rows.append(row)
-        return _lines(rows)
+        return rows
     import openpyxl
     book = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
     rows = []
     for ws in book.worksheets:
         for r in ws.iter_rows():
-            rows.append([_cell(c.value, getattr(c, 'number_format', '')) for c in r])
+            rows.append([(c.value, getattr(c, 'number_format', '')) for c in r])
     book.close()
-    return _lines(rows)
+    return rows
+
+
+def rows_text(rows):
+    """Spreadsheet rows (sheet_rows) as the printed report's text."""
+    return _lines([_cell(v, f) for v, f in r] for r in rows)
+
+
+def sheet_text(name, data):
+    return rows_text(sheet_rows(name, data))
 
 
 def report_text(name, src):

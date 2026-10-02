@@ -70,7 +70,7 @@ const ownerHere = () => !!(window.MERCH_HOST && MERCH_HOST.me && MERCH_HOST.me.r
 function upReset(){ Object.assign(UP, {files: [], note: '', busy: false, applying: false, result: null, error: null, found: null, rcv: null}); }
 function upFilesTable(found){
   if (!found || !found.length) return '';
-  return `<table class="mini" style="margin:8px 16px 4px;width:calc(100% - 32px)"><thead><tr><th>File</th><th>Read as</th></tr></thead><tbody>${found.map(f => `<tr><td style="word-break:break-all">${esc(f.name)}</td><td>${f.ok ? esc(UP_KINDS[f.kind] || f.kind) : `<span class="neg">${esc(f.note || 'Not used')}</span>`}</td></tr>`).join('')}</tbody></table>`;
+  return `<table class="mini" style="margin:8px 16px 4px;width:calc(100% - 32px)"><thead><tr><th>File</th><th>Read as</th></tr></thead><tbody>${found.map(f => `<tr><td style="word-break:break-all">${esc(f.name)}</td><td>${f.ok ? esc(UP_KINDS[f.kind] || f.kind) + (f.detail ? `<div class="hint">${esc(f.detail)}</div>` : '') : `<span class="neg">${esc(f.note || 'Not used')}</span>`}</td></tr>`).join('')}</tbody></table>`;
 }
 function renderUpload(){
   if (!ownerHere()) return '';
