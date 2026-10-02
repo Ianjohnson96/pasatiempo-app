@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import PackageCard from "./PackageCard";
 import ClientLessons from "./ClientLessons";
+import { mailHref, smsHref, telHref } from "@/lib/lessons/contact";
 import { createPackage, updateClient } from "@/lib/lessons/actions";
 import {
   money,
@@ -100,6 +101,8 @@ export default function ClientDetail({
           )}
         </div>
       </div>
+
+      <Contact client={client} />
 
       <div className="lb-actions" style={{ marginTop: 10 }}>
         <button
@@ -348,6 +351,44 @@ function Editor({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Text / Call / Email, handed to the phone's own apps so messages come from
+ * Ian's number. Shown only for what is on file; nothing is on file yet for
+ * most clients, so it points at Details instead of showing dead buttons.
+ */
+function Contact({ client }: { client: ClientRec }) {
+  const sms = smsHref(client.phone, "");
+  const tel = telHref(client.phone);
+  const mail = mailHref(client.email);
+  if (!sms && !tel && !mail) {
+    return (
+      <p className="lb-fhint" style={{ marginTop: 8 }}>
+        No phone or email on file &mdash; add them under Details to text or
+        call from here.
+      </p>
+    );
+  }
+  return (
+    <div className="lb-actions lb-contact" style={{ marginTop: 10 }}>
+      {sms && (
+        <a className="btn secondary small" href={sms}>
+          Text
+        </a>
+      )}
+      {tel && (
+        <a className="btn secondary small" href={tel}>
+          Call
+        </a>
+      )}
+      {mail && (
+        <a className="btn secondary small" href={mail}>
+          Email
+        </a>
+      )}
     </div>
   );
 }

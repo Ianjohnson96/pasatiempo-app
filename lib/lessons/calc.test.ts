@@ -17,6 +17,7 @@ import {
   seqLabel,
   shiftAnchor,
   suggestForPackage,
+  undoGroups,
   weekRange,
 } from "./calc";
 
@@ -306,5 +307,19 @@ describe("aliasClash", () => {
   });
   it("allows a new spelling", () => {
     expect(aliasClash(["Jonny D"], "me", others)).toBeNull();
+  });
+});
+
+describe("undoGroups", () => {
+  it("groups moved lessons by where each one came from", () => {
+    const groups = undoGroups({ a: "p1", b: null, c: "p1", d: "p2" });
+    expect(groups).toEqual(
+      expect.arrayContaining([
+        { packageId: "p1", lessonIds: ["a", "c"] },
+        { packageId: null, lessonIds: ["b"] },
+        { packageId: "p2", lessonIds: ["d"] },
+      ]),
+    );
+    expect(groups).toHaveLength(3);
   });
 });

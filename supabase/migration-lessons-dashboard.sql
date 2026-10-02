@@ -28,7 +28,10 @@ select
   l.ends_at,
   l.status,
   l.title_raw,
-  l.calendar_uid
+  l.calendar_uid,
+  -- Added later, so at the end: create or replace view cannot reorder.
+  l.notes,
+  l.calendar_source
 from public.lessons l
 left join public.lesson_clients c on c.id = l.client_id
 left join public.lesson_packages p on p.id = l.package_id;
@@ -86,6 +89,18 @@ select jsonb_build_object(
     where n.status = 'scheduled' and n.starts_at > b.now_ts
     order by n.starts_at limit 1),
 
+  -- What was worked on last time with whoever is next, to glance at first.
+  'next_last_note', (
+    select jsonb_build_object('notes', l.notes, 'starts_at', l.starts_at)
+    from lessons l
+    where l.client_id = (
+        select n.client_id from lesson_numbered n, b
+        where n.status = 'scheduled' and n.starts_at > b.now_ts
+        order by n.starts_at limit 1)
+      and l.status = 'completed'
+      and l.notes is not null and btrim(l.notes) <> ''
+    order by l.starts_at desc limit 1),
+
   'week', coalesce((
     select jsonb_agg(to_jsonb(n) order by n.starts_at) from lesson_numbered n, b
     where n.starts_at >= b.day_start and n.starts_at < b.week_end
@@ -104,10 +119,22 @@ select jsonb_build_object(
       'unpriced', count(*) filter (where p.price_cents is null))
     from lesson_packages p, b),
 
+  -- With the client's phone, for the "time for the next package" text.
   'running_out', coalesce((
-    select jsonb_agg(to_jsonb(s) order by s.lessons_remaining, s.last_lesson_at desc nulls last)
+    select jsonb_agg(to_jsonb(s) || jsonb_build_object('client_phone', c.phone)
+                     order by s.lessons_remaining, s.last_lesson_at desc nulls last)
     from lesson_package_status s
+    join lesson_clients c on c.id = s.client_id
     where not s.is_complete and s.lessons_remaining <= 1), '[]'::jsonb),
+
+  -- Collected this season, split by how it was paid ("none" = not recorded).
+  'collected_by_method', coalesce((
+    select jsonb_object_agg(x.method, x.cents) from (
+      select coalesce(p.payment_method, 'none') as method, sum(p.price_cents) as cents
+      from lesson_packages p, b
+      where p.payment_status = 'paid' and p.price_cents is not null
+        and p.paid_on >= b.season_start::date
+      group by 1) x), '{}'::jsonb),
 
   'unpaid', coalesce((
     select jsonb_agg(to_jsonb(s) order by s.sold_on nulls last, s.client_name)

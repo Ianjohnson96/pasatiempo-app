@@ -6,7 +6,10 @@ import {
   setPackagePayment,
   setPackagePrice,
   setPackageSize,
+  deletePackage,
 } from "@/lib/lessons/actions";
+import { METHOD_LABEL, type PaymentMethod } from "@/lib/lessons/income";
+import MethodPicker from "./MethodPicker";
 import { parseDollars } from "@/lib/lessons/calc";
 import {
   formatDay,
@@ -47,6 +50,9 @@ export default function PackageCard({
   );
   const [size, setSize] = useState(String(pkg.size));
   const [error, setError] = useState<string | null>(null);
+  const [askMethod, setAskMethod] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleted, setDeleted] = useState(false);
   const [, start] = useTransition();
   const [status, showStatus] = useOptimistic(pkg.paymentStatus);
   // Price and size show the new value the moment it is entered, like the
@@ -59,12 +65,21 @@ export default function PackageCard({
     }),
   );
 
-  function pay(s: PaymentStatus) {
+  function pay(s: PaymentStatus, method?: PaymentMethod | null) {
     if (s === status) return;
+    // Paid asks how first; the answer feeds the year-end income export.
+    if (s === "paid" && method === undefined) {
+      setAskMethod(true);
+      return;
+    }
+    setAskMethod(false);
     setError(null);
     start(async () => {
       showStatus(s);
-      const r = await setPackagePayment(pkg.id, s, { clientId: pkg.clientId });
+      const r = await setPackagePayment(pkg.id, s, {
+        clientId: pkg.clientId,
+        ...(s === "paid" ? { method: method ?? null } : {}),
+      });
       // On failure the optimistic state falls back to the real one by itself.
       if (!r.ok) setError(r.error ?? "That did not work.");
     });
@@ -115,6 +130,8 @@ export default function PackageCard({
   const complete = remaining <= 0;
   const nearlyDone = !complete && remaining <= 1;
 
+  if (deleted) return null;
+
   return (
     <div className="card">
       <div className="lb-head">
@@ -141,6 +158,9 @@ export default function PackageCard({
           {pkg.paidOn && status === "paid" && (
             <div className="muted" style={{ fontSize: 12 }}>
               paid {formatDay(pkg.paidOn)}
+              {pkg.paymentMethod &&
+                pkg.paymentMethod in METHOD_LABEL &&
+                ` · ${METHOD_LABEL[pkg.paymentMethod as PaymentMethod]}`}
             </div>
           )}
         </div>
@@ -220,7 +240,60 @@ export default function PackageCard({
         </p>
       )}
 
+      {askMethod && (
+        <MethodPicker
+          onPick={(m) => pay("paid", m)}
+          onCancel={() => setAskMethod(false)}
+        />
+      )}
+
       {lessons && <PackageDates lessons={lessons} />}
+
+      {/* Delete lives on the client page only (where lessons are passed). */}
+      {lessons &&
+        (confirmDelete ? (
+          <div className="lb-qask" style={{ marginTop: 10 }}>
+            <span>
+              Delete this package?{" "}
+              {lessons.length > 0
+                ? `Its ${lessons.length} lesson${lessons.length === 1 ? "" : "s"} stay and become one-offs. `
+                : ""}
+              Its price and payment record are removed.
+            </span>
+            <div className="lb-qacts">
+              <button
+                type="button"
+                className="btn danger small"
+                onClick={() => {
+                  setError(null);
+                  start(async () => {
+                    const r = await deletePackage(pkg.id, pkg.clientId);
+                    if (r.ok) setDeleted(true);
+                    else setError(r.error);
+                    setConfirmDelete(false);
+                  });
+                }}
+              >
+                Delete package
+              </button>
+              <button
+                type="button"
+                className="btn secondary small"
+                onClick={() => setConfirmDelete(false)}
+              >
+                Keep it
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="btn ghost small lb-del"
+            onClick={() => setConfirmDelete(true)}
+          >
+            Delete package
+          </button>
+        ))}
     </div>
   );
 }

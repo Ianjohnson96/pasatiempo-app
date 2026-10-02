@@ -1,12 +1,19 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   addLesson,
   assignLessonToPackage,
   assignLessons,
+  deleteLesson,
+  setLessonNote,
 } from "@/lib/lessons/actions";
-import { courseDay, seqLabel, suggestForPackage } from "@/lib/lessons/calc";
+import {
+  courseDay,
+  seqLabel,
+  suggestForPackage,
+  undoGroups,
+} from "@/lib/lessons/calc";
 import {
   formatWhen,
   type NumberedLesson,
@@ -48,6 +55,15 @@ export default function ClientLessons({
     packages.find((p) => !p.isComplete)?.id ?? packages[0]?.id ?? "";
   const [target, setTarget] = useState<string>(firstWithRoom);
   const [busy, start] = useTransition();
+  // A wrong Move is one tap from fixed for ten seconds.
+  const [undo, setUndo] = useState<{ text: string; run: () => Promise<void> } | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!undo) return;
+    const t = setTimeout(() => setUndo(null), 10000);
+    return () => clearTimeout(t);
+  }, [undo]);
 
   const byId = useMemo(
     () => new Map(packages.map((p) => [p.id, p])),
@@ -78,6 +94,10 @@ export default function ClientLessons({
   function move() {
     const ids = [...picked];
     const packageId = target === "" ? null : target;
+    // Where each one was, so Undo can put it back exactly.
+    const previous = Object.fromEntries(
+      ids.map((id) => [id, lessons.find((l) => l.id === id)?.packageId ?? null]),
+    );
     onNote(null);
     start(async () => {
       const r = await assignLessons(ids, packageId, clientId);
@@ -85,9 +105,18 @@ export default function ClientLessons({
         onNote({ kind: "err", text: r.error });
         return;
       }
-      onNote({
-        kind: "ok",
+      setUndo({
         text: `Moved ${r.value} lesson${r.value === 1 ? "" : "s"} to ${nameOf(packageId)}.`,
+        run: async () => {
+          for (const g of undoGroups(previous)) {
+            const u = await assignLessons(g.lessonIds, g.packageId, clientId);
+            if (!u.ok) {
+              onNote({ kind: "err", text: u.error });
+              return;
+            }
+          }
+          onNote({ kind: "ok", text: "Put back where they were." });
+        },
       });
       setPicked(new Set());
       setSelecting(false);
@@ -122,6 +151,23 @@ export default function ClientLessons({
 
   return (
     <>
+      {undo && (
+        <div className="notice ok lb-undo" role="status">
+          <span>{undo.text}</span>
+          <button
+            type="button"
+            className="btn secondary small"
+            disabled={busy}
+            onClick={() => {
+              const run = undo.run;
+              setUndo(null);
+              start(run);
+            }}
+          >
+            Undo
+          </button>
+        </div>
+      )}
       {adder}
       <div className="lb-sechead" style={{ marginTop: 0 }}>
         <p className="muted" style={{ fontSize: 13, margin: 0 }}>
@@ -207,6 +253,10 @@ export default function ClientLessons({
                   ))}
                 </select>
               </div>
+              <LessonNote lesson={l} clientId={clientId} onNote={onNote} />
+              {l.calendarSource === "manual" && (
+                <DeleteManual lesson={l} clientId={clientId} onNote={onNote} />
+              )}
             </div>
           );
         })}
@@ -380,6 +430,120 @@ function AddLesson({
           Cancel
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * What was worked on. Shown under the lesson; saved when the box loses focus,
+ * so there is no Save button to forget on the range.
+ */
+function LessonNote({
+  lesson,
+  clientId,
+  onNote,
+}: {
+  lesson: NumberedLesson;
+  clientId: string;
+  onNote: (n: { kind: "ok" | "err"; text: string } | null) => void;
+}) {
+  const [text, setText] = useState(lesson.notes ?? "");
+  const [saved, setSaved] = useState(lesson.notes ?? "");
+  const [editing, setEditing] = useState(false);
+  const [, start] = useTransition();
+
+  function save() {
+    setEditing(false);
+    if (text.trim() === saved.trim()) return;
+    const next = text;
+    start(async () => {
+      const r = await setLessonNote(lesson.id, clientId, next);
+      if (r.ok) setSaved(next.trim());
+      else {
+        onNote({ kind: "err", text: r.error });
+        setText(saved);
+      }
+    });
+  }
+
+  if (editing) {
+    return (
+      <textarea
+        className="field lb-note-input"
+        rows={2}
+        autoFocus
+        value={text}
+        placeholder="What you worked on, homework…"
+        onChange={(e) => setText(e.target.value)}
+        onBlur={save}
+      />
+    );
+  }
+  return saved ? (
+    <button type="button" className="lb-note" onClick={() => setEditing(true)}>
+      {saved}
+    </button>
+  ) : (
+    <button
+      type="button"
+      className="lb-note-add"
+      onClick={() => setEditing(true)}
+    >
+      + Note
+    </button>
+  );
+}
+
+/** Delete, for lessons added by hand only (calendar ones come back on sync). */
+function DeleteManual({
+  lesson,
+  clientId,
+  onNote,
+}: {
+  lesson: NumberedLesson;
+  clientId: string;
+  onNote: (n: { kind: "ok" | "err"; text: string } | null) => void;
+}) {
+  const [asking, setAsking] = useState(false);
+  const [busy, start] = useTransition();
+  if (!asking) {
+    return (
+      <button
+        type="button"
+        className="btn ghost small lb-del"
+        onClick={() => setAsking(true)}
+      >
+        Delete lesson
+      </button>
+    );
+  }
+  return (
+    <div className="lb-qacts" style={{ marginTop: 8 }}>
+      <button
+        type="button"
+        className="btn danger small"
+        disabled={busy}
+        onClick={() =>
+          start(async () => {
+            const r = await deleteLesson(lesson.id, clientId);
+            onNote(
+              r.ok
+                ? { kind: "ok", text: "Lesson deleted." }
+                : { kind: "err", text: r.error },
+            );
+            setAsking(false);
+          })
+        }
+      >
+        Yes, delete it
+      </button>
+      <button
+        type="button"
+        className="btn secondary small"
+        onClick={() => setAsking(false)}
+      >
+        Keep it
+      </button>
     </div>
   );
 }
