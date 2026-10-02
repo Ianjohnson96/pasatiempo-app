@@ -10,8 +10,10 @@ import Link from "next/link";
 // the pages now load both at once.
 
 const TABS = [
-  { href: "/lessons", key: "dashboard", label: "Dashboard" },
+  // "Home", not "Dashboard": five tabs have to fit across a phone.
+  { href: "/lessons", key: "dashboard", label: "Home" },
   { href: "/lessons/schedule", key: "schedule", label: "Schedule" },
+  { href: "/lessons/billing", key: "billing", label: "Billing" },
   { href: "/lessons/clients", key: "clients", label: "Clients" },
   { href: "/lessons/review", key: "review", label: "Review" },
 ] as const;

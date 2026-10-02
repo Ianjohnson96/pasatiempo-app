@@ -233,11 +233,11 @@ export function FollowUps({ d }: { d: DashboardData }) {
           </h3>
           <p className="lb-fhint">
             Lessons on no bill yet, across {d.unbilled.clients} client
-            {d.unbilled.clients === 1 ? "" : "s"}. On each client: Select, then
-            Move into a package or Bill each as a single.
+            {d.unbilled.clients === 1 ? "" : "s"}. Billing does a whole client
+            in one tap.
           </p>
-          <Link href="/lessons/clients?sort=unbilled" className="btn secondary small">
-            Sort them out &rarr;
+          <Link href="/lessons/billing" className="btn small">
+            Bill them &rarr;
           </Link>
         </section>
       )}

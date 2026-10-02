@@ -262,3 +262,24 @@ export function packageProgress(p: PackageRec): string {
 export function runningOut(p: PackageRec): boolean {
   return !p.isComplete && p.remaining <= 1;
 }
+
+export type PayMethod = "venmo" | "member_charge" | "cash" | "other";
+
+/** One client's row on the Billing screen. */
+export interface BillingClient {
+  clientId: string;
+  name: string;
+  isMember: boolean;
+  /** Lessons taught or booked that are on no bill yet, oldest first. */
+  lessons: { id: string; startsAt: string; status: LessonStatus; titleRaw: string | null }[];
+  /** Pre-filled amount (cents) and method - see billingDefaults. */
+  defaults: { priceCents: number | null; method: PayMethod };
+  /** A package with lessons left: these might belong to it, not be singles. */
+  roomIn: { id: string; title: string; left: number }[];
+}
+
+export interface BillingData {
+  clients: BillingClient[];
+  /** Every bill not yet paid (unpaid or pending), oldest first. */
+  unpaid: PackageRec[];
+}

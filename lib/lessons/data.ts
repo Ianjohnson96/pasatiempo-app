@@ -1,12 +1,16 @@
 import { lessonBookClient } from "./db";
-import { matchExisting } from "./calc";
+import { billingDefaults, matchExisting } from "./calc";
+import { packageTitle } from "./types";
 import type {
+  BillingClient,
+  BillingData,
   ClientRec,
   ClientSummary,
   DashboardData,
   LessonStatus,
   NumberedLesson,
   PackageRec,
+  PayMethod,
   PaymentStatus,
   ReviewRec,
   SingleRates,
@@ -382,5 +386,88 @@ export async function dashboardData(): Promise<DashboardData> {
       lessons: num((d.unbilled as Row | null)?.lessons),
       clients: num((d.unbilled as Row | null)?.clients),
     },
+  };
+}
+
+/**
+ * The Billing screen: every lesson on no bill yet, grouped by client, with
+ * what to pre-fill, plus every bill still waiting for money. Four reads,
+ * all at once.
+ */
+export async function billingData(): Promise<BillingData> {
+  const supa = await lessonBookClient();
+  const [lessonsRes, clientsRes, packages, rates] = await Promise.all([
+    supa
+      .from("lesson_numbered")
+      .select("id, client_id, starts_at, status, title_raw")
+      .is("package_id", null)
+      .not("client_id", "is", null)
+      .in("status", ["completed", "scheduled"])
+      .order("starts_at"),
+    supa.from("lesson_clients").select("id, name, is_member"),
+    listPackages(),
+    singleRates(),
+  ]);
+  if (lessonsRes.error) throw new Error(lessonsRes.error.message);
+  if (clientsRes.error) throw new Error(clientsRes.error.message);
+
+  const client = new Map(
+    (clientsRes.data ?? []).map((c) => [
+      c.id as string,
+      { name: c.name as string, isMember: c.is_member === true },
+    ]),
+  );
+
+  // The most recent priced single per client: "what they paid last time".
+  const lastSingle = new Map<string, { priceCents: number | null; method: PayMethod | null }>();
+  for (const p of [...packages]
+    .filter((p) => p.kind === "single" && p.priceCents !== null)
+    .sort((a, b) => (a.soldOn ?? "").localeCompare(b.soldOn ?? ""))) {
+    lastSingle.set(p.clientId, {
+      priceCents: p.priceCents,
+      method: (p.paymentMethod as PayMethod | null) ?? null,
+    });
+  }
+
+  const byClient = new Map<string, BillingClient>();
+  for (const l of lessonsRes.data ?? []) {
+    const id = l.client_id as string;
+    const who = client.get(id);
+    if (!who) continue;
+    let row = byClient.get(id);
+    if (!row) {
+      row = {
+        clientId: id,
+        name: who.name,
+        isMember: who.isMember,
+        lessons: [],
+        defaults: billingDefaults({
+          isMember: who.isMember,
+          last: lastSingle.get(id) ?? null,
+          rates,
+        }),
+        roomIn: packages
+          .filter((p) => p.clientId === id && p.kind === "package")
+          .map((p) => ({ id: p.id, title: packageTitle(p), left: p.size - p.used - p.booked }))
+          .filter((p) => p.left > 0),
+      };
+      byClient.set(id, row);
+    }
+    row.lessons.push({
+      id: l.id as string,
+      startsAt: l.starts_at as string,
+      status: ((l.status as string) ?? "completed") as LessonStatus,
+      titleRaw: str(l.title_raw),
+    });
+  }
+
+  return {
+    // Most to bill first: that is where one tap saves the most.
+    clients: [...byClient.values()].sort(
+      (a, b) => b.lessons.length - a.lessons.length || a.name.localeCompare(b.name),
+    ),
+    unpaid: packages
+      .filter((p) => p.paymentStatus !== "paid")
+      .sort((a, b) => (a.soldOn ?? "").localeCompare(b.soldOn ?? "")),
   };
 }

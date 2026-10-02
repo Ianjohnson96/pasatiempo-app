@@ -1168,3 +1168,156 @@ export async function billAsSingles(
     return fail(e, "Could not bill those lessons.");
   }
 }
+
+export interface BillItem {
+  lessonId: string;
+  /** Integer cents; null = no price recorded yet. */
+  priceCents: number | null;
+  status: PaymentStatus;
+  method: PaymentMethodValue | null;
+}
+
+type PaymentMethodValue = "venmo" | "member_charge" | "cash" | "other";
+const METHODS = new Set(["venmo", "member_charge", "cash", "other"]);
+
+/**
+ * The Billing screen's one tap: each lesson becomes its own single with the
+ * amount, status and method chosen. A paid one is dated the day of its own
+ * lesson - the money arrived around the lesson, not the day it was entered
+ * - so the year-end income lands in the right year. Only lessons still on
+ * no bill, and only this client's. Returns the singles made, for Undo.
+ */
+export async function billLessons(
+  clientId: string,
+  items: BillItem[],
+): Promise<Result<{ billed: number; packageIds: string[] }>> {
+  try {
+    await assertLessonBook();
+    if (!items.length) return { ok: true, value: { billed: 0, packageIds: [] } };
+    for (const it of items) {
+      if (
+        it.priceCents !== null &&
+        (!Number.isInteger(it.priceCents) || it.priceCents < 0)
+      ) {
+        return { ok: false, error: "That is not a valid amount." };
+      }
+      if (it.method !== null && !METHODS.has(it.method)) {
+        return { ok: false, error: "That is not a payment method." };
+      }
+    }
+    const supa = await lessonBookClient();
+    const { data: lessons, error: lErr } = await supa
+      .from("lessons")
+      .select("id, starts_at")
+      .in(
+        "id",
+        items.map((i) => i.lessonId),
+      )
+      .eq("client_id", clientId)
+      .is("package_id", null);
+    if (lErr) throw lErr;
+    const when = new Map(
+      (lessons ?? []).map((l) => [l.id as string, l.starts_at as string]),
+    );
+
+    const packageIds: string[] = [];
+    for (const it of items) {
+      const startsAt = when.get(it.lessonId);
+      if (!startsAt) continue; // already billed, or not this client's
+      const day = courseDay(startsAt);
+      const { data: pkg, error: pErr } = await supa
+        .from("lesson_packages")
+        .insert({
+          client_id: clientId,
+          size: 1,
+          kind: "single",
+          sold_on: day,
+          price_cents: it.priceCents,
+          payment_status: it.status,
+          payment_method: it.status === "unpaid" ? null : it.method,
+          paid_on: it.status === "paid" ? day : null,
+        })
+        .select("id")
+        .single();
+      if (pErr) throw pErr;
+      const { data: moved, error: mErr } = await supa
+        .from("lessons")
+        .update({ package_id: pkg.id })
+        .eq("id", it.lessonId)
+        .is("package_id", null)
+        .select("id");
+      if (mErr) throw mErr;
+      if (moved?.length) packageIds.push(pkg.id as string);
+      else await supa.from("lesson_packages").delete().eq("id", pkg.id);
+    }
+
+    touched(clientId);
+    revalidatePath("/lessons/billing");
+    return { ok: true, value: { billed: packageIds.length, packageIds } };
+  } catch (e) {
+    return fail(e, "Could not bill those lessons.");
+  }
+}
+
+/**
+ * Undo for billLessons: delete those singles, and their lessons go back to
+ * not billed (the foreign key clears package_id). Singles only, this
+ * client's only - a package can never be removed this way.
+ */
+export async function unbillSingles(
+  clientId: string,
+  packageIds: string[],
+): Promise<Result<number>> {
+  try {
+    await assertLessonBook();
+    if (!packageIds.length) return { ok: true, value: 0 };
+    const supa = await lessonBookClient();
+    const { data, error } = await supa
+      .from("lesson_packages")
+      .delete()
+      .in("id", packageIds)
+      .eq("client_id", clientId)
+      .eq("kind", "single")
+      .select("id");
+    if (error) throw error;
+    touched(clientId);
+    revalidatePath("/lessons/billing");
+    return { ok: true, value: data?.length ?? 0 };
+  } catch (e) {
+    return fail(e, "Could not undo that.");
+  }
+}
+
+/**
+ * Mark several unpaid or pending bills paid at once, all by one method,
+ * dated today. Only touches bills not already paid.
+ */
+export async function markPaidMany(
+  packageIds: string[],
+  method: PaymentMethodValue | null,
+): Promise<Result<number>> {
+  try {
+    await assertLessonBook();
+    if (!packageIds.length) return { ok: true, value: 0 };
+    if (method !== null && !METHODS.has(method)) {
+      return { ok: false, error: "That is not a payment method." };
+    }
+    const supa = await lessonBookClient();
+    const { data, error } = await supa
+      .from("lesson_packages")
+      .update({
+        payment_status: "paid",
+        payment_method: method,
+        paid_on: courseToday(),
+      })
+      .in("id", packageIds)
+      .neq("payment_status", "paid")
+      .select("id");
+    if (error) throw error;
+    touched();
+    revalidatePath("/lessons/billing");
+    return { ok: true, value: data?.length ?? 0 };
+  } catch (e) {
+    return fail(e, "Could not mark those paid.");
+  }
+}

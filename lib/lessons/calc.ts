@@ -377,3 +377,28 @@ export function singleRate(
   const other = isMember ? rates.guest : rates.member;
   return mine ?? other ?? null;
 }
+
+type Method = "venmo" | "member_charge" | "cash" | "other";
+
+/**
+ * What the Billing screen pre-fills for a client, so most rows need no
+ * typing: whatever they paid last time, else the member or guest rate and
+ * the usual method for that kind of client (member charge for members,
+ * Venmo for guests). No amount at all rather than $0 when nothing is known.
+ */
+export function billingDefaults(e: {
+  isMember: boolean;
+  last: { priceCents: number | null; method: Method | null } | null;
+  rates: { member?: number; guest?: number };
+}): { priceCents: number | null; method: Method } {
+  const usual: Method = e.isMember ? "member_charge" : "venmo";
+  return {
+    priceCents: e.last?.priceCents ?? singleRate(e.isMember, e.rates),
+    method: e.last?.method ?? usual,
+  };
+}
+
+/** A lesson already taught was almost always paid; a booked one is not yet. */
+export function defaultBillStatus(status: string): "paid" | "unpaid" {
+  return status === "completed" ? "paid" : "unpaid";
+}

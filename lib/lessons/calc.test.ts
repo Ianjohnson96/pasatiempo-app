@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   addDays,
+  billingDefaults,
+  defaultBillStatus,
   aliasClash,
   cleanAliases,
   courseDay,
@@ -345,5 +347,41 @@ describe("seqLabel for singles", () => {
     expect(
       seqLabel({ seq: 1, packageSize: 1, packageId: "s", status: "completed", packageKind: "single" }),
     ).toBe("single");
+  });
+});
+
+describe("billingDefaults", () => {
+  const rates = { member: 8500, guest: 11000 };
+  it("repeats what the client paid last time", () => {
+    expect(
+      billingDefaults({ isMember: false, last: { priceCents: 9000, method: "cash" }, rates }),
+    ).toEqual({ priceCents: 9000, method: "cash" });
+  });
+  it("falls back to the member rate and member charge for a member", () => {
+    expect(billingDefaults({ isMember: true, last: null, rates })).toEqual({
+      priceCents: 8500,
+      method: "member_charge",
+    });
+  });
+  it("falls back to the guest rate and Venmo for a guest", () => {
+    expect(billingDefaults({ isMember: false, last: null, rates })).toEqual({
+      priceCents: 11000,
+      method: "venmo",
+    });
+  });
+  it("keeps a last price but fills a missing last method from membership", () => {
+    expect(
+      billingDefaults({ isMember: true, last: { priceCents: 8000, method: null }, rates }),
+    ).toEqual({ priceCents: 8000, method: "member_charge" });
+  });
+  it("has no amount rather than $0 when nothing is known", () => {
+    expect(billingDefaults({ isMember: false, last: null, rates: {} }).priceCents).toBeNull();
+  });
+});
+
+describe("defaultBillStatus", () => {
+  it("treats a taught lesson as paid and a booked one as unpaid", () => {
+    expect(defaultBillStatus("completed")).toBe("paid");
+    expect(defaultBillStatus("scheduled")).toBe("unpaid");
   });
 });

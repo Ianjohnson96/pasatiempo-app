@@ -6,11 +6,18 @@ import {
   assignLessonToPackage,
   assignLessons,
   billAsSingles,
+  billLessons,
+  unbillSingles,
+  type BillItem,
   deleteLesson,
   setLessonNote,
 } from "@/lib/lessons/actions";
+import BillChoices, { type BillChoiceValue } from "./BillChoices";
 import {
+  billingDefaults,
   courseDay,
+  defaultBillStatus,
+  parseDollars,
   seqLabel,
   suggestForPackage,
   undoGroups,
@@ -19,6 +26,8 @@ import {
   formatWhen,
   type NumberedLesson,
   type PackageRec,
+  type PayMethod,
+  type SingleRates,
 } from "@/lib/lessons/types";
 
 // A client's lessons, and the tools to put them into packages.
@@ -47,13 +56,39 @@ export default function ClientLessons({
   packages,
   lessons,
   onNote,
+  isMember,
+  rates,
 }: {
   clientId: string;
   packages: PackageRec[];
   lessons: NumberedLesson[];
   onNote: (n: { kind: "ok" | "err"; text: string } | null) => void;
+  isMember: boolean;
+  rates: SingleRates;
 }) {
   const [selecting, setSelecting] = useState(false);
+  // Billing panel in Select mode, pre-filled like the Billing screen.
+  const [billOpen, setBillOpen] = useState(false);
+  const [choice, setChoice] = useState<BillChoiceValue>(() => {
+    const last = [...packages]
+      .filter((p) => p.kind === "single" && p.priceCents !== null)
+      .sort((a, b) => (b.soldOn ?? "").localeCompare(a.soldOn ?? ""))[0];
+    const d = billingDefaults({
+      isMember,
+      last: last
+        ? {
+            priceCents: last.priceCents,
+            method: (last.paymentMethod as PayMethod | null) ?? null,
+          }
+        : null,
+      rates,
+    });
+    return {
+      dollars: d.priceCents === null ? "" : String(d.priceCents / 100),
+      method: d.method,
+      status: "auto",
+    };
+  });
   const [picked, setPicked] = useState<Set<string>>(new Set());
   // The first package with room is the likeliest target.
   // Only real packages are places to move lessons into; a single bills
@@ -130,6 +165,53 @@ export default function ClientLessons({
         },
       });
       setPicked(new Set());
+      setSelecting(false);
+    });
+  }
+
+  /** The Select-mode panel: amount, method and status for every tick. */
+  function billPicked() {
+    const parsed = parseDollars(choice.dollars);
+    if (!parsed.ok) {
+      onNote({ kind: "err", text: "That is not a valid amount." });
+      return;
+    }
+    const items: BillItem[] = lessons
+      .filter((l) => picked.has(l.id) && !l.packageId)
+      .map((l) => {
+        const status =
+          choice.status === "auto" ? defaultBillStatus(l.status) : choice.status;
+        return {
+          lessonId: l.id,
+          priceCents: parsed.cents,
+          status,
+          method: status === "unpaid" ? null : choice.method,
+        };
+      });
+    const skipped = picked.size - items.length;
+    onNote(null);
+    start(async () => {
+      const r = await billLessons(clientId, items);
+      if (!r.ok) {
+        onNote({ kind: "err", text: r.error });
+        return;
+      }
+      const ids = r.value.packageIds;
+      setUndo({
+        text:
+          `Billed ${r.value.billed} as single${r.value.billed === 1 ? "" : "s"}.` +
+          (skipped ? ` ${skipped} already on a bill, left alone.` : ""),
+        run: async () => {
+          const u = await unbillSingles(clientId, ids);
+          onNote(
+            u.ok
+              ? { kind: "ok", text: "Back to not billed." }
+              : { kind: "err", text: u.error },
+          );
+        },
+      });
+      setPicked(new Set());
+      setBillOpen(false);
       setSelecting(false);
     });
   }
@@ -342,13 +424,29 @@ export default function ClientLessons({
             </button>
             <button
               type="button"
-              className="btn secondary small"
-              disabled={busy || picked.size === 0}
-              onClick={() => billSingles([...picked])}
+              className={billOpen ? "btn small" : "btn secondary small"}
+              disabled={busy}
+              onClick={() => setBillOpen((v) => !v)}
             >
-              Bill each as a single
+              Bill as singles…
             </button>
           </div>
+          {billOpen && (
+            <div className="lb-billpanel">
+              <BillChoices value={choice} onChange={setChoice} disabled={busy} />
+              <button
+                type="button"
+                className="btn small"
+                style={{ marginTop: 10 }}
+                disabled={busy || picked.size === 0 || choice.dollars.trim() === ""}
+                onClick={billPicked}
+              >
+                {busy
+                  ? "Billing…"
+                  : `Bill ${picked.size} as single${picked.size === 1 ? "" : "s"}`}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </>

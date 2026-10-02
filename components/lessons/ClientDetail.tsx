@@ -11,6 +11,7 @@ import {
   type ClientRec,
   type NumberedLesson,
   type PackageRec,
+  type SingleRates,
 } from "@/lib/lessons/types";
 
 // One client: their packages, their lesson history, and the controls to put
@@ -32,10 +33,13 @@ export default function ClientDetail({
   client,
   packages,
   lessons,
+  rates,
 }: {
   client: ClientRec;
   packages: PackageRec[];
   lessons: NumberedLesson[];
+  /** Single-lesson rates, for the billing panel's defaults. */
+  rates: SingleRates;
 }) {
   const [editing, setEditing] = useState(false);
   const [note, setNote] = useState<{ kind: "ok" | "err"; text: string } | null>(
@@ -188,6 +192,8 @@ export default function ClientDetail({
         Lessons
       </h2>
       <ClientLessons
+        isMember={client.isMember}
+        rates={rates}
         clientId={client.id}
         packages={packages}
         lessons={lessons}

@@ -927,3 +927,71 @@ a.lb-next:hover {
 .lb-undo .btn {
   flex-shrink: 0;
 }
+
+/* ---- Billing screen ----------------------------------------------------- */
+.lb-billchoices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+.lb-billchoices .lb-num .field {
+  min-height: 40px;
+}
+.lb-billchoices .lb-grow select {
+  width: 100%;
+}
+.lb-billpick {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  cursor: pointer;
+}
+.lb-billpick input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--green);
+}
+.lb-billbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+.lb-billbar .lb-billpick {
+  width: auto;
+  align-items: center;
+  font-weight: 600;
+}
+.lb-billbar select {
+  width: auto;
+  flex: 1 1 140px;
+  min-height: 40px;
+}
+.lb-billrow {
+  border-left: 4px solid var(--warn);
+}
+@media (max-width: 560px) {
+  .lb-billchoices .lb-num {
+    flex: 1 1 100%;
+  }
+  .lb-billchoices .lb-num .field,
+  .lb-billbar select {
+    min-height: 44px;
+  }
+  .lb-billrow .lb-actions .btn,
+  .lb-billbar .btn {
+    flex: 1;
+    min-height: 44px;
+  }
+}
+.lb-billpanel {
+  width: 100%;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}

@@ -9,6 +9,7 @@ import {
   getClient,
   listPackages,
   reviewCount,
+  singleRates,
 } from "@/lib/lessons/data";
 
 // One client: packages, lesson history, and the controls to connect them.
@@ -24,13 +25,14 @@ export default async function ClientPage({
   if (!isUuid(id)) notFound();
 
   // One round of reads, not three in a row, alongside the gate (see gate.ts).
-  const [viewer, [client, packages, lessons, waiting]] = await gateFirst(
+  const [viewer, [client, packages, lessons, waiting, rates]] = await gateFirst(
     requireLessonBook(),
     Promise.all([
       getClient(id),
       listPackages(id),
       clientLessons(id),
       reviewCount(),
+      singleRates(),
     ]),
   );
   // Also covers an id RLS will not show: a missing row and a forbidden row
@@ -41,7 +43,12 @@ export default async function ClientPage({
     <>
       <LessonsHeader email={viewer.email} active="clients" waiting={waiting} />
       <main className="container">
-        <ClientDetail client={client} packages={packages} lessons={lessons} />
+        <ClientDetail
+          client={client}
+          packages={packages}
+          lessons={lessons}
+          rates={rates}
+        />
       </main>
     </>
   );
