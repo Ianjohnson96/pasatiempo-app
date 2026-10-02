@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   dismissReview,
   linkReviews,
   resolveReview,
+  unlinkReviews,
+  type LinkUndo,
 } from "@/lib/lessons/actions";
 import { formatDay, formatWhen, type ReviewRec } from "@/lib/lessons/types";
 
@@ -42,6 +44,16 @@ export default function ReviewQueue({
     null,
   );
   const [linked, setLinked] = useState<Set<string>>(new Set());
+  // Ten seconds to take a Link back.
+  const [undo, setUndo] = useState<{ text: string; items: LinkUndo[] } | null>(
+    null,
+  );
+  const [undoing, startUndo] = useTransition();
+  useEffect(() => {
+    if (!undo) return;
+    const t = setTimeout(() => setUndo(null), 10000);
+    return () => clearTimeout(t);
+  }, [undo]);
 
   // Entries that are lessons already in the book, grouped by whose lesson
   // they are - one tap links a whole group. The rest need a real answer.
@@ -93,10 +105,40 @@ export default function ReviewQueue({
           "Most are lessons already in the book under a differently written title - link them and the sync recognises them from now on."}
       </p>
 
-      {note && (
-        <p className={note.kind === "ok" ? "notice ok" : "notice err"}>
-          {note.text}
-        </p>
+      {undo ? (
+        <div className="notice ok lb-undo" role="status">
+          <span>{undo.text}</span>
+          <button
+            type="button"
+            className="btn secondary small"
+            disabled={undoing}
+            onClick={() => {
+              const items = undo.items;
+              setUndo(null);
+              startUndo(async () => {
+                const r = await unlinkReviews(items);
+                if (!r.ok) {
+                  setNote({ kind: "err", text: r.error });
+                  return;
+                }
+                setLinked((s) => {
+                  const n = new Set(s);
+                  for (const i of items) n.delete(i.calendarUid);
+                  return n;
+                });
+                setNote({ kind: "ok", text: `Put ${r.value} back in Review.` });
+              });
+            }}
+          >
+            Undo
+          </button>
+        </div>
+      ) : (
+        note && (
+          <p className={note.kind === "ok" ? "notice ok" : "notice err"}>
+            {note.text}
+          </p>
+        )
       )}
 
       {groups.length > 0 && (
@@ -106,9 +148,10 @@ export default function ReviewQueue({
               key={g.clientId}
               clientName={g.clientName}
               items={g.items}
-              onDone={(uids, text) => {
+              onDone={(uids, text, undoItems) => {
                 setLinked((s) => new Set([...s, ...uids]));
-                setNote({ kind: "ok", text });
+                setNote(null);
+                setUndo({ text, items: undoItems });
               }}
               onError={(text) => setNote({ kind: "err", text })}
             />
@@ -152,7 +195,7 @@ function LinkGroup({
 }: {
   clientName: string;
   items: ReviewRec[];
-  onDone: (uids: string[], text: string) => void;
+  onDone: (uids: string[], text: string, undo: LinkUndo[]) => void;
   onError: (text: string) => void;
 }) {
   const [busy, start] = useTransition();
@@ -169,11 +212,13 @@ function LinkGroup({
         onError(r.error);
         return;
       }
-      const { linked, skipped } = r.value;
+      const { linked, skipped, undo } = r.value;
       onDone(
-        uids,
+        // Only the ones that actually linked leave the screen.
+        undo.map((u) => u.calendarUid),
         `Linked ${linked} to ${clientName}'s lessons.` +
           (skipped ? ` ${skipped} could not be matched and stay in the queue.` : ""),
+        undo,
       );
     });
   }

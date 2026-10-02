@@ -62,6 +62,7 @@ function toPackage(r: Row): PackageRec {
     booked: num(r.lessons_booked),
     lastLessonAt: str(r.last_lesson_at),
     isComplete: r.is_complete === true,
+    clientPhone: str(r.client_phone),
   };
 }
 
@@ -127,6 +128,8 @@ function toNumbered(r: Row): NumberedLesson {
     packageLabel: str(r.package_label),
     paymentStatus: (str(r.payment_status) as PaymentStatus | null) ?? null,
     seq: r.seq === null || r.seq === undefined ? null : num(r.seq),
+    notes: str(r.notes),
+    calendarSource: str(r.calendar_source),
   };
 }
 
@@ -291,6 +294,12 @@ export async function dashboardData(): Promise<DashboardData> {
   return {
     now: (d.now as string) ?? new Date().toISOString(),
     next: d.next ? toNumbered(d.next as Row) : null,
+    nextLastNote: d.next_last_note
+      ? {
+          notes: String((d.next_last_note as Row).notes ?? ""),
+          startsAt: String((d.next_last_note as Row).starts_at ?? ""),
+        }
+      : null,
     week: rows(d.week).map(toNumbered),
     money: {
       owedCents: num(m.owed_cents),
@@ -302,6 +311,12 @@ export async function dashboardData(): Promise<DashboardData> {
       unpriced: num(m.unpriced),
     },
     runningOut: rows(d.running_out).map(toPackage),
+    collectedByMethod: Object.fromEntries(
+      Object.entries((d.collected_by_method ?? {}) as Row).map(([k, v]) => [
+        k,
+        num(v),
+      ]),
+    ),
     unpaid: rows(d.unpaid).map(toPackage),
     notSeen: rows(d.not_seen).map((r) => ({
       id: r.id as string,

@@ -4,6 +4,9 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { createPackage, setPackagePayment } from "@/lib/lessons/actions";
 import { money, type PackageRec, type PaymentStatus } from "@/lib/lessons/types";
+import { nextPackageText, smsHref } from "@/lib/lessons/contact";
+import type { PaymentMethod } from "@/lib/lessons/income";
+import MethodPicker from "./MethodPicker";
 
 // Actions right on the dashboard's follow-up lists, so the common jobs -
 // "she paid", "he bought another five" - do not need a trip to the client.
@@ -22,14 +25,19 @@ export function UnpaidItem({
   children: React.ReactNode;
 }) {
   const [gone, setGone] = useState(false);
+  const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, start] = useTransition();
 
-  function mark(s: PaymentStatus) {
+  function mark(s: PaymentStatus, method?: PaymentMethod | null) {
     setError(null);
+    setAsking(false);
     setGone(true);
     start(async () => {
-      const r = await setPackagePayment(p.id, s, { clientId: p.clientId });
+      const r = await setPackagePayment(p.id, s, {
+        clientId: p.clientId,
+        ...(s === "paid" ? { method: method ?? null } : {}),
+      });
       if (!r.ok) {
         setGone(false);
         setError(r.error);
@@ -49,10 +57,20 @@ export function UnpaidItem({
         >
           Pending
         </button>
-        <button type="button" className="btn small" onClick={() => mark("paid")}>
+        <button
+          type="button"
+          className="btn small"
+          onClick={() => setAsking(true)}
+        >
           Paid
         </button>
       </div>
+      {asking && (
+        <MethodPicker
+          onPick={(m) => mark("paid", m)}
+          onCancel={() => setAsking(false)}
+        />
+      )}
       {error && <p className="notice err lb-qerr">{error}</p>}
     </li>
   );
@@ -93,6 +111,7 @@ export function SellNextItem({
 
   const price =
     standardCents !== undefined ? money(standardCents) : "no price yet";
+  const text = smsHref(p.clientPhone, nextPackageText(p.clientName, p.size));
 
   return (
     <li className="lb-qrow">
@@ -135,6 +154,12 @@ export function SellNextItem({
           >
             Sell next
           </button>
+          {text && (
+            // Opens Messages with the words filled in; Ian presses send.
+            <a className="btn secondary small" href={text}>
+              Text
+            </a>
+          )}
         </div>
       )}
       {error && <p className="notice err lb-qerr">{error}</p>}

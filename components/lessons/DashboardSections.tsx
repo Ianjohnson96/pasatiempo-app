@@ -2,6 +2,7 @@ import Link from "next/link";
 import BarChart from "./BarChart";
 import { SellNextItem, UnpaidItem } from "./QuickActions";
 import SyncNow from "./SyncNow";
+import { METHOD_LABEL, type PaymentMethod } from "@/lib/lessons/income";
 import { courseDay, delta, seqLabel } from "@/lib/lessons/calc";
 import {
   formatDay,
@@ -94,6 +95,12 @@ export function NextUp({ d }: { d: DashboardData }) {
           <span className="badge open">Last of the package</span>
         )}
       </div>
+      {d.nextLastNote && (
+        <div className="lb-lastnote">
+          <span>Last time ({formatDay(d.nextLastNote.startsAt)}):</span>{" "}
+          {d.nextLastNote.notes}
+        </div>
+      )}
     </Link>
   );
 }
@@ -128,6 +135,7 @@ export function MoneyTiles({ d }: { d: DashboardData }) {
           <div className="l">Collected this season</div>
         </div>
       </div>
+      <ByMethod d={d} />
       {m.unpriced > 0 && (
         <Link href="/lessons/prices" className="notice warn lb-banner">
           <span>
@@ -141,6 +149,32 @@ export function MoneyTiles({ d }: { d: DashboardData }) {
         </Link>
       )}
     </>
+  );
+}
+
+/** "Collected this season: Venmo $1,200 · Member charge $800", plus export. */
+function ByMethod({ d }: { d: DashboardData }) {
+  const year = courseDay(d.now).slice(0, 4);
+  const entries = Object.entries(d.collectedByMethod)
+    .filter(([, c]) => c > 0)
+    .sort((a, b) => b[1] - a[1]);
+  return (
+    <div className="lb-bymethod">
+      {entries.length > 0 && (
+        <span>
+          {entries
+            .map(
+              ([k, c]) =>
+                `${k in METHOD_LABEL ? METHOD_LABEL[k as PaymentMethod] : "Not recorded"} ${money(c)}`,
+            )
+            .join(" · ")}
+        </span>
+      )}
+      {/* A plain link: the browser downloads the CSV the route returns. */}
+      <a href={`/lessons/export?year=${year}`} download>
+        Download {year} income (CSV)
+      </a>
+    </div>
   );
 }
 

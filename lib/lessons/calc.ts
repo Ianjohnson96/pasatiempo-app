@@ -344,3 +344,19 @@ export function aliasClash(
   }
   return null;
 }
+
+/**
+ * Undo for a bulk move: lessons grouped by the package each was in before
+ * (null = one-off), so each group goes back with one write.
+ */
+export function undoGroups(
+  previous: Record<string, string | null>,
+): { packageId: string | null; lessonIds: string[] }[] {
+  const by = new Map<string | null, string[]>();
+  for (const [lessonId, packageId] of Object.entries(previous)) {
+    const list = by.get(packageId) ?? [];
+    list.push(lessonId);
+    by.set(packageId, list);
+  }
+  return [...by].map(([packageId, lessonIds]) => ({ packageId, lessonIds }));
+}

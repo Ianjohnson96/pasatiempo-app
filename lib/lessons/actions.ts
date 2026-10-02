@@ -643,17 +643,19 @@ export async function assignLessons(
  */
 export async function linkReviews(
   calendarUids: string[],
-): Promise<Result<{ linked: number; skipped: number }>> {
+): Promise<
+  Result<{ linked: number; skipped: number; undo: LinkUndo[] }>
+> {
   try {
     await assertLessonBook();
     if (!calendarUids.length) {
-      return { ok: true, value: { linked: 0, skipped: 0 } };
+      return { ok: true, value: { linked: 0, skipped: 0, undo: [] } };
     }
     const supa = await lessonBookClient();
 
     const { data: rows, error: rErr } = await supa
       .from("lesson_review")
-      .select("calendar_uid, starts_at, ends_at, title_raw")
+      .select("*")
       .in("calendar_uid", calendarUids);
     if (rErr) throw rErr;
 
@@ -661,7 +663,9 @@ export async function linkReviews(
     const { data: cands, error: cErr } = times.length
       ? await supa
           .from("lesson_numbered")
-          .select("id, client_name, starts_at, calendar_uid")
+          .select(
+            "id, client_name, starts_at, ends_at, calendar_uid, title_raw, calendar_source",
+          )
           .in("starts_at", times)
       : { data: [], error: null };
     if (cErr) throw cErr;
@@ -670,7 +674,14 @@ export async function linkReviews(
       clientName: (c.client_name as string) ?? "",
       startsAt: c.starts_at as string,
       calendarUid: (c.calendar_uid as string | null) ?? null,
+      // What the lesson looked like before linking, for Undo.
+      before: {
+        ends_at: c.ends_at as string,
+        title_raw: (c.title_raw as string | null) ?? null,
+        calendar_source: (c.calendar_source as string | null) ?? null,
+      },
     }));
+    const undo: LinkUndo[] = [];
 
     let linked = 0;
     let skipped = 0;
@@ -711,11 +722,19 @@ export async function linkReviews(
         .eq("calendar_uid", r.calendar_uid);
       if (dErr) throw dErr;
       linked++;
+      if (used) {
+        undo.push({
+          calendarUid: r.calendar_uid as string,
+          lessonId: id,
+          lessonBefore: used.before,
+          review: r as Record<string, unknown>,
+        });
+      }
     }
 
     revalidatePath(REVIEW);
     touched();
-    return { ok: true, value: { linked, skipped } };
+    return { ok: true, value: { linked, skipped, undo } };
   } catch (e) {
     return fail(e, "Could not link those entries.");
   }
@@ -828,5 +847,156 @@ export async function syncCalendarNow(): Promise<Result<SyncSummary>> {
     return { ok: true, value: summary };
   } catch (e) {
     return fail(e, "The calendar sync did not run.");
+  }
+}
+
+/** Enough to put one Link back exactly as it was. */
+export interface LinkUndo {
+  calendarUid: string;
+  lessonId: string;
+  lessonBefore: {
+    ends_at: string;
+    title_raw: string | null;
+    calendar_source: string | null;
+  };
+  /** The lesson_review row as it was before it was cleared. */
+  review: Record<string, unknown>;
+}
+
+/**
+ * Undo a Link: the lesson loses its calendar id (and gets its old title and
+ * end time back) and the entry returns to Review. Only undoes a lesson still
+ * linked to that same entry, so it cannot unpick a later change.
+ */
+export async function unlinkReviews(items: LinkUndo[]): Promise<Result<number>> {
+  try {
+    await assertLessonBook();
+    const supa = await lessonBookClient();
+    let undone = 0;
+    for (const it of items) {
+      if (typeof it?.calendarUid !== "string" || typeof it?.lessonId !== "string") {
+        continue;
+      }
+      const { data, error } = await supa
+        .from("lessons")
+        .update({
+          calendar_uid: null,
+          calendar_source: it.lessonBefore.calendar_source,
+          title_raw: it.lessonBefore.title_raw,
+          ends_at: it.lessonBefore.ends_at,
+        })
+        .eq("id", it.lessonId)
+        .eq("calendar_uid", it.calendarUid)
+        .select("id");
+      if (error) throw error;
+      if (!data?.length) continue;
+
+      // Back into the queue as it was; only the columns Review owns.
+      const r = it.review;
+      const { error: rErr } = await supa.from("lesson_review").upsert(
+        {
+          calendar_uid: it.calendarUid,
+          starts_at: r.starts_at,
+          ends_at: r.ends_at,
+          title_raw: r.title_raw,
+          guess_name: r.guess_name ?? null,
+          guess_client_id: r.guess_client_id ?? null,
+          calendar_source: r.calendar_source ?? "m365",
+          dismissed: false,
+        },
+        { onConflict: "calendar_uid" },
+      );
+      if (rErr) throw rErr;
+      undone++;
+    }
+    revalidatePath(REVIEW);
+    touched();
+    return { ok: true, value: undone };
+  } catch (e) {
+    return fail(e, "Could not undo that.");
+  }
+}
+
+/** What was worked on in a lesson. Blank clears it. */
+export async function setLessonNote(
+  lessonId: string,
+  clientId: string,
+  text: string,
+): Promise<Result> {
+  try {
+    await assertLessonBook();
+    const notes = text.trim().slice(0, 2000) || null;
+    const supa = await lessonBookClient();
+    const { error } = await supa
+      .from("lessons")
+      .update({ notes })
+      .eq("id", lessonId)
+      .eq("client_id", clientId);
+    if (error) throw error;
+    // The client page holds the note in its own state; only the dashboard's
+    // "last time" line needs a refresh.
+    revalidatePath(BOOK);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not save that note.");
+  }
+}
+
+/**
+ * Delete a package. Its lessons are kept and become one-offs (the foreign
+ * key sets package_id to null); its price and payment record go with it.
+ */
+export async function deletePackage(
+  packageId: string,
+  clientId: string,
+): Promise<Result> {
+  try {
+    await assertLessonBook();
+    const supa = await lessonBookClient();
+    const { data, error } = await supa
+      .from("lesson_packages")
+      .delete()
+      .eq("id", packageId)
+      .eq("client_id", clientId)
+      .select("id");
+    if (error) throw error;
+    if (!data?.length) return { ok: false, error: "That package is already gone." };
+    touched(clientId);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not delete that package.");
+  }
+}
+
+/**
+ * Delete a lesson that was added by hand. Calendar lessons are refused: the
+ * next sync would only bring them back - cancel those in Outlook instead.
+ */
+export async function deleteLesson(
+  lessonId: string,
+  clientId: string,
+): Promise<Result> {
+  try {
+    await assertLessonBook();
+    const supa = await lessonBookClient();
+    const { data, error } = await supa
+      .from("lessons")
+      .delete()
+      .eq("id", lessonId)
+      .eq("client_id", clientId)
+      .eq("calendar_source", "manual")
+      .select("id");
+    if (error) throw error;
+    if (!data?.length) {
+      return {
+        ok: false,
+        error:
+          "Only lessons added by hand can be deleted here. Cancel calendar lessons in Outlook.",
+      };
+    }
+    touched(clientId);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not delete that lesson.");
   }
 }

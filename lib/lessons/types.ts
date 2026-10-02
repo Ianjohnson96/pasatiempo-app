@@ -42,6 +42,8 @@ export interface PackageRec {
   booked: number;
   lastLessonAt: string | null;
   isComplete: boolean;
+  /** Only on dashboard rows that offer a text. */
+  clientPhone?: string | null;
 }
 
 export interface LessonRec {
@@ -67,6 +69,10 @@ export interface NumberedLesson extends LessonRec {
   paymentStatus: PaymentStatus | null;
   /** Position among the package's completed + scheduled lessons. */
   seq: number | null;
+  /** What was worked on, in Ian's words. */
+  notes: string | null;
+  /** "m365" from the calendar, "manual" when added by hand. */
+  calendarSource: string | null;
 }
 
 export interface MonthPoint {
@@ -81,6 +87,8 @@ export interface MonthPoint {
 export interface DashboardData {
   now: string;
   next: NumberedLesson | null;
+  /** The last note on whoever is next, to read before they arrive. */
+  nextLastNote: { notes: string; startsAt: string } | null;
   /** Today through the next six days, cancelled left out. */
   week: NumberedLesson[];
   money: {
@@ -93,6 +101,8 @@ export interface DashboardData {
     unpriced: number;
   };
   runningOut: PackageRec[];
+  /** Collected this season by method; "none" = method not recorded. */
+  collectedByMethod: Record<string, number>;
   unpaid: PackageRec[];
   notSeen: { id: string; name: string; lastLessonAt: string }[];
   /** Thirteen months ending this one, oldest first. */
