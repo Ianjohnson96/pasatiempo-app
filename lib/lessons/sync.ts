@@ -63,7 +63,24 @@ export interface SyncReport {
   cancelled: number;
   skippedGroup: number;
   unmatchedNames: string[];
+  /** Writes that were rejected. A run with failures is not a clean run. */
+  failed: number;
+  /** Distinct reasons, so one bad value does not hide behind 155 repeats. */
+  errors: string[];
   error?: string;
+}
+
+/**
+ * Record a rejected write.
+ *
+ * Deduplicated: 155 rows failing the same check constraint is one problem,
+ * and listing it 155 times buries it.
+ */
+function note(report: SyncReport, message: string): void {
+  report.failed++;
+  if (!report.errors.includes(message) && report.errors.length < 5) {
+    report.errors.push(message);
+  }
 }
 
 /**
@@ -100,6 +117,8 @@ export async function syncLessons(opts?: {
     cancelled: 0,
     skippedGroup: 0,
     unmatchedNames: [],
+    failed: 0,
+    errors: [],
   };
 
   if (!graphConfigured()) {
@@ -172,7 +191,7 @@ export async function syncLessons(opts?: {
           ends_at: ev.endsAt,
           title_raw: ev.subject,
           guess_name: bare || null,
-          calendar_source: "graph",
+          calendar_source: "m365",
         });
         continue;
       }
@@ -186,9 +205,10 @@ export async function syncLessons(opts?: {
 
       const known = byUid.get(ev.uid);
       if (known) {
-        report.updated++;
-        if (!dryRun) {
-          await supa
+        if (dryRun) {
+          report.updated++;
+        } else {
+          const { error } = await supa
             .from("lessons")
             .update({
               starts_at: ev.startsAt,
@@ -197,6 +217,11 @@ export async function syncLessons(opts?: {
               title_raw: ev.subject,
             })
             .eq("id", known.id);
+          // Count what happened, not what was attempted. Incrementing first
+          // and discarding the error is how a run that wrote nothing at all
+          // still reported 155 successes.
+          if (error) note(report, error.message);
+          else report.updated++;
         }
         continue;
       }
@@ -208,18 +233,21 @@ export async function syncLessons(opts?: {
       const adoptKey = `${clientId}|${new Date(ev.startsAt).toISOString()}`;
       const adoptable = byClientStart.get(adoptKey);
       if (adoptable && !adoptable.uid) {
-        report.adopted++;
-        if (!dryRun) {
-          await supa
+        if (dryRun) {
+          report.adopted++;
+        } else {
+          const { error } = await supa
             .from("lessons")
             .update({
               calendar_uid: ev.uid,
-              calendar_source: "graph",
+              calendar_source: "m365",
               ends_at: ev.endsAt,
               status,
               title_raw: ev.subject,
             })
             .eq("id", adoptable.id);
+          if (error) note(report, error.message);
+          else report.adopted++;
         }
         continue;
       }
@@ -231,7 +259,7 @@ export async function syncLessons(opts?: {
         ends_at: ev.endsAt,
         status,
         calendar_uid: ev.uid,
-        calendar_source: "graph",
+        calendar_source: "m365",
         title_raw: ev.subject,
         // package_id deliberately left null. Which series a lesson belongs to
         // is Ian's call, made on the client screen - guessing would move
@@ -258,21 +286,27 @@ export async function syncLessons(opts?: {
         if (error) throw error;
       }
 
-      await supa.from("lesson_calendar_sync").upsert(
+      const { error: healthErr } = await supa.from("lesson_calendar_sync").upsert(
         {
-          source: "graph",
+          source: "m365",
           label: process.env.MS_LESSON_MAILBOX ?? "Outlook",
           enabled: true,
           last_synced_at: new Date().toISOString(),
-          last_status: "ok",
+          // A run with rejected writes is not "ok", and saying so here is what
+          // makes a broken sync visible without reading the logs.
+          last_status: report.failed ? `partial: ${report.failed} rejected` : "ok",
           last_event_count: report.candidates,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "source" },
       );
+      if (healthErr) note(report, healthErr.message);
     }
 
-    report.ok = true;
+    // `ok` means the run did what it said. Rejected writes make it false, so
+    // the cron route returns 500 and the failure surfaces instead of reading
+    // as a clean run that happened to change nothing.
+    report.ok = report.failed === 0;
     return report;
   } catch (e) {
     report.error = e instanceof Error ? e.message : String(e);
@@ -282,7 +316,7 @@ export async function syncLessons(opts?: {
       try {
         await supa.from("lesson_calendar_sync").upsert(
           {
-            source: "graph",
+            source: "m365",
             label: process.env.MS_LESSON_MAILBOX ?? "Outlook",
             last_synced_at: new Date().toISOString(),
             last_status: `error: ${report.error}`.slice(0, 300),
