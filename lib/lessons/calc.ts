@@ -23,8 +23,33 @@ function fromUtc(ms: number): string {
 function isDay(s: string | undefined): s is string {
   if (!s || !DAY_RE.test(s)) return false;
   const [y, m, d] = parts(s);
+  // A sane window: the book starts in 2025, and a month step from 9999-12
+  // would walk into year 10000, which no longer formats as "YYYY".
+  if (y < 2000 || y > 2100) return false;
   // Round-trip catches Feb 31 and friends, which Date.UTC silently rolls over.
   return fromUtc(Date.UTC(y, m - 1, d)) === s;
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** True for a well-formed id, so a mangled URL can 404 instead of erroring. */
+export function isUuid(s: string): boolean {
+  return UUID_RE.test(s);
+}
+
+/**
+ * A typed price, as cents. Blank is "no price" (null), never $0; negative or
+ * non-numeric is refused rather than stored.
+ */
+export function parseDollars(
+  v: string | number | null | undefined,
+): { ok: true; cents: number | null } | { ok: false } {
+  if (v === null || v === undefined) return { ok: true, cents: null };
+  if (typeof v === "string" && v.trim() === "") return { ok: true, cents: null };
+  const n = typeof v === "number" ? v : Number(v.trim());
+  if (!Number.isFinite(n) || n < 0) return { ok: false };
+  return { ok: true, cents: Math.round(n * 100) };
 }
 
 const dayFmt = new Intl.DateTimeFormat("en-CA", {

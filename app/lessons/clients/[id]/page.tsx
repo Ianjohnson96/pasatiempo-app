@@ -3,6 +3,7 @@ import LessonsHeader from "@/components/lessons/LessonsHeader";
 import ClientDetail from "@/components/lessons/ClientDetail";
 import { requireLessonBook } from "@/lib/lessons/auth";
 import { gateFirst } from "@/lib/lessons/gate";
+import { isUuid } from "@/lib/lessons/calc";
 import {
   clientLessons,
   getClient,
@@ -19,6 +20,8 @@ export default async function ClientPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  // A mangled link is "not found", not a database error about uuid syntax.
+  if (!isUuid(id)) notFound();
 
   // One round of reads, not three in a row, alongside the gate (see gate.ts).
   const [viewer, [client, packages, lessons, waiting]] = await gateFirst(

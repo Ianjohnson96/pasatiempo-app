@@ -5,7 +5,9 @@ import {
   courseMidnightIso,
   delta,
   groupByDay,
+  isUuid,
   monthRange,
+  parseDollars,
   parseScheduleParams,
   scaleBars,
   seqLabel,
@@ -73,6 +75,15 @@ describe("parseScheduleParams", () => {
       "2026-10-01",
     );
   });
+  it("rejects a year the date maths cannot reach", () => {
+    // monthRange(9999-12) would step into year 10000 and throw.
+    expect(parseScheduleParams({ d: "9999-12-15" }, "2026-10-01").day).toBe(
+      "2026-10-01",
+    );
+    expect(parseScheduleParams({ d: "1066-10-14" }, "2026-10-01").day).toBe(
+      "2026-10-01",
+    );
+  });
   it("keeps valid input", () => {
     expect(parseScheduleParams({ view: "month", d: "2026-07-04" }, "2026-10-01"))
       .toEqual({ view: "month", day: "2026-07-04" });
@@ -132,5 +143,29 @@ describe("delta", () => {
   });
   it("has no percentage against zero", () => {
     expect(delta(5, 0)).toEqual({ diff: 5, pct: null });
+  });
+});
+
+describe("parseDollars", () => {
+  it("reads a price", () => {
+    expect(parseDollars("120")).toEqual({ ok: true, cents: 12000 });
+    expect(parseDollars(" 87.5 ")).toEqual({ ok: true, cents: 8750 });
+  });
+  it("treats blank as no price, not $0", () => {
+    expect(parseDollars("")).toEqual({ ok: true, cents: null });
+    expect(parseDollars(null)).toEqual({ ok: true, cents: null });
+  });
+  it("refuses a negative or non-numeric price", () => {
+    expect(parseDollars(-5).ok).toBe(false);
+    expect(parseDollars("abc").ok).toBe(false);
+    expect(parseDollars(Infinity).ok).toBe(false);
+  });
+});
+
+describe("isUuid", () => {
+  it("accepts a client id and refuses anything else", () => {
+    expect(isUuid("4a8735af-9be2-4e60-babf-c10a8ccd3e31")).toBe(true);
+    expect(isUuid("not-an-id")).toBe(false);
+    expect(isUuid("4a8735af-9be2-4e60-babf-c10a8ccd3e3")).toBe(false);
   });
 });
