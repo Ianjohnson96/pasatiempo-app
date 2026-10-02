@@ -48,3 +48,13 @@ def test_an_identical_second_file_is_left_out(tmp_path):
     _, found = refresh.read_reports([('Top 100.csv', data), ('Sku.csv', data)])
     assert found[0]['ok'] and found[0]['name'] == 'Sku.csv'
     assert not found[1]['ok'] and 'same rows' in found[1]['note']
+
+
+def test_headerless_best100_reads_cost_and_margin():
+    rows = [cells('0000000620', 'General Accessories', f'{i + 1:3d}', f'6200{i:02d}', f'Item {i}', (i + 1) * 5, 200.0, 120.0, 0.4, 3)
+            for i in range(12)]
+    assert exports.detect(rows) == 'best100'
+    d = exports.parse_best100(rows)
+    assert d['rows'][0] == dict(cat_no='620', cat='General Accessories', sku='620000', desc='Item 0', qty=5, gross=200, cost=120,
+                                margin_pct=40.0, markdown=3)
+    assert exports.infer_period(exports.units_of('best100', d), exports.parse_sku_analysis(sku_rows())) == ('2026-05', '2026-09')

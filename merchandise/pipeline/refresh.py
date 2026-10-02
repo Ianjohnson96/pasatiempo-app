@@ -113,12 +113,15 @@ def read_reports(files):
     for k, d, f in undated:
         per = exports.infer_period(exports.units_of(k, d), sku) if sku else None
         if per:
-            if k == 'sales_by_category':
+            if k in ('sales_by_category', 'best100'):
                 d['period'] = exports.period_text(*per)
             f['detail'] = exports.period_label(*per) + ' (worked out from the SKU Analysis: the file has no dates)'
         else:
             f['detail'] = ('period unknown: the file has no dates and its units match no run of months in the SKU Analysis'
-                           + (', so it is kept for the record only' if k == 'sales_by_category' else ''))
+                           + (', so it is kept for the record only' if k == 'sales_by_category' else '')
+                           + (', so check it is fiscal year to date' if k == 'best100' else ''))
+        if k == 'best100' and d.get('cut'):
+            f['detail'] += f". Stops at 100 SKUs in {', '.join(d['cut'])} while still selling: margins there leave out the rest"
     return reports, found
 
 

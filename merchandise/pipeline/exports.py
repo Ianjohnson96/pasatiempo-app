@@ -8,12 +8,14 @@ and the sales reports' period are worked out:
                     The newest month is the month of the latest sale.
   Sales by Category sales area no, area, category no, category, SKU, description, average price, units, sales
   Sales by Item     sales area no, area, SKU, description, average price, units, sales
+  BEST 100          category no, category, rank, SKU, description, quantity sold, sales, cost,
+                    margin (a fraction: 0.496), markdown; at most 100 SKUs per category
 
 The sales reports list each sales area, then the same rows again under "All Sales Areas" (no area
 number); the second pass is left out. Their period is the run of months, ending at the SKU
 Analysis's newest month, whose unit sales add up to the report's units.
 
-Checked against the September 30, 2026 exports (Sku analysis, By Catagory, By Item).
+Checked against the September 30, 2026 exports (Sku analysis, By Catagory, By Item, Top 100 Hottest items).
 """
 from datetime import date, datetime
 import re
@@ -86,7 +88,12 @@ def _is_item_row(r):
     return len(r) == 7 and _t(r[1]) != '' and _t(r[2]) != '' and _num(r[3]) is None and _nums(r, (4, 5, 6))
 
 
-TESTS = (('sku_analysis', _is_sku_row), ('sales_by_category', _is_cat_row), ('sales_by_item', _is_item_row))
+def _is_best_row(r):
+    return (len(r) == 10 and _t(r[0]).isdigit() and _t(r[2]).isdigit() and _t(r[3]) != '' and _num(r[4]) is None
+            and _nums(r, range(5, 10)))
+
+
+TESTS = (('sku_analysis', _is_sku_row), ('best100', _is_best_row), ('sales_by_category', _is_cat_row), ('sales_by_item', _is_item_row))
 
 
 def detect(rows):
@@ -162,12 +169,30 @@ def parse_sales_by_item(rows):
     return out
 
 
-PARSE = {'sku_analysis': parse_sku_analysis, 'sales_by_category': parse_sales_by_category, 'sales_by_item': parse_sales_by_item}
+def parse_best100(rows):
+    """Same shape as parse.parse_best100; the period is worked out later (infer_period). 'cut' lists the
+    categories that stop at 100 SKUs while still selling, so some of their sales are missing."""
+    out, per_cat = [], {}
+    for r in _values(rows):
+        if not _is_best_row(r):
+            continue
+        g, c = _num(r[6]), _num(r[7])
+        out.append(dict(cat_no=str(int(_t(r[0]))), cat=_t(r[1]), sku=_t(r[3]), desc=_t(r[4]), qty=int(_num(r[5])),
+                        gross=int(round(g)), cost=int(round(c)), margin_pct=round((1 - c / g) * 100, 1) if g else 0.0,
+                        markdown=int(round(_num(r[9])))))
+        per_cat.setdefault(out[-1]['cat_no'], []).append(out[-1]['qty'])
+    cut = sorted(k for k, q in per_cat.items() if len(q) >= 100 and q[-1] > 1)
+    return dict(period=None, rows=out, cut=cut)
+
+
+PARSE = {'sku_analysis': parse_sku_analysis, 'sales_by_category': parse_sales_by_category, 'sales_by_item': parse_sales_by_item, 'best100': parse_best100}
 
 
 def units_of(kind, d):
     if kind == 'sales_by_item':
         return {s: v['units'] for s, v in d.items()}
+    if kind == 'best100':
+        return {r['sku']: r['qty'] for r in d['rows']}
     u = {}
     for c in d['cats'].values():
         for i in c['items']:
