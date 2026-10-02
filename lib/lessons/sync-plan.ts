@@ -66,3 +66,16 @@ export function planEntry(e: { matched: boolean; review: ReviewState }): {
     clearReview: false,
   };
 }
+
+/**
+ * Should a new calendar lesson be billed as a single?
+ *
+ * Yes when the client has no package with room left - nothing else it could
+ * belong to. No when a package still has room: it might be the next lesson of
+ * that series, and which series is Ian's call, not the sync's.
+ */
+export function needsSingle(
+  packages: { kind: string; size: number; counted: number }[],
+): boolean {
+  return !packages.some((p) => p.kind === "package" && p.size - p.counted > 0);
+}

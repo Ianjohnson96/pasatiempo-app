@@ -7,7 +7,12 @@ import { listClientSummaries, reviewCount } from "@/lib/lessons/data";
 // Everyone Ian teaches, with what they owe and when he last saw them.
 export const dynamic = "force-dynamic";
 
-export default async function ClientsPage() {
+export default async function ClientsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string }>;
+}) {
+  const { sort } = await searchParams;
   // Reads run alongside the gate (RLS guards them); gateFirst lets the gate's
   // redirect win for a signed-out visitor.
   const [viewer, [clients, waiting]] = await gateFirst(
@@ -19,7 +24,10 @@ export default async function ClientsPage() {
     <>
       <LessonsHeader email={viewer.email} active="clients" waiting={waiting} />
       <main className="container">
-        <ClientList clients={clients} />
+        <ClientList
+          clients={clients}
+          initialSort={sort === "unbilled" ? "unbilled" : "owed"}
+        />
       </main>
     </>
   );

@@ -1,9 +1,10 @@
 import { createClient as createSbClient } from "@supabase/supabase-js";
 import { fetchCalendarEvents, graphConfigured } from "./graph";
-import { normName } from "./calc";
+import { courseDay, normName, singleRate } from "./calc";
 import {
   isLessonTitle,
   nameFromTitle,
+  needsSingle,
   planEntry,
   type ReviewState,
 } from "./sync-plan";
@@ -39,6 +40,8 @@ export interface SyncReport {
   skippedGroup: number;
   /** Waiting Review entries whose title now matches, booked and cleared. */
   resolved: number;
+  /** New lessons billed as singles (client had no package with room). */
+  singles: number;
   unmatchedNames: string[];
   /** Writes that were rejected. A run with failures is not a clean run. */
   failed: number;
@@ -94,6 +97,7 @@ export async function syncLessons(opts?: {
     cancelled: 0,
     skippedGroup: 0,
     resolved: 0,
+    singles: 0,
     unmatchedNames: [],
     failed: 0,
     errors: [],
@@ -110,12 +114,59 @@ export async function syncLessons(opts?: {
     const events = await fetchCalendarEvents(from, to);
     report.scanned = events.length;
 
-    const [{ data: clients }, { data: existing }, { data: reviewed }] =
-      await Promise.all([
-        supa.from("lesson_clients").select("id, name, aliases"),
-        supa.from("lessons").select("id, client_id, starts_at, calendar_uid"),
-        supa.from("lesson_review").select("calendar_uid, dismissed"),
-      ]);
+    const [
+      { data: clients },
+      { data: existing },
+      { data: reviewed },
+      { data: packages },
+      { data: settings },
+    ] = await Promise.all([
+      supa.from("lesson_clients").select("id, name, aliases, is_member"),
+      supa
+        .from("lessons")
+        .select("id, client_id, starts_at, calendar_uid, package_id, status"),
+      supa.from("lesson_review").select("calendar_uid, dismissed"),
+      supa.from("lesson_packages").select("id, client_id, size, kind"),
+      supa
+        .from("lesson_settings")
+        .select("single_rates")
+        .eq("id", 1)
+        .maybeSingle(),
+    ]);
+
+    // Room per client, for deciding whether a new lesson is a single: each
+    // package's size against the lessons already counted in it.
+    const counted = new Map<string, number>();
+    for (const l of existing ?? []) {
+      if (l.package_id && (l.status === "completed" || l.status === "scheduled")) {
+        const k = l.package_id as string;
+        counted.set(k, (counted.get(k) ?? 0) + 1);
+      }
+    }
+    const roomByClient = new Map<
+      string,
+      { kind: string; size: number; counted: number }[]
+    >();
+    for (const p of packages ?? []) {
+      const list = roomByClient.get(p.client_id as string) ?? [];
+      list.push({
+        kind: (p.kind as string) ?? "package",
+        size: Number(p.size),
+        counted: counted.get(p.id as string) ?? 0,
+      });
+      roomByClient.set(p.client_id as string, list);
+    }
+    const isMember = new Map(
+      (clients ?? []).map((c) => [c.id as string, c.is_member === true]),
+    );
+    const rawRates = (settings?.single_rates ?? {}) as Record<string, unknown>;
+    const rateOf = (v: unknown) =>
+      v !== null && v !== undefined && Number.isFinite(Number(v))
+        ? Number(v)
+        : undefined;
+    const rates = { member: rateOf(rawRates.member), guest: rateOf(rawRates.guest) };
+    // New lessons to bill on their own once inserted: calendar uid -> client.
+    const toSingle = new Map<string, string>();
 
     // name OR alias -> client id
     const byName = new Map<string, string>();
@@ -255,15 +306,21 @@ export async function syncLessons(opts?: {
         calendar_uid: ev.uid,
         calendar_source: "m365",
         title_raw: ev.subject,
-        // package_id deliberately left null. Which series a lesson belongs to
-        // is Ian's call, made on the client screen - guessing would move
-        // somebody's remaining count without them knowing.
+        // package_id left null here. A client with no package that has room
+        // gets the lesson billed as a single below; one WITH room keeps it
+        // unassigned, because which series it belongs to is Ian's call.
       });
+      if (status !== "cancelled" && needsSingle(roomByClient.get(clientId) ?? [])) {
+        toSingle.set(ev.uid, clientId);
+      }
     }
 
     report.unmatchedNames = [...unmatched].slice(0, 40);
 
-    if (dryRun) report.resolved = toClear.length;
+    if (dryRun) {
+      report.resolved = toClear.length;
+      report.singles = toSingle.size;
+    }
 
     if (!dryRun) {
       if (toInsert.length) {
@@ -271,6 +328,40 @@ export async function syncLessons(opts?: {
           .from("lessons")
           .upsert(toInsert, { onConflict: "calendar_uid" });
         if (error) throw error;
+      }
+      if (toSingle.size) {
+        const { data: fresh, error: fErr } = await supa
+          .from("lessons")
+          .select("id, client_id, starts_at, calendar_uid")
+          .in("calendar_uid", [...toSingle.keys()])
+          .is("package_id", null);
+        if (fErr) throw fErr;
+        for (const l of fresh ?? []) {
+          const clientId = l.client_id as string;
+          const { data: pkg, error: pErr } = await supa
+            .from("lesson_packages")
+            .insert({
+              client_id: clientId,
+              size: 1,
+              kind: "single",
+              sold_on: courseDay(l.starts_at as string),
+              price_cents: singleRate(isMember.get(clientId) ?? false, rates),
+              payment_status: "unpaid",
+            })
+            .select("id")
+            .single();
+          if (pErr) {
+            note(report, pErr.message);
+            continue;
+          }
+          const { error: uErr } = await supa
+            .from("lessons")
+            .update({ package_id: pkg.id })
+            .eq("id", l.id)
+            .is("package_id", null);
+          if (uErr) note(report, uErr.message);
+          else report.singles++;
+        }
       }
       if (toClear.length) {
         // Only entries whose lesson is now in the book by its calendar id:

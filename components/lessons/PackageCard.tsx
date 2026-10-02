@@ -17,6 +17,7 @@ import {
   money,
   PAYMENT_BADGE,
   PAYMENT_LABEL,
+  packageTitle,
   type NumberedLesson,
   type PackageRec,
   type PaymentStatus,
@@ -127,8 +128,10 @@ export default function PackageCard({
 
   // Worked out from the shown size, so a size change moves "remaining" at once.
   const remaining = shown.size - pkg.used;
-  const complete = remaining <= 0;
-  const nearlyDone = !complete && remaining <= 1;
+  // A single bills one lesson; "finished" and "1 left" mean nothing for it.
+  const single = pkg.kind === "single";
+  const complete = !single && remaining <= 0;
+  const nearlyDone = !single && !complete && remaining <= 1;
 
   if (deleted) return null;
 
@@ -142,12 +145,24 @@ export default function PackageCard({
             </Link>
           )}
           <div style={{ fontWeight: showClient ? 400 : 700 }}>
-            {pkg.label || `${pkg.size}-lesson package`}
+            {packageTitle(pkg)}
           </div>
           <div className="lb-sub">
-            {pkg.used} of {shown.size} used
-            {pkg.booked > 0 && ` · ${pkg.booked} booked`}
-            {pkg.soldOn && ` · sold ${formatDay(pkg.soldOn)}`}
+            {single ? (
+              pkg.booked > 0 ? (
+                "Booked"
+              ) : pkg.used > 0 ? (
+                "Taught"
+              ) : (
+                "No lesson attached"
+              )
+            ) : (
+              <>
+                {pkg.used} of {shown.size} used
+                {pkg.booked > 0 && ` · ${pkg.booked} booked`}
+                {pkg.soldOn && ` · sold ${formatDay(pkg.soldOn)}`}
+              </>
+            )}
           </div>
         </div>
         <div>
@@ -201,6 +216,7 @@ export default function PackageCard({
           />
         </label>
 
+        {!single && (
         <label className="lb-num small">
           Lessons
           <input
@@ -217,6 +233,7 @@ export default function PackageCard({
             }}
           />
         </label>
+        )}
 
         <div className="seg lb-pay" role="radiogroup" aria-label="Payment">
           {STATES.map((s) => (
@@ -247,18 +264,27 @@ export default function PackageCard({
         />
       )}
 
-      {lessons && <PackageDates lessons={lessons} />}
+      {lessons && !single && <PackageDates lessons={lessons} />}
 
       {/* Delete lives on the client page only (where lessons are passed). */}
       {lessons &&
         (confirmDelete ? (
           <div className="lb-qask" style={{ marginTop: 10 }}>
             <span>
-              Delete this package?{" "}
-              {lessons.length > 0
-                ? `Its ${lessons.length} lesson${lessons.length === 1 ? "" : "s"} stay and become one-offs. `
-                : ""}
-              Its price and payment record are removed.
+              {single ? (
+                <>
+                  Delete this single? The lesson stays and goes back to not
+                  billed. Its price and payment record are removed.
+                </>
+              ) : (
+                <>
+                  Delete this package?{" "}
+                  {lessons.length > 0
+                    ? `Its ${lessons.length} lesson${lessons.length === 1 ? "" : "s"} stay and go back to not billed. `
+                    : ""}
+                  Its price and payment record are removed.
+                </>
+              )}
             </span>
             <div className="lb-qacts">
               <button
@@ -274,7 +300,7 @@ export default function PackageCard({
                   });
                 }}
               >
-                Delete package
+                {single ? "Delete single" : "Delete package"}
               </button>
               <button
                 type="button"
@@ -291,7 +317,7 @@ export default function PackageCard({
             className="btn ghost small lb-del"
             onClick={() => setConfirmDelete(true)}
           >
-            Delete package
+            {single ? "Delete single" : "Delete package"}
           </button>
         ))}
     </div>

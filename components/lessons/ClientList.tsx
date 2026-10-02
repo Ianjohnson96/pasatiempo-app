@@ -7,11 +7,17 @@ import { formatDay, money, type ClientSummary } from "@/lib/lessons/types";
 // The roster. Sorted by who owes money first, because that is the question
 // this screen exists to answer; alphabetical is there for looking somebody up.
 
-type Sort = "owed" | "name" | "recent";
+type Sort = "owed" | "name" | "recent" | "unbilled";
 
-export default function ClientList({ clients }: { clients: ClientSummary[] }) {
+export default function ClientList({
+  clients,
+  initialSort = "owed",
+}: {
+  clients: ClientSummary[];
+  initialSort?: Sort;
+}) {
   const [q, setQ] = useState("");
-  const [sort, setSort] = useState<Sort>("owed");
+  const [sort, setSort] = useState<Sort>(initialSort);
   const [showInactive, setShowInactive] = useState(false);
 
   const shown = useMemo(() => {
@@ -25,6 +31,8 @@ export default function ClientList({ clients }: { clients: ClientSummary[] }) {
         if (sort === "name") return a.name.localeCompare(b.name);
         if (sort === "recent")
           return (b.lastLessonAt ?? "").localeCompare(a.lastLessonAt ?? "");
+        if (sort === "unbilled" && b.unbilled !== a.unbilled)
+          return b.unbilled - a.unbilled;
         if (b.owedCents !== a.owedCents) return b.owedCents - a.owedCents;
         return a.name.localeCompare(b.name);
       });
@@ -49,6 +57,7 @@ export default function ClientList({ clients }: { clients: ClientSummary[] }) {
           <option value="owed">Owes most</option>
           <option value="name">Name</option>
           <option value="recent">Most recent</option>
+          <option value="unbilled">Not billed</option>
         </select>
         <label className="check" style={{ whiteSpace: "nowrap" }}>
           <input
@@ -93,6 +102,11 @@ export default function ClientList({ clients }: { clients: ClientSummary[] }) {
                     ` · ${c.packageCount} package${c.packageCount === 1 ? "" : "s"}`}
                   {c.lastLessonAt && ` · last ${formatDay(c.lastLessonAt)}`}
                 </div>
+                {c.unbilled > 0 && (
+                  <span className="badge closed" style={{ marginTop: 6 }}>
+                    {c.unbilled} not billed
+                  </span>
+                )}
               </div>
               <div style={{ fontWeight: 700 }}>
                 {c.owedCents > 0 ? (

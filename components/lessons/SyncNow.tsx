@@ -11,6 +11,7 @@ function describe(s: SyncSummary): string {
     s.inserted && `${s.inserted} new`,
     s.adopted && `${s.adopted} linked`,
     s.resolved && `${s.resolved} cleared from Review`,
+    s.singles && `${s.singles} billed as singles`,
     s.queued && `${s.queued} sent to Review`,
   ].filter(Boolean);
   return bits.length

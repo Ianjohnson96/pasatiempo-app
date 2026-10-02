@@ -3,7 +3,14 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { applyStandardPrices, setPackagePrice } from "@/lib/lessons/actions";
-import { formatDay, money, type PackageRec } from "@/lib/lessons/types";
+import { singleRate } from "@/lib/lessons/calc";
+import {
+  formatDay,
+  money,
+  packageTitle,
+  type PackageRec,
+  type SingleRates,
+} from "@/lib/lessons/types";
 
 // Packages sold with no price recorded. Until each has one, "owed" and
 // "collected" leave it out, so this list is what makes the money add up.
@@ -16,10 +23,17 @@ import { formatDay, money, type PackageRec } from "@/lib/lessons/types";
 export default function PriceBacklog({
   packages,
   prices,
+  rates,
 }: {
   packages: PackageRec[];
   prices: Record<number, number>;
+  rates: SingleRates;
 }) {
+  // A package's standard is by size; a single's is the member or guest rate.
+  const standardFor = (p: PackageRec): number | undefined =>
+    p.kind === "single"
+      ? (singleRate(p.clientIsMember, rates) ?? undefined)
+      : prices[p.size];
   const [done, setDone] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
   const [note, setNote] = useState<{ kind: "ok" | "err"; text: string } | null>(
@@ -28,7 +42,7 @@ export default function PriceBacklog({
   const [busy, start] = useTransition();
 
   const left = packages.filter((p) => !done.has(p.id));
-  const fillable = left.filter((p) => prices[p.size] !== undefined);
+  const fillable = left.filter((p) => standardFor(p) !== undefined);
 
   function finish(ids: string[], ok: string) {
     setDone((d) => new Set([...d, ...ids]));
@@ -124,7 +138,7 @@ export default function PriceBacklog({
           <BacklogRow
             key={p.id}
             p={p}
-            standard={prices[p.size]}
+            standard={standardFor(p)}
             busy={busy}
             onSet={(d) => setOne(p, d)}
           />
@@ -157,8 +171,13 @@ function BacklogRow({
             {p.clientName}
           </Link>
           <div className="lb-sub">
-            {p.label || `${p.size}-lesson package`} · {p.used} of {p.size} used
-            {p.soldOn && ` · sold ${formatDay(p.soldOn)}`}
+            {packageTitle(p)}
+            {p.kind === "single"
+              ? p.clientIsMember
+                ? " · member"
+                : " · guest"
+              : ` · ${p.used} of ${p.size} used`}
+            {p.kind !== "single" && p.soldOn && ` · sold ${formatDay(p.soldOn)}`}
           </div>
         </div>
         <span

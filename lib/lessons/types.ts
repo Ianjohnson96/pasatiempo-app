@@ -44,6 +44,9 @@ export interface PackageRec {
   isComplete: boolean;
   /** Only on dashboard rows that offer a text. */
   clientPhone?: string | null;
+  /** A package Ian sold, or one lesson billed on its own. */
+  kind: "package" | "single";
+  clientIsMember: boolean;
 }
 
 export interface LessonRec {
@@ -73,6 +76,8 @@ export interface NumberedLesson extends LessonRec {
   notes: string | null;
   /** "m365" from the calendar, "manual" when added by hand. */
   calendarSource: string | null;
+  /** "single" when this lesson is billed on its own. */
+  packageKind: "package" | "single" | null;
 }
 
 export interface MonthPoint {
@@ -113,6 +118,15 @@ export interface DashboardData {
   reviewCount: number;
   /** Package size -> standard price in cents. */
   standardPrices: Record<number, number>;
+  /** Single-lesson rates in cents. */
+  singleRates: SingleRates;
+  /** Taught or booked lessons that are on no bill yet. */
+  unbilled: { lessons: number; clients: number };
+}
+
+export interface SingleRates {
+  member?: number;
+  guest?: number;
 }
 
 /**
@@ -143,6 +157,8 @@ export interface ClientSummary {
   lastLessonAt: string | null;
   packageCount: number;
   owedCents: number;
+  /** Lessons on no bill yet - neither in a package nor a single. */
+  unbilled: number;
 }
 
 export type Result<T = void> =
@@ -229,6 +245,14 @@ export const PAYMENT_BADGE: Record<PaymentStatus, string> = {
   pending: "badge draft",
   paid: "badge full",
 };
+
+/** "Single · Sep 3, 2026" for a single, the label or "5-lesson package" otherwise. */
+export function packageTitle(p: PackageRec): string {
+  if (p.kind === "single") {
+    return p.soldOn ? `Single · ${formatDay(p.soldOn)}` : "Single lesson";
+  }
+  return p.label || `${p.size}-lesson package`;
+}
 
 export function packageProgress(p: PackageRec): string {
   return `${p.used} of ${p.size} used`;

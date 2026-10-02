@@ -5,6 +5,7 @@ import {
   addLesson,
   assignLessonToPackage,
   assignLessons,
+  billAsSingles,
   deleteLesson,
   setLessonNote,
 } from "@/lib/lessons/actions";
@@ -29,7 +30,11 @@ import {
 // from the day the package was sold, up to the room it has left. Nothing
 // moves until Ian taps Move.
 
+/** Dropdown value meaning "make this lesson its own single". */
+const SINGLE = "__single__";
+
 function pkgName(p: PackageRec): string {
+  if (p.kind === "single") return "Single";
   return `${p.label || `${p.size}-lesson`}${p.soldOn ? ` (${p.soldOn})` : ""}`;
 }
 
@@ -51,8 +56,14 @@ export default function ClientLessons({
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   // The first package with room is the likeliest target.
+  // Only real packages are places to move lessons into; a single bills
+  // exactly one lesson and is made per lesson, never filled up.
+  const sold = useMemo(
+    () => packages.filter((p) => p.kind === "package"),
+    [packages],
+  );
   const firstWithRoom =
-    packages.find((p) => !p.isComplete)?.id ?? packages[0]?.id ?? "";
+    sold.find((p) => !p.isComplete)?.id ?? sold[0]?.id ?? "";
   const [target, setTarget] = useState<string>(firstWithRoom);
   const [busy, start] = useTransition();
   // A wrong Move is one tap from fixed for ten seconds.
@@ -71,7 +82,7 @@ export default function ClientLessons({
   );
   const nameOf = (id: string | null) => {
     const p = id ? byId.get(id) : undefined;
-    return p ? pkgName(p) : "one-offs";
+    return p ? pkgName(p) : "not billed";
   };
 
   function toggle(id: string) {
@@ -123,6 +134,27 @@ export default function ClientLessons({
     });
   }
 
+  /** One single per lesson, never bundled; only lessons on no bill yet. */
+  function billSingles(ids: string[]) {
+    onNote(null);
+    start(async () => {
+      const r = await billAsSingles(ids, clientId);
+      if (!r.ok) {
+        onNote({ kind: "err", text: r.error });
+        return;
+      }
+      const skipped = ids.length - r.value;
+      onNote({
+        kind: "ok",
+        text:
+          `Billed ${r.value} as single${r.value === 1 ? "" : "s"}.` +
+          (skipped ? ` ${skipped} already on a bill, left alone.` : ""),
+      });
+      setPicked(new Set());
+      setSelecting(false);
+    });
+  }
+
   function moveOne(lessonId: string, packageId: string | null) {
     onNote(null);
     start(async () => {
@@ -134,7 +166,7 @@ export default function ClientLessons({
   const adder = (
     <AddLesson
       clientId={clientId}
-      packages={packages}
+      packages={sold}
       defaultPackage={firstWithRoom}
       onNote={onNote}
     />
@@ -173,10 +205,10 @@ export default function ClientLessons({
         <p className="muted" style={{ fontSize: 13, margin: 0 }}>
           Newest first.{" "}
           {selecting
-            ? "Tick lessons, pick a package, Move."
-            : "Use a dropdown, or Select to move several at once."}
+            ? "Tick lessons, then Move them into a package or bill each as a single."
+            : "Use a dropdown, or Select to bill several at once."}
         </p>
-        {packages.length > 0 && (
+        {lessons.length > 0 && (
           <button
             type="button"
             className={selecting ? "btn secondary small" : "btn small"}
@@ -242,11 +274,20 @@ export default function ClientLessons({
                   className="field"
                   value={l.packageId ?? ""}
                   disabled={busy}
-                  onChange={(e) => moveOne(l.id, e.target.value || null)}
-                  aria-label="Package for this lesson"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === SINGLE) billSingles([l.id]);
+                    else moveOne(l.id, v || null);
+                  }}
+                  aria-label="Bill for this lesson"
                 >
-                  <option value="">One-off</option>
-                  {packages.map((p) => (
+                  <option value="">Not billed</option>
+                  {l.packageKind === "single" && l.packageId ? (
+                    <option value={l.packageId}>Single (billed on its own)</option>
+                  ) : (
+                    <option value={SINGLE}>Single lesson (bill on its own)</option>
+                  )}
+                  {sold.map((p) => (
                     <option key={p.id} value={p.id}>
                       {pkgName(p)}
                     </option>
@@ -275,12 +316,12 @@ export default function ClientLessons({
             onChange={(e) => setTarget(e.target.value)}
             aria-label="Move to"
           >
-            {packages.map((p) => (
+            {sold.map((p) => (
               <option key={p.id} value={p.id}>
                 {pkgName(p)} · {p.used}/{p.size}
               </option>
             ))}
-            <option value="">One-off (no package)</option>
+            <option value="">Not billed (no package)</option>
           </select>
           <div className="lb-actions">
             <button
@@ -298,6 +339,14 @@ export default function ClientLessons({
               onClick={move}
             >
               {busy ? "Moving…" : "Move"}
+            </button>
+            <button
+              type="button"
+              className="btn secondary small"
+              disabled={busy || picked.size === 0}
+              onClick={() => billSingles([...picked])}
+            >
+              Bill each as a single
             </button>
           </div>
         </div>

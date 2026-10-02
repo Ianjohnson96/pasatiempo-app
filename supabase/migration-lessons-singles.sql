@@ -1,12 +1,49 @@
--- Lesson book dashboard, 2026-10-01. Run after migration-lessons-fixes.sql.
--- Plan: docs/superpowers/plans/2026-10-01-lesson-book-dashboard.md
-
--- 1. Every lesson, numbered within its package.
+-- Lesson book: single lessons billed on their own, 2026-10-01.
+-- Run after migration-lessons-dashboard.sql (then re-run its function).
 --
--- "Lesson 3 of 5" is worked out once, here, so the dashboard, the schedule
--- and the package cards can never disagree about it. Only completed and
--- scheduled lessons take a number; a cancelled one is still listed but does
--- not use up the package (the same rule lesson_package_status counts by).
+-- A single is a one-lesson bill: a lesson_packages row with kind = 'single'
+-- and size 1. Reusing the package row is deliberate - price, paid / pending /
+-- unpaid, payment method, owed, collected and the income export all already
+-- work on packages - and one row per single is what keeps two singles from
+-- ever being bundled together.
+
+alter table public.lesson_packages
+  add column if not exists kind text not null default 'package'
+  check (kind in ('package', 'single'));
+
+-- {"member": cents, "guest": cents}; either may be missing.
+alter table public.lesson_settings
+  add column if not exists single_rates jsonb not null default '{}'::jsonb;
+
+-- New columns go at the end: create or replace view cannot reorder.
+-- paid_on and notes were missing from this view, so a card could never show
+-- when a package was paid; they are added here too.
+create or replace view public.lesson_package_status
+with (security_invoker = true) as
+select
+  p.id as package_id,
+  p.client_id,
+  c.name as client_name,
+  p.label,
+  p.size,
+  p.price_cents,
+  p.sold_on,
+  p.payment_method,
+  p.payment_status,
+  count(l.id) filter (where l.status = 'completed') as lessons_used,
+  p.size - count(l.id) filter (where l.status = 'completed') as lessons_remaining,
+  count(l.id) filter (where l.status = 'scheduled') as lessons_booked,
+  max(l.starts_at) filter (where l.status = 'completed') as last_lesson_at,
+  (p.size - count(l.id) filter (where l.status = 'completed')) <= 0 as is_complete,
+  p.paid_on,
+  p.notes,
+  p.kind,
+  coalesce(c.is_member, false) as client_is_member
+from public.lesson_packages p
+join public.lesson_clients c on c.id = p.client_id
+left join public.lessons l on l.package_id = p.id
+group by p.id, c.name, c.is_member;
+
 create or replace view public.lesson_numbered
 with (security_invoker = true) as
 select
@@ -29,40 +66,16 @@ select
   l.status,
   l.title_raw,
   l.calendar_uid,
-  -- Added later, so at the end: create or replace view cannot reorder.
   l.notes,
-  l.calendar_source
+  l.calendar_source,
+  p.kind as package_kind
 from public.lessons l
 left join public.lesson_clients c on c.id = l.client_id
 left join public.lesson_packages p on p.id = l.package_id;
 
--- 2. Settings: standard package prices, size -> cents, e.g. {"5": 50000}.
--- One row. Most packages sell at the standard price; the few that do not are
--- simply edited on the package itself.
-create table if not exists public.lesson_settings (
-  id int primary key default 1 check (id = 1),
-  standard_prices jsonb not null default '{}'::jsonb,
-  updated_at timestamptz not null default now()
-);
-alter table public.lesson_settings enable row level security;
-drop policy if exists lesson_settings_owner on public.lesson_settings;
-create policy lesson_settings_owner on public.lesson_settings
-  for all
-  using ((select public.lesson_is_owner()))
-  with check ((select public.lesson_is_owner()));
-revoke all on public.lesson_settings from anon;
-grant select, insert, update on public.lesson_settings to authenticated;
-insert into public.lesson_settings (id) values (1) on conflict (id) do nothing;
-
--- 3. The whole front page in one round trip.
---
--- Superseded: the current lesson_dashboard() is in
--- migration-lessons-singles.sql (it needs lesson_packages.kind). This copy is
--- the version before singles, kept so the files still run in order.
---
--- security invoker: it runs as the signed-in user, so RLS still decides what
--- comes back and a stranger gets empty lists. Every boundary - today, this
--- week, this month, the season - is Pacific, not the server's UTC.
+-- The front page, now aware of singles: Running out is for packages only (a
+-- single is never "about to run out"), and lessons on no bill yet are counted
+-- so they cannot be forgotten.
 create or replace function public.lesson_dashboard()
 returns jsonb
 language sql
@@ -129,7 +142,8 @@ select jsonb_build_object(
                      order by s.lessons_remaining, s.last_lesson_at desc nulls last)
     from lesson_package_status s
     join lesson_clients c on c.id = s.client_id
-    where not s.is_complete and s.lessons_remaining <= 1), '[]'::jsonb),
+    where s.kind = 'package'
+      and not s.is_complete and s.lessons_remaining <= 1), '[]'::jsonb),
 
   -- Collected this season, split by how it was paid ("none" = not recorded).
   'collected_by_method', coalesce((
@@ -139,6 +153,13 @@ select jsonb_build_object(
       where p.payment_status = 'paid' and p.price_cents is not null
         and p.paid_on >= b.season_start::date
       group by 1) x), '{}'::jsonb),
+
+  -- Taught or booked but on no bill yet: neither in a package nor a single.
+  'unbilled', (
+    select jsonb_build_object('lessons', count(*), 'clients', count(distinct l.client_id))
+    from lessons l
+    where l.package_id is null and l.client_id is not null
+      and l.status in ('completed', 'scheduled')),
 
   'unpaid', coalesce((
     select jsonb_agg(to_jsonb(s) order by s.sold_on nulls last, s.client_name)
@@ -203,9 +224,44 @@ select jsonb_build_object(
   'review_count', (select count(*) from lesson_review where not dismissed),
 
   'standard_prices', coalesce(
-    (select standard_prices from lesson_settings where id = 1), '{}'::jsonb)
+    (select standard_prices from lesson_settings where id = 1), '{}'::jsonb),
+
+  'single_rates', coalesce(
+    (select single_rates from lesson_settings where id = 1), '{}'::jsonb)
 );
 $$;
 
 revoke all on function public.lesson_dashboard() from public, anon;
 grant execute on function public.lesson_dashboard() to authenticated;
+
+-- The roster's "not billed" count, so the clients with lessons on no bill
+-- can be sorted to the top and worked through. Appended at the end.
+create or replace view public.lesson_client_summary
+with (security_invoker = true) as
+select
+  c.id,
+  c.name,
+  c.is_member,
+  c.active,
+  coalesce(l.total_lessons, 0) as total_lessons,
+  l.last_lesson_at,
+  coalesce(p.package_count, 0) as package_count,
+  coalesce(p.owed_cents, 0)::bigint as owed_cents,
+  coalesce(l.unbilled, 0) as unbilled_lessons
+from public.lesson_clients c
+left join (
+  select client_id,
+         count(*) as total_lessons,
+         max(starts_at) filter (where status = 'completed') as last_lesson_at,
+         count(*) filter (where package_id is null
+                            and status in ('completed', 'scheduled')) as unbilled
+  from public.lessons
+  group by client_id
+) l on l.client_id = c.id
+left join (
+  select client_id,
+         count(*) filter (where kind = 'package') as package_count,
+         sum(price_cents) filter (where payment_status = 'unpaid') as owed_cents
+  from public.lesson_packages
+  group by client_id
+) p on p.client_id = c.id;

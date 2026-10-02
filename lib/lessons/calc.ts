@@ -177,9 +177,12 @@ export function seqLabel(l: {
   packageSize: number | null;
   packageId: string | null;
   status: string;
+  packageKind?: string | null;
 }): string {
   if (l.status === "cancelled" || l.status === "no_show") return "";
   if (!l.packageId) return "one-off";
+  // Billed on its own: "single", never "1 of 1".
+  if (l.packageKind === "single") return "single";
   if (l.seq === null) return "";
   return `${l.seq} of ${l.packageSize ?? "?"}`;
 }
@@ -359,4 +362,18 @@ export function undoGroups(
     by.set(packageId, list);
   }
   return [...by].map(([packageId, lessonIds]) => ({ packageId, lessonIds }));
+}
+
+/**
+ * The rate for a single lesson: members pay the member rate, everyone else
+ * the guest rate. With only one rate set it serves both; with neither, there
+ * is no price (null) - never $0, which would read as free.
+ */
+export function singleRate(
+  isMember: boolean,
+  rates: { member?: number; guest?: number },
+): number | null {
+  const mine = isMember ? rates.member : rates.guest;
+  const other = isMember ? rates.guest : rates.member;
+  return mine ?? other ?? null;
 }

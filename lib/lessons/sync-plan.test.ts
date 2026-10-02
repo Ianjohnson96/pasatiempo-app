@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isLessonTitle, nameFromTitle, planEntry } from "./sync-plan";
+import { isLessonTitle, nameFromTitle, needsSingle, planEntry } from "./sync-plan";
 
 // The title rules Ian was told to follow. If one of these breaks, the advice
 // on the Review page is wrong.
@@ -53,5 +53,20 @@ describe("planEntry", () => {
     expect(planEntry({ matched: false, review: null }).action).toBe("queue");
     expect(planEntry({ matched: false, review: "waiting" }).action).toBe("skip");
     expect(planEntry({ matched: false, review: "dismissed" }).action).toBe("skip");
+  });
+});
+
+describe("needsSingle", () => {
+  it("bills a new lesson as a single when the client has no package at all", () => {
+    expect(needsSingle([])).toBe(true);
+  });
+  it("bills a single when every package is full", () => {
+    expect(needsSingle([{ kind: "package", size: 5, counted: 5 }])).toBe(true);
+  });
+  it("leaves it for Ian when a package still has room", () => {
+    expect(needsSingle([{ kind: "package", size: 5, counted: 3 }])).toBe(false);
+  });
+  it("does not treat existing singles as room", () => {
+    expect(needsSingle([{ kind: "single", size: 1, counted: 0 }])).toBe(true);
   });
 });

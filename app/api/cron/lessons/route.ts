@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
         updated: report.updated,
         queued: report.queued,
         resolved: report.resolved,
+        singles: report.singles,
       },
     });
   }

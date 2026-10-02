@@ -3,15 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { lessonBookClient } from "./db";
 import { assertLessonBook } from "./auth";
-import { standardPrices } from "./data";
+import { singleRates, standardPrices } from "./data";
 import { syncLessons } from "./sync";
 import { logActivity } from "@/lib/hub/log";
 import {
   aliasClash,
   cleanAliases,
+  courseDay,
   courseLocalIso,
   matchExisting,
   parseDollars,
+  singleRate,
 } from "./calc";
 import type { PaymentStatus, Result } from "./types";
 
@@ -224,6 +226,7 @@ export async function assignLessonToPackage(
       .update({ package_id: packageId })
       .eq("id", lessonId);
     if (error) throw error;
+    if (clientId) await dropEmptySingles(supa, clientId);
 
     touched(clientId);
     return { ok: true, value: undefined };
@@ -561,9 +564,13 @@ export async function applyStandardPrices(
     if (!packageIds.length) return { ok: true, value: 0 };
 
     const supa = await lessonBookClient();
-    const standard = await standardPrices();
+    const [standard, rates] = await Promise.all([
+      standardPrices(),
+      singleRates(),
+    ]);
     const sizes = Object.keys(standard).map(Number);
-    if (!sizes.length) {
+    const noRates = rates.member === undefined && rates.guest === undefined;
+    if (!sizes.length && noRates) {
       return { ok: false, error: "Set the standard prices first." };
     }
 
@@ -573,7 +580,31 @@ export async function applyStandardPrices(
         .from("lesson_packages")
         .update({ price_cents: standard[size] })
         .in("id", packageIds)
+        .eq("kind", "package")
         .eq("size", size)
+        .is("price_cents", null)
+        .select("id");
+      if (error) throw error;
+      filled += data?.length ?? 0;
+    }
+
+    // Singles take the member or guest rate, by the client's membership.
+    for (const member of [true, false]) {
+      const cents = singleRate(member, rates);
+      if (cents === null) continue;
+      const { data: who, error: wErr } = await supa
+        .from("lesson_package_status")
+        .select("package_id")
+        .in("package_id", packageIds)
+        .eq("kind", "single")
+        .eq("client_is_member", member);
+      if (wErr) throw wErr;
+      const ids = (who ?? []).map((w) => w.package_id as string);
+      if (!ids.length) continue;
+      const { data, error } = await supa
+        .from("lesson_packages")
+        .update({ price_cents: cents })
+        .in("id", ids)
         .is("price_cents", null)
         .select("id");
       if (error) throw error;
@@ -624,6 +655,7 @@ export async function assignLessons(
       .eq("client_id", clientId)
       .select("id");
     if (error) throw error;
+    await dropEmptySingles(supa, clientId);
 
     touched(clientId);
     return { ok: true, value: data?.length ?? 0 };
@@ -810,6 +842,7 @@ export interface SyncSummary {
   updated: number;
   queued: number;
   resolved: number;
+  singles: number;
 }
 
 /**
@@ -835,6 +868,7 @@ export async function syncCalendarNow(): Promise<Result<SyncSummary>> {
       updated: report.updated,
       queued: report.queued,
       resolved: report.resolved,
+      singles: report.singles,
     };
     await logActivity({
       actor: viewer.email,
@@ -998,5 +1032,139 @@ export async function deleteLesson(
     return { ok: true, value: undefined };
   } catch (e) {
     return fail(e, "Could not delete that lesson.");
+  }
+}
+
+type Supa = Awaited<ReturnType<typeof lessonBookClient>>;
+
+/**
+ * A single exists to bill one lesson. When its lesson moves into a package
+ * it has nothing left to bill, so it goes - unless it was already paid,
+ * because that is a money record, and deleting it would lose the payment.
+ */
+async function dropEmptySingles(supa: Supa, clientId: string): Promise<void> {
+  const { data: singles, error } = await supa
+    .from("lesson_package_status")
+    .select("package_id, payment_status")
+    .eq("client_id", clientId)
+    .eq("kind", "single");
+  if (error) throw error;
+  const unpaid = (singles ?? [])
+    .filter((s) => s.payment_status !== "paid")
+    .map((s) => s.package_id as string);
+  if (!unpaid.length) return;
+  // Any lesson of any status still pointing at it keeps it.
+  const { data: still, error: sErr } = await supa
+    .from("lessons")
+    .select("package_id")
+    .in("package_id", unpaid);
+  if (sErr) throw sErr;
+  const inUse = new Set((still ?? []).map((l) => l.package_id as string));
+  const gone = unpaid.filter((id) => !inUse.has(id));
+  if (gone.length) {
+    const { error: dErr } = await supa
+      .from("lesson_packages")
+      .delete()
+      .in("id", gone)
+      .eq("kind", "single");
+    if (dErr) throw dErr;
+  }
+}
+
+/** Save the single-lesson rates, in dollars. Blank = no rate. */
+export async function setSingleRates(rates: {
+  member: number | null;
+  guest: number | null;
+}): Promise<Result> {
+  try {
+    await assertLessonBook();
+    const out: Record<string, number> = {};
+    for (const k of ["member", "guest"] as const) {
+      const parsed = parseDollars(rates[k]);
+      if (!parsed.ok) {
+        return { ok: false, error: `That is not a valid ${k} rate.` };
+      }
+      if (parsed.cents !== null) out[k] = parsed.cents;
+    }
+    const supa = await lessonBookClient();
+    const { error } = await supa
+      .from("lesson_settings")
+      .upsert(
+        { id: 1, single_rates: out, updated_at: new Date().toISOString() },
+        { onConflict: "id" },
+      );
+    if (error) throw error;
+    revalidatePath(BOOK);
+    revalidatePath(PRICES);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not save the single rates.");
+  }
+}
+
+/**
+ * Bill each of these lessons on its own: one single (a one-lesson bill) per
+ * lesson, at the member or guest rate, unpaid. Each is its own row, so two
+ * singles are never bundled. Only lessons still on no bill are touched.
+ */
+export async function billAsSingles(
+  lessonIds: string[],
+  clientId: string,
+): Promise<Result<number>> {
+  try {
+    await assertLessonBook();
+    if (!lessonIds.length) return { ok: true, value: 0 };
+    const supa = await lessonBookClient();
+
+    const [clientRes, rates, lessonsRes] = await Promise.all([
+      supa
+        .from("lesson_clients")
+        .select("is_member")
+        .eq("id", clientId)
+        .maybeSingle(),
+      singleRates(),
+      supa
+        .from("lessons")
+        .select("id, starts_at")
+        .in("id", lessonIds)
+        .eq("client_id", clientId)
+        .is("package_id", null),
+    ]);
+    if (clientRes.error) throw clientRes.error;
+    if (lessonsRes.error) throw lessonsRes.error;
+    if (!clientRes.data) return { ok: false, error: "That client is gone." };
+    const cents = singleRate(clientRes.data.is_member === true, rates);
+
+    let billed = 0;
+    for (const l of lessonsRes.data ?? []) {
+      const { data: pkg, error: pErr } = await supa
+        .from("lesson_packages")
+        .insert({
+          client_id: clientId,
+          size: 1,
+          kind: "single",
+          sold_on: courseDay(l.starts_at as string),
+          price_cents: cents,
+          payment_status: "unpaid",
+        })
+        .select("id")
+        .single();
+      if (pErr) throw pErr;
+      // Guarded: if the lesson was billed elsewhere meanwhile, drop the single.
+      const { data: moved, error: mErr } = await supa
+        .from("lessons")
+        .update({ package_id: pkg.id })
+        .eq("id", l.id)
+        .is("package_id", null)
+        .select("id");
+      if (mErr) throw mErr;
+      if (moved?.length) billed++;
+      else await supa.from("lesson_packages").delete().eq("id", pkg.id);
+    }
+
+    touched(clientId);
+    return { ok: true, value: billed };
+  } catch (e) {
+    return fail(e, "Could not bill those lessons.");
   }
 }

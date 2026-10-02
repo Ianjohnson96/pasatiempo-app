@@ -9,6 +9,7 @@ import type {
   PackageRec,
   PaymentStatus,
   ReviewRec,
+  SingleRates,
 } from "./types";
 
 // Read-side for the lesson book.
@@ -63,6 +64,8 @@ function toPackage(r: Row): PackageRec {
     lastLessonAt: str(r.last_lesson_at),
     isComplete: r.is_complete === true,
     clientPhone: str(r.client_phone),
+    kind: r.kind === "single" ? "single" : "package",
+    clientIsMember: r.client_is_member === true,
   };
 }
 
@@ -82,6 +85,7 @@ export async function listClientSummaries(): Promise<ClientSummary[]> {
     lastLessonAt: str(r.last_lesson_at),
     packageCount: num(r.package_count),
     owedCents: num(r.owed_cents),
+    unbilled: num(r.unbilled_lessons),
   }));
 }
 
@@ -130,6 +134,12 @@ function toNumbered(r: Row): NumberedLesson {
     seq: r.seq === null || r.seq === undefined ? null : num(r.seq),
     notes: str(r.notes),
     calendarSource: str(r.calendar_source),
+    packageKind:
+      r.package_kind === "single"
+        ? "single"
+        : r.package_kind === "package"
+          ? "package"
+          : null,
   };
 }
 
@@ -184,6 +194,31 @@ function toPrices(v: unknown): Record<number, number> {
     }
   }
   return out;
+}
+
+/** {"member": cents, "guest": cents}, keeping only real prices. */
+function toRates(v: unknown): SingleRates {
+  const out: SingleRates = {};
+  const r = (v ?? {}) as Row;
+  for (const k of ["member", "guest"] as const) {
+    const c = Number(r[k]);
+    if (r[k] !== null && r[k] !== undefined && Number.isFinite(c) && c >= 0) {
+      out[k] = c;
+    }
+  }
+  return out;
+}
+
+/** Single-lesson rates. Empty until Ian sets them. */
+export async function singleRates(): Promise<SingleRates> {
+  const supa = await lessonBookClient();
+  const { data, error } = await supa
+    .from("lesson_settings")
+    .select("single_rates")
+    .eq("id", 1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return toRates(data?.single_rates);
 }
 
 /** Package size -> standard price in cents. Empty until Ian sets them. */
@@ -342,5 +377,10 @@ export async function dashboardData(): Promise<DashboardData> {
       : null,
     reviewCount: num(d.review_count),
     standardPrices: toPrices(d.standard_prices),
+    singleRates: toRates(d.single_rates),
+    unbilled: {
+      lessons: num((d.unbilled as Row | null)?.lessons),
+      clients: num((d.unbilled as Row | null)?.clients),
+    },
   };
 }

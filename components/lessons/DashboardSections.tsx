@@ -10,6 +10,7 @@ import {
   money,
   PAYMENT_BADGE,
   PAYMENT_LABEL,
+  packageTitle,
   type DashboardData,
   type PackageRec,
 } from "@/lib/lessons/types";
@@ -83,7 +84,11 @@ export function NextUp({ d }: { d: DashboardData }) {
       <div className="lb-chips">
         {seq && (
           <span className="badge gray">
-            {seq === "one-off" ? "One-off" : `Lesson ${seq}`}
+            {seq === "one-off"
+              ? "Not billed yet"
+              : seq === "single"
+                ? "Single lesson"
+                : `Lesson ${seq}`}
           </span>
         )}
         {n.paymentStatus && (
@@ -91,7 +96,10 @@ export function NextUp({ d }: { d: DashboardData }) {
             {PAYMENT_LABEL[n.paymentStatus]}
           </span>
         )}
-        {n.seq !== null && n.packageSize !== null && n.seq === n.packageSize && (
+        {n.packageKind !== "single" &&
+          n.seq !== null &&
+          n.packageSize !== null &&
+          n.seq === n.packageSize && (
           <span className="badge open">Last of the package</span>
         )}
       </div>
@@ -204,9 +212,7 @@ function Capped<T>({
   );
 }
 
-function pkgName(p: PackageRec): string {
-  return p.label || `${p.size}-lesson package`;
-}
+const pkgName = packageTitle;
 
 function PkgLink({ p, children }: { p: PackageRec; children: React.ReactNode }) {
   return (
@@ -220,6 +226,21 @@ function PkgLink({ p, children }: { p: PackageRec; children: React.ReactNode }) 
 export function FollowUps({ d }: { d: DashboardData }) {
   return (
     <div className="lb-follow">
+      {d.unbilled.lessons > 0 && (
+        <section className="card lb-unbilled">
+          <h3 className="lb-ftitle">
+            Not billed <span className="badge closed">{d.unbilled.lessons}</span>
+          </h3>
+          <p className="lb-fhint">
+            Lessons on no bill yet, across {d.unbilled.clients} client
+            {d.unbilled.clients === 1 ? "" : "s"}. On each client: Select, then
+            Move into a package or Bill each as a single.
+          </p>
+          <Link href="/lessons/clients?sort=unbilled" className="btn secondary small">
+            Sort them out &rarr;
+          </Link>
+        </section>
+      )}
       <section className="card">
         <h3 className="lb-ftitle">
           Running out <span className="badge open">{d.runningOut.length}</span>

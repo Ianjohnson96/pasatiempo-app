@@ -51,7 +51,12 @@ export default function ClientDetail({
     .filter((p) => p.paymentStatus === "unpaid")
     .reduce((t, p) => t + (p.priceCents ?? 0), 0);
   const unpriced = packages.filter((p) => p.priceCents === null).length;
-  const oneOffs = lessons.filter((l) => !l.packageId).length;
+  // Not on any bill yet: neither in a package nor billed as a single.
+  const unbilled = lessons.filter(
+    (l) => !l.packageId && (l.status === "completed" || l.status === "scheduled"),
+  ).length;
+  const sold = packages.filter((p) => p.kind === "package");
+  const singles = packages.filter((p) => p.kind === "single");
 
   function run(fn: () => Promise<{ ok: boolean; error?: string }>, ok?: string) {
     setNote(null);
@@ -79,7 +84,9 @@ export default function ClientDetail({
             {lessons.length} lesson{lessons.length === 1 ? "" : "s"}
             {packages.length > 0 &&
               ` · ${packages.length} package${packages.length === 1 ? "" : "s"}`}
-            {oneOffs > 0 && ` · ${oneOffs} not in a package`}
+            {singles.length > 0 &&
+              ` · ${singles.length} single${singles.length === 1 ? "" : "s"}`}
+            {unbilled > 0 && ` · ${unbilled} not billed`}
           </div>
           {client.aliases.length > 0 && (
             <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
@@ -142,11 +149,11 @@ export default function ClientDetail({
       <h2 className="section-title" style={{ marginTop: 24 }}>
         Packages
       </h2>
-      {packages.length === 0 ? (
-        <p className="empty">No packages. Every lesson here is a one-off.</p>
+      {sold.length === 0 ? (
+        <p className="empty">No packages sold.</p>
       ) : (
         <div className="stack" style={{ marginTop: 12 }}>
-          {packages.map((p) => (
+          {sold.map((p) => (
             <PackageCard
               key={p.id}
               pkg={p}
@@ -154,6 +161,27 @@ export default function ClientDetail({
             />
           ))}
         </div>
+      )}
+
+      {/* Each single is its own bill - listed apart so they never read as a
+          package, and so each one's rate and payment stand on their own. */}
+      {singles.length > 0 && (
+        <>
+          <h2 className="section-title" style={{ marginTop: 26 }}>
+            Single lessons
+          </h2>
+          <div className="stack" style={{ marginTop: 12 }}>
+            {[...singles]
+              .sort((a, b) => (b.soldOn ?? "").localeCompare(a.soldOn ?? ""))
+              .map((p) => (
+                <PackageCard
+                  key={p.id}
+                  pkg={p}
+                  lessons={lessons.filter((l) => l.packageId === p.id)}
+                />
+              ))}
+          </div>
+        </>
       )}
 
       <h2 className="section-title" style={{ marginTop: 26 }}>

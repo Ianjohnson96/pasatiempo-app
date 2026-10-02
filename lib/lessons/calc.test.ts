@@ -16,6 +16,7 @@ import {
   scaleBars,
   seqLabel,
   shiftAnchor,
+  singleRate,
   suggestForPackage,
   undoGroups,
   weekRange,
@@ -321,5 +322,28 @@ describe("undoGroups", () => {
       ]),
     );
     expect(groups).toHaveLength(3);
+  });
+});
+
+describe("singleRate", () => {
+  const rates = { member: 8500, guest: 11000 };
+  it("charges a member the member rate and anyone else the guest rate", () => {
+    expect(singleRate(true, rates)).toBe(8500);
+    expect(singleRate(false, rates)).toBe(11000);
+  });
+  it("falls back to the other rate when only one is set", () => {
+    expect(singleRate(true, { guest: 11000 })).toBe(11000);
+    expect(singleRate(false, { member: 8500 })).toBe(8500);
+  });
+  it("has no price when no rate is set, rather than $0", () => {
+    expect(singleRate(true, {})).toBeNull();
+  });
+});
+
+describe("seqLabel for singles", () => {
+  it("calls a lesson billed on its own a single, never 1 of 1", () => {
+    expect(
+      seqLabel({ seq: 1, packageSize: 1, packageId: "s", status: "completed", packageKind: "single" }),
+    ).toBe("single");
   });
 });

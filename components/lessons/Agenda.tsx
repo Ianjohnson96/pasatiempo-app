@@ -31,8 +31,10 @@ function Row({ l }: { l: NumberedLesson }) {
   const off = l.status === "cancelled" || l.status === "no_show";
   const seq = seqLabel(l);
   const size = l.packageSize ?? 0;
-  const last = !off && l.seq !== null && size > 0 && l.seq === size;
-  const over = !off && l.seq !== null && size > 0 && l.seq > size;
+  // A single is never "the last one of a package" or over it.
+  const inPackage = l.packageKind !== "single";
+  const last = inPackage && !off && l.seq !== null && size > 0 && l.seq === size;
+  const over = inPackage && !off && l.seq !== null && size > 0 && l.seq > size;
 
   return (
     <li className={off ? "lb-arow off" : "lb-arow"}>
@@ -46,7 +48,12 @@ function Row({ l }: { l: NumberedLesson }) {
           <span className="lb-name">{l.titleRaw ?? "Unassigned"}</span>
         )}
         <div className="lb-chips" style={{ marginTop: 4 }}>
-          {seq && <span className="badge gray">{seq}</span>}
+          {seq === "single" && <span className="badge draft">Single</span>}
+          {/* On no bill yet: said plainly, so it is not forgotten. */}
+          {seq === "one-off" && <span className="badge closed">Not billed</span>}
+          {seq && seq !== "single" && seq !== "one-off" && (
+            <span className="badge gray">{seq}</span>
+          )}
           {STATUS_CHIP[l.status] && (
             <span className="badge gray">{STATUS_CHIP[l.status]}</span>
           )}
