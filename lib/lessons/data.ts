@@ -2,8 +2,9 @@ import { lessonBookClient } from "./db";
 import type {
   ClientRec,
   ClientSummary,
-  LessonRec,
+  DashboardData,
   LessonStatus,
+  NumberedLesson,
   PackageRec,
   PaymentStatus,
   ReviewRec,
@@ -105,32 +106,92 @@ export async function listPackages(clientId?: string): Promise<PackageRec[]> {
   return (data ?? []).map(toPackage);
 }
 
-/**
- * One client's lessons, newest first.
- *
- * The name is joined in rather than copied onto the lesson, so a rename shows
- * everywhere at once instead of leaving history behind under the old spelling.
- */
-export async function clientLessons(clientId: string): Promise<LessonRec[]> {
-  const supa = await lessonBookClient();
-  const { data, error } = await supa
-    .from("lessons")
-    .select("*, lesson_clients(name)")
-    .eq("client_id", clientId)
-    .order("starts_at", { ascending: false });
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((r) => ({
+/** A lesson_numbered row, as the browser sees it. */
+function toNumbered(r: Row): NumberedLesson {
+  return {
     id: r.id as string,
     clientId: str(r.client_id),
-    clientName:
-      ((r.lesson_clients as { name?: string } | null)?.name as string) ?? "",
+    clientName: (r.client_name as string) ?? "",
     packageId: str(r.package_id),
     startsAt: r.starts_at as string,
     endsAt: r.ends_at as string,
     status: ((r.status as string) ?? "completed") as LessonStatus,
     titleRaw: str(r.title_raw),
     calendarUid: str(r.calendar_uid),
-  }));
+    isMember: r.is_member === true,
+    packageSize:
+      r.package_size === null || r.package_size === undefined
+        ? null
+        : num(r.package_size),
+    packageLabel: str(r.package_label),
+    paymentStatus: (str(r.payment_status) as PaymentStatus | null) ?? null,
+    seq: r.seq === null || r.seq === undefined ? null : num(r.seq),
+  };
+}
+
+/**
+ * One client's lessons, newest first, each numbered within its package.
+ *
+ * The name is joined in rather than copied onto the lesson, so a rename shows
+ * everywhere at once instead of leaving history behind under the old spelling.
+ */
+export async function clientLessons(
+  clientId: string,
+): Promise<NumberedLesson[]> {
+  const supa = await lessonBookClient();
+  const { data, error } = await supa
+    .from("lesson_numbered")
+    .select("*")
+    .eq("client_id", clientId)
+    .order("starts_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(toNumbered);
+}
+
+/** Every lesson starting in [fromIso, toIso), in time order. */
+export async function scheduleLessons(
+  fromIso: string,
+  toIso: string,
+): Promise<NumberedLesson[]> {
+  const supa = await lessonBookClient();
+  const { data, error } = await supa
+    .from("lesson_numbered")
+    .select("*")
+    .gte("starts_at", fromIso)
+    .lt("starts_at", toIso)
+    .order("starts_at");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(toNumbered);
+}
+
+/** jsonb {"5": 50000} -> {5: 50000}, dropping anything that is not a price. */
+function toPrices(v: unknown): Record<number, number> {
+  const out: Record<number, number> = {};
+  if (v && typeof v === "object") {
+    for (const [k, c] of Object.entries(v as Record<string, unknown>)) {
+      const size = Number(k);
+      const cents = Number(c);
+      const ok =
+        Number.isInteger(size) &&
+        size > 0 &&
+        Number.isFinite(cents) &&
+        cents >= 0;
+      if (ok) out[size] = cents;
+    }
+  }
+  return out;
+}
+
+/** Package size -> standard price in cents. Empty until Ian sets them. */
+export async function standardPrices(): Promise<Record<number, number>> {
+  const supa = await lessonBookClient();
+  const { data, error } = await supa
+    .from("lesson_settings")
+    .select("standard_prices")
+    .eq("id", 1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return toPrices(data?.standard_prices);
 }
 
 /** The queue of calendar entries the sync would not guess at. */
@@ -165,74 +226,61 @@ export async function reviewCount(): Promise<number> {
   return count ?? 0;
 }
 
-export interface Dashboard {
-  owedCents: number;
-  unpaidPackages: number;
-  pendingPackages: number;
-  activeClients: number;
-  lessonsThisMonth: number;
-  upcoming: number;
-  chase: PackageRec[];
-  runningOut: PackageRec[];
-  unpriced: number;
-}
-
 /**
- * The front page: who owes money, and whose package is about to run out.
+ * The front page, in one round trip.
  *
- * Those are the two things that cost Ian if he misses them - an unpaid package
- * is income not collected, and a finished one is the moment to sell the next.
+ * lesson_dashboard() works out every number in SQL - Pacific day, week,
+ * month and season boundaries included - because doing it here took five
+ * queries one after another and was most of why the book felt slow.
  */
-export async function dashboard(): Promise<Dashboard> {
+export async function dashboardData(): Promise<DashboardData> {
   const supa = await lessonBookClient();
-  const [packages, summaries] = await Promise.all([
-    listPackages(),
-    listClientSummaries(),
-  ]);
-
-  // Month boundary in course time, not the server's: on Vercel (UTC) the first
-  // of the month starts seven hours early and drags in the previous month.
-  const now = new Date();
-  const ym = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-  }).format(now);
-  const monthStart = `${ym}-01T00:00:00`;
-
-  const [{ count: thisMonth }, { count: upcoming }] = await Promise.all([
-    supa
-      .from("lessons")
-      .select("id", { count: "exact", head: true })
-      .gte("starts_at", monthStart)
-      .lte("starts_at", now.toISOString()),
-    supa
-      .from("lessons")
-      .select("id", { count: "exact", head: true })
-      .gt("starts_at", now.toISOString()),
-  ]);
-
-  const owing = packages.filter((p) => p.paymentStatus !== "paid");
+  const { data, error } = await supa.rpc("lesson_dashboard");
+  if (error) throw new Error(error.message);
+  const d = (data ?? {}) as Row;
+  const rows = (v: unknown): Row[] => (Array.isArray(v) ? (v as Row[]) : []);
+  const m = (d.money ?? {}) as Row;
+  const split = (d.split ?? {}) as Row;
+  const sync = d.sync as Row | null;
 
   return {
-    owedCents: owing.reduce((t, p) => t + (p.priceCents ?? 0), 0),
-    unpaidPackages: packages.filter((p) => p.paymentStatus === "unpaid").length,
-    pendingPackages: packages.filter((p) => p.paymentStatus === "pending")
-      .length,
-    activeClients: summaries.filter((s) => s.active).length,
-    lessonsThisMonth: thisMonth ?? 0,
-    upcoming: upcoming ?? 0,
-    // Biggest debts first. A package with no price recorded sorts last rather
-    // than counting as zero, which would make it look settled.
-    chase: owing
-      .slice()
-      .sort((a, b) => (b.priceCents ?? -1) - (a.priceCents ?? -1))
-      .slice(0, 12),
-    runningOut: packages
-      .filter((p) => !p.isComplete && p.remaining <= 1)
-      .sort((a, b) => a.remaining - b.remaining)
-      .slice(0, 12),
-    // The reconciliation backlog, stated plainly rather than buried in a total.
-    unpriced: packages.filter((p) => p.priceCents === null).length,
+    now: (d.now as string) ?? new Date().toISOString(),
+    next: d.next ? toNumbered(d.next as Row) : null,
+    week: rows(d.week).map(toNumbered),
+    money: {
+      owedCents: num(m.owed_cents),
+      pendingCents: num(m.pending_cents),
+      unpaidCount: num(m.unpaid_count),
+      pendingCount: num(m.pending_count),
+      collectedMonthCents: num(m.collected_month_cents),
+      collectedSeasonCents: num(m.collected_season_cents),
+      unpriced: num(m.unpriced),
+    },
+    runningOut: rows(d.running_out).map(toPackage),
+    unpaid: rows(d.unpaid).map(toPackage),
+    notSeen: rows(d.not_seen).map((r) => ({
+      id: r.id as string,
+      name: r.name as string,
+      lastLessonAt: r.last_lesson_at as string,
+    })),
+    months: rows(d.months).map((r) => ({
+      month: r.month as string,
+      lessons: num(r.lessons),
+      revenueCents: num(r.revenue_cents),
+    })),
+    split: { member: num(split.member), guest: num(split.guest) },
+    topClients: rows(d.top_clients).map((r) => ({
+      id: r.id as string,
+      name: r.name as string,
+      lessons: num(r.lessons),
+    })),
+    sync: sync
+      ? {
+          lastSyncedAt: str(sync.last_synced_at),
+          lastStatus: str(sync.last_status),
+        }
+      : null,
+    reviewCount: num(d.review_count),
+    standardPrices: toPrices(d.standard_prices),
   };
 }

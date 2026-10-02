@@ -1,5 +1,6 @@
 // Ian's teaching book. Loads the shared design system, the same as /admin.
 import "../globals.css";
+import "./lessons.css";
 
 export const metadata = {
   title: "Lesson Book",
@@ -12,5 +13,6 @@ export default function LessonsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  // `.lb` scopes the lesson book's form resets (lessons.css).
+  return <div className="lb">{children}</div>;
 }

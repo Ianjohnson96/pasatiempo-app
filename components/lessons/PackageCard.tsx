@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   setPackagePayment,
@@ -9,9 +9,11 @@ import {
 } from "@/lib/lessons/actions";
 import {
   formatDay,
+  formatWhen,
   money,
   PAYMENT_BADGE,
   PAYMENT_LABEL,
+  type NumberedLesson,
   type PackageRec,
   type PaymentStatus,
 } from "@/lib/lessons/types";
@@ -22,27 +24,46 @@ import {
 // is a member charge submitted but not yet posted to the club's books - real
 // money in flight - and collapsing it into paid or unpaid would misstate what
 // Ian is owed.
+//
+// Payment changes are optimistic: the button lights up on the tap, and the
+// save happens behind it. Waiting a full server round trip before a button
+// reacts is what made the book feel slow.
 
 const STATES: PaymentStatus[] = ["unpaid", "pending", "paid"];
 
 export default function PackageCard({
   pkg,
   showClient = false,
+  lessons,
 }: {
   pkg: PackageRec;
   showClient?: boolean;
+  /** This package's lessons; when given, the card can list their dates. */
+  lessons?: NumberedLesson[];
 }) {
   const [price, setPrice] = useState(
     pkg.priceCents === null ? "" : String(pkg.priceCents / 100),
   );
   const [size, setSize] = useState(String(pkg.size));
   const [error, setError] = useState<string | null>(null);
-  const [busy, start] = useTransition();
+  const [, start] = useTransition();
+  const [status, showStatus] = useOptimistic(pkg.paymentStatus);
 
   function run(fn: () => Promise<{ ok: boolean; error?: string }>) {
     setError(null);
     start(async () => {
       const r = await fn();
+      if (!r.ok) setError(r.error ?? "That did not work.");
+    });
+  }
+
+  function pay(s: PaymentStatus) {
+    if (s === status) return;
+    setError(null);
+    start(async () => {
+      showStatus(s);
+      const r = await setPackagePayment(pkg.id, s, { clientId: pkg.clientId });
+      // On failure the optimistic state falls back to the real one by itself.
       if (!r.ok) setError(r.error ?? "That did not work.");
     });
   }
@@ -67,40 +88,28 @@ export default function PackageCard({
 
   return (
     <div className="card">
-      <div
-        className="row"
-        style={{
-          justifyContent: "space-between",
-          gap: 10,
-          alignItems: "baseline",
-        }}
-      >
+      <div className="lb-head">
         <div>
           {showClient && (
-            <Link
-              href={`/lessons/clients/${pkg.clientId}`}
-              style={{ fontWeight: 700, fontSize: 16 }}
-            >
+            <Link href={`/lessons/clients/${pkg.clientId}`} className="lb-name">
               {pkg.clientName}
             </Link>
           )}
           <div style={{ fontWeight: showClient ? 400 : 700 }}>
             {pkg.label || `${pkg.size}-lesson package`}
           </div>
-          <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
+          <div className="lb-sub">
             {pkg.used} of {pkg.size} used
             {pkg.booked > 0 && ` · ${pkg.booked} booked`}
             {pkg.soldOn && ` · sold ${formatDay(pkg.soldOn)}`}
           </div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <span className={PAYMENT_BADGE[pkg.paymentStatus]}>
-            {PAYMENT_LABEL[pkg.paymentStatus]}
-          </span>
+        <div>
+          <span className={PAYMENT_BADGE[status]}>{PAYMENT_LABEL[status]}</span>
           <div style={{ fontWeight: 700, marginTop: 4 }}>
             {money(pkg.priceCents)}
           </div>
-          {pkg.paidOn && (
+          {pkg.paidOn && status === "paid" && (
             <div className="muted" style={{ fontSize: 12 }}>
               paid {formatDay(pkg.paidOn)}
             </div>
@@ -109,7 +118,7 @@ export default function PackageCard({
       </div>
 
       {(pkg.isComplete || nearlyDone || pkg.priceCents === null) && (
-        <div className="row" style={{ gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+        <div className="lb-chips">
           {pkg.isComplete && <span className="badge gray">Finished</span>}
           {nearlyDone && <span className="badge open">1 lesson left</span>}
           {/* Said out loud rather than shown as $0, which would read as free. */}
@@ -125,11 +134,8 @@ export default function PackageCard({
         </p>
       )}
 
-      <div
-        className="row"
-        style={{ gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}
-      >
-        <label className="muted" style={{ fontSize: 12 }}>
+      <div className="lb-controls">
+        <label className="lb-num">
           Price $
           <input
             className="field"
@@ -138,47 +144,40 @@ export default function PackageCard({
             step="10"
             inputMode="decimal"
             value={price}
-            disabled={busy}
             onChange={(e) => setPrice(e.target.value)}
             onBlur={commitPrice}
             onKeyDown={(e) => {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             }}
-            style={{ width: 90, marginLeft: 4 }}
           />
         </label>
 
-        <label className="muted" style={{ fontSize: 12 }}>
-          Size
+        <label className="lb-num small">
+          Lessons
           <input
             className="field"
             type="number"
             min="1"
             max="50"
+            inputMode="numeric"
             value={size}
-            disabled={busy}
             onChange={(e) => setSize(e.target.value)}
             onBlur={commitSize}
             onKeyDown={(e) => {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             }}
-            style={{ width: 70, marginLeft: 4 }}
           />
         </label>
 
-        <span style={{ flex: 1 }} />
-
-        <div className="seg">
+        <div className="seg lb-pay" role="radiogroup" aria-label="Payment">
           {STATES.map((s) => (
             <button
               key={s}
-              className={s === pkg.paymentStatus ? "segbtn on" : "segbtn"}
-              disabled={busy}
-              onClick={() =>
-                run(() =>
-                  setPackagePayment(pkg.id, s, { clientId: pkg.clientId }),
-                )
-              }
+              type="button"
+              role="radio"
+              aria-checked={s === status}
+              className={s === status ? "segbtn on" : "segbtn"}
+              onClick={() => pay(s)}
             >
               {PAYMENT_LABEL[s]}
             </button>
@@ -191,6 +190,54 @@ export default function PackageCard({
           {pkg.notes}
         </p>
       )}
+
+      {lessons && <PackageDates lessons={lessons} />}
     </div>
+  );
+}
+
+const STATE: Record<NumberedLesson["status"], string> = {
+  completed: "✓",
+  scheduled: "booked",
+  cancelled: "cancelled",
+  no_show: "no-show",
+};
+
+/**
+ * Which lessons of the package happened when: "1 · Tue, Sep 3 ✓".
+ *
+ * Closed by default - it is there when Ian wants it, not in the way when he
+ * does not. Cancelled lessons are listed but unnumbered, because they did not
+ * use up the package.
+ */
+function PackageDates({ lessons }: { lessons: NumberedLesson[] }) {
+  const ordered = [...lessons].sort(
+    (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+  );
+  return (
+    <details className="lb-dates">
+      <summary>
+        Show dates <span className="muted">({ordered.length})</span>
+      </summary>
+      {ordered.length === 0 ? (
+        <p className="lb-fhint" style={{ marginTop: 8 }}>
+          No lessons attached yet. Use the dropdown on each lesson below to
+          put it in this package.
+        </p>
+      ) : (
+        <ol className="lb-dlist">
+          {ordered.map((l) => {
+            const off = l.status === "cancelled" || l.status === "no_show";
+            return (
+              <li key={l.id} className={off ? "off" : l.status}>
+                <span className="lb-dseq">{off ? "–" : (l.seq ?? "–")}</span>
+                <span className="lb-dwhen">{formatWhen(l.startsAt)}</span>
+                <span className="lb-dstate">{STATE[l.status]}</span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </details>
   );
 }

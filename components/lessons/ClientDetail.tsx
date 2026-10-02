@@ -8,11 +8,12 @@ import {
   createPackage,
   updateClient,
 } from "@/lib/lessons/actions";
+import { seqLabel } from "@/lib/lessons/calc";
 import {
   formatWhen,
   money,
   type ClientRec,
-  type LessonRec,
+  type NumberedLesson,
   type PackageRec,
 } from "@/lib/lessons/types";
 
@@ -38,7 +39,7 @@ export default function ClientDetail({
 }: {
   client: ClientRec;
   packages: PackageRec[];
-  lessons: LessonRec[];
+  lessons: NumberedLesson[];
 }) {
   const [editing, setEditing] = useState(false);
   const [note, setNote] = useState<{ kind: "ok" | "err"; text: string } | null>(
@@ -46,8 +47,12 @@ export default function ClientDetail({
   );
   const [busy, start] = useTransition();
 
+  // Owed is unpaid only; a pending member charge is in flight, not owed.
+  const pending = packages
+    .filter((p) => p.paymentStatus === "pending")
+    .reduce((t, p) => t + (p.priceCents ?? 0), 0);
   const owed = packages
-    .filter((p) => p.paymentStatus !== "paid")
+    .filter((p) => p.paymentStatus === "unpaid")
     .reduce((t, p) => t + (p.priceCents ?? 0), 0);
   const unpriced = packages.filter((p) => p.priceCents === null).length;
   const oneOffs = lessons.filter((l) => !l.packageId).length;
@@ -69,16 +74,11 @@ export default function ClientDetail({
         </Link>
       </p>
 
-      <div
-        className="row"
-        style={{
-          justifyContent: "space-between",
-          gap: 12,
-          alignItems: "baseline",
-        }}
-      >
+      <div className="lb-head">
         <div>
-          <h1 style={{ fontSize: 24, margin: 0 }}>{client.name}</h1>
+          <h1 style={{ fontSize: 24, margin: 0, overflowWrap: "anywhere" }}>
+            {client.name}
+          </h1>
           <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
             {lessons.length} lesson{lessons.length === 1 ? "" : "s"}
             {packages.length > 0 &&
@@ -91,8 +91,13 @@ export default function ClientDetail({
             </div>
           )}
         </div>
-        <div style={{ textAlign: "right" }}>
+        <div>
           {owed > 0 && <div style={{ fontWeight: 700 }}>{money(owed)} owed</div>}
+          {pending > 0 && (
+            <div className="muted" style={{ fontSize: 13 }}>
+              {money(pending)} pending
+            </div>
+          )}
           {unpriced > 0 && (
             <div className="muted" style={{ fontSize: 12 }}>
               {unpriced} package{unpriced === 1 ? "" : "s"} unpriced
@@ -101,8 +106,11 @@ export default function ClientDetail({
         </div>
       </div>
 
-      <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-        <button className="btn ghost small" onClick={() => setEditing((v) => !v)}>
+      <div className="lb-actions" style={{ marginTop: 10 }}>
+        <button
+          className="btn secondary small"
+          onClick={() => setEditing((v) => !v)}
+        >
           {editing ? "Close" : "Details"}
         </button>
         <NewPackage
@@ -141,7 +149,11 @@ export default function ClientDetail({
       ) : (
         <div className="stack" style={{ marginTop: 12 }}>
           {packages.map((p) => (
-            <PackageCard key={p.id} pkg={p} />
+            <PackageCard
+              key={p.id}
+              pkg={p}
+              lessons={lessons.filter((l) => l.packageId === p.id)}
+            />
           ))}
         </div>
       )}
@@ -158,19 +170,17 @@ export default function ClientDetail({
         <div className="stack" style={{ marginTop: 12 }}>
           {lessons.map((l) => (
             <div className="card" key={l.id}>
-              <div
-                className="row"
-                style={{
-                  justifyContent: "space-between",
-                  gap: 10,
-                  flexWrap: "wrap",
-                }}
-              >
+              <div className="lb-lesson">
                 <div style={{ minWidth: 0 }}>
                   <strong>{formatWhen(l.startsAt)}</strong>
+                  {seqLabel(l) && seqLabel(l) !== "one-off" && (
+                    <span className="badge gray" style={{ marginLeft: 8 }}>
+                      {seqLabel(l)}
+                    </span>
+                  )}
                   {l.status !== "completed" && (
                     <span className="badge gray" style={{ marginLeft: 8 }}>
-                      {l.status}
+                      {l.status === "scheduled" ? "booked" : l.status.replace("_", "-")}
                     </span>
                   )}
                   {/* The calendar title as Ian typed it. Kept visible because
@@ -197,7 +207,7 @@ export default function ClientDetail({
                       ),
                     )
                   }
-                  style={{ maxWidth: 220 }}
+                  aria-label="Package for this lesson"
                 >
                   <option value="">One-off</option>
                   {packages.map((p) => (
@@ -236,10 +246,7 @@ function NewPackage({
   }
 
   return (
-    <span
-      className="row"
-      style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}
-    >
+    <span className="lb-actions">
       <input
         className="field"
         type="number"
@@ -359,7 +366,7 @@ function Editor({
           />
         </label>
 
-        <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+        <div className="lb-actions">
           <button
             className="btn small"
             disabled={busy}

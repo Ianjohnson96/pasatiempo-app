@@ -32,14 +32,14 @@ export default function ClientList({ clients }: { clients: ClientSummary[] }) {
 
   return (
     <>
-      <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+      <div className="lb-actions">
         <input
           className="field"
           type="search"
           placeholder="Find a client"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          style={{ flex: "1 1 200px", minWidth: 160 }}
+          style={{ flex: "1 1 200px", minWidth: 0 }}
         />
         <select
           className="field"
@@ -74,16 +74,9 @@ export default function ClientList({ clients }: { clients: ClientSummary[] }) {
             className="card"
             style={{ display: "block", textDecoration: "none" }}
           >
-            <div
-              className="row"
-              style={{
-                justifyContent: "space-between",
-                gap: 12,
-                alignItems: "baseline",
-              }}
-            >
+            <div className="lb-head">
               <div>
-                <strong style={{ fontSize: 16 }}>{c.name}</strong>
+                <strong className="lb-name">{c.name}</strong>
                 {c.isMember && (
                   <span className="badge gray" style={{ marginLeft: 8 }}>
                     Member
@@ -101,7 +94,7 @@ export default function ClientList({ clients }: { clients: ClientSummary[] }) {
                   {c.lastLessonAt && ` · last ${formatDay(c.lastLessonAt)}`}
                 </div>
               </div>
-              <div style={{ textAlign: "right", fontWeight: 700 }}>
+              <div style={{ fontWeight: 700 }}>
                 {c.owedCents > 0 ? (
                   money(c.owedCents)
                 ) : (

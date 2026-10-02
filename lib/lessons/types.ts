@@ -57,6 +57,55 @@ export interface LessonRec {
 }
 
 /**
+ * A lesson as lesson_numbered returns it: where it sits in its package
+ * ("3 of 5"), worked out in SQL so every screen agrees.
+ */
+export interface NumberedLesson extends LessonRec {
+  isMember: boolean;
+  packageSize: number | null;
+  packageLabel: string | null;
+  paymentStatus: PaymentStatus | null;
+  /** Position among the package's completed + scheduled lessons. */
+  seq: number | null;
+}
+
+export interface MonthPoint {
+  /** "YYYY-MM", Pacific. */
+  month: string;
+  lessons: number;
+  /** Paid packages by the month they were paid in. */
+  revenueCents: number;
+}
+
+/** Everything the front page shows, from one lesson_dashboard() call. */
+export interface DashboardData {
+  now: string;
+  next: NumberedLesson | null;
+  /** Today through the next six days, cancelled left out. */
+  week: NumberedLesson[];
+  money: {
+    owedCents: number;
+    pendingCents: number;
+    unpaidCount: number;
+    pendingCount: number;
+    collectedMonthCents: number;
+    collectedSeasonCents: number;
+    unpriced: number;
+  };
+  runningOut: PackageRec[];
+  unpaid: PackageRec[];
+  notSeen: { id: string; name: string; lastLessonAt: string }[];
+  /** Thirteen months ending this one, oldest first. */
+  months: MonthPoint[];
+  split: { member: number; guest: number };
+  topClients: { id: string; name: string; lessons: number }[];
+  sync: { lastSyncedAt: string | null; lastStatus: string | null } | null;
+  reviewCount: number;
+  /** Package size -> standard price in cents. */
+  standardPrices: Record<number, number>;
+}
+
+/**
  * A calendar entry the sync could not place.
  *
  * Counted nowhere until Ian answers it. The sync offers `guessName` - what it
@@ -105,6 +154,18 @@ export function formatWhen(iso: string | null): string {
     month: "short",
     day: "numeric",
     year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/** "2:00 PM", Pacific. */
+export function formatTime(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("en-US", {
+    timeZone: COURSE_TZ,
     hour: "numeric",
     minute: "2-digit",
   });

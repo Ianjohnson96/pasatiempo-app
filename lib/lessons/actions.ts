@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { lessonBookClient } from "./db";
 import { assertLessonBook } from "./auth";
+import { standardPrices } from "./data";
 import type { PaymentStatus, Result } from "./types";
 
 // Write-side for the lesson book.
@@ -17,6 +18,8 @@ import type { PaymentStatus, Result } from "./types";
 const BOOK = "/lessons";
 const CLIENTS = "/lessons/clients";
 const REVIEW = "/lessons/review";
+const PRICES = "/lessons/prices";
+const SCHEDULE = "/lessons/schedule";
 
 function fail(e: unknown, fallback: string): { ok: false; error: string } {
   const msg =
@@ -29,6 +32,8 @@ function fail(e: unknown, fallback: string): { ok: false; error: string } {
 function touched(clientId?: string) {
   revalidatePath(BOOK);
   revalidatePath(CLIENTS);
+  revalidatePath(PRICES);
+  revalidatePath(SCHEDULE);
   if (clientId) revalidatePath(`${CLIENTS}/${clientId}`);
 }
 
@@ -158,16 +163,25 @@ export async function createPackage(
       return { ok: false, error: "A package holds between 1 and 50 lessons." };
     }
     const supa = await lessonBookClient();
+
+    // No price typed: use the standard price for this size, if Ian has set
+    // one. Most packages sell at standard; the rest get edited on the card.
+    let priceCents: number | null =
+      input.dollars === null || input.dollars === undefined
+        ? null
+        : Math.round(input.dollars * 100);
+    if (priceCents === null) {
+      const standard = await standardPrices();
+      priceCents = standard[input.size] ?? null;
+    }
+
     const { data, error } = await supa
       .from("lesson_packages")
       .insert({
         client_id: clientId,
         size: input.size,
         label: input.label?.trim() || null,
-        price_cents:
-          input.dollars === null || input.dollars === undefined
-            ? null
-            : Math.round(input.dollars * 100),
+        price_cents: priceCents,
         sold_on: courseToday(),
         payment_status: "unpaid",
       })
@@ -428,5 +442,88 @@ export async function mergeClients(
     return { ok: true, value: undefined };
   } catch (e) {
     return fail(e, "Could not merge those two.");
+  }
+}
+
+/**
+ * Save the standard price list: package size -> dollars.
+ *
+ * A null or blank price removes that size from the list rather than storing
+ * $0, which would read as "this package is free".
+ */
+export async function setStandardPrices(
+  prices: Record<number, number | null>,
+): Promise<Result> {
+  try {
+    await assertLessonBook();
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(prices)) {
+      const size = Number(k);
+      if (!Number.isInteger(size) || size < 1 || size > 50) {
+        return { ok: false, error: "A package holds between 1 and 50 lessons." };
+      }
+      if (v === null || v === undefined) continue;
+      if (!isFinite(v) || v < 0) {
+        return { ok: false, error: `That is not a valid price for ${size}.` };
+      }
+      out[String(size)] = Math.round(v * 100);
+    }
+
+    const supa = await lessonBookClient();
+    const { error } = await supa
+      .from("lesson_settings")
+      .upsert(
+        { id: 1, standard_prices: out, updated_at: new Date().toISOString() },
+        { onConflict: "id" },
+      );
+    if (error) throw error;
+
+    revalidatePath(BOOK);
+    revalidatePath(PRICES);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not save the standard prices.");
+  }
+}
+
+/**
+ * Fill in the standard price on packages that have none.
+ *
+ * Only ever touches a package whose price is still null - the filter is in
+ * the update itself, so a price Ian typed by hand (the ones that are
+ * different) can never be overwritten, even if the screen was stale.
+ * Returns how many packages were filled.
+ */
+export async function applyStandardPrices(
+  packageIds: string[],
+): Promise<Result<number>> {
+  try {
+    await assertLessonBook();
+    if (!packageIds.length) return { ok: true, value: 0 };
+
+    const supa = await lessonBookClient();
+    const standard = await standardPrices();
+    const sizes = Object.keys(standard).map(Number);
+    if (!sizes.length) {
+      return { ok: false, error: "Set the standard prices first." };
+    }
+
+    let filled = 0;
+    for (const size of sizes) {
+      const { data, error } = await supa
+        .from("lesson_packages")
+        .update({ price_cents: standard[size] })
+        .in("id", packageIds)
+        .eq("size", size)
+        .is("price_cents", null)
+        .select("id");
+      if (error) throw error;
+      filled += data?.length ?? 0;
+    }
+
+    touched();
+    return { ok: true, value: filled };
+  } catch (e) {
+    return fail(e, "Could not apply the standard prices.");
   }
 }

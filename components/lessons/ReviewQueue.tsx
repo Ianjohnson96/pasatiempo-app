@@ -121,10 +121,7 @@ function ReviewCard({
       )}
 
       {suggestions.length > 0 && (
-        <div
-          className="row"
-          style={{ gap: 6, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}
-        >
+        <div className="lb-actions" style={{ gap: 6, marginTop: 8 }}>
           <span className="muted" style={{ fontSize: 12 }}>
             Looks like:
           </span>
@@ -144,7 +141,7 @@ function ReviewCard({
         </div>
       )}
 
-      <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+      <div className="lb-actions" style={{ marginTop: 10 }}>
         <select
           className="field"
           value={choice}
@@ -171,7 +168,7 @@ function ReviewCard({
         )}
       </div>
 
-      <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+      <div className="lb-actions" style={{ marginTop: 10 }}>
         <button
           className="btn small"
           disabled={busy || (choice === "" && !newName.trim())}
