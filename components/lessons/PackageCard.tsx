@@ -7,6 +7,7 @@ import {
   setPackagePrice,
   setPackageSize,
 } from "@/lib/lessons/actions";
+import { parseDollars } from "@/lib/lessons/calc";
 import {
   formatDay,
   formatWhen,
@@ -48,14 +49,15 @@ export default function PackageCard({
   const [error, setError] = useState<string | null>(null);
   const [, start] = useTransition();
   const [status, showStatus] = useOptimistic(pkg.paymentStatus);
-
-  function run(fn: () => Promise<{ ok: boolean; error?: string }>) {
-    setError(null);
-    start(async () => {
-      const r = await fn();
-      if (!r.ok) setError(r.error ?? "That did not work.");
-    });
-  }
+  // Price and size show the new value the moment it is entered, like the
+  // payment buttons; the card falls back to the saved values if a save fails.
+  const [shown, showEdit] = useOptimistic(
+    { priceCents: pkg.priceCents, size: pkg.size },
+    (cur, patch: Partial<{ priceCents: number | null; size: number }>) => ({
+      ...cur,
+      ...patch,
+    }),
+  );
 
   function pay(s: PaymentStatus) {
     if (s === status) return;
@@ -69,22 +71,49 @@ export default function PackageCard({
   }
 
   // Commit on blur, not per keystroke: otherwise "120" fires three writes.
+  const savedPrice = pkg.priceCents === null ? "" : String(pkg.priceCents / 100);
+
   function commitPrice() {
-    const t = price.trim();
-    const next = t === "" ? null : Number(t);
-    if (next !== null && !isFinite(next)) return;
-    const cents = next === null ? null : Math.round(next * 100);
-    if (cents === pkg.priceCents) return;
-    run(() => setPackagePrice(pkg.id, next, pkg.clientId));
+    const parsed = parseDollars(price);
+    if (!parsed.ok) {
+      setError("That is not a valid price.");
+      setPrice(savedPrice);
+      return;
+    }
+    if (parsed.cents === pkg.priceCents) return;
+    setError(null);
+    start(async () => {
+      showEdit({ priceCents: parsed.cents });
+      const r = await setPackagePrice(
+        pkg.id,
+        parsed.cents === null ? null : parsed.cents / 100,
+        pkg.clientId,
+      );
+      if (!r.ok) {
+        setError(r.error);
+        setPrice(savedPrice); // don't leave the rejected value in the box
+      }
+    });
   }
 
   function commitSize() {
     const n = Number(size.trim());
     if (!Number.isInteger(n) || n === pkg.size) return;
-    run(() => setPackageSize(pkg.id, n, pkg.clientId));
+    setError(null);
+    start(async () => {
+      showEdit({ size: n });
+      const r = await setPackageSize(pkg.id, n, pkg.clientId);
+      if (!r.ok) {
+        setError(r.error);
+        setSize(String(pkg.size));
+      }
+    });
   }
 
-  const nearlyDone = !pkg.isComplete && pkg.remaining <= 1;
+  // Worked out from the shown size, so a size change moves "remaining" at once.
+  const remaining = shown.size - pkg.used;
+  const complete = remaining <= 0;
+  const nearlyDone = !complete && remaining <= 1;
 
   return (
     <div className="card">
@@ -99,7 +128,7 @@ export default function PackageCard({
             {pkg.label || `${pkg.size}-lesson package`}
           </div>
           <div className="lb-sub">
-            {pkg.used} of {pkg.size} used
+            {pkg.used} of {shown.size} used
             {pkg.booked > 0 && ` · ${pkg.booked} booked`}
             {pkg.soldOn && ` · sold ${formatDay(pkg.soldOn)}`}
           </div>
@@ -107,7 +136,7 @@ export default function PackageCard({
         <div>
           <span className={PAYMENT_BADGE[status]}>{PAYMENT_LABEL[status]}</span>
           <div style={{ fontWeight: 700, marginTop: 4 }}>
-            {money(pkg.priceCents)}
+            {money(shown.priceCents)}
           </div>
           {pkg.paidOn && status === "paid" && (
             <div className="muted" style={{ fontSize: 12 }}>
@@ -117,12 +146,12 @@ export default function PackageCard({
         </div>
       </div>
 
-      {(pkg.isComplete || nearlyDone || pkg.priceCents === null) && (
+      {(complete || nearlyDone || shown.priceCents === null) && (
         <div className="lb-chips">
-          {pkg.isComplete && <span className="badge gray">Finished</span>}
+          {complete && <span className="badge gray">Finished</span>}
           {nearlyDone && <span className="badge open">1 lesson left</span>}
           {/* Said out loud rather than shown as $0, which would read as free. */}
-          {pkg.priceCents === null && (
+          {shown.priceCents === null && (
             <span className="badge draft">No price recorded</span>
           )}
         </div>

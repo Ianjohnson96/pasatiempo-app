@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { lessonBookClient } from "./db";
 import { assertLessonBook } from "./auth";
 import { standardPrices } from "./data";
+import { parseDollars } from "./calc";
 import type { PaymentStatus, Result } from "./types";
 
 // Write-side for the lesson book.
@@ -166,10 +167,9 @@ export async function createPackage(
 
     // No price typed: use the standard price for this size, if Ian has set
     // one. Most packages sell at standard; the rest get edited on the card.
-    let priceCents: number | null =
-      input.dollars === null || input.dollars === undefined
-        ? null
-        : Math.round(input.dollars * 100);
+    const typed = parseDollars(input.dollars);
+    if (!typed.ok) return { ok: false, error: "That is not a valid price." };
+    let priceCents = typed.cents;
     if (priceCents === null) {
       const standard = await standardPrices();
       priceCents = standard[input.size] ?? null;

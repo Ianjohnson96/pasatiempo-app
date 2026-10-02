@@ -71,7 +71,11 @@ with b as (
     ((d + 7)::timestamp at time zone 'America/Los_Angeles') as week_end,
     date_trunc('month', d::timestamp) as month_start,
     date_trunc('year', d::timestamp) as season_start,
-    (date_trunc('year', d::timestamp) at time zone 'America/Los_Angeles') as season_start_ts
+    (date_trunc('year', d::timestamp) at time zone 'America/Los_Angeles') as season_start_ts,
+    -- Upper bound too: in December, January lessons already on the books
+    -- belong to next season, not this one.
+    ((date_trunc('year', d::timestamp) + interval '1 year')
+       at time zone 'America/Los_Angeles') as season_end_ts
   from (select (now() at time zone 'America/Los_Angeles')::date as d) t
 )
 select jsonb_build_object(
@@ -149,14 +153,14 @@ select jsonb_build_object(
       'guest', count(*) filter (where not n.is_member))
     from lesson_numbered n, b
     where n.status in ('completed', 'scheduled') and n.client_id is not null
-      and n.starts_at >= b.season_start_ts),
+      and n.starts_at >= b.season_start_ts and n.starts_at < b.season_end_ts),
 
   'top_clients', coalesce((
     select jsonb_agg(x order by x.lessons desc, x.name) from (
       select n.client_id as id, n.client_name as name, count(*) as lessons
       from lesson_numbered n, b
       where n.status in ('completed', 'scheduled') and n.client_id is not null
-        and n.starts_at >= b.season_start_ts
+        and n.starts_at >= b.season_start_ts and n.starts_at < b.season_end_ts
       group by n.client_id, n.client_name
       order by count(*) desc, n.client_name
       limit 5) x), '[]'::jsonb),
