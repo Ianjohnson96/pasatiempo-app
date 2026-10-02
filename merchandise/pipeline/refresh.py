@@ -53,7 +53,7 @@ def read_reports(files):
     """files: [(name, path or bytes)]. Returns (reports, found).
     found: one dict per file: name, kind (None if not recognised), ok, a note when it isn't used, and a
     detail (the period or date it covers) when that's known."""
-    reports, found, seen, undated = {}, [], {}, []
+    reports, found, seen, undated, rounds_undated = {}, [], {}, [], []
     for name, src in files:
         if not name.lower().endswith(('.pdf',) + SHEETS):
             found.append(dict(name=name, kind=None, ok=False, note='Not a PDF, Excel or CSV file.'))
@@ -89,8 +89,8 @@ def read_reports(files):
             continue
         seen[h] = len(found)
         try:
-            d = exports.PARSE[k](rows) if export else getattr(parse, 'parse_' + k)(t)
-            ok = HAS_ROWS[k](d)
+            d = (exports.parse_rounds(rows, name) if k == 'rounds' else exports.PARSE[k](rows)) if export else getattr(parse, 'parse_' + k)(t)
+            ok = bool(d['rows']) if export and k == 'rounds' else HAS_ROWS[k](d)  # its year can come from the SKU Analysis
         except Exception:
             ok = False
         if not ok:
@@ -102,6 +102,8 @@ def read_reports(files):
         f = dict(name=name, kind=k, ok=True, note=None)
         if k == 'sku_analysis':
             f['detail'] = (f"as of {_day(d['day'])}" if d.get('day') else f"as of {d['as_of']}") + f", {len(d['rows']):,} SKUs"
+        elif export and k == 'rounds':
+            rounds_undated.append((d, f))
         elif export:
             undated.append((k, d, f))  # the period comes from the SKU Analysis, below
         found.append(f)
@@ -122,6 +124,19 @@ def read_reports(files):
                            + (', so check it is fiscal year to date' if k == 'best100' else ''))
         if k == 'best100' and d.get('cut'):
             f['detail'] += f". Stops at 100 SKUs in {', '.join(d['cut'])} while still selling: margins there leave out the rest"
+    for d, f in rounds_undated:
+        if d['year']:
+            f['detail'] = f"{d['year']} (from the file name)"
+        elif sku:
+            d['year'] = int(sku['as_of'][:4])
+            f['detail'] = f"{d['year']}, the SKU Analysis's year: the file has no dates"
+        else:
+            reports['rounds'].remove(d)
+            f.update(ok=False, note='The file has no year, and there is no SKU Analysis to take it from.')
+            continue
+        tot = d['rows'].get('Report Totals')
+        if tot:
+            f['detail'] += f", {tot[12]:,} rounds booked"
     return reports, found
 
 

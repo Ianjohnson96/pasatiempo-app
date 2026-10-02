@@ -8,6 +8,9 @@ and the sales reports' period are worked out:
                     The newest month is the month of the latest sale.
   Sales by Category sales area no, area, category no, category, SKU, description, average price, units, sales
   Sales by Item     sales area no, area, SKU, description, average price, units, sales
+  Rounds            the Yearly Rounds Summary by golfer classification. It keeps its headings (Group Code,
+                    Golfer Class'n Code, January Weekdays ... December Total) but has no year and no total
+                    rows: the groups are added up here, and the year comes from the file name or the SKU Analysis
   BEST 100          category no, category, rank, SKU, description, quantity sold, sales, cost,
                     margin (a fraction: 0.496), markdown; at most 100 SKUs per category
 
@@ -15,7 +18,7 @@ The sales reports list each sales area, then the same rows again under "All Sale
 number); the second pass is left out. Their period is the run of months, ending at the SKU
 Analysis's newest month, whose unit sales add up to the report's units.
 
-Checked against the September 30, 2026 exports (Sku analysis, By Catagory, By Item, Top 100 Hottest items).
+Checked against the September 30, 2026 exports (Sku analysis, By Catagory, By Item, Top 100 Hottest items, Rounds of golf).
 """
 from datetime import date, datetime
 import re
@@ -96,9 +99,23 @@ def _is_best_row(r):
 TESTS = (('sku_analysis', _is_sku_row), ('best100', _is_best_row), ('sales_by_category', _is_cat_row), ('sales_by_item', _is_item_row))
 
 
+MONTHS_FULL = ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')
+
+
+def _rounds_cols(head):
+    """Column of each month's total in the rounds export's heading row, or None."""
+    h = [_t(x).lower() for x in head]
+    if not any('golfer class' in x for x in h):
+        return None
+    cols = [h.index(f'{m.lower()} total') if f'{m.lower()} total' in h else None for m in MONTHS_FULL]
+    return cols if None not in cols else None
+
+
 def detect(rows):
-    """The report a headerless export holds, or None. rows: extract.sheet_rows."""
+    """The report an export without a title holds, or None. rows: extract.sheet_rows."""
     v = _values(rows)[:300]
+    if v and _rounds_cols(v[0]):
+        return 'rounds'
     if len(v) < 5:
         return None
     for k, test in TESTS:
@@ -185,7 +202,32 @@ def parse_best100(rows):
     return dict(period=None, rows=out, cut=cut)
 
 
-PARSE = {'sku_analysis': parse_sku_analysis, 'sales_by_category': parse_sales_by_category, 'sales_by_item': parse_sales_by_item, 'best100': parse_best100}
+# the group totals the program keeps (model.build), by the group's description in the export
+ROUND_GROUPS = {'Member Rounds': 'Member Rounds Total', 'Guest Rounds': 'Guest Rounds Total', 'Public Rounds': 'Public Rounds Total'}
+
+
+def parse_rounds(rows, name=''):
+    """Same shape as parse.parse_rounds, {year, rows: {label: [Jan..Dec, Total]}}, with the labels the
+    program keeps. Report Totals adds up every classification, as the printed report does. year: a 20xx
+    in the file name, else None (read_reports takes the SKU Analysis's)."""
+    v = _values(rows)
+    cols = _rounds_cols(v[0]) if v else None
+    if not cols:
+        return dict(year=None, rows={})
+    out = {}
+    for r in v[1:]:
+        r = r + [None] * (max(cols) + 1 - len(r))
+        if not all(_t(r[i]) == '' or _num(r[i]) is not None for i in cols):
+            continue
+        mo = [int(_num(r[i]) or 0) for i in cols]
+        for label in ('Report Totals', ROUND_GROUPS.get(_t(r[1]))):
+            if label:
+                out[label] = [a + b for a, b in zip(out.get(label, [0] * 12), mo)]
+    y = re.search(r'(?<!\d)(20\d\d)(?!\d)', name)
+    return dict(year=int(y.group(1)) if y else None, rows={k: m + [sum(m)] for k, m in out.items()})
+
+
+PARSE = {'sku_analysis': parse_sku_analysis, 'sales_by_category': parse_sales_by_category, 'sales_by_item': parse_sales_by_item, 'best100': parse_best100, 'rounds': parse_rounds}
 
 
 def units_of(kind, d):
