@@ -39,13 +39,24 @@ const norm = (s: string) =>
 
 /** Strip the scaffolding so "Jon Davies lesson 2 of 5" leaves "jon davies". */
 function nameFromTitle(subject: string): string {
-  let s = norm(subject);
+  // Asides first, while the brackets still exist - norm() strips punctuation,
+  // and after that "[chrck with ken]" is indistinguishable from a surname.
+  // That is how "Patsy leung lesson [chrck with ken]" turned into a client
+  // called "Patsy Leung Chrck Ken". First line only, for the same reason.
+  const plain = subject
+    .split("\n")[0]
+    .replace(/\[[^\]]*\]/g, " ")
+    .replace(/\([^)]*\)/g, " ");
+
+  let s = norm(plain);
+  // "not paid" before bare "paid", or the "not" survives alone and
+  // "Jack Hutchinson lesson 2 of 5 not paid" reduces to "jack hutchinson not".
+  s = s.replace(/\bnot\s+paid\b|\bunpaid\b|\bno\s+pay\b|\bpaid\b/g, " ");
   s = s.replace(/\blessons?\b/g, " ");
   s = s.replace(
     /\bseries\b|\bsession\b|\bpackage\b|\bpkg\b|\bof\b|\bwith\b|\bfor\b/g,
     " ",
   );
-  s = s.replace(/\bpaid\b|\bunpaid\b/g, " ");
   s = s.replace(/\b\d+\b/g, " ");
   return s.replace(/\s+/g, " ").trim();
 }
