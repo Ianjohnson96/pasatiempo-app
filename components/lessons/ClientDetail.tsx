@@ -3,14 +3,9 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import PackageCard from "./PackageCard";
+import ClientLessons from "./ClientLessons";
+import { createPackage, updateClient } from "@/lib/lessons/actions";
 import {
-  assignLessonToPackage,
-  createPackage,
-  updateClient,
-} from "@/lib/lessons/actions";
-import { seqLabel } from "@/lib/lessons/calc";
-import {
-  formatWhen,
   money,
   type ClientRec,
   type NumberedLesson,
@@ -161,67 +156,12 @@ export default function ClientDetail({
       <h2 className="section-title" style={{ marginTop: 26 }}>
         Lessons
       </h2>
-      <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
-        Newest first. Use the dropdown to move a lesson into a package.
-      </p>
-      {lessons.length === 0 ? (
-        <p className="empty">No lessons recorded.</p>
-      ) : (
-        <div className="stack" style={{ marginTop: 12 }}>
-          {lessons.map((l) => (
-            <div className="card" key={l.id}>
-              <div className="lb-lesson">
-                <div style={{ minWidth: 0 }}>
-                  <strong>{formatWhen(l.startsAt)}</strong>
-                  {seqLabel(l) && seqLabel(l) !== "one-off" && (
-                    <span className="badge gray" style={{ marginLeft: 8 }}>
-                      {seqLabel(l)}
-                    </span>
-                  )}
-                  {l.status !== "completed" && (
-                    <span className="badge gray" style={{ marginLeft: 8 }}>
-                      {l.status === "scheduled" ? "booked" : l.status.replace("_", "-")}
-                    </span>
-                  )}
-                  {/* The calendar title as Ian typed it. Kept visible because
-                      it is the only clue to which series a lesson belonged to. */}
-                  {l.titleRaw && (
-                    <div
-                      className="muted"
-                      style={{ fontSize: 12, marginTop: 2 }}
-                    >
-                      {l.titleRaw}
-                    </div>
-                  )}
-                </div>
-                <select
-                  className="field"
-                  value={l.packageId ?? ""}
-                  disabled={busy}
-                  onChange={(e) =>
-                    run(() =>
-                      assignLessonToPackage(
-                        l.id,
-                        e.target.value || null,
-                        client.id,
-                      ),
-                    )
-                  }
-                  aria-label="Package for this lesson"
-                >
-                  <option value="">One-off</option>
-                  {packages.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.label || `${p.size}-lesson`}
-                      {p.soldOn ? ` (${p.soldOn})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <ClientLessons
+        clientId={client.id}
+        packages={packages}
+        lessons={lessons}
+        onNote={setNote}
+      />
     </>
   );
 }
