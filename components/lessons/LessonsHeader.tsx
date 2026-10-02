@@ -1,28 +1,33 @@
 import Link from "next/link";
-import { pendingCount } from "@/lib/lessons/data";
 
-// Shared chrome for the three lesson-book screens. A server component: it needs
-// only the signed-in email, which the page already has, plus the confirm count.
+// Shared chrome for the lesson book.
+//
+// The Review badge is the point of that tab: a queue nobody can see is a queue
+// nobody answers, and anything sitting in it is counted nowhere until it is.
+//
+// The count is passed in rather than fetched here. Fetching it here meant a
+// database trip that could only start once the page's own data had arrived;
+// the pages now load both at once.
 
 const TABS = [
-  { href: "/lessons", key: "students", label: "Students" },
-  { href: "/lessons/log", key: "log", label: "Lessons" },
-  { href: "/lessons/confirm", key: "confirm", label: "Confirm" },
+  { href: "/lessons", key: "dashboard", label: "Dashboard" },
+  { href: "/lessons/schedule", key: "schedule", label: "Schedule" },
+  { href: "/lessons/clients", key: "clients", label: "Clients" },
+  { href: "/lessons/review", key: "review", label: "Review" },
 ] as const;
 
 export type LessonTab = (typeof TABS)[number]["key"];
 
-export default async function LessonsHeader({
+export default function LessonsHeader({
   email,
   active,
+  waiting,
 }: {
   email: string;
   active: LessonTab;
+  /** Unanswered review entries, for the badge. */
+  waiting: number;
 }) {
-  // The badge is the whole point of the Confirm tab: with no number on it there
-  // is nothing to prompt Ian to go and answer the queue.
-  const waiting = await pendingCount();
-
   return (
     <>
       <div className="appbar">
@@ -31,7 +36,7 @@ export default async function LessonsHeader({
             <span className="mark">P</span> Lesson Book
           </Link>
           <span className="spacer" />
-          <span className="navlink">{email}</span>
+          <span className="navlink u-email">{email}</span>
           <form action="/auth/signout" method="post" style={{ margin: 0 }}>
             <button className="btn secondary small" type="submit">
               Sign out
@@ -41,22 +46,21 @@ export default async function LessonsHeader({
       </div>
 
       <div className="container" style={{ paddingBottom: 0 }}>
-        <div className="seg" style={{ marginTop: 18 }}>
+        <nav className="seg lb-tabs" style={{ marginTop: 18 }}>
           {TABS.map((t) => (
             <Link
               key={t.key}
               href={t.href}
               className={t.key === active ? "segbtn on" : "segbtn"}
+              aria-current={t.key === active ? "page" : undefined}
             >
               {t.label}
-              {t.key === "confirm" && waiting > 0 && (
-                <span className="badge open" style={{ marginLeft: 6 }}>
-                  {waiting}
-                </span>
+              {t.key === "review" && waiting > 0 && (
+                <span className="badge open">{waiting}</span>
               )}
             </Link>
           ))}
-        </div>
+        </nav>
       </div>
     </>
   );

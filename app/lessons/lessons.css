@@ -1,0 +1,658 @@
+/* Lesson Book. Phone first: Ian uses this on the lesson tee.
+ *
+ * These screens deliberately avoid the shared `.row`, whose
+ * `> * { flex: 1; min-width: 160px }` stretches every control in a toolbar
+ * and pushed the package card's price, size and payment controls off the
+ * edge of a phone. Everything here is `lb-*` and sized on purpose.
+ */
+
+/* Controls here carry className="field", which globally is the WRAPPER class
+   and adds a 16px bottom margin - enough to knock every toolbar out of line.
+   Search boxes also miss the shared input styling, which lists types. */
+.lb input.field,
+.lb select.field,
+.lb textarea.field {
+  margin-bottom: 0;
+}
+.lb input[type="search"] {
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  min-height: 44px;
+}
+.lb-actions select {
+  width: auto;
+  min-height: 44px;
+}
+
+.lb-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.lb-head > :first-child {
+  min-width: 0;
+  flex: 1;
+}
+.lb-head > :last-child {
+  flex-shrink: 0;
+  text-align: right;
+}
+.lb-name {
+  font-weight: 700;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.lb-sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.lb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* Toolbar: price, size, payment. Wraps rather than squeezing. */
+.lb-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+.lb-num {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.lb-num .field {
+  width: 96px;
+  min-height: 40px;
+  padding: 8px 10px;
+}
+.lb-num.small .field {
+  width: 72px;
+}
+.lb-pay {
+  margin-left: auto;
+  display: flex;
+}
+.lb-pay .segbtn {
+  min-height: 40px;
+  padding: 8px 14px;
+}
+
+/* Lesson Book labels are short; keep "Unpaid" or "Review 29" on one line.
+   Scoped here, not global: the events editor's long seg labels must wrap. */
+.lb .segbtn {
+  white-space: nowrap;
+}
+
+.lb-tabs {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.lb-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.lb-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* A lesson row on the client screen: date on the left, package picker on
+   the right, picker drops underneath on a phone. */
+.lb-lesson {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.lb-lesson > :first-child {
+  min-width: 0;
+  flex: 1 1 200px;
+}
+.lb-lesson select {
+  flex: 0 1 220px;
+  min-width: 0;
+  min-height: 40px;
+}
+
+/* ---- Dashboard --------------------------------------------------------- */
+
+.lb-sechead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 26px 0 10px;
+}
+.lb-sechead .section-title {
+  margin: 0;
+}
+.lb-sechead a {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.lb-next {
+  display: block;
+  margin-top: 4px;
+  border-left: 4px solid var(--green);
+  color: inherit;
+  text-decoration: none;
+}
+a.lb-next:hover {
+  text-decoration: none;
+  box-shadow: 0 0 0 2px var(--green-light), var(--shadow);
+}
+.lb-kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+.lb-next-name {
+  font-size: 22px;
+  font-weight: 700;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+.lb-next-when {
+  font-size: 15px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* Agenda: lessons grouped by day */
+.lb-agenda {
+  display: grid;
+  gap: 12px;
+}
+.lb-day {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.lb-dayhead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.lb-dayhead.now {
+  background: var(--green-tint);
+  color: var(--green-dark);
+}
+.lb-dayhead span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.lb-alist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lb-arow {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+}
+.lb-arow + .lb-arow {
+  border-top: 1px solid var(--line);
+}
+.lb-arow.off .lb-name,
+.lb-arow.off .lb-time {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.lb-time {
+  /* "10:30 AM" in bold, on one line */
+  flex: 0 0 78px;
+  white-space: nowrap;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding-top: 1px;
+}
+.lb-awho {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Money */
+.lb-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.lb-tiles .n {
+  font-size: 22px;
+}
+.lb-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+.lb-banner:hover {
+  text-decoration: none;
+  filter: brightness(0.98);
+}
+.lb-banner-go {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Follow up */
+.lb-follow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.lb-follow .card {
+  margin: 0;
+}
+.lb-ftitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.lb-fhint {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 3px 0 8px;
+}
+.lb-flist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lb-frow {
+  display: flex;
+  flex-direction: column;
+  padding: 9px 0;
+  min-height: 44px;
+  border-top: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+}
+.lb-frow:hover {
+  text-decoration: none;
+}
+.lb-frow:hover .lb-name {
+  color: var(--green);
+}
+.lb-frow .lb-name {
+  font-size: 15px;
+}
+.lb-more summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green);
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+/* Teaching volume */
+.lb-vol-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.lb-hero {
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+}
+.lb-vol-cmp {
+  font-size: 13px;
+  text-align: right;
+  display: grid;
+  gap: 2px;
+}
+.lb-vol-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+.lb-top {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+}
+.lb-top li {
+  padding-left: 2px;
+}
+.lb-top li a {
+  font-weight: 600;
+}
+.lb-top li .lb-sub {
+  display: inline;
+  margin-left: 6px;
+}
+.lb-split {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  margin-top: 10px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.lb-split .m {
+  background: var(--green);
+}
+.lb-split .g {
+  background: #8fbc9f;
+}
+
+/* Column chart (BarChart.tsx). One hue: this month full green, the rest a
+   lighter step, 2px of surface between columns, rounded tops on a square
+   baseline. */
+.lb-bars {
+  margin: 18px 0 0;
+}
+.lb-bars-plot {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 130px;
+  padding-top: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.lb-bar {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+}
+.lb-bar-fill {
+  display: block;
+  width: 100%;
+  max-width: 24px;
+  background: #8fbc9f;
+  border-radius: 4px 4px 0 0;
+}
+.lb-bar.on .lb-bar-fill {
+  background: var(--green);
+}
+.lb-bar-val {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1;
+  margin-bottom: 3px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.lb-bar.on .lb-bar-val {
+  color: var(--ink);
+  font-weight: 700;
+}
+.lb-bars-axis {
+  display: flex;
+  gap: 2px;
+  margin-top: 4px;
+}
+.lb-bars-axis span {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.lb-bars-axis span.on {
+  color: var(--ink);
+  font-weight: 700;
+}
+.lb-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.lb-sync {
+  margin: 26px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+.lb-sync.bad {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* ---- Schedule ---------------------------------------------------------- */
+.lb-schedbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.lb-schedbar .segbtn {
+  min-height: 44px;
+  min-width: 44px;
+  font-size: 15px;
+}
+.lb-schedtitle {
+  font-size: 24px;
+  margin: 18px 0 2px;
+}
+
+/* ---- Package dates (PackageCard) ---------------------------------------- */
+.lb-dates {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 4px;
+}
+.lb-dates summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--green);
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.lb-dlist {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+.lb-dlist li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: 14px;
+}
+.lb-dlist li + li {
+  border-top: 1px dashed var(--line);
+}
+.lb-dseq {
+  flex: 0 0 22px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.lb-dwhen {
+  flex: 1;
+  min-width: 0;
+}
+.lb-dstate {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.lb-dlist li.completed .lb-dstate {
+  color: var(--green);
+  font-weight: 700;
+  font-size: 14px;
+}
+.lb-dlist li.scheduled .lb-dstate {
+  color: var(--warn);
+  font-weight: 600;
+}
+.lb-dlist li.off {
+  color: var(--muted);
+}
+.lb-dlist li.off .lb-dwhen {
+  text-decoration: line-through;
+}
+
+/* ---- Prices ------------------------------------------------------------ */
+.lb-plist {
+  display: grid;
+  gap: 10px;
+}
+.lb-prow {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.lb-x {
+  font-size: 20px;
+  min-width: 40px;
+  min-height: 40px;
+}
+
+/* Loading skeleton */
+.lb-skel {
+  border-radius: 12px;
+  background: linear-gradient(90deg, #e8eee9 0%, #f3f6f3 50%, #e8eee9 100%);
+  background-size: 200% 100%;
+  animation: lb-shimmer 1.2s ease-in-out infinite;
+}
+.lb-skel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+@keyframes lb-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lb-skel {
+    animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .lb-follow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lb-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .lb-vol-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lb-vol-cmp {
+    text-align: left;
+  }
+  .lb-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  /* 13 months across a phone: the month names thin out to every other one,
+     the value labels stay. */
+  .lb-bars-axis span:nth-child(even):not(.on) {
+    visibility: hidden;
+  }
+  /* Thumb-sized and full width: three equal payment buttons. */
+  .lb-pay {
+    margin-left: 0;
+    width: 100%;
+  }
+  .lb-pay .segbtn {
+    flex: 1;
+    min-height: 44px;
+  }
+  .lb-num {
+    flex: 1;
+  }
+  .lb-num .field,
+  .lb-num.small .field {
+    width: 100%;
+    min-height: 44px;
+  }
+  .lb-tabs {
+    width: 100%;
+  }
+  /* Four tabs and a badge across ~343px: tighter padding so Review and its
+     count stay on screen instead of scrolling off the edge. */
+  .lb-tabs .segbtn {
+    flex: 1 1 auto;
+    min-height: 44px;
+    padding: 8px 6px;
+    gap: 4px;
+  }
+  .lb-tabs .segbtn .badge {
+    padding: 1px 6px;
+  }
+  .lb-lesson select {
+    flex: 1 1 100%;
+    min-height: 44px;
+  }
+  .lb-actions .btn {
+    min-height: 44px;
+  }
+}

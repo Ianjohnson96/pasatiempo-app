@@ -22,21 +22,10 @@ export function createAdminClient(section: SectionKey) {
   );
 }
 
-// Server-only client for the lesson book (lessons.*). Not a SECTION - it has
-// no domain of its own and nothing public - so it gets its own factory, the
-// same way the hub does.
-//
-// Bypasses RLS, so every caller must sit behind assertApp("lessons").
-export function createLessonsClient() {
-  return createSbClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      db: { schema: "lessons" },
-      auth: { persistSession: false, autoRefreshToken: false },
-    },
-  );
-}
+// The lesson book has no factory here on purpose. Its tables carry real RLS
+// tied to lesson_owners, so it talks to Postgres as the signed-in user via
+// lib/lessons/db.ts - service_role would bypass the one thing keeping that
+// data private from the rest of the staff.
 
 // Server-only client for the hub's own schema: people, per-app access and
 // public-site switches (lib/hub/access.ts). Same service_role key.
