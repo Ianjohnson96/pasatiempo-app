@@ -25,8 +25,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "unauthorised" }, { status: 401 });
   }
 
-  const dryRun = new URL(request.url).searchParams.get("dry") === "1";
-  const report = await syncLessons({ dryRun });
+  const params = new URL(request.url).searchParams;
+  const dryRun = params.get("dry") === "1";
+
+  // `?days=N` widens the look-back for a one-off backfill. The nightly run
+  // keeps the default window: re-reading years of calendar every night would
+  // be slow and would change nothing, since old lessons do not move.
+  const days = Number(params.get("days"));
+  const fromIso =
+    Number.isFinite(days) && days > 0
+      ? new Date(
+          Date.now() - Math.min(days, 2000) * 24 * 3600 * 1000,
+        ).toISOString()
+      : undefined;
+
+  const report = await syncLessons({ dryRun, fromIso });
 
   if (!report.ok) {
     return NextResponse.json(report, { status: 500 });

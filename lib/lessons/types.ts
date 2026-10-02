@@ -56,6 +56,24 @@ export interface LessonRec {
   calendarUid: string | null;
 }
 
+/**
+ * A calendar entry the sync could not place.
+ *
+ * Counted nowhere until Ian answers it. The sync offers `guessName` - what it
+ * stripped the title down to - but never acts on it, because "Adrian Moreno
+ * wife" might be Adrian's lesson or his wife's, and billing the wrong one is
+ * the kind of error nobody ever notices.
+ */
+export interface ReviewRec {
+  calendarUid: string;
+  startsAt: string;
+  endsAt: string;
+  titleRaw: string;
+  guessClientId: string | null;
+  guessName: string | null;
+  seenAt: string;
+}
+
 /** One row of lesson_client_summary - the roster screen. */
 export interface ClientSummary {
   id: string;

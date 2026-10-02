@@ -6,6 +6,7 @@ import type {
   LessonStatus,
   PackageRec,
   PaymentStatus,
+  ReviewRec,
 } from "./types";
 
 // Read-side for the lesson book.
@@ -130,6 +131,38 @@ export async function clientLessons(clientId: string): Promise<LessonRec[]> {
     titleRaw: str(r.title_raw),
     calendarUid: str(r.calendar_uid),
   }));
+}
+
+/** The queue of calendar entries the sync would not guess at. */
+export async function listReview(): Promise<ReviewRec[]> {
+  const supa = await lessonBookClient();
+  const { data, error } = await supa
+    .from("lesson_review")
+    .select("*")
+    .eq("dismissed", false)
+    .order("starts_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => ({
+    calendarUid: r.calendar_uid as string,
+    startsAt: r.starts_at as string,
+    endsAt: r.ends_at as string,
+    titleRaw: (r.title_raw as string) ?? "",
+    guessClientId: str(r.guess_client_id),
+    guessName: str(r.guess_name),
+    seenAt: r.seen_at as string,
+  }));
+}
+
+/** Badge count for the Review tab. A head request - no rows come back. */
+export async function reviewCount(): Promise<number> {
+  const supa = await lessonBookClient();
+  const { count, error } = await supa
+    .from("lesson_review")
+    .select("calendar_uid", { count: "exact", head: true })
+    .eq("dismissed", false);
+  // A badge is not worth failing a page render over.
+  if (error) return 0;
+  return count ?? 0;
 }
 
 export interface Dashboard {

@@ -1,22 +1,28 @@
 import Link from "next/link";
+import { reviewCount } from "@/lib/lessons/data";
 
-// Shared chrome for the lesson book. A server component - it only needs the
-// signed-in email, which the page already has.
+// Shared chrome for the lesson book.
+//
+// The Review badge is the point of that tab: a queue nobody can see is a queue
+// nobody answers, and anything sitting in it is counted nowhere until it is.
 
 const TABS = [
   { href: "/lessons", key: "dashboard", label: "Dashboard" },
   { href: "/lessons/clients", key: "clients", label: "Clients" },
+  { href: "/lessons/review", key: "review", label: "Review" },
 ] as const;
 
 export type LessonTab = (typeof TABS)[number]["key"];
 
-export default function LessonsHeader({
+export default async function LessonsHeader({
   email,
   active,
 }: {
   email: string;
   active: LessonTab;
 }) {
+  const waiting = await reviewCount();
+
   return (
     <>
       <div className="appbar">
@@ -43,6 +49,11 @@ export default function LessonsHeader({
               className={t.key === active ? "segbtn on" : "segbtn"}
             >
               {t.label}
+              {t.key === "review" && waiting > 0 && (
+                <span className="badge open" style={{ marginLeft: 6 }}>
+                  {waiting}
+                </span>
+              )}
             </Link>
           ))}
         </div>

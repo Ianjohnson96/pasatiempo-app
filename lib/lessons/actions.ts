@@ -16,6 +16,7 @@ import type { PaymentStatus, Result } from "./types";
 
 const BOOK = "/lessons";
 const CLIENTS = "/lessons/clients";
+const REVIEW = "/lessons/review";
 
 function fail(e: unknown, fallback: string): { ok: false; error: string } {
   const msg =
@@ -30,6 +31,14 @@ function touched(clientId?: string) {
   revalidatePath(CLIENTS);
   if (clientId) revalidatePath(`${CLIENTS}/${clientId}`);
 }
+
+/** Compare names the way a person would: case and spacing are not identity. */
+const norm = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 /** Today in course time - "paid today" must not become tomorrow on a UTC server. */
 function courseToday(): string {
@@ -241,6 +250,112 @@ export async function updateClient(
     return { ok: true, value: undefined };
   } catch (e) {
     return fail(e, "Could not save that client.");
+  }
+}
+
+/**
+ * "Yes, this was a lesson." Turns a queued calendar entry into a real lesson
+ * against a client Ian picks - an existing one, or a new one by name.
+ *
+ * The lesson is created with no package. Which series it belongs to is a
+ * separate decision, made on the client screen, because attaching it moves
+ * somebody's remaining count.
+ */
+export async function resolveReview(
+  calendarUid: string,
+  client: { id?: string; name?: string },
+): Promise<Result> {
+  try {
+    await assertLessonBook();
+    const supa = await lessonBookClient();
+
+    const { data: row, error: rErr } = await supa
+      .from("lesson_review")
+      .select("*")
+      .eq("calendar_uid", calendarUid)
+      .maybeSingle();
+    if (rErr) throw rErr;
+    if (!row) return { ok: false, error: "That one has already been answered." };
+
+    let clientId = client.id;
+    if (!clientId) {
+      const name = (client.name ?? "").trim();
+      if (!name) return { ok: false, error: "Pick a client, or type a new name." };
+
+      // Match case-insensitively first, or a differently-cased duplicate gets
+      // created alongside the person who is already there.
+      const { data: all, error: cErr } = await supa
+        .from("lesson_clients")
+        .select("id, name");
+      if (cErr) throw cErr;
+      const hit = (all ?? []).find((c) => norm(c.name as string) === norm(name));
+
+      if (hit) {
+        clientId = hit.id as string;
+      } else {
+        const { data: made, error: iErr } = await supa
+          .from("lesson_clients")
+          .insert({ name })
+          .select("id")
+          .single();
+        if (iErr) throw iErr;
+        clientId = made.id as string;
+      }
+    }
+
+    const startsAt = row.starts_at as string;
+    const { error: lErr } = await supa.from("lessons").upsert(
+      {
+        client_id: clientId,
+        starts_at: startsAt,
+        ends_at: row.ends_at,
+        status: new Date(startsAt) > new Date() ? "scheduled" : "completed",
+        calendar_uid: calendarUid,
+        calendar_source: "m365",
+        title_raw: row.title_raw,
+      },
+      { onConflict: "calendar_uid" },
+    );
+    if (lErr) throw lErr;
+
+    // Only now. If the insert had failed, the entry must stay in the queue
+    // rather than disappearing unanswered.
+    const { error: dErr } = await supa
+      .from("lesson_review")
+      .delete()
+      .eq("calendar_uid", calendarUid);
+    if (dErr) throw dErr;
+
+    touched(clientId);
+    revalidatePath(REVIEW);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not add that lesson.");
+  }
+}
+
+/**
+ * "No, that was not a lesson."
+ *
+ * Marked dismissed rather than deleted: the calendar event still exists, so a
+ * deleted row would be re-queued on the next sync and Ian would answer the
+ * same question every night.
+ */
+export async function dismissReview(calendarUid: string): Promise<Result> {
+  try {
+    await assertLessonBook();
+    const supa = await lessonBookClient();
+    const { error } = await supa
+      .from("lesson_review")
+      .update({ dismissed: true })
+      .eq("calendar_uid", calendarUid);
+    if (error) throw error;
+
+    revalidatePath(REVIEW);
+    revalidatePath(BOOK);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not dismiss that one.");
   }
 }
 
