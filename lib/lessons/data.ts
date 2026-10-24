@@ -471,3 +471,40 @@ export async function billingData(): Promise<BillingData> {
       .sort((a, b) => (a.soldOn ?? "").localeCompare(b.soldOn ?? "")),
   };
 }
+
+/**
+ * Venmo payments, newest first.
+ *
+ * Unanswered ones come first regardless of date: the list exists to be worked
+ * through, and burying the undecided rows among months of settled history is
+ * how a reconciliation never gets finished.
+ */
+export async function listPayments(): Promise<import("./types").PaymentRec[]> {
+  const supa = await lessonBookClient();
+  const { data, error } = await supa
+    .from("lesson_payments")
+    .select("*, lesson_clients(name)")
+    .order("paid_on", { ascending: false });
+  if (error) throw new Error(error.message);
+
+  const rows = (data ?? []).map((r) => ({
+    id: r.id as string,
+    paidOn: r.paid_on as string,
+    payerName: (r.payer_name as string) ?? "",
+    note: (r.note as string) ?? "",
+    amountCents: Number(r.amount_cents ?? 0),
+    kind: ((r.kind as string) ?? "unclassified") as import("./types").PaymentKind,
+    clientId: str(r.client_id),
+    clientName: ((r.lesson_clients as { name?: string } | null)?.name as string) ?? null,
+    packageId: str(r.package_id),
+    lessonId: str(r.lesson_id),
+    decidedBy: ((r.decided_by as string) ?? "auto") as "auto" | "ian",
+  }));
+
+  return rows.sort((a, b) => {
+    const aTodo = a.decidedBy === "auto" ? 0 : 1;
+    const bTodo = b.decidedBy === "auto" ? 0 : 1;
+    if (aTodo !== bTodo) return aTodo - bTodo;
+    return b.paidOn.localeCompare(a.paidOn);
+  });
+}

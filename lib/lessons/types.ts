@@ -283,3 +283,34 @@ export interface BillingData {
   /** Every bill not yet paid (unpaid or pending), oldest first. */
   unpaid: PackageRec[];
 }
+
+// ---- payments received ----------------------------------------------------
+// Money that actually arrived, imported from Venmo. Deliberately separate from
+// a package's payment_status: that records a decision ("this package is
+// paid"), this records an event ("$320 came in from Kyle Promes on 12 May").
+// Keeping them apart is what makes reconciliation mean anything - a book
+// cannot be checked against itself.
+
+export type PaymentKind = "unclassified" | "lesson" | "clinic" | "not_lesson";
+
+export interface PaymentRec {
+  id: string;
+  paidOn: string;
+  payerName: string;
+  note: string;
+  amountCents: number;
+  kind: PaymentKind;
+  clientId: string | null;
+  clientName: string | null;
+  packageId: string | null;
+  lessonId: string | null;
+  /** 'auto' is the importer's guess; 'ian' means it has been answered. */
+  decidedBy: "auto" | "ian";
+}
+
+export const PAYMENT_KIND_LABEL: Record<PaymentKind, string> = {
+  unclassified: "Not sorted",
+  lesson: "Lesson",
+  clinic: "Clinic",
+  not_lesson: "Not a lesson",
+};

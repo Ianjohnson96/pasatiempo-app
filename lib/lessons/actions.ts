@@ -1321,3 +1321,48 @@ export async function markPaidMany(
     return fail(e, "Could not mark those paid.");
   }
 }
+
+/**
+ * Answer what a Venmo payment was for.
+ *
+ * Writing decided_by = 'ian' is the point: it marks the row as answered, so a
+ * later statement re-import leaves it alone instead of replacing a decision
+ * with a fresh guess.
+ *
+ * Only a lesson payment may carry a package or a lesson, so switching a row to
+ * clinic or not-a-lesson clears any tie - the database enforces the same rule,
+ * and leaving a stale link would attribute money to a package it no longer
+ * belongs to.
+ */
+export async function setPaymentKind(
+  id: string,
+  kind: "unclassified" | "lesson" | "clinic" | "not_lesson",
+  opts?: { clientId?: string | null; packageId?: string | null; lessonId?: string | null },
+): Promise<Result> {
+  try {
+    await assertLessonBook();
+    const isLesson = kind === "lesson";
+    const patch: Record<string, unknown> = {
+      kind,
+      decided_by: "ian",
+      decided_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      client_id: isLesson ? (opts?.clientId ?? null) : null,
+      package_id: isLesson ? (opts?.packageId ?? null) : null,
+      lesson_id: isLesson ? (opts?.lessonId ?? null) : null,
+    };
+
+    const { error } = await (await lessonBookClient())
+      .from("lesson_payments")
+      .update(patch)
+      .eq("id", id);
+    if (error) throw error;
+
+    revalidatePath("/lessons/payments");
+    revalidatePath(BOOK);
+    if (opts?.clientId) revalidatePath(`${CLIENTS}/${opts.clientId}`);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not save that payment.");
+  }
+}
