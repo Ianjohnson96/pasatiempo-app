@@ -508,3 +508,62 @@ export async function listPayments(): Promise<import("./types").PaymentRec[]> {
     return b.paidOn.localeCompare(a.paidOn);
   });
 }
+
+/**
+ * Every package, with the span of lessons inside it, for the screen that
+ * puts Venmo payments against bills.
+ *
+ * All of them, not just the unpaid ones: a package can be marked paid from
+ * the shop and still be the thing a Venmo payment belongs to, and hiding it
+ * would leave Ian unable to say so.
+ */
+export async function listPackageOptions(): Promise<
+  import("./types").PackageOption[]
+> {
+  const supa = await lessonBookClient();
+  const [{ data: pkgs, error: pErr }, { data: lessons, error: lErr }] =
+    await Promise.all([
+      supa
+        .from("lesson_packages")
+        .select("id, client_id, kind, size, price_cents, payment_status, sold_on"),
+      supa
+        .from("lessons")
+        .select("package_id, starts_at, status")
+        .not("package_id", "is", null),
+    ]);
+  if (pErr) throw new Error(pErr.message);
+  if (lErr) throw new Error(lErr.message);
+
+  const span = new Map<string, { first: string; last: string; used: number }>();
+  for (const l of lessons ?? []) {
+    const id = l.package_id as string;
+    const at = l.starts_at as string;
+    const s = span.get(id);
+    if (!s) span.set(id, { first: at, last: at, used: 0 });
+    else {
+      if (at < s.first) s.first = at;
+      if (at > s.last) s.last = at;
+    }
+    // A cancelled lesson still sits in the series but was never taught.
+    if (l.status === "completed" || l.status === "scheduled") {
+      span.get(id)!.used += 1;
+    }
+  }
+
+  return (pkgs ?? []).map((p) => {
+    const s = span.get(p.id as string);
+    return {
+      id: p.id as string,
+      clientId: p.client_id as string,
+      kind: ((p.kind as string) ?? "package") as "package" | "single",
+      size: Number(p.size ?? 1),
+      priceCents: p.price_cents == null ? null : Number(p.price_cents),
+      paymentStatus: ((p.payment_status as string) ??
+        "unpaid") as import("./types").PaymentStatus,
+      soldOn: str(p.sold_on),
+      used: s?.used ?? 0,
+      firstLessonAt: s?.first ?? null,
+      lastLessonAt: s?.last ?? null,
+    };
+  });
+}

@@ -3,7 +3,12 @@ import LessonsHeader from "@/components/lessons/LessonsHeader";
 import PaymentsList from "@/components/lessons/PaymentsList";
 import { requireLessonBook } from "@/lib/lessons/auth";
 import { gateFirst } from "@/lib/lessons/gate";
-import { listClientSummaries, listPayments, reviewCount } from "@/lib/lessons/data";
+import {
+  listClientSummaries,
+  listPackageOptions,
+  listPayments,
+  reviewCount,
+} from "@/lib/lessons/data";
 
 // Money that actually arrived, from the Venmo statements, and what it was for.
 //
@@ -13,9 +18,14 @@ import { listClientSummaries, listPayments, reviewCount } from "@/lib/lessons/da
 export const dynamic = "force-dynamic";
 
 export default async function PaymentsPage() {
-  const [viewer, [payments, clients, waiting]] = await gateFirst(
+  const [viewer, [payments, clients, packages, waiting]] = await gateFirst(
     requireLessonBook(),
-    Promise.all([listPayments(), listClientSummaries(), reviewCount()]),
+    Promise.all([
+      listPayments(),
+      listClientSummaries(),
+      listPackageOptions(),
+      reviewCount(),
+    ]),
   );
 
   return (
@@ -38,6 +48,7 @@ export default async function PaymentsPage() {
         <PaymentsList
           payments={payments}
           clients={clients.map((c) => ({ id: c.id, name: c.name }))}
+          packages={packages}
         />
       </main>
     </>

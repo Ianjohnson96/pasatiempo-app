@@ -1366,3 +1366,37 @@ export async function setPaymentKind(
     return fail(e, "Could not save that payment.");
   }
 }
+
+/**
+ * Put a payment against the bill it paid for, leaving everything else alone.
+ *
+ * Separate from setPaymentKind because that one clears the tie whenever the
+ * kind is not a lesson - right when answering "what was this", wrong when
+ * the answer is already "a lesson" and Ian is now saying which one.
+ */
+export async function tiePaymentToPackage(
+  id: string,
+  packageId: string | null,
+): Promise<Result> {
+  try {
+    await assertLessonBook();
+    const { error } = await (await lessonBookClient())
+      .from("lesson_payments")
+      .update({
+        package_id: packageId,
+        // A payment buys one or the other, never both.
+        lesson_id: null,
+        decided_by: "ian",
+        decided_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+    if (error) throw error;
+
+    revalidatePath("/lessons/payments");
+    revalidatePath(BOOK);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not tie that payment to a package.");
+  }
+}

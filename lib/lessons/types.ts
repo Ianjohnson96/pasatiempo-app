@@ -314,3 +314,43 @@ export const PAYMENT_KIND_LABEL: Record<PaymentKind, string> = {
   clinic: "Clinic",
   not_lesson: "Not a lesson",
 };
+
+/**
+ * A bill a payment could belong to, as the matching screen lists it.
+ *
+ * Carries the lesson dates rather than just the sold date, because that is
+ * what Ian recognises: he remembers the Tuesday run of lessons, not when a
+ * row was created. Money is often handed over before the first one, so the
+ * screen sorts on how close the payment is to the series, not on an exact
+ * date, and never hides a package for being far away.
+ */
+export interface PackageOption {
+  id: string;
+  clientId: string;
+  kind: "package" | "single";
+  size: number;
+  priceCents: number | null;
+  paymentStatus: PaymentStatus;
+  soldOn: string | null;
+  used: number;
+  /** First and last lesson in the package; null when none are booked yet. */
+  firstLessonAt: string | null;
+  lastLessonAt: string | null;
+}
+
+/** "5-pack · Sep 19 → Dec 10 · 3 of 5 · unpaid" */
+export function packageOptionLabel(p: PackageOption): string {
+  const what = p.kind === "single" ? "Single" : `${p.size}-pack`;
+  const when = p.firstLessonAt
+    ? p.lastLessonAt && p.lastLessonAt.slice(0, 10) !== p.firstLessonAt.slice(0, 10)
+      ? `${formatDay(p.firstLessonAt)} → ${formatDay(p.lastLessonAt)}`
+      : formatDay(p.firstLessonAt)
+    : p.soldOn
+      ? `sold ${formatDay(p.soldOn)}`
+      : "no lessons yet";
+  const bits = [what, when];
+  if (p.kind !== "single") bits.push(`${p.used} of ${p.size}`);
+  bits.push(p.priceCents == null ? "no price" : money(p.priceCents));
+  if (p.paymentStatus !== "unpaid") bits.push(PAYMENT_LABEL[p.paymentStatus].toLowerCase());
+  return bits.join(" · ");
+}
