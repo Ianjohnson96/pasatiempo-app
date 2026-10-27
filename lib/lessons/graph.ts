@@ -106,9 +106,14 @@ export async function fetchCalendarEvents(
     const res: Response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`,
-        // Without this the times arrive in the mailbox's own zone with no
-        // offset attached, and everything lands hours out.
-        Prefer: 'outlook.timezone="UTC"',
+        // outlook.timezone: without it the times arrive in the mailbox's own
+        // zone with no offset attached, and everything lands hours out.
+        //
+        // ImmutableId: the default entry id is a location, not a name - it
+        // changes when Exchange moves the item, and every lesson we had was
+        // duplicated the night a batch of them rotated. An immutable id is
+        // the same string for the life of the event.
+        Prefer: 'outlook.timezone="UTC", IdType="ImmutableId"',
       },
       cache: "no-store",
     });

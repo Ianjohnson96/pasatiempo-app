@@ -272,12 +272,15 @@ export async function syncLessons(opts?: {
       }
 
       // No uid match. Before inserting, look for the same client at the same
-      // moment - that is a seeded row for this very event, and inserting would
-      // duplicate all 283 of them on the first run. Adopt it instead by
-      // stamping the uid, after which the cheap uid path handles it forever.
+      // moment: one client cannot be on the tee twice at once, so that row IS
+      // this event. It may be a seeded row carrying no uid, or a row whose uid
+      // has gone stale - Exchange entry ids are not permanent, and the night
+      // 94 of them rotated at once the book grew a second copy of every
+      // lesson. Adopt either way, stamping the uid the calendar answers to
+      // now; only a genuinely new slot falls through to an insert.
       const adoptKey = `${clientId}|${new Date(ev.startsAt).toISOString()}`;
       const adoptable = byClientStart.get(adoptKey);
-      if (adoptable && !adoptable.uid) {
+      if (adoptable) {
         if (dryRun) {
           report.adopted++;
         } else {
@@ -294,6 +297,10 @@ export async function syncLessons(opts?: {
           if (error) note(report, error.message);
           else report.adopted++;
         }
+        // Keep the indexes honest, so a second event claiming the same slot
+        // in this same run updates the row instead of inserting beside it.
+        byUid.set(ev.uid, { id: adoptable.id });
+        adoptable.uid = ev.uid;
         continue;
       }
 
