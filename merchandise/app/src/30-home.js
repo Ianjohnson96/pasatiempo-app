@@ -2,7 +2,7 @@
 function orderAlerts(S){
   const out = [];
   for (const p of POS){
-    if (p.status !== 'open' && p.status !== 'partial') continue;
+    if (!isOpen(p)) continue;
     const tag = `PO ${p.poNumber} · ${vendorName(p)}`;
     if (p.cancelDate && p.cancelDate < todayISO) out.push({id:'o-cx-'+p.id, kind:'order', sev:'crit', po:p.id, title:`${tag}: past its cancel date`, detail:`Cancel-by was ${dateLabel(p.cancelDate)}.`, action:'Confirm with the vendor that it is still coming, or cancel it.'});
     else if (p.cancelDate && daysBetween(todayISO, p.cancelDate) <= 14) out.push({id:'o-cw-'+p.id, kind:'order', sev:'warn', po:p.id, title:`${tag}: cancel window closes in ${daysBetween(todayISO, p.cancelDate)} days`, detail:`Last day to cancel or trim is ${dateLabel(p.cancelDate)}.`, action:'Decide now whether you still want all of it.'});
@@ -63,7 +63,7 @@ function renderKpis(S){
   const k = (lab, v, sub, expl, extra = '') => `<div class="kpi"><div class="lab">${lab}</div><div class="v num">${v}</div><div class="s">${sub}</div>${extra}<div class="x">${expl}</div></div>`;
   $('#kpis').innerHTML =
     k(s === 'season' ? PLAN.fy + ' budget' : `Room through ${monthShort(s)}`, money(S.room), 'at cost', s === 'season' ? `What the plan lets you receive from ${periodTxt(PLAN)}.` : `What the plan lets you receive from ${dateLabel(PLAN.start)} to the end of this month.`) +
-    k('Committed', money(S.commit), `${POS.filter(p => p.status === 'open' || p.status === 'partial').length} open orders`, 'Orders arriving in this period, plus anything already received.', `<div class="meter"><i style="width:${S.room > 0 ? Math.min(100, S.commit / S.room * 100) : (S.commit ? 100 : 0)}%;background:${S.commit > S.room ? 'var(--brick)' : 'var(--cypress)'}"></i></div>`) +
+    k('Committed', money(S.commit), `${POS.filter(isOpen).length} open orders`, 'Orders arriving in this period, plus anything already received.', `<div class="meter"><i style="width:${S.room > 0 ? Math.min(100, S.commit / S.room * 100) : (S.commit ? 100 : 0)}%;background:${S.commit > S.room ? 'var(--brick)' : 'var(--cypress)'}"></i></div>`) +
     k('Left to buy', `<span class="${S.left < 0 ? 'neg' : ''}">${money(S.left)}</span>`, `${catsWithRoom} of 15 categories have room`, S.left < 0 ? 'Negative means more is due in than the plan allows by then.' : 'Room minus committed. Spend it where the category list shows room.') +
     k('On hand', money(invTot), `${int(invU)} units · ${dateLabel(INV.asOf)}`, `Stock on the shelf at cost, from the SKU Analysis. ${S.receivedSince ? money(S.receivedSince) + ' received since.' : 'Updated every month-end.'}`) +
     k('On order', money(S.open), S.later ? `+ ${money(S.later)} after ${monthShort(LAST())} ${LAST().slice(0,4)}` : 'not yet received', 'Still to arrive from vendors on open orders.') +

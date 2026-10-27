@@ -4,7 +4,7 @@ const vendorName = p => (vendorOf(p) || {}).name || p.vendorName || p.vendor || 
 const subName = id => (SUBCATS.find(s => s.id === id) || {}).name || '';
 const COLS = [{k:'poNumber',l:'PO #'},{k:'vendor',l:'Vendor'},{k:'cat',l:'Category'},{k:'items',l:'Items'},{k:'deliveryMonth',l:'Delivery'},{k:'cancelDate',l:'Cancel by'},{k:'cost',l:'Cost',r:1},{k:'open',l:'Still to come',r:1},{k:'status',l:'Status'},{k:'createdBy',l:'Entered by'}];
 function sortVal(p, k){ if (k === 'open') return onOrder(p); if (k === 'cost') return poTotal(p); if (k === 'items') return poUnits(p); if (k === 'vendor') return vendorName(p).toLowerCase(); if (k === 'cat') return CAT(p.cat).name; return String(p[k] || ''); }
-function rowFlag(p){ if (p.status !== 'open' && p.status !== 'partial') return '';
+function rowFlag(p){ if (!isOpen(p)) return ''; if (p.status === 'hold') return 'flag-hold';
   if (p.cancelDate && p.cancelDate < todayISO) return 'flag-crit';
   if ((p.cancelDate && daysBetween(todayISO, p.cancelDate) <= 14) || (p.deliveryMonth && p.deliveryMonth < THIS_MONTH)) return 'flag-warn'; return ''; }
 function itemsSummary(p){
@@ -19,18 +19,19 @@ function catSummary(p){
 function renderOrders(S){
   const sel = selMonth(), q = filt.q.trim().toLowerCase();
   let rows = POS.filter(p => {
-    if (filt.status === 'active' && !(p.status === 'open' || p.status === 'partial')) return false;
+    if (filt.status === 'active' && !isOpen(p)) return false;
+    if (filt.status === 'hold' && p.status !== 'hold') return false;
     if (filt.status === 'received' && p.status !== 'received') return false;
     if (filt.status === 'cancelled' && p.status !== 'cancelled') return false;
     if (filt.cat !== 'all' && !(p.cat === filt.cat || (p.lines || []).some(l => l.cat === filt.cat))) return false;
     if (filt.arriving && sel !== 'season' && bucket(p) !== sel) return false;
-    if (q && !`${p.poNumber} ${vendorName(p)} ${p.notes || ''} ${(p.lines || []).map(l => l.style + ' ' + l.color).join(' ')}`.toLowerCase().includes(q)) return false;
+    if (q && !`${p.poNumber} ${vendorName(p)} ${p.notes || ''} ${p.fix || ''} ${(p.lines || []).map(l => l.style + ' ' + l.color).join(' ')}`.toLowerCase().includes(q)) return false;
     return true;
   });
   rows.sort((a,b) => { const x = sortVal(a, sort.key), y = sortVal(b, sort.key); return (x < y ? -1 : x > y ? 1 : 0) * sort.dir; });
   const segB = (v,l) => `<button type="button" data-ofilt="${v}" aria-pressed="${filt.status === v}">${l}</button>`;
   $('#pane').innerHTML = `<section class="panel">
-    <div class="toolbar"><div class="filters"><div class="seg" role="group" aria-label="Status">${segB('active','Open')}${segB('all','All')}${segB('received','Received')}${segB('cancelled','Cancelled')}</div>
+    <div class="toolbar"><div class="filters"><div class="seg" role="group" aria-label="Status">${segB('active','Open')}${POS.some(p => p.status === 'hold') ? segB('hold', `On hold (${POS.filter(p => p.status === 'hold').length})`) : ''}${segB('all','All')}${segB('received','Received')}${segB('cancelled','Cancelled')}</div>
       ${sel !== 'season' ? `<label style="font-size:13px;display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="fArr" ${filt.arriving ? 'checked' : ''}> Only arriving in ${monthFull(sel)}</label>` : ''}</div>
       <div class="filters"><label for="fCat" class="sr">Category</label><select id="fCat" class="field-inline"><option value="all">All categories</option>${catList().map(c => `<option value="${c.code}" ${filt.cat === c.code ? 'selected' : ''}>${c.code} · ${esc(c.name)}</option>`).join('')}</select>
       <label for="fQ" class="sr">Search</label><input id="fQ" class="field-inline" type="search" placeholder="Search PO #, vendor, style" value="${esc(filt.q)}"></div></div>
@@ -39,7 +40,7 @@ function renderOrders(S){
       <td class="po">${esc(p.poNumber)}</td><td>${esc(vendorName(p))}${RISK_VENDORS.test(vendorName(p)) ? '<span class="sm" style="color:var(--ochre)">cost risk</span>' : ''}</td>
       <td>${catSummary(p)}</td><td>${itemsSummary(p)}</td><td>${monthLabel(p.deliveryMonth)}</td><td class="num">${p.cancelDate ? dateLabel(p.cancelDate) : '—'}</td>
       <td class="r num">${money(poTotal(p))}</td><td class="r num">${onOrder(p) ? money(onOrder(p)) : '—'}</td>
-      <td><span class="pill ${esc(p.status)}">${STATUS[p.status] || esc(p.status)}</span></td><td><span class="person" data-uid="${esc(p.createdBy || '')}"></span></td></tr>`).join('')}</tbody></table></div>
+      <td><span class="pill ${esc(p.status)}">${STATUS[p.status] || esc(p.status)}</span>${p.status === 'hold' && p.fix ? `<span class="sm fixnote" title="${esc(p.fix)}">${esc(p.fix)}</span>` : ''}</td><td><span class="person" data-uid="${esc(p.createdBy || '')}"></span></td></tr>`).join('')}</tbody></table></div>
     ${!POS.length ? `<div class="empty"><h3>No purchase orders yet</h3><p>Click <b>+ New order</b> to write one, or use <b>Tools → Paste orders from a spreadsheet</b> to load your current open orders all at once.</p>${canAct() ? '<button class="btn primary" type="button" data-act="new">+ New order</button>' : ''}</div>` : !rows.length ? '<div class="empty"><p>No orders match these filters.</p></div>' : ''}
   </section>`;
   fillPeople();

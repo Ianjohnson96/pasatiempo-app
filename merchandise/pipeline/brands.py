@@ -2,7 +2,8 @@
 import re
 
 ALIAS = [
-    ('Peter Millar', r'peter millar|\bpm\b'), ('Straight Down', r'straight down|\bsdr?\b|\bsd mack|\bsd mens'),
+    ('Peter Millar', r'peter millar|\bpm\b'), ('Sun Day Red', r'sun\s*day red|\bsdr\b'),
+    ('Straight Down', r'straight down|\bsd\b|\bsd mack|\bsd mens'),
     ('Holderness & Bourne', r'holderness|\bh&b\b|\bhb\b'), ('Travis Mathew', r'travis\s*mathew|\btm logo'), ('Melin', r'melin'),
     ('Imperial', r'imperial'), ('Branded Bills', r'branded bills'), ('Legendary', r'legendary'), ('Angus & Grace', r'angus'),
     ('Greyson', r'greyson'), ('KJUS', r'kjus'), ('Zero Restriction', r'\bzero\b'), ('Sunice', r'sunice'), ('Amble', r'amble'),

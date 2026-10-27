@@ -23,7 +23,7 @@ function matchCat(s){ s = (s || '').trim().toLowerCase(); if (!s) return '';
   const code = s.match(/^\d{3}/); if (code && PLAN.cats[code[0]]) return code[0];
   const ex = catList().find(c => c.name.toLowerCase() === s); if (ex) return ex.code;
   const hits = catList().filter(c => c.name.toLowerCase().includes(s) || s.includes(c.name.toLowerCase())); return hits.length === 1 ? hits[0].code : ''; }
-function parseStatus(s){ s = (s || '').trim().toLowerCase(); if (!s || /open|on order|ordered|pending/.test(s)) return 'open'; if (/part/.test(s)) return 'partial'; if (/rec|complete|closed/.test(s)) return 'received'; if (/cancel|void/.test(s)) return 'cancelled'; return null; }
+function parseStatus(s){ s = (s || '').trim().toLowerCase(); if (/hold/.test(s)) return 'hold'; if (!s || /open|on order|ordered|pending/.test(s)) return 'open'; if (/part/.test(s)) return 'partial'; if (/rec|complete|closed/.test(s)) return 'received'; if (/cancel|void/.test(s)) return 'cancelled'; return null; }
 let IMP = [];
 function openImport(){
   $('#overlay').innerHTML = `<div class="scrim" data-close="1"></div><div class="modal" role="dialog" aria-modal="true" aria-labelledby="iTitle">
@@ -71,8 +71,8 @@ async function download(name, rows){
   catch (e){ if (e && e.code !== 'declined') toast(e.code === 'rate_limited' ? 'A download is already waiting for your OK.' : 'Downloads aren\'t available in this view.'); }
 }
 function exportOrders(){
-  const rows = [['PO #','Vendor','Main category code','Main category','Order date','Delivery month','Cancel by','Units','Cost','Received','Still to come','Status','Received date','Notes']]
-    .concat([...POS].sort((a,b) => String(a.deliveryMonth).localeCompare(String(b.deliveryMonth))).map(p => [p.poNumber, vendorName(p), p.cat, CAT(p.cat).name, p.orderDate, p.deliveryMonth, p.cancelDate, poUnits(p), poTotal(p).toFixed(2), num(p.received).toFixed(2), onOrder(p).toFixed(2), STATUS[p.status], p.receivedDate, p.notes]));
+  const rows = [['PO #','Vendor','Main category code','Main category','Order date','Delivery month','Cancel by','Units','Cost','Received','Still to come','Status','Needs fixing','Received date','Notes']]
+    .concat([...POS].sort((a,b) => String(a.deliveryMonth).localeCompare(String(b.deliveryMonth))).map(p => [p.poNumber, vendorName(p), p.cat, CAT(p.cat).name, p.orderDate, p.deliveryMonth, p.cancelDate, poUnits(p), poTotal(p).toFixed(2), num(p.received).toFixed(2), onOrder(p).toFixed(2), STATUS[p.status], p.status === 'hold' ? p.fix || '' : '', p.receivedDate, p.notes]));
   download(`pasatiempo-orders-${todayISO}.csv`, rows);
 }
 function exportLines(){
@@ -273,7 +273,7 @@ document.addEventListener('input', e => {
   if (t.dataset.bmb != null){ BM.draft[+t.dataset.bmb].b = t.value; return; }
   if (t.dataset.bms != null){ BM.draft[+t.dataset.bms].s = t.value; const tot = BM.draft.reduce((a, x) => a + num(x.s), 0), h = $('#bmTot'); if (h) h.textContent = `Shares add up to ${tot}%${tot === 100 ? '' : ' (they need to make 100%)'}. Sales, stock and deliveries are split the same way.`; return; }
   if (!D) return;
-  if (t.dataset.d){ D[t.dataset.d] = t.value; return updateTotals(); }
+  if (t.dataset.d){ D[t.dataset.d] = t.value; if (t.dataset.d === 'status' && $('#wFix')) $('#wFix').hidden = t.value !== 'hold'; return updateTotals(); }
   if (t.dataset.q){ const l = D.lines.find(x => x.id === t.dataset.q); const v = Math.max(0, Math.floor(num(t.value))); if (v) l.qty[t.dataset.k] = v; else delete l.qty[t.dataset.k]; return updateTotals(); }
   if (t.dataset.l && ['style','color','cost','units'].includes(t.dataset.f)){ const l = D.lines.find(x => x.id === t.dataset.l); l[t.dataset.f] = t.value; return updateTotals(); }
 });
@@ -297,7 +297,7 @@ document.addEventListener('change', e => {
   if (t.dataset.rcvamt != null && UP.rcv){ UP.rcv.matches[+t.dataset.rcvamt].amount = Math.max(0, r2(num(t.value))); return schedule(); }
   if (!D) return;
   if (t.id === 'dVendor'){ if (t.value === '__new'){ D._addVendor = true; } else { D._addVendor = false; D.vendorId = t.value; } renderVendorBox(); return updateTotals(); }
-  if (t.dataset.d){ D[t.dataset.d] = t.value; return updateTotals(); }
+  if (t.dataset.d){ D[t.dataset.d] = t.value; if (t.dataset.d === 'status' && $('#wFix')) $('#wFix').hidden = t.value !== 'hold'; return updateTotals(); }
   if (t.dataset.l){
     const l = D.lines.find(x => x.id === t.dataset.l), f = t.dataset.f;
     if (f === 'cat'){ l.cat = t.value; l.sub = ''; }

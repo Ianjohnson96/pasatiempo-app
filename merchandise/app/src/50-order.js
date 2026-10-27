@@ -25,6 +25,7 @@ function openOrder(id, preset){
         <div class="f"><label for="dOrder">Order date</label><input id="dOrder" type="date" data-d="orderDate" value="${esc(D.orderDate)}" ${ro ? 'disabled' : ''}></div>
         <div class="f"><label for="dStatus">Status</label><select id="dStatus" data-d="status" ${ro ? 'disabled' : ''}>${Object.entries(STATUS).map(([k,v]) => `<option value="${k}" ${D.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
       </div>
+      <div class="f fixbox" id="wFix" ${D.status === 'hold' ? '' : 'hidden'}><label for="dFix">On hold: what needs fixing</label><textarea id="dFix" data-d="fix" rows="2" ${ro ? 'disabled' : ''} placeholder="e.g. Sizes missing from the confirmation; waiting on quantities">${esc(D.fix || '')}</textarea><div class="hint">Set the status back to Open once it's fixed. On-hold orders still count against the budget.</div></div>
       <div id="dVendorBox"></div>
       <div class="row3">
         <div class="f" id="wCat"><label for="dCat">Main category</label><select id="dCat" data-d="cat" ${ro ? 'disabled' : ''}><option value="">Choose…</option>${catList().map(c => `<option value="${c.code}" ${D.cat === c.code ? 'selected' : ''}>${c.code} · ${esc(c.name)}</option>`).join('')}</select><div class="hint">New lines start in this category</div></div>
@@ -164,9 +165,9 @@ function renderImpactIn(p){
 function validateOrder(p){
   let ok = true; const mark = (id, bad) => { const el = $(id); if (el) el.classList.toggle('err', bad); if (bad) ok = false; };
   mark('#wPo', !p.poNumber); mark('#wVendor', !p.vendorId); mark('#wDel', !p.deliveryMonth);
-  const lineBad = p.lines.some(l => !l.cat || !(num(l.cost) > 0) || !(lineUnits(l) > 0));
+  const lineBad = p.lines.some(l => !l.cat || !(num(l.cost) > 0) || (p.status !== 'hold' && !(lineUnits(l) > 0)));
   mark('#wCat', !p.cat && !p.lines.length);
-  if (p.lines.length && lineBad){ ok = false; toast('Each line needs a category, a unit cost and at least one unit.'); return false; }
+  if (p.lines.length && lineBad){ ok = false; toast(p.status === 'hold' ? 'Each line needs a category and a unit cost.' : 'Each line needs a category, a unit cost and at least one unit. Put the order On hold to save it without quantities.'); return false; }
   if (!p.lines.length && !(num(p.cost) > 0)){ ok = false; toast('Add a line, or enter the order total.'); return false; }
   if (!ok) toast('Fill in the highlighted fields: PO number, vendor and delivery month.');
   return ok;
@@ -176,6 +177,7 @@ async function saveOrder(){
   if (!p.cat && p.lines.length) p.cat = p.lines[0].cat;
   if (!validateOrder(p)) return;
   const v = VENDORS.find(x => x.id === p.vendorId); p.vendorName = v ? v.name : '';
+  if (p.status !== 'hold') delete p.fix;
   if (p.status === 'received' && !num(p.received)){ p.received = poTotal(p); p.receivedDate = p.receivedDate || todayISO; }
   const now = new Date().toISOString();
   const body = {...p, createdBy: DX ? (DX.createdBy || null) : myId, createdAt: DX ? (DX.createdAt || now) : now, updatedBy: myId, updatedAt: now};

@@ -12,7 +12,7 @@ function matchArrivals(A){
   const toM = A.to.slice(0, 7), horizon = addMonths(toM, 2), taken = {}, byPo = {}, loose = [];
   for (const g of A.groups || []){
     let left = num(g.value);
-    const cands = !g.brand ? [] : POS.filter(p => (p.status === 'open' || p.status === 'partial') && String(p.orderDate || '') <= A.to
+    const cands = !g.brand ? [] : POS.filter(p => isOpen(p) && String(p.orderDate || '') <= A.to
         && String(p.deliveryMonth || toM) <= horizon && brandNameFor(vendorName(p)) === g.brand && poParts(p).some(x => x.cat === g.cat))
       .sort((a, b) => String(a.deliveryMonth).localeCompare(String(b.deliveryMonth)) || String(a.orderDate).localeCompare(String(b.orderDate)));
     for (const p of cands){

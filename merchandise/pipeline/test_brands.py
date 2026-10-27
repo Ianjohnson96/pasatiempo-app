@@ -21,6 +21,14 @@ def test_lab_squid_and_the_clubs_own_goods():
     assert brand_of('Misc. Label Maker') is None
 
 
+def test_sdr_is_sun_day_red_and_sd_is_straight_down():
+    assert brand_of('Shirt SDR') == 'Sun Day Red'
+    assert brand_of('Shoes SDR Osprey') == 'Sun Day Red'
+    assert brand_of('Pants SD (Argo)') == 'Straight Down'
+    assert brand_of('Shirt SD Mack Gathering') == 'Straight Down'
+    assert brand_of('Sweater Straight Down') == 'Straight Down'
+
+
 def test_a_sku_split_between_brands():
     m = {'626000': [{'b': 'PRG', 's': 60}, {'b': 'Winston / Vanto / Seamus', 's': 40}]}
     assert brand_split(m, '626000', 'Towel PRG/Winston Large') == [('PRG', 0.6), ('Winston / Vanto / Seamus', 0.4)]

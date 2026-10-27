@@ -42,7 +42,7 @@ Four sections, each with its pages as a row of pills: **Summary**, **Analysis** 
 | Budget | Budget left by category for the chosen fiscal year and month; top to-dos |
 | Forecast | Sales by month for this year and next. Growth, extra category growth and target weeks can be edited as a what-if, and the owner can save them as the plan (`plan/assumptions`) |
 | Open-to-buy | Category × month grid (this FY, next FY, calendar year), the inherited-stock table, and the classic OTB worksheet |
-| Orders | Purchase orders with sizes. Each order is checked against the budget of the fiscal year it arrives in |
+| Orders | Purchase orders with sizes. Each order is checked against the budget of the fiscal year it arrives in. **On hold** marks an order that was placed but needs fixing (missing sizes or quantities, or held by the vendor); `fix` says what. It still counts against the budget, and can be saved with lines that have no quantities yet |
 | Brands | Scorecard by segment with a suggested call (Grow / Keep / Watch / Reduce / Drop). The owner can override a call in `brandCalls/{id}`. Orders link to brands by vendor name |
 | To do | Order alerts plus item suggestions (`insights/current`) |
 | Inventory & counts | On hand by category; quarterly counts |

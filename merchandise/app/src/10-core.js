@@ -21,7 +21,9 @@ const daysBetween = (a,b) => Math.round((Date.parse(b+'T00:00:00') - Date.parse(
 const addMonths = (m, k) => { let y = +m.slice(0,4), mo = +m.slice(5,7) - 1 + k; y += Math.floor(mo/12); mo = ((mo%12)+12)%12; return y + '-' + pad(mo+1); };
 const MONTH_OPTS = (() => { const o = []; for (let m = '2026-06'; m <= '2028-06'; m = addMonths(m,1)) o.push(m); return o; })();
 const uid = () => Math.random().toString(36).slice(2,10);
-const STATUS = {open:'Open', partial:'Partly received', received:'Received', cancelled:'Cancelled'};
+const STATUS = {open:'Open', hold:'On hold', partial:'Partly received', received:'Received', cancelled:'Cancelled'};
+// On hold = placed but something on it needs fixing (p.fix says what). It still counts against the budget like an open order.
+const isOpen = p => p.status === 'open' || p.status === 'partial' || p.status === 'hold';
 const CALLTXT = {buy:'Buy', replenish:'Replenish', stop:'Stop', excluded:'Not in OTB'};
 const CALLHELP = {buy:'Growing and productive — buy within budget.', replenish:'Reorder proven sellers only; no new lines.', stop:'Already overbought — order only against a customer commitment.', excluded:'Customer-ordered; tracked but not budgeted.'};
 const BCALL = {grow:'Grow', keep:'Keep', watch:'Watch', reduce:'Reduce', drop:'Drop', inactive:'Not stocked', special:'Special orders'};
@@ -73,7 +75,7 @@ function poTotal(p){ return (p.lines && p.lines.length) ? r2(p.lines.reduce((a,l
 function poUnits(p){ return (p.lines && p.lines.length) ? p.lines.reduce((a,l) => a + lineUnits(l), 0) : num(p.units); }
 function committed(p){ const cost = poTotal(p), rec = num(p.received);
   if (p.status === 'cancelled') return rec; if (p.status === 'received') return rec || cost; return Math.max(cost, rec); }
-function onOrder(p){ return (p.status === 'open' || p.status === 'partial') ? Math.max(poTotal(p) - num(p.received), 0) : 0; }
+function onOrder(p){ return isOpen(p) ? Math.max(poTotal(p) - num(p.received), 0) : 0; }
 /* Deliveries on an order: receipts [{date, amount, byCat?, source}]. Orders from before deliveries were kept
    one by one have a single delivery of `received` on `receivedDate`. */
 function poReceipts(p){
@@ -85,7 +87,7 @@ function inWindow(m, P){ const w = P.months.map(x => x.m); return m < w[0] ? 'be
 function bucket(p, P = PLAN){
   let m = p.deliveryMonth;
   if (!m) return null;
-  if ((p.status === 'open' || p.status === 'partial') && m < THIS_MONTH) m = THIS_MONTH;
+  if (isOpen(p) && m < THIS_MONTH) m = THIS_MONTH;
   return inWindow(m, P);
 }
 function poParts(p){
@@ -121,7 +123,7 @@ function ledger(list, P = PLAN){
         }
       } else for (const x of parts) push(x, b, num(r.amount) * (tot > 0 ? x.ext / tot : 1 / parts.length), 0);
     }
-    if (p.status !== 'open' && p.status !== 'partial') continue;
+    if (!isOpen(p)) continue;
     const rc = receivedByCat(p), b = bucket(p, P);
     for (const x of parts){
       const got = catExt[x.cat] > 0 ? num(rc[x.cat]) * x.ext / catExt[x.cat] : 0, owed = Math.max(x.ext - got, 0);
