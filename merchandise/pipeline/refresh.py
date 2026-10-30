@@ -226,8 +226,8 @@ def warnings(reports, prior, summary):
     out = []
     if not reports.get('best100'):
         out.append('No cost & margin report (BEST 100): margins stay as they were.')
-    if not reports.get('sales_by_item'):
-        out.append('No Sales by Item report: selling prices stay as they were.')
+    if not reports.get('sales_by_item') and not (reports.get('daily_sales') or {}).get('items'):
+        out.append('No Sales by Item report or Daily Sales export: selling prices stay as they were.')
     if not (prior or {}).get('skusnap'):
         out.append("Deliveries are matched to orders from the next upload on: this one saves the stock snapshot they're worked out from.")
     pb = (prior or {}).get('base') or {}

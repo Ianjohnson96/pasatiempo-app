@@ -45,9 +45,7 @@ export const ITEMS: Record<Cadence, ReportItem[]> = {
   // Keys match the checklist the Month-end page has always used, so earlier ticks still count.
   monthly: [
     { k: "sku", t: "SKU Analysis", d: "PRSHP – SKU Analysis as of the last day, all categories. Must be run on the last day: on-hand can't be recreated later." },
-    { k: "daily", t: "Daily Sales Report by Item", d: "Run for the last day of the month. Gives month-to-date and fiscal-year-to-date sales by category." },
-    { k: "cat", t: "Sales by Category", d: "Net Sales by Category – Pro Shop: the month just closed, and fiscal year to date from May 1." },
-    { k: "item", t: "Sales by Item", d: "Net Sales by Item – Pro Shop, fiscal year to date. Gives each SKU's average selling price." },
+    { k: "daily", t: "Daily Sales Report by Item", d: "Run for the last day of the month, the same day as the SKU Analysis. Gives month-to-date and fiscal-year-to-date sales by category, and each SKU's average selling price." },
     { k: "best", t: "Cost & margin report", d: "PRSHP – BEST 100 based on Quantity Sold, fiscal year to date — without the zero-on-hand filter, past the top 100 if the system allows." },
     { k: "rounds", t: "Rounds Summary", d: "Yearly Rounds Summary by Golfer Classification, calendar year to date." },
     { k: "pos", t: "Every purchase order is in the Order Book", d: "Including phone and show orders, so this month's deliveries have an order to match to." },

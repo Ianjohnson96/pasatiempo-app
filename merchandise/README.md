@@ -143,7 +143,7 @@ On reminder days, `/api/cron/merch` (Vercel Cron, 15:00 UTC, about 8 am Pacific)
 
 ## Month-end refresh
 
-1. Pull the month-end reports (see the Month-end page): SKU Analysis, Daily Sales Report by Item, Sales by Item (FYTD) and BEST 100 cost & margin (FYTD). The checklist also lists Sales by Category (FYTD), which is kept for the record; only a full-year Sales by Category changes the forecast. Add the Yearly Rounds Summary when it's available. Excel exports read in seconds; PDFs take up to a minute.
+1. Pull the month-end reports (see the Month-end page): SKU Analysis, Daily Sales Report by Item (the same day) and BEST 100 cost & margin (FYTD). The Daily Sales Report gives sales by category and each SKU's average selling price (fiscal-year-to-date sales over units), so Sales by Item and Sales by Category aren't needed during the year; a Sales by Item still wins for prices if one is uploaded, and only a full-year Sales by Category changes the forecast. BEST 100 stays: it's the only report with markdowns and the cost of what actually sold. Add the Yearly Rounds Summary when it's available. Excel exports read in seconds; PDFs take up to a minute.
 2. As the owner, open **Month-end → Update from this month's reports** and choose all the files at once. The report type is detected from each file's contents, so file names don't matter.
 3. The page shows how each file was read, any warnings (a missing report, or data older than what's loaded), and the new numbers next to the current ones. Nothing changes until **Update the program**, which loads the new data file through `/merch/api/import`.
 

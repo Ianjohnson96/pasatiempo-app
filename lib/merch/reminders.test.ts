@@ -8,7 +8,7 @@ describe("reminder email", () => {
     const m = reminderEmail("2026-09-30", due, "https://example.test/merch#reports");
     expect(m.subject).toBe("Pro Shop reports: Sep month-end due today · Week of Sep 28 overdue");
     expect(m.text).toContain("Run the SKU Analysis today");
-    expect(m.text).toContain("Sep month-end (due today), 8 left:");
+    expect(m.text).toContain("Sep month-end (due today), 6 left:");
     expect(m.text).not.toContain("Daily Sales Report by Item");
     expect(m.html).toContain('href="https://example.test/merch#reports"');
   });

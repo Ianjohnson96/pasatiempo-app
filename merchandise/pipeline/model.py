@@ -205,7 +205,9 @@ def build(reports, prior=None):
     hist = merge_history(skus, {k: v for k, v in phist.items() if k.startswith('FY')})
     pmeta = dict(phist.get('meta', {}))
     split_recycled(hist, pmeta, prior.get('brandmap'))
-    price = prices(reports.get('sales_by_item', []), pmeta, snap)
+    # Prices: fiscal year to date from a Daily Sales export (sales and units per SKU), then a Sales by Item over it
+    from_daily = [{s: dict(units=v['fytd_u'], value=v['fytd']) for s, v in daily['items'].items()}] if daily and daily.get('items') else []
+    price = prices(from_daily + reports.get('sales_by_item', []), pmeta, snap)
 
     # category of each SKU: snapshot, then prior meta
     cat_of = {s: v[0] for s, v in pmeta.items()}

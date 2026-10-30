@@ -123,3 +123,16 @@ def test_daily_sales_export_from_another_day_is_left_out():
         return buf.getvalue().encode()
     reports, found = refresh.read_reports([('Daily.csv', csv_bytes(daily_rows(off=3))), ('Sku.csv', csv_bytes(sku_rows()))])
     assert 'daily_sales' not in reports and not found[0]['ok'] and 'same day' in found[0]['note']
+
+
+def test_a_daily_sales_export_stands_in_for_sales_by_item():
+    import csv, io
+    def csv_bytes(rows):
+        buf = io.StringIO()
+        csv.writer(buf).writerows([[v for v, _ in r] for r in rows])
+        return buf.getvalue().encode()
+    summary = dict(fy='FY2027', ytd=0, asOf='2026-09-30')
+    sku_only, _ = refresh.read_reports([('Sku.csv', csv_bytes(sku_rows()))])
+    assert any('Sales by Item' in w for w in refresh.warnings(sku_only, None, summary))
+    reports, _ = refresh.read_reports([('Daily.csv', csv_bytes(daily_rows())), ('Sku.csv', csv_bytes(sku_rows()))])
+    assert not any('Sales by Item' in w for w in refresh.warnings(reports, None, summary))

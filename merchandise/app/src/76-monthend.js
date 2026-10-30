@@ -3,9 +3,7 @@
 let REFRESHES = [], CHECKS = {};
 const MONTH_END = [
   {k: 'sku', t: 'SKU Analysis', d: 'PRSHP – SKU Analysis as of the last day, all categories. Must be run on the last day: on-hand can\'t be recreated later.'},
-  {k: 'daily', t: 'Daily Sales Report by Item', d: 'Run for the last day of the month. Gives month-to-date and fiscal-year-to-date sales by category.'},
-  {k: 'cat', t: 'Sales by Category', d: 'Net Sales by Category – Pro Shop, fiscal year to date from May 1.'},
-  {k: 'item', t: 'Sales by Item', d: 'Net Sales by Item – Pro Shop, fiscal year to date. Gives each SKU\'s average selling price.'},
+  {k: 'daily', t: 'Daily Sales Report by Item', d: 'Run for the last day of the month, the same day as the SKU Analysis. Gives month-to-date and fiscal-year-to-date sales by category, and each SKU\'s average selling price.'},
   {k: 'best', t: 'Cost & margin report', d: 'PRSHP – BEST 100 based on Quantity Sold, fiscal year to date — past the top 100 if the system allows.'},
   {k: 'pos', t: 'Every purchase order is in the Order Book', d: 'Including phone and show orders, so this month\'s deliveries have an order to match to.'},
   {k: 'recv', t: 'Receipts entered in the POS', d: 'Every box that came in is received in the POS before the SKU Analysis runs.'},
