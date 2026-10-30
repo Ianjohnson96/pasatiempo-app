@@ -101,6 +101,14 @@ def test_a_new_description_is_flagged_until_answered():
     assert open_desc_changes(got, {'recycled': {'A1': {'from': '2025-01', 'at': '2025-02-01T09:00:00Z'}}}) == got  # an older reuse
 
 
+def test_a_description_the_pdf_cut_off_is_the_same_product():
+    snap = {'C3': dict(sku='C3', desc='Balls Titleist Pro-V1 3 Ball Tin', cat_no='160'), 'D4': dict(sku='D4', desc='Sweater SDR', cat_no='490')}
+    prev = {'skus': {'C3': [50.0, 3, 20.0, 'Aug01/26', 'Balls Titleist Pro-V1 3 B'], 'D4': [40.0, 1, 20.0, 'Aug01/26', 'Sweater Sun Mtn']},
+            'changed': {'C3': dict(was='Balls Titleist Pro-V1 3 B', wasCat='160', now='Balls Titleist Pro-V1 3 Ball Tin', at='earlier')}}
+    got = desc_changes(prev, snap, {}, {}, 'now')
+    assert list(got) == ['D4']  # the old flag on C3 is dropped too
+
+
 def test_subcategories_from_descriptions_and_the_programs_choice():
     assert sub_auto('620', 'Winston/Vanto/Seamus Dr Cover') == 's-620-headcovers'
     assert sub_auto('620', 'Misc. PRG Bag Tag') == 's-620-bag-tags'  # before totes & pouches ("bag")

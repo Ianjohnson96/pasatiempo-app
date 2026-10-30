@@ -107,6 +107,13 @@ def _norm_desc(d):
     return re.sub(r'\s+', ' ', str(d or '')).strip().lower()
 
 
+def same_desc(a, b):
+    """The same product's description: equal but for case, spacing and punctuation, or one the start of the
+    other (the PDF SKU Analysis cuts descriptions off at 25 characters; the Excel export doesn't)."""
+    a, b = (re.sub(r'[^a-z0-9]', '', str(x or '').lower()) for x in (a, b))
+    return a == b or (min(len(a), len(b)) >= 8 and (a.startswith(b) or b.startswith(a)))
+
+
 def open_desc_changes(changed, bm):
     """The new-description flags nobody has answered yet. A flag is answered when the SKU is marked reused
     after the flag was raised (brandmap "recycled"), or marked the same product for that description
@@ -131,11 +138,11 @@ def desc_changes(prev_inputs, snap, meta, bm, now):
     out = {}
     for sku, v in ((prev_inputs or {}).get('changed') or {}).items():
         r = snap.get(sku)
-        if r and _norm_desc(r['desc']) == _norm_desc(v.get('now')):
+        if r and _norm_desc(r['desc']) == _norm_desc(v.get('now')) and not same_desc(v.get('was'), v.get('now')):
             out[sku] = v
     for sku, r in snap.items():
         old = (before.get(sku) or [None] * 5)[4]
-        if old and _norm_desc(old) != _norm_desc(r['desc']):
+        if old and not same_desc(old, r['desc']):
             out[sku] = dict(was=old, wasCat=(meta.get(sku) or [None])[0], now=r['desc'], at=now)
     return open_desc_changes(out, bm)
 
