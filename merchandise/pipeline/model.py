@@ -286,7 +286,7 @@ def build(reports, prior=None):
         if not is_month_end:
             partial = dict(m=cur, actual=round(daily['report']['mtd'], 2), day=as_of.day, days=monthrange(as_of.year, as_of.month)[1])
         for name, v in daily['cats'].items():
-            code = DAILY_NAMES.get(name)
+            code = DAILY_NAMES.get(name) or (name if name in MERCH else None)  # an export's are keyed by number
             if code and v['tot']:
                 ytd_cat[code] = v['tot']['fytd']
     else:

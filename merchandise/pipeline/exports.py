@@ -13,6 +13,9 @@ and the sales reports' period are worked out:
                     rows: the groups are added up here, and the year comes from the file name or the SKU Analysis
   BEST 100          category no, category, rank, SKU, description, quantity sold, sales, cost,
                     margin (a fraction: 0.496), markdown; at most 100 SKUs per category
+  Daily Sales       sales area no, area, SKU, description, then today, month to date and fiscal year to date,
+                    each as amount, units, average price. No categories and no date: both come from the
+                    SKU Analysis (daily_from_sku). It lists green fees, gift cards and payments too
 
 The sales reports list each sales area, then the same rows again under "All Sales Areas" (no area
 number); the second pass is left out. Their period is the run of months, ending at the SKU
@@ -96,7 +99,12 @@ def _is_best_row(r):
             and _nums(r, range(5, 10)))
 
 
-TESTS = (('sku_analysis', _is_sku_row), ('best100', _is_best_row), ('sales_by_category', _is_cat_row), ('sales_by_item', _is_item_row))
+def _is_daily_row(r):
+    return len(r) == 13 and _t(r[2]) != '' and _num(r[3]) is None and _nums(r, range(4, 13))
+
+
+TESTS = (('sku_analysis', _is_sku_row), ('best100', _is_best_row), ('sales_by_category', _is_cat_row), ('sales_by_item', _is_item_row),
+         ('daily_sales', _is_daily_row))
 
 
 MONTHS_FULL = ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')
@@ -186,6 +194,46 @@ def parse_sales_by_item(rows):
     return out
 
 
+DAILY_KEYS = ('mtd', 'mtd_u', 'fytd', 'fytd_u')
+
+
+def parse_daily_sales(rows):
+    """Daily Sales Report by Item, per SKU. Categories, totals and the date are filled in by daily_from_sku()."""
+    items = {}
+    for r in _sales_rows([r for r in _values(rows) if _is_daily_row(r)]):
+        s = items.setdefault(_t(r[2]), dict(desc=_t(r[3]), **{k: 0.0 for k in DAILY_KEYS}))
+        for k, i in zip(DAILY_KEYS, (7, 8, 10, 11)):
+            s[k] += _num(r[i])
+    return dict(date=None, cats={}, report=None, items=items)
+
+
+def daily_from_sku(d, sku, merch):
+    """Give a Daily Sales export the shape parse.parse_daily_sales returns (cats by category number), from the
+    SKU Analysis run with it. Only SKUs in the merchandise categories count. The date is the SKU Analysis's
+    latest sale, the day both run through, so the month-to-date units have to be its newest month's.
+    Returns False (and fills in nothing) when they aren't."""
+    snap = {r['sku']: r for r in sku['rows']}
+    sold = [(v['mtd_u'], snap[s]['mo'].get(sku['months'][0], 0)) for s, v in d['items'].items() if s in snap and v['mtd_u']]
+    if not sku.get('day') or len(sold) < 10 or sum(1 for a, b in sold if abs(a - b) <= 0.5) < len(sold) * 0.9:
+        return False
+    zero = lambda: {k: 0.0 for k in DAILY_KEYS}
+    cats, report = {}, zero()
+    for s, v in d['items'].items():
+        c = snap[s]['cat_no'] if s in snap else None
+        if c not in merch:
+            continue
+        cat = cats.setdefault(c, dict(items=[], tot=zero()))
+        cat['items'].append(dict(desc=v['desc'], **{k: v[k] for k in DAILY_KEYS}))
+        for k in DAILY_KEYS:
+            cat['tot'][k] += v[k]
+            report[k] += v[k]
+    rnd = lambda t: {k: round(x, 2) for k, x in t.items()}
+    for cat in cats.values():
+        cat['tot'] = rnd(cat['tot'])
+    d.update(date=sku['day'], cats=cats, report=rnd(report))
+    return True
+
+
 def parse_best100(rows):
     """Same shape as parse.parse_best100; the period is worked out later (infer_period). 'cut' lists the
     categories that stop at 100 SKUs while still selling, so some of their sales are missing."""
@@ -227,7 +275,8 @@ def parse_rounds(rows, name=''):
     return dict(year=int(y.group(1)) if y else None, rows={k: m + [sum(m)] for k, m in out.items()})
 
 
-PARSE = {'sku_analysis': parse_sku_analysis, 'sales_by_category': parse_sales_by_category, 'sales_by_item': parse_sales_by_item, 'best100': parse_best100, 'rounds': parse_rounds}
+PARSE = {'sku_analysis': parse_sku_analysis, 'sales_by_category': parse_sales_by_category, 'sales_by_item': parse_sales_by_item, 'best100': parse_best100,
+         'rounds': parse_rounds, 'daily_sales': parse_daily_sales}
 
 
 def units_of(kind, d):

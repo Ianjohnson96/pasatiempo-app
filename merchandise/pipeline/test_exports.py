@@ -92,3 +92,34 @@ def test_rounds_export_gets_its_year_in_read_reports():
     rnd = [cells(*head)] + [cells('1MBR', 'Member Rounds', 'MBR', 'Member', *[1] * 36)] * 3
     reports, found = refresh.read_reports([('Rounds.xlsx', xlsx(rnd)), ('Sku.xlsx', xlsx(sku_rows()))])
     assert reports['rounds'][0]['year'] == 2026 and found[0]['ok']
+
+
+def daily_rows(off=0):
+    """Daily Sales Report by Item export: today, month to date, fiscal year to date (amount, units, average)."""
+    rows = [cells('07', 'Pro Shop', f'6200{i:02d}', f'Item {i}', 0, 0, 0, (i + 1 + off) * 20.0, i + 1 + off, 20.0,
+                  5 * (i + 1) * 20.0, 5 * (i + 1), 20.0) for i in range(12)]
+    rows.append(cells('07', 'Pro Shop', '010001', 'Green Fee - Public 18', 0, 0, 0, 4650.0, 10, 465.0, 46500.0, 100, 465.0))
+    return rows
+
+
+def test_headerless_daily_sales_takes_categories_and_date_from_the_sku_analysis():
+    import csv, io
+    def csv_bytes(rows):
+        buf = io.StringIO()
+        csv.writer(buf).writerows([[v for v, _ in r] for r in rows])
+        return buf.getvalue().encode()
+    assert exports.detect(daily_rows()) == 'daily_sales'
+    reports, found = refresh.read_reports([('Daily.csv', csv_bytes(daily_rows())), ('Sku.csv', csv_bytes(sku_rows()))])
+    d = reports['daily_sales']
+    assert found[0]['ok'] and d['date'] == '2026-09-30' and list(d['cats']) == ['620']  # the green fee isn't merchandise
+    assert d['report'] == dict(mtd=1560.0, mtd_u=78.0, fytd=7800.0, fytd_u=390.0) and d['cats']['620']['tot'] == d['report']
+
+
+def test_daily_sales_export_from_another_day_is_left_out():
+    import csv, io
+    def csv_bytes(rows):
+        buf = io.StringIO()
+        csv.writer(buf).writerows([[v for v, _ in r] for r in rows])
+        return buf.getvalue().encode()
+    reports, found = refresh.read_reports([('Daily.csv', csv_bytes(daily_rows(off=3))), ('Sku.csv', csv_bytes(sku_rows()))])
+    assert 'daily_sales' not in reports and not found[0]['ok'] and 'same day' in found[0]['note']

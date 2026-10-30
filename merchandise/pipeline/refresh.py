@@ -22,7 +22,7 @@ import exports
 import model
 import parse
 import receipts
-from config import OTB_EXCLUDE, REPLENISH
+from config import CATS, OTB_EXCLUDE, REPLENISH
 from extract import SHEETS, detect_kind, is_sheet, pdf_text, rows_text, sheet_rows
 
 LISTS = ('sku_analysis', 'rounds', 'sales_by_item', 'sales_by_category', 'best100')
@@ -90,7 +90,8 @@ def read_reports(files):
         seen[h] = len(found)
         try:
             d = (exports.parse_rounds(rows, name) if k == 'rounds' else exports.PARSE[k](rows)) if export else getattr(parse, 'parse_' + k)(t)
-            ok = bool(d['rows']) if export and k == 'rounds' else HAS_ROWS[k](d)  # its year can come from the SKU Analysis
+            # a rounds export's year and a daily sales export's date can come from the SKU Analysis
+            ok = bool(d['rows']) if export and k == 'rounds' else bool(d['items']) if export and k == 'daily_sales' else HAS_ROWS[k](d)
         except Exception:
             ok = False
         if not ok:
@@ -113,6 +114,14 @@ def read_reports(files):
             reports[k] = d
     sku = max(reports.get('sku_analysis', []), key=lambda r: r['as_of'], default=None)
     for k, d, f in undated:
+        if k == 'daily_sales':
+            if sku and exports.daily_from_sku(d, sku, CATS):
+                f['detail'] = f"month and fiscal year to date, through {_day(d['date'])} (the SKU Analysis's date: the file has no dates)"
+            else:
+                del reports[k]
+                f.update(ok=False, note="The file has no date, and its month-to-date units don't match the SKU Analysis's newest month. "
+                                        "Run it on the same day as the SKU Analysis, or use the PDF.")
+            continue
         per = exports.infer_period(exports.units_of(k, d), sku) if sku else None
         if per:
             if k in ('sales_by_category', 'best100'):
