@@ -10,9 +10,11 @@ import Link from "next/link";
 // the pages now load both at once.
 
 const TABS = [
-  // "Home", not "Dashboard": five tabs have to fit across a phone.
+  // "Home", not "Dashboard": these have to fit across a phone, and at six the
+  // row scrolls sideways rather than wrapping onto a second line.
   { href: "/lessons", key: "dashboard", label: "Home" },
   { href: "/lessons/schedule", key: "schedule", label: "Schedule" },
+  { href: "/lessons/ledger", key: "ledger", label: "Lessons" },
   { href: "/lessons/billing", key: "billing", label: "Billing" },
   { href: "/lessons/clients", key: "clients", label: "Clients" },
   { href: "/lessons/review", key: "review", label: "Review" },

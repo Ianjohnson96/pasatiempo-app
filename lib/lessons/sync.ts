@@ -177,13 +177,19 @@ export async function syncLessons(opts?: {
       }
     }
 
-    const byUid = new Map<string, { id: string }>();
+    // The stored status travels with the id: a lesson Ian has marked as never
+    // having happened must not be quietly restored by the next run.
+    const byUid = new Map<string, { id: string; status: string | null }>();
     // The adoption index: seeded rows have no uid, so the only way to
     // recognise them is who and when.
     const byClientStart = new Map<string, { id: string; uid: string | null }>();
     for (const l of existing ?? []) {
       const uid = l.calendar_uid as string | null;
-      if (uid) byUid.set(uid, { id: l.id as string });
+      if (uid)
+        byUid.set(uid, {
+          id: l.id as string,
+          status: (l.status as string | null) ?? null,
+        });
       if (l.client_id && l.starts_at) {
         const key = `${l.client_id}|${new Date(l.starts_at as string).toISOString()}`;
         byClientStart.set(key, { id: l.id as string, uid });
@@ -250,6 +256,15 @@ export async function syncLessons(opts?: {
 
       const known = byUid.get(ev.uid);
       if (known) {
+        // Ian's answer outranks the calendar's. He marks a lesson that never
+        // happened in the book, not in Outlook - the event stays on the
+        // calendar either way - so recomputing the status from the event
+        // would undo him every night and silently re-bill the lesson.
+        const kept =
+          (known.status === "cancelled" || known.status === "no_show") &&
+          !ev.isCancelled
+            ? known.status
+            : status;
         if (dryRun) {
           report.updated++;
         } else {
@@ -258,7 +273,7 @@ export async function syncLessons(opts?: {
             .update({
               starts_at: ev.startsAt,
               ends_at: ev.endsAt,
-              status,
+              status: kept,
               title_raw: ev.subject,
             })
             .eq("id", known.id);
@@ -299,7 +314,7 @@ export async function syncLessons(opts?: {
         }
         // Keep the indexes honest, so a second event claiming the same slot
         // in this same run updates the row instead of inserting beside it.
-        byUid.set(ev.uid, { id: adoptable.id });
+        byUid.set(ev.uid, { id: adoptable.id, status });
         adoptable.uid = ev.uid;
         continue;
       }

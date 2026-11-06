@@ -45,6 +45,121 @@ export function nameFromTitle(subject: string): string {
   return s.replace(/\s+/g, " ").trim();
 }
 
+// What Ian already wrote on the calendar.
+//
+// He has kept the answer in the event title for two years - "lesson 3 of 5",
+// "lesson 2 series 5", "lesson 1 of 5 [paid]" - and until now the book threw
+// all of it away and asked him again. 135 of 312 titles carry a hint.
+//
+// Two shapes, because he writes both:
+//
+//   "lesson 3 of 5"      the 3rd of a five-lesson package
+//   "lesson 2 series 5"  the 2nd lesson of his 5th series with that client
+//
+// They combine ("lesson 4 of 5 series 2"), and the series number also turns up
+// bracketed ("lesson 1 of 5 [series 2]"). Only "of N" states the package SIZE;
+// a bare series number says which block, not how long it runs.
+//
+// Nothing here decides anything. It reads a string and reports what it saw, so
+// the screen can offer it and Ian can say no.
+
+export interface TitleHints {
+  /** Which lesson of the series, 1-based. "lesson 3 of 5" -> 3 */
+  index: number | null;
+  /** How many lessons the package holds. Only "of N" says this. */
+  size: number | null;
+  /** Which block of lessons: "series 2" -> 2. Not a size. */
+  series: number | null;
+  /** The title says the money is in. */
+  paid: boolean;
+  /** Anything bracketed that was not a payment or series marker. */
+  aside: string | null;
+}
+
+export const NO_HINTS: TitleHints = {
+  index: null,
+  size: null,
+  series: null,
+  paid: false,
+  aside: null,
+};
+
+/** 1-40. A package of 50 is a typo, and a year is not a lesson count. */
+function smallCount(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 1 && n <= 40 ? n : null;
+}
+
+export function readTitle(titleRaw: string | null | undefined): TitleHints {
+  const title = (titleRaw ?? "").trim();
+  if (!title) return NO_HINTS;
+
+  // "3 of 5", "3 / 5". The word "lesson" need not be in front of it.
+  const ofMatch = /\b(\d{1,2})\s*(?:of|\/)\s*(\d{1,2})\b/i.exec(title);
+  // Read the series before falling back to a bare index, or "lesson 2
+  // series 5" takes the 5 for the position.
+  const seriesMatch = /\bseries\s*(\d{1,2})\b/i.exec(title);
+
+  let index = smallCount(ofMatch?.[1]);
+  const size = smallCount(ofMatch?.[2]);
+  const series = smallCount(seriesMatch?.[1]);
+
+  // "lesson 2 series 5": no "of", so the number after "lesson" is the
+  // position. Only trusted when a series number follows, which is the form he
+  // actually writes - a bare "lesson 2" is too thin to guess from.
+  if (index === null && series !== null) {
+    index = smallCount(/\blessons?\s*(\d{1,2})\b/i.exec(title)?.[1]);
+  }
+
+  // A package cannot be "7 of 5". When the two disagree keep the size and drop
+  // the position: the size is the figure he writes deliberately.
+  if (index !== null && size !== null && index > size) index = null;
+
+  // "not paid" is not paid - nameFromTitle has the same ordering trap.
+  const paid =
+    /\bpaid\b/i.test(title) && !/\b(?:not\s+paid|unpaid|no\s+pay)\b/i.test(title);
+
+  // Bracketed text that is neither the series nor the payment note is
+  // something he wanted to remember - usually who was in the group.
+  const asides: string[] = [];
+  for (const m of title.matchAll(/[[(]([^\])]*)[\])]/g)) {
+    const inner = m[1].trim();
+    if (!inner) continue;
+    if (/^series\s*\d{1,2}$/i.test(inner)) continue;
+    if (/^(?:un)?paid\b/i.test(inner)) continue;
+    asides.push(inner);
+  }
+
+  return {
+    index,
+    size,
+    series,
+    paid,
+    aside: asides.length ? asides.join("; ") : null,
+  };
+}
+
+/** "3rd of 5 · series 2 · paid", or null when the title said nothing. */
+export function hintSummary(h: TitleHints): string | null {
+  const bits: string[] = [];
+  if (h.index !== null && h.size !== null) bits.push(`${ordinal(h.index)} of ${h.size}`);
+  else if (h.size !== null) bits.push(`${h.size}-pack`);
+  else if (h.index !== null) bits.push(`${ordinal(h.index)} lesson`);
+  if (h.series !== null) bits.push(`series ${h.series}`);
+  if (h.paid) bits.push("paid");
+  return bits.length ? bits.join(" · ") : null;
+}
+
+function ordinal(n: number): string {
+  const teen = n % 100;
+  if (teen >= 11 && teen <= 13) return `${n}th`;
+  if (n % 10 === 1) return `${n}st`;
+  if (n % 10 === 2) return `${n}nd`;
+  if (n % 10 === 3) return `${n}rd`;
+  return `${n}th`;
+}
+
 export type ReviewState = "waiting" | "dismissed" | null;
 
 /**

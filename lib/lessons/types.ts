@@ -338,6 +338,75 @@ export interface PackageOption {
   lastLessonAt: string | null;
 }
 
+// ---- the lesson ledger ----------------------------------------------------
+// Every lesson in date order, with whatever is known about the money on it.
+//
+// The other screens come at this from the money's side: here is a package,
+// what paid for it? This one comes from the lesson's side, because that is the
+// order Ian remembers his work in - and 74 lessons with nothing against them
+// are only findable by walking the days.
+
+/** A Venmo payment that might be the one that paid for a given lesson. */
+export interface LedgerCandidate {
+  id: string;
+  payerName: string;
+  note: string;
+  amountCents: number;
+  paidOn: string;
+  /** Days from lesson to payment. Negative means paid in advance. */
+  dayGap: number;
+  /** Why it is being offered, for the line underneath it. */
+  why: string;
+}
+
+/** The package a lesson comes out of, when it has one. */
+export interface LedgerPack {
+  id: string;
+  kind: "package" | "single";
+  size: number;
+  /** Lessons taught against it, this one included. */
+  used: number;
+  /** size - used, never below zero. */
+  left: number;
+  priceCents: number | null;
+  paymentStatus: PaymentStatus;
+  paymentMethod: string | null;
+  soldOn: string | null;
+}
+
+export interface LedgerRow {
+  id: string;
+  startsAt: string;
+  status: LessonStatus;
+  titleRaw: string | null;
+  clientId: string | null;
+  clientName: string;
+  isMember: boolean;
+  /** Null when the lesson is on nothing - the ones that need the work. */
+  pack: LedgerPack | null;
+  /** What the calendar title says, summarised: "3rd of 5 · paid". */
+  hint: string | null;
+  /** The package size the title claims, for offering to build one. */
+  hintSize: number | null;
+  /** The title says the money is in, whatever the book says. */
+  hintPaid: boolean;
+  /** Untied Venmo payments that could be this lesson, best first. */
+  candidates: LedgerCandidate[];
+  /** What this client paid last time, to fill the form in. */
+  lastPriceCents: number | null;
+  lastMethod: PayMethod | null;
+  /** Another lesson for the same client at the same moment. */
+  duplicateOf: string | null;
+}
+
+export interface LedgerData {
+  rows: LedgerRow[];
+  /** Past lessons carrying no package at all. */
+  unbilledCount: number;
+  /** Every untied payment, for when none of the offered ones is right. */
+  loose: LedgerCandidate[];
+}
+
 /** "5-pack · Sep 19 → Dec 10 · 3 of 5 · unpaid" */
 export function packageOptionLabel(p: PackageOption): string {
   const what = p.kind === "single" ? "Single" : `${p.size}-pack`;

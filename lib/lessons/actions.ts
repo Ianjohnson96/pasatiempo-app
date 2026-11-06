@@ -15,7 +15,7 @@ import {
   parseDollars,
   singleRate,
 } from "./calc";
-import type { PaymentStatus, Result } from "./types";
+import type { PayMethod, PaymentStatus, Result } from "./types";
 
 // Write-side for the lesson book.
 //
@@ -31,6 +31,7 @@ const CLIENTS = "/lessons/clients";
 const REVIEW = "/lessons/review";
 const PRICES = "/lessons/prices";
 const SCHEDULE = "/lessons/schedule";
+const LEDGER = "/lessons/ledger";
 
 function fail(e: unknown, fallback: string): { ok: false; error: string } {
   const msg =
@@ -45,6 +46,7 @@ function touched(clientId?: string) {
   revalidatePath(CLIENTS);
   revalidatePath(PRICES);
   revalidatePath(SCHEDULE);
+  revalidatePath(LEDGER);
   if (clientId) revalidatePath(`${CLIENTS}/${clientId}`);
 }
 
@@ -358,15 +360,20 @@ export async function resolveReview(
 
     const startsAt = row.starts_at as string;
 
-    // The seeded lessons carry no calendar link, so most queued entries are
-    // lessons already in the book. Inserting would count them twice: adopt
-    // the existing one for this client at this moment instead.
+    // Most queued entries are lessons already in the book, so inserting would
+    // count them twice: adopt the existing one for this client at this moment
+    // instead.
+    //
+    // Any uid, not just a missing one. Exchange entry ids are not permanent,
+    // and a row whose uid has gone stale is still that lesson - the sync
+    // learned this the night 94 ids rotated and the book grew a second copy
+    // of everything. Answering two Review entries on 6 November made two more
+    // the same way, because this query still asked for a null uid.
     const { data: seeded, error: sErr } = await supa
       .from("lessons")
       .select("id")
       .eq("client_id", clientId)
       .eq("starts_at", startsAt)
-      .is("calendar_uid", null)
       .limit(1);
     if (sErr) throw sErr;
 
@@ -1395,8 +1402,265 @@ export async function tiePaymentToPackage(
 
     revalidatePath("/lessons/payments");
     revalidatePath(BOOK);
+    revalidatePath(LEDGER);
     return { ok: true, value: undefined };
   } catch (e) {
     return fail(e, "Could not tie that payment to a package.");
+  }
+}
+
+// ---- the lesson ledger ----------------------------------------------------
+// One lesson at a time, from the lesson's side. Everything below writes the
+// same shapes the rest of the book uses - money on a package, never on a
+// lesson - so a row settled here is indistinguishable from one settled on the
+// Billing screen.
+
+export interface LedgerPay {
+  /** Integer cents. Null is refused: a paid single worth nothing hides a gap. */
+  priceCents: number | null;
+  method: PayMethod | null;
+  status: PaymentStatus;
+  /** Course-local date the money moved. Defaults to the lesson's own day. */
+  paidOn?: string | null;
+  /** A Venmo payment to tie to the single this creates. */
+  paymentId?: string | null;
+}
+
+/**
+ * Put an amount and a payment on one lesson, and tie the Venmo row that paid
+ * for it.
+ *
+ * The lesson becomes its own single, the way billLessons does it - but one at
+ * a time, with its own date and its own method, because walking 74 lessons by
+ * day means each one is answered on its own terms rather than in a block.
+ *
+ * Re-running on an already-billed lesson edits that single rather than making
+ * a second one, so a corrected amount does not double the takings.
+ */
+export async function setLessonPayment(
+  lessonId: string,
+  pay: LedgerPay,
+): Promise<Result<{ packageId: string }>> {
+  try {
+    await assertLessonBook();
+    if (pay.priceCents === null) {
+      return { ok: false, error: "Enter an amount." };
+    }
+    if (!Number.isInteger(pay.priceCents) || pay.priceCents < 0) {
+      return { ok: false, error: "That is not a valid amount." };
+    }
+    if (pay.method !== null && !METHODS.has(pay.method)) {
+      return { ok: false, error: "That is not a payment method." };
+    }
+    if (!["unpaid", "pending", "paid"].includes(pay.status)) {
+      return { ok: false, error: "That is not a payment state." };
+    }
+
+    const supa = await lessonBookClient();
+    const { data: lesson, error: lErr } = await supa
+      .from("lessons")
+      .select("id, client_id, package_id, starts_at")
+      .eq("id", lessonId)
+      .maybeSingle();
+    if (lErr) throw lErr;
+    if (!lesson) return { ok: false, error: "That lesson is no longer in the book." };
+    const clientId = lesson.client_id as string | null;
+    if (!clientId) {
+      return { ok: false, error: "Give that lesson a student before billing it." };
+    }
+
+    const day = courseDay(lesson.starts_at as string);
+    const paidOn = pay.status === "paid" ? (pay.paidOn?.trim() || day) : null;
+    const fields = {
+      price_cents: pay.priceCents,
+      payment_status: pay.status,
+      payment_method: pay.status === "unpaid" ? null : pay.method,
+      paid_on: paidOn,
+    };
+
+    // Already on a package? Edit that one - but only when it is this lesson's
+    // own single. A real package is shared with its other lessons, and
+    // rewriting its price from one of them would misprice the rest.
+    let packageId = lesson.package_id as string | null;
+    if (packageId) {
+      const { data: existing, error: pErr } = await supa
+        .from("lesson_packages")
+        .select("id, kind")
+        .eq("id", packageId)
+        .maybeSingle();
+      if (pErr) throw pErr;
+      if (existing && existing.kind !== "single") {
+        return {
+          ok: false,
+          error: "That lesson is part of a package - price the package itself.",
+        };
+      }
+      const { error } = await supa
+        .from("lesson_packages")
+        .update(fields)
+        .eq("id", packageId);
+      if (error) throw error;
+    } else {
+      const { data: made, error } = await supa
+        .from("lesson_packages")
+        .insert({ client_id: clientId, size: 1, kind: "single", sold_on: day, ...fields })
+        .select("id")
+        .single();
+      if (error) throw error;
+      packageId = made.id as string;
+
+      const { data: moved, error: mErr } = await supa
+        .from("lessons")
+        .update({ package_id: packageId })
+        .eq("id", lessonId)
+        .is("package_id", null)
+        .select("id");
+      if (mErr) throw mErr;
+      if (!moved?.length) {
+        // Billed from another screen a moment ago. Drop the single rather
+        // than leave it hanging where it will read as money owed.
+        await supa.from("lesson_packages").delete().eq("id", packageId);
+        return { ok: false, error: "That lesson was just billed somewhere else." };
+      }
+    }
+
+    // Tie the Venmo row last: it is the only part that can fail without
+    // leaving the book wrong, and a bill with an untied payment is still
+    // better than no bill.
+    if (pay.paymentId) {
+      const { error } = await supa
+        .from("lesson_payments")
+        .update({
+          package_id: packageId,
+          lesson_id: null,
+          decided_by: "ian",
+          decided_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", pay.paymentId);
+      if (error) throw error;
+      revalidatePath("/lessons/payments");
+    }
+
+    touched(clientId);
+    revalidatePath("/lessons/billing");
+    return { ok: true, value: { packageId } };
+  } catch (e) {
+    return fail(e, "Could not put that payment on the lesson.");
+  }
+}
+
+/**
+ * The lesson never happened.
+ *
+ * Marked, not deleted. Deleting is wrong twice over: the calendar event still
+ * exists, so tonight's sync would put the row straight back, and a package
+ * would lose the audit trail of a lesson that was booked and dropped. A
+ * cancelled lesson counts toward no package - lesson_package_status only
+ * counts 'completed' - so the series gets its slot back by itself.
+ *
+ * Pass back "completed" to undo.
+ */
+export async function setLessonHappened(
+  lessonId: string,
+  status: "cancelled" | "no_show" | "completed",
+): Promise<Result> {
+  try {
+    await assertLessonBook();
+    if (!["cancelled", "no_show", "completed"].includes(status)) {
+      return { ok: false, error: "That is not a lesson state." };
+    }
+    const supa = await lessonBookClient();
+    const { data, error } = await supa
+      .from("lessons")
+      .update({ status })
+      .eq("id", lessonId)
+      .select("client_id");
+    if (error) throw error;
+    if (!data?.length) return { ok: false, error: "That lesson is no longer in the book." };
+
+    touched((data[0].client_id as string) ?? undefined);
+    return { ok: true, value: undefined };
+  } catch (e) {
+    return fail(e, "Could not change that lesson.");
+  }
+}
+
+/**
+ * Take the calendar title at its word and put this lesson on a package.
+ *
+ * "Jack Hutchinson lesson 3 of 5" says there is a five-lesson package and
+ * this is the third of it. Prefer one that already exists and has room -
+ * making a second 5-pack for a series already half recorded is how a client
+ * ends up with eleven lessons across three packages.
+ */
+export async function packFromTitle(
+  lessonId: string,
+  size: number,
+): Promise<Result<{ packageId: string; made: boolean }>> {
+  try {
+    await assertLessonBook();
+    if (!Number.isInteger(size) || size < 2 || size > 50) {
+      return { ok: false, error: "A package holds between 2 and 50 lessons." };
+    }
+    const supa = await lessonBookClient();
+    const { data: lesson, error: lErr } = await supa
+      .from("lessons")
+      .select("id, client_id, package_id, starts_at")
+      .eq("id", lessonId)
+      .maybeSingle();
+    if (lErr) throw lErr;
+    if (!lesson) return { ok: false, error: "That lesson is no longer in the book." };
+    if (lesson.package_id) {
+      return { ok: false, error: "That lesson is already on a bill." };
+    }
+    const clientId = lesson.client_id as string | null;
+    if (!clientId) {
+      return { ok: false, error: "Give that lesson a student first." };
+    }
+
+    const { data: open, error: oErr } = await supa
+      .from("lesson_package_status")
+      .select("package_id, size, lessons_remaining")
+      .eq("client_id", clientId)
+      .eq("kind", "package")
+      .eq("size", size)
+      .gt("lessons_remaining", 0)
+      .order("last_lesson_at", { ascending: false, nullsFirst: false })
+      .limit(1);
+    if (oErr) throw oErr;
+
+    let packageId = (open?.[0]?.package_id as string | undefined) ?? null;
+    const made = !packageId;
+    if (!packageId) {
+      const standard = await standardPrices();
+      const { data: created, error: cErr } = await supa
+        .from("lesson_packages")
+        .insert({
+          client_id: clientId,
+          size,
+          kind: "package",
+          sold_on: courseDay(lesson.starts_at as string),
+          price_cents: standard[size] ?? null,
+          payment_status: "unpaid",
+        })
+        .select("id")
+        .single();
+      if (cErr) throw cErr;
+      packageId = created.id as string;
+    }
+
+    const { error: mErr } = await supa
+      .from("lessons")
+      .update({ package_id: packageId })
+      .eq("id", lessonId)
+      .is("package_id", null);
+    if (mErr) throw mErr;
+
+    await dropEmptySingles(supa, clientId);
+    touched(clientId);
+    return { ok: true, value: { packageId, made } };
+  } catch (e) {
+    return fail(e, "Could not put that lesson on a package.");
   }
 }

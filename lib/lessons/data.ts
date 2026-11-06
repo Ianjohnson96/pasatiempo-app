@@ -1,5 +1,6 @@
 import { lessonBookClient } from "./db";
 import { billingDefaults, matchExisting } from "./calc";
+import { hintSummary, readTitle } from "./sync-plan";
 import { packageTitle } from "./types";
 import type {
   BillingClient,
@@ -7,6 +8,9 @@ import type {
   ClientRec,
   ClientSummary,
   DashboardData,
+  LedgerCandidate,
+  LedgerData,
+  LedgerRow,
   LessonStatus,
   NumberedLesson,
   PackageRec,
@@ -470,6 +474,202 @@ export async function billingData(): Promise<BillingData> {
       .filter((p) => p.paymentStatus !== "paid")
       .sort((a, b) => (a.soldOn ?? "").localeCompare(b.soldOn ?? "")),
   };
+}
+
+/**
+ * Every lesson in date order, with whatever is known about the money on it.
+ *
+ * Built in one pass over four tables rather than per-row queries: 311 lessons
+ * against 151 loose payments is nothing in memory, and 311 round trips is not.
+ *
+ * The matching is deliberately generous. It offers; it never decides. A
+ * payment is a candidate when the payer's name shares a distinguishing word
+ * with the client's and the money moved anywhere near the lesson - wide,
+ * because "Joseph Wold" paying for "Aiden wold" is the normal case rather
+ * than the exception, and a candidate Ian rejects costs him a glance while
+ * one that was never offered costs him the afternoon.
+ */
+export async function lessonLedger(): Promise<LedgerData> {
+  const supa = await lessonBookClient();
+  const [lessonsRes, clientsRes, packagesRes, paymentsRes] = await Promise.all([
+    supa
+      .from("lessons")
+      .select("id, client_id, package_id, starts_at, status, title_raw")
+      .order("starts_at", { ascending: false }),
+    supa.from("lesson_clients").select("id, name, is_member"),
+    supa
+      .from("lesson_packages")
+      .select(
+        "id, client_id, kind, size, price_cents, payment_status, payment_method, sold_on",
+      ),
+    supa
+      .from("lesson_payments")
+      .select("id, payer_name, note, amount_cents, paid_on, package_id, lesson_id, kind"),
+  ]);
+  for (const r of [lessonsRes, clientsRes, packagesRes, paymentsRes]) {
+    if (r.error) throw new Error(r.error.message);
+  }
+  const lessons = lessonsRes.data ?? [];
+  const client = new Map(
+    (clientsRes.data ?? []).map((c) => [
+      c.id as string,
+      { name: c.name as string, isMember: c.is_member === true },
+    ]),
+  );
+  const pkg = new Map((packagesRes.data ?? []).map((p) => [p.id as string, p as Row]));
+
+  // Lessons taught against each package. A cancelled one does not count,
+  // which is the whole point of marking it rather than deleting it.
+  const usedBy = new Map<string, number>();
+  for (const l of lessons) {
+    const id = l.package_id as string | null;
+    if (!id) continue;
+    if (l.status !== "completed" && l.status !== "scheduled") continue;
+    usedBy.set(id, (usedBy.get(id) ?? 0) + 1);
+  }
+
+  // What each client paid last time, to fill the form in: the most recent
+  // single that actually carries a price.
+  const last = new Map<string, { priceCents: number; method: PayMethod | null }>();
+  for (const p of [...(packagesRes.data ?? [])]
+    .filter((p) => p.kind === "single" && p.price_cents != null)
+    .sort((a, b) => String(a.sold_on ?? "").localeCompare(String(b.sold_on ?? "")))) {
+    last.set(p.client_id as string, {
+      priceCents: num(p.price_cents),
+      method: (p.payment_method as PayMethod | null) ?? null,
+    });
+  }
+
+  // Payments attached to nothing yet. One already ruled "not a lesson" is
+  // left out; an unclassified one is offered, because unclassified means
+  // nobody has looked, not that it was judged irrelevant.
+  const loose = (paymentsRes.data ?? []).filter(
+    (p) => !p.package_id && !p.lesson_id && p.kind !== "not_lesson",
+  );
+
+  // Words that actually tell one client from another. "Sprague" is useless
+  // when the book holds "Calli Sprague- weston Sprague"; a word only one
+  // client uses is worth trusting.
+  const owners = new Map<string, Set<string>>();
+  for (const [id, c] of client) {
+    for (const w of nameWords(c.name)) {
+      if (!owners.has(w)) owners.set(w, new Set());
+      owners.get(w)!.add(id);
+    }
+  }
+
+  const gapDays = (paidOn: string, startsAt: string) =>
+    Math.round(
+      (new Date(paidOn).getTime() - new Date(startsAt).getTime()) / 86400000,
+    );
+
+  const toCandidate = (p: Row, startsAt: string, why: string): LedgerCandidate => ({
+    id: p.id as string,
+    payerName: (p.payer_name as string) ?? "",
+    note: (p.note as string) ?? "",
+    amountCents: num(p.amount_cents),
+    paidOn: String(p.paid_on),
+    dayGap: gapDays(String(p.paid_on), startsAt),
+    why,
+  });
+
+  // Two lessons for one client at one moment: nobody is on the tee twice.
+  const seenSlot = new Map<string, string>();
+
+  const rows: LedgerRow[] = lessons.map((l) => {
+    const clientId = (l.client_id as string | null) ?? null;
+    const who = clientId ? client.get(clientId) : undefined;
+    const startsAt = l.starts_at as string;
+    const raw = l.package_id ? pkg.get(l.package_id as string) : undefined;
+    const hints = readTitle(l.title_raw as string | null);
+
+    const slot = `${clientId ?? "?"}|${startsAt}`;
+    const duplicateOf = seenSlot.get(slot) ?? null;
+    if (!duplicateOf) seenSlot.set(slot, l.id as string);
+
+    let candidates: LedgerCandidate[] = [];
+    if (clientId && who && !raw) {
+      const telling = nameWords(who.name).filter((w) => owners.get(w)?.size === 1);
+      const any = new Set(nameWords(who.name));
+      candidates = loose
+        .map((p) => {
+          const payer = new Set([...nameWords(p.payer_name), ...nameWords(p.note)]);
+          const strong = telling.some((w) => payer.has(w));
+          const weak = [...any].some((w) => payer.has(w));
+          if (!strong && !weak) return null;
+          const gap = gapDays(String(p.paid_on), startsAt);
+          // Up to two months early (a package bought in advance) or three
+          // weeks late (he had to chase it).
+          if (gap < -62 || gap > 21) return null;
+          const when =
+            gap === 0
+              ? "same day"
+              : `${Math.abs(gap)} day${Math.abs(gap) === 1 ? "" : "s"} ${gap < 0 ? "before" : "after"}`;
+          return {
+            cand: toCandidate(p, startsAt, strong ? `${when}, name matches` : when),
+            score: (strong ? 0 : 1000) + Math.abs(gap),
+          };
+        })
+        .filter((x): x is { cand: LedgerCandidate; score: number } => x !== null)
+        .sort((a, b) => a.score - b.score)
+        .slice(0, 4)
+        .map((x) => x.cand);
+    }
+
+    const size = raw ? num(raw.size) : 0;
+    const used = raw ? (usedBy.get(raw.id as string) ?? 0) : 0;
+    const prior = clientId ? last.get(clientId) : undefined;
+    return {
+      id: l.id as string,
+      startsAt,
+      status: ((l.status as string) ?? "completed") as LessonStatus,
+      titleRaw: str(l.title_raw),
+      clientId,
+      clientName: who?.name ?? "(no client)",
+      isMember: who?.isMember ?? false,
+      pack: raw
+        ? {
+            id: raw.id as string,
+            kind: ((raw.kind as string) ?? "package") as "package" | "single",
+            size,
+            used,
+            left: Math.max(0, size - used),
+            priceCents: raw.price_cents == null ? null : num(raw.price_cents),
+            paymentStatus: ((raw.payment_status as string) ?? "unpaid") as PaymentStatus,
+            paymentMethod: str(raw.payment_method),
+            soldOn: str(raw.sold_on),
+          }
+        : null,
+      hint: hintSummary(hints),
+      hintSize: hints.size,
+      hintPaid: hints.paid,
+      candidates,
+      lastPriceCents: prior?.priceCents ?? null,
+      lastMethod: prior?.method ?? null,
+      duplicateOf,
+    };
+  });
+
+  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date().toISOString();
+  return {
+    rows,
+    unbilledCount: rows.filter(
+      (r) => !r.pack && r.startsAt.slice(0, 10) <= today && r.status !== "cancelled",
+    ).length,
+    loose: loose
+      .slice()
+      .sort((a, b) => String(b.paid_on).localeCompare(String(a.paid_on)))
+      .map((p) => toCandidate(p, now, "")),
+  };
+}
+
+/** Lower-case words of three letters or more: the parts worth matching on. */
+function nameWords(s: unknown): string[] {
+  return String(s ?? "")
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((w) => w.length > 2);
 }
 
 /**

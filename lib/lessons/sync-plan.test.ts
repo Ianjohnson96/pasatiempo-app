@@ -1,5 +1,98 @@
 import { describe, expect, it } from "vitest";
-import { isLessonTitle, nameFromTitle, needsSingle, planEntry } from "./sync-plan";
+import {
+  hintSummary,
+  isLessonTitle,
+  nameFromTitle,
+  needsSingle,
+  planEntry,
+  readTitle,
+} from "./sync-plan";
+
+// Every title below is one Ian actually wrote. The screen offers a package,
+// a position and a paid flag from these, so a wrong read is a wrong bill.
+describe("readTitle", () => {
+  it("reads 'N of M' as position and size", () => {
+    expect(readTitle("Jon Davies Lesson 3 of 5")).toMatchObject({
+      index: 3,
+      size: 5,
+      series: null,
+      paid: false,
+    });
+  });
+
+  it("reads 'lesson N series S' as position and block, with no size", () => {
+    // His other shape. "series 5" is which block, not how long it runs -
+    // calling it a 5-pack here would invent a package size he never wrote.
+    expect(readTitle("Meredith Hoffman lesson 2 series 5")).toMatchObject({
+      index: 2,
+      size: null,
+      series: 5,
+    });
+  });
+
+  it("takes both when both are written", () => {
+    expect(readTitle("Renee tomer lesson 4 of 5 series 2")).toMatchObject({
+      index: 4,
+      size: 5,
+      series: 2,
+    });
+    expect(readTitle("Jack Hutchinson lesson 1 of 5 [series 2]")).toMatchObject({
+      index: 1,
+      size: 5,
+      series: 2,
+    });
+  });
+
+  it("sees paid, bracketed or not", () => {
+    expect(readTitle("Ray gorski lesson 5 of 5 paid").paid).toBe(true);
+    expect(readTitle("Oscar shipper lesson 1 of 5 [paid]").paid).toBe(true);
+    expect(readTitle("Jeff Ursino and Wife Lesson 1 of 3 [Paid december]").paid).toBe(
+      true,
+    );
+  });
+
+  it("does not read 'not paid' as paid", () => {
+    expect(readTitle("Jack Hutchinson lesson 2 of 5 not paid").paid).toBe(false);
+  });
+
+  it("keeps a real aside and drops the markers", () => {
+    expect(
+      readTitle("Hoffman kids group lesson 4 series 6 [Nico, Cece, Natalie]").aside,
+    ).toBe("Nico, Cece, Natalie");
+    expect(readTitle("Oscar shipper lesson 1 of 5 [paid]").aside).toBe(null);
+    expect(readTitle("Jack Hutchinson lesson 1 of 5 [series 2]").aside).toBe(null);
+  });
+
+  it("refuses a position past the size", () => {
+    // "7 of 5" is a typo. Keep the size, which he writes deliberately.
+    expect(readTitle("Someone lesson 7 of 5")).toMatchObject({ index: null, size: 5 });
+  });
+
+  it("says nothing about a plain title", () => {
+    expect(readTitle("Lan takahashi lesson")).toMatchObject({
+      index: null,
+      size: null,
+      series: null,
+      paid: false,
+    });
+    expect(hintSummary(readTitle("Lan takahashi lesson"))).toBe(null);
+    expect(readTitle("")).toMatchObject({ index: null, size: null });
+  });
+
+  it("will not take a bare number as a position", () => {
+    // No series to anchor it, so "lesson 2" could be anything.
+    expect(readTitle("Max miceli lesson 2").index).toBe(null);
+  });
+
+  it("sums up what it found", () => {
+    expect(hintSummary(readTitle("Renee tomer lesson 4 of 5 series 2"))).toBe(
+      "4th of 5 · series 2",
+    );
+    expect(hintSummary(readTitle("Ray gorski lesson 5 of 5 paid"))).toBe(
+      "5th of 5 · paid",
+    );
+  });
+});
 
 // The title rules Ian was told to follow. If one of these breaks, the advice
 // on the Review page is wrong.
