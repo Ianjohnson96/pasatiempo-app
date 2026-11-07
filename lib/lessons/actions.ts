@@ -358,6 +358,40 @@ export async function resolveReview(
       }
     }
 
+    // Remember the spelling that did not match, or the queue asks forever.
+    //
+    // The sync matches on the client's name and aliases. "Takahashi son
+    // lesson" and "Cameron Stewart lesson Individual paying" match neither,
+    // so every run queued them again, Ian answered again, and before the
+    // adopt fix each answer left another copy of the lesson behind. Saving
+    // the guessed name as an alias is what makes the answer stick - the same
+    // reasoning mergeClients already relies on.
+    const guess = ((row.guess_name as string | null) ?? "").trim();
+    if (guess) {
+      const { data: everyone, error: gErr } = await supa
+        .from("lesson_clients")
+        .select("id, name, aliases");
+      if (gErr) throw gErr;
+      const all = (everyone ?? []).map((c) => ({
+        id: c.id as string,
+        name: c.name as string,
+        aliases: (c.aliases as string[] | null) ?? [],
+      }));
+      const me = all.find((c) => c.id === clientId);
+      // A spelling another client already answers to would break the sync's
+      // name -> client map, so it is not worth having.
+      if (me && !aliasClash([guess], clientId, all)) {
+        const next = cleanAliases([...me.aliases, guess], me.name);
+        if (next.length !== me.aliases.length) {
+          const { error: aErr } = await supa
+            .from("lesson_clients")
+            .update({ aliases: next })
+            .eq("id", clientId);
+          if (aErr) throw aErr;
+        }
+      }
+    }
+
     const startsAt = row.starts_at as string;
 
     // Most queued entries are lessons already in the book, so inserting would
@@ -1393,6 +1427,12 @@ export async function tiePaymentToPackage(
         package_id: packageId,
         // A payment buys one or the other, never both.
         lesson_id: null,
+        // tie_needs_lesson_kind: a payment pointing at a bill must say it was
+        // for a lesson. Most arrive 'unclassified', so tying one without
+        // this is rejected by the database outright. Untying is exempt - the
+        // constraint only bites while a tie exists - but saying so anyway
+        // keeps the kind honest for a row Ian has now ruled on.
+        kind: "lesson",
         decided_by: "ian",
         decided_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -1533,6 +1573,8 @@ export async function setLessonPayment(
         .update({
           package_id: packageId,
           lesson_id: null,
+          // Required by tie_needs_lesson_kind - see tiePaymentToPackage.
+          kind: "lesson",
           decided_by: "ian",
           decided_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),

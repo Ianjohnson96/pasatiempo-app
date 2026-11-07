@@ -182,17 +182,17 @@ export async function syncLessons(opts?: {
     const byUid = new Map<string, { id: string; status: string | null }>();
     // The adoption index: seeded rows have no uid, so the only way to
     // recognise them is who and when.
-    const byClientStart = new Map<string, { id: string; uid: string | null }>();
+    const byClientStart = new Map<
+      string,
+      { id: string; uid: string | null; status: string | null }
+    >();
     for (const l of existing ?? []) {
       const uid = l.calendar_uid as string | null;
-      if (uid)
-        byUid.set(uid, {
-          id: l.id as string,
-          status: (l.status as string | null) ?? null,
-        });
+      const status = (l.status as string | null) ?? null;
+      if (uid) byUid.set(uid, { id: l.id as string, status });
       if (l.client_id && l.starts_at) {
         const key = `${l.client_id}|${new Date(l.starts_at as string).toISOString()}`;
-        byClientStart.set(key, { id: l.id as string, uid });
+        byClientStart.set(key, { id: l.id as string, uid, status });
       }
     }
 
@@ -296,6 +296,15 @@ export async function syncLessons(opts?: {
       const adoptKey = `${clientId}|${new Date(ev.startsAt).toISOString()}`;
       const adoptable = byClientStart.get(adoptKey);
       if (adoptable) {
+        // Ian's answer survives an adoption too. A lesson he marked as never
+        // having happened keeps that mark even when its calendar id rotates
+        // underneath it - otherwise a rotation silently puts the lesson back
+        // on the book and bills it again.
+        const kept =
+          (adoptable.status === "cancelled" || adoptable.status === "no_show") &&
+          !ev.isCancelled
+            ? adoptable.status
+            : status;
         if (dryRun) {
           report.adopted++;
         } else {
@@ -305,7 +314,7 @@ export async function syncLessons(opts?: {
               calendar_uid: ev.uid,
               calendar_source: "m365",
               ends_at: ev.endsAt,
-              status,
+              status: kept,
               title_raw: ev.subject,
             })
             .eq("id", adoptable.id);
@@ -314,8 +323,9 @@ export async function syncLessons(opts?: {
         }
         // Keep the indexes honest, so a second event claiming the same slot
         // in this same run updates the row instead of inserting beside it.
-        byUid.set(ev.uid, { id: adoptable.id, status });
+        byUid.set(ev.uid, { id: adoptable.id, status: kept });
         adoptable.uid = ev.uid;
+        adoptable.status = kept;
         continue;
       }
 
