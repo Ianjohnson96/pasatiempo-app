@@ -130,7 +130,7 @@ export async function proxy(request: NextRequest) {
 
   // --- 3) Staff gate: the admin area AND the hub root (the section directory)
   //        require a signed-in user. Public visitors reach the individual
-  //        sections directly (/mhi, /events/…, /sombrero) — never the hub. ----
+  //        sections directly (/mhi, /events/…, /sombrero, /invitational) — never the hub. ----
   // --- 2a) Public sites the super admin has switched off ------------------
   //         Visitors get the "not available" page; super admins still see it.
   const site = isAdminPath(internalPath) ? null : siteForPath(internalPath);

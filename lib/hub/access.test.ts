@@ -46,6 +46,8 @@ describe("public-site switches", () => {
     expect(siteForPath("/mhi")).toBe("mhi");
     expect(siteForPath("/events/e/member-guest")).toBe("events");
     expect(siteForPath("/sombrero")).toBe("sombrero");
+    expect(siteForPath("/invitational")).toBe("invitational");
+    expect(siteForPath("/invitational/anything")).toBe("invitational");
     expect(siteForPath("/eventsx")).toBeNull();
     expect(siteForPath("/merch")).toBeNull();
     expect(siteForPath("/caddie")).toBeNull();

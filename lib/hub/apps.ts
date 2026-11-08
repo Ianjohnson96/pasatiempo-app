@@ -62,6 +62,7 @@ export const SITES = {
   events: { label: "Event pages (sign-ups)", prefix: "/events" },
   mhi: { label: "Marion Hollins Invitational", prefix: "/mhi" },
   sombrero: { label: "El Sombrero", prefix: "/sombrero" },
+  invitational: { label: "Men's Club Invitational", prefix: "/invitational" },
 } as const;
 
 export type SiteKey = keyof typeof SITES;
