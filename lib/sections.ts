@@ -14,7 +14,7 @@
 // lib/hub/apps.ts (the apps and their roles) and lib/hub/access.ts (the
 // checks). Staff sign in once with Supabase Auth; each app's pages call
 // requireApp() and its server actions assertApp(). A super admin has every
-// app. Public sites (events pages, MHI, El Sombrero) can be switched off by
+// app. Public sites (events pages, MHI, El Sombrero, the Invitational) can be switched off by
 // the super admin (hub.sites, enforced in proxy.ts).
 //
 // Caddies are not staff: the caddie portal carries its own cookie check in
@@ -25,7 +25,13 @@
 // touching your hosts file.
 // ===========================================================================
 
-export type SectionKey = "events" | "mhi" | "sombrero" | "caddie" | "merch";
+export type SectionKey =
+  | "events"
+  | "mhi"
+  | "sombrero"
+  | "invitational"
+  | "caddie"
+  | "merch";
 
 export interface Section {
   key: SectionKey;
@@ -86,6 +92,17 @@ export const SECTIONS: Section[] = [
       "el-sombrero.example.com", // TODO: real El Sombrero domain
       "sombrero.local",
       "sombrero.local:3000",
+    ],
+  },
+  {
+    key: "invitational",
+    label: "Men's Club Invitational",
+    // Real React route at app/invitational (static content, no database).
+    pathPrefix: "/invitational",
+    hosts: [
+      "invitational.example.com", // TODO: real Invitational domain
+      "invitational.local",
+      "invitational.local:3000",
     ],
   },
   {

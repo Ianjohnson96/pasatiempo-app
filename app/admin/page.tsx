@@ -376,6 +376,23 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
               controls={siteSwitch("sombrero")}
             />
           )}
+
+          {isSuper && (
+            <HubTile
+              index={order++}
+              external
+              href="/invitational"
+              title="Men’s Club Invitational"
+              desc="The Invitational’s event page — schedule, flights, the field and prizes."
+              tag="Public site"
+              // Morning down the fairway toward the bay: the page's own hero.
+              img="/invitational/img/hero.avif"
+              focus="center 55%"
+              meta={<span>Edited in code (components/invitational/content.ts)</span>}
+              cta="View site"
+              controls={siteSwitch("invitational")}
+            />
+          )}
         </div>
 
         {isSuper && (

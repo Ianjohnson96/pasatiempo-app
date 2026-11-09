@@ -41,7 +41,7 @@ create table if not exists hub.access (
 -- Public sites the super admin can take offline. Off = visitors see a
 -- "not available" page; super admins still see the site.
 create table if not exists hub.sites (
-  key         text primary key check (key in ('events', 'mhi', 'sombrero')),
+  key         text primary key check (key in ('events', 'mhi', 'sombrero', 'invitational')),
   label       text not null,
   enabled     boolean not null default true,
   updated_by  text,
@@ -62,7 +62,8 @@ alter default privileges in schema hub grant all on sequences to service_role;
 insert into hub.sites (key, label) values
   ('events', 'Event pages (sign-ups)'),
   ('mhi', 'Marion Hollins Invitational'),
-  ('sombrero', 'El Sombrero')
+  ('sombrero', 'El Sombrero'),
+  ('invitational', 'Men''s Club Invitational')
 on conflict (key) do nothing;
 
 insert into hub.people (email, name, super_admin, created_by)
