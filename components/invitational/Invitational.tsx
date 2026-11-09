@@ -9,6 +9,7 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 import {
   COMMITTEE,
@@ -43,6 +44,7 @@ import IntroReel, { INTRO_GATE, allowReplay } from "./IntroReel";
 //     course numbers count up
 
 const IMG = "/invitational/img/";
+const VID = "/invitational/video/";
 const tabMeta = (k: TabKey) => TABS.find((t) => t.key === k)!;
 const stagger = (i: number) => ({ "--i": i }) as CSSProperties;
 
@@ -280,15 +282,17 @@ function Header({
 
 function Home({ go }: { go: (t: TabKey) => void }) {
   const word = "Invitational";
+  const { ref: heroRef, paused: heroPaused, toggle: heroToggle } = useFilm();
   return (
     <>
       <section className="mci-hero">
         <div className="mci-hero-bg" data-parallax="0.18">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={IMG + "hero.avif"}
-            alt="Morning light down a Pasatiempo fairway toward Monterey Bay"
-            fetchPriority="high"
+          {/* A drone pass over the bunkers to the 4th green, the clubhouse beyond. */}
+          <LoopVideo
+            videoRef={heroRef}
+            src={VID + "hole-4-approach.mp4"}
+            poster={IMG + "hole-4-approach-poster.jpg"}
+            eager
           />
         </div>
         <div className="mci-hero-veil" />
@@ -330,6 +334,7 @@ function Home({ go }: { go: (t: TabKey) => void }) {
             <path d="M12 4v14M6 12l6 6 6-6" />
           </svg>
         </button>
+        <FilmToggle paused={heroPaused} toggle={heroToggle} label="the course film" />
       </section>
 
       <section className="mci-block" id="mci-intro">
@@ -396,7 +401,8 @@ function Home({ go }: { go: (t: TabKey) => void }) {
       </section>
 
       <PhotoBand
-        photo={IMG + "course-wide.jpg"}
+        photo={IMG + "hole-11-approach-poster.jpg"}
+        video={VID + "hole-11-approach.mp4"}
         focus="center 50%"
         tall
         quote="The chief object of every golf course architect worth his salt is to imitate the beauties of nature so closely as to make his work indistinguishable from nature itself."
@@ -495,22 +501,30 @@ function Photo({
 
 function PhotoBand({
   photo,
+  video,
   focus,
   quote,
   attribution,
   tall,
 }: {
   photo: string;
+  /** A looping course film instead of the still (the still becomes its poster). */
+  video?: string;
   focus: string;
   quote: string;
   attribution: string;
   tall?: boolean;
 }) {
+  const { ref: filmRef, paused, toggle } = useFilm();
   return (
     <div className={"mci-quote" + (tall ? " is-tall" : "")}>
       <div className="mci-quote-bg" data-parallax="0.16">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photo} alt="" loading="lazy" style={{ objectPosition: focus }} />
+        {video ? (
+          <LoopVideo videoRef={filmRef} src={video} poster={photo} focus={focus} />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photo} alt="" loading="lazy" style={{ objectPosition: focus }} />
+        )}
       </div>
       <div className="mci-quote-veil" />
       <div className="mci-quote-inner">
@@ -521,7 +535,106 @@ function PhotoBand({
           {attribution}
         </div>
       </div>
+      {video && <FilmToggle paused={paused} toggle={toggle} label="the course film" />}
     </div>
+  );
+}
+
+/**
+ * A silent, looping course film. It plays only while it's on screen (and
+ * doesn't download until it's near, unless `eager`), keeps its still for
+ * visitors who ask for reduced motion, and comes with a pause button —
+ * moving background video needs one. The state lives in a hook so the film
+ * can sit in a parallax layer while its button stays put in the section.
+ */
+function useFilm() {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [paused, setPaused] = useState(false);
+  const userPaused = useRef(false);
+
+  useEffect(() => {
+    const v = ref.current;
+    if (!v || prefersReducedMotion()) return;
+    v.muted = true;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting && !userPaused.current) {
+          if (v.preload === "none") v.preload = "auto";
+          v.play().catch(() => {});
+        } else if (!e.isIntersecting) {
+          v.pause();
+        }
+      },
+      { rootMargin: "200px 0px" },
+    );
+    io.observe(v);
+    return () => io.disconnect();
+  }, []);
+
+  const toggle = () => {
+    const v = ref.current;
+    if (!v) return;
+    if (v.paused) {
+      userPaused.current = false;
+      v.play().catch(() => {});
+      setPaused(false);
+    } else {
+      userPaused.current = true;
+      v.pause();
+      setPaused(true);
+    }
+  };
+  return { ref, paused, toggle };
+}
+
+function LoopVideo({
+  videoRef,
+  src,
+  poster,
+  focus = "center",
+  eager,
+}: {
+  videoRef: RefObject<HTMLVideoElement | null>;
+  src: string;
+  poster: string;
+  focus?: string;
+  eager?: boolean;
+}) {
+  return (
+    <video
+      ref={videoRef}
+      className="mci-loop"
+      src={src}
+      poster={poster}
+      muted
+      loop
+      playsInline
+      preload={eager ? "auto" : "none"}
+      disablePictureInPicture
+      aria-hidden
+      style={{ objectPosition: focus }}
+    />
+  );
+}
+
+function FilmToggle({ paused, toggle, label }: { paused: boolean; toggle: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      className="mci-loop-toggle"
+      onClick={toggle}
+      aria-label={(paused ? "Play " : "Pause ") + label}
+    >
+      {paused ? (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <path d="M7 4v16l13-8z" />
+        </svg>
+      ) : (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
+        </svg>
+      )}
+    </button>
   );
 }
 
