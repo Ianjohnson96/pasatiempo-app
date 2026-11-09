@@ -410,10 +410,11 @@ function Home({ go }: { go: (t: TabKey) => void }) {
         </div>
       </section>
 
+      <ArchiveStrip />
+
       <PhotoBand
-        photo={IMG + "hole-11-approach-poster.jpg"}
-        video={VID + "hole-11-approach.mp4"}
-        focus="center 50%"
+        photo={IMG + "today-aerial-dawn.jpg"}
+        focus="center 45%"
         tall
         quote="The chief object of every golf course architect worth his salt is to imitate the beauties of nature so closely as to make his work indistinguishable from nature itself."
         attribution="Dr. Alister MacKenzie · Golf Architecture, 1920"
@@ -482,6 +483,66 @@ function StatusChip({ posted }: { posted: boolean }) {
       <span className="mci-pulse" aria-hidden />
       Coming soon
     </span>
+  );
+}
+
+/** The club's early photographs, on a strip of film you can scroll through. */
+const ARCHIVE = [
+  { src: "archive-1929-tee-shot-bay.jpg", alt: "A crowd lines a tee at Pasatiempo, Monterey Bay beyond", cap: "A crowd lines the tee, the bay beyond", focus: "center 70%" },
+  { src: "archive-1929-opening-foursome.jpg", alt: "Two men and two women stand on a tee before a large gallery", cap: "Players and gallery on the first tee", focus: "center 20%" },
+  { src: "archive-1929-gallery-oak.jpg", alt: "A gallery circles a green, framed by an oak", cap: "The gallery circles a green, framed by the oaks", focus: "center 60%" },
+  { src: "archive-1929-bunkered-green.jpg", alt: "Spectators walk past deep, sprawling bunkers to a green", cap: "MacKenzie's bunkering, new-cut", focus: "center 60%" },
+  { src: "archive-1929-golfer-oak.jpg", alt: "A lone golfer plays beneath the oaks", cap: "A lone golfer beneath the oaks", focus: "center 70%" },
+  { src: "archive-mackenzie-house-1933.jpg", alt: "Dr. Alister MacKenzie's house beside the course, 1933", cap: "Dr. MacKenzie's house on the course, 1933", focus: "center 70%" },
+];
+
+function ArchiveStrip() {
+  const strip = useRef<HTMLDivElement>(null);
+  const step = (dir: 1 | -1) => {
+    const el = strip.current;
+    if (!el) return;
+    const frame = el.querySelector<HTMLElement>(".mci-film-frame");
+    el.scrollBy({
+      left: dir * ((frame?.offsetWidth ?? 400) + 18),
+      behavior: prefersReducedMotion() ? "auto" : "smooth",
+    });
+  };
+  return (
+    <section className="mci-archive">
+      <div className="mci-wrap mci-center">
+        <div className="mci-orn mci-orn-dark" data-reveal>
+          <span className="mci-eyebrow">From the Club Archive</span>
+        </div>
+        <h3 data-reveal style={stagger(1)}>
+          The Early Years
+        </h3>
+        <p className="mci-lead mci-center" data-reveal style={stagger(2)}>
+          Galleries round MacKenzie&rsquo;s new greens, the Doctor&rsquo;s own house on the
+          course &mdash; Pasatiempo as it first was.
+        </p>
+      </div>
+      <div className="mci-film" data-reveal style={stagger(3)}>
+        <div className="mci-film-track" ref={strip} tabIndex={0} aria-label="Archive photographs — scroll sideways">
+          {ARCHIVE.map((a) => (
+            <figure className="mci-film-frame" key={a.src}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={IMG + a.src} alt={a.alt} loading="lazy" style={{ objectPosition: a.focus }} />
+              <figcaption>{a.cap}</figcaption>
+            </figure>
+          ))}
+        </div>
+        <button type="button" className="mci-film-btn is-prev" onClick={() => step(-1)} aria-label="Previous photograph">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <path d="M15 5l-7 7 7 7" />
+          </svg>
+        </button>
+        <button type="button" className="mci-film-btn is-next" onClick={() => step(1)} aria-label="Next photograph">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <path d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+    </section>
   );
 }
 
