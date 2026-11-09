@@ -70,7 +70,6 @@ const FRAMES: Frame[] = [
   { src: T("flag-green.jpg"), hold: 85, era: "today", focus: "70% 60%" },
   { src: T("chairs-bay.jpg"), hold: 80, era: "today", focus: "center 45%" },
   { src: IMG + "course-wide.jpg", hold: 75, era: "today" },
-  { src: IMG + "sixteenth.jpg", hold: 70, era: "today" },
   { src: IMG + "clubhouse.avif", hold: 70, era: "today" },
   { src: IMG + "hole-4-approach-poster.jpg", hold: 65, era: "today" },
   { src: IMG + "aerial.avif", hold: 65, era: "today" },
@@ -91,7 +90,7 @@ const FILL = [
   A("1929-bunkered-green.jpg"),
   T("bridge.jpg"),
   A("1929-gallery-oak.jpg"),
-  IMG + "sixteenth.jpg",
+  IMG + "hole-4-approach-poster.jpg",
   IMG + "mackenzie.jpg",
   T("flag-green.jpg"),
 ];
