@@ -7,32 +7,45 @@ import { EVENT } from "./content";
 //
 //   1. THE CREST — the club's palm-and-figure logo on a cream medallion, a
 //      gold ring drawing round it.
-//   2. THE ARCHIVE — black-and-white film: MacKenzie's house on the course
-//      (1933), the Doctor himself, Marion Hollins. Grain, flicker, a little
-//      gate weave. A faint "1929" sits in the corner.
-//   3. TODAY — the film bursts into colour and the cuts come faster and
-//      faster while the year runs from 1929 to the Invitational's own,
-//      landing on PASATIEMPO with the photos running through the letters
-//      and the crest above it, before it all lifts away into the page.
+//   2. 1929, ON FILM — letterboxed black-and-white with grain, flicker and
+//      gate weave: the opening-day crowd looking out to the bay, the
+//      foursome on the first tee, the galleries round MacKenzie's greens,
+//      the Doctor and Marion Hollins themselves. Slow at first, each photo
+//      with its own camera move, then cutting faster and faster.
+//   3. TODAY — the 1929 bunkered green dissolves into the same kind of green
+//      today, in colour; the letterbox opens, the cuts race, and the year
+//      runs from 1929 to the Invitational's own before landing on
+//      PASATIEMPO, the crest above it, and lifting away into the page.
 //
-// No captions: the faces and the years carry it.
+// No captions: the faces, the course and the years carry it.
 //
 // Plays once per browser session, on the home tab, never for visitors who ask
 // for reduced motion. Skippable at any point (button, Esc, Enter, Space, or a
 // click). The page's own hero animation waits underneath and starts as the
 // reel lifts. A replay button lives in the footer.
 //
-// Archive photographs — "House of Dr. Alister MacKenzie, Pasatiempo Estates,
-// California; William Wilson Wurster, architect", photo by Sturtevant, The
-// Architect and Engineer, April 1933 (San Francisco Public Library scan via
-// the Internet Archive; Wikimedia Commons files 14598027017 and 14784188652,
-// "No known copyright restrictions"). MacKenzie's portrait is from the Library
-// of Congress; Hollins's from the MHI site.
+// Photographs: the 1929 course and opening-day photographs are the club's
+// own archive (archive-1929-*). "House of Dr. Alister MacKenzie, Pasatiempo
+// Estates" (archive-mackenzie-house-1933*) is by Sturtevant for The Architect
+// and Engineer, April 1933 (San Francisco Public Library scan via the
+// Internet Archive; Wikimedia Commons files 14598027017 and 14784188652, "No
+// known copyright restrictions"). MacKenzie's portrait is from the Library of
+// Congress; Hollins's from the MHI site.
 
 const IMG = "/invitational/img/";
 const LOGO = "/logo-full.png";
 
 type Era = "archive" | "today";
+
+/** A camera move over a full-bleed photo: scale and offset (in %), from → to. */
+interface Move {
+  from: [scale: number, x: number, y: number];
+  to: [scale: number, x: number, y: number];
+  /** transform-origin, e.g. "40% 20%" to push in on a face. */
+  origin?: string;
+}
+const DRIFT: Move = { from: [1.14, 1.5, 0], to: [1.02, -1, 0] };
+
 interface Frame {
   src: string;
   /** How long the frame holds, in ms. */
@@ -40,28 +53,74 @@ interface Frame {
   era: Era;
   /** object-position for the crop. */
   focus?: string;
+  move?: Move;
   /** Portrait card with a push-in toward the face (transform-origin). */
   face?: string;
-  /** How far the push-in goes (default 1.45). */
+  /** How far the portrait push-in goes (default 1.45). */
   zoom?: number;
+  /** Dissolve in over the previous frame instead of cutting (then → now). */
+  match?: boolean;
 }
 
+const A = (f: string) => IMG + "archive-" + f;
+
 const FRAMES: Frame[] = [
-  // Act two: the archive, in black and white, at the pace of old film.
-  { src: IMG + "archive-mackenzie-house-1933.jpg", hold: 1150, era: "archive", focus: "center 70%" },
-  { src: IMG + "mackenzie.jpg", hold: 1350, era: "archive", face: "53% 17%", zoom: 2.1 },
-  { src: IMG + "archive-mackenzie-house-1933b.jpg", hold: 650, era: "archive", focus: "center 40%" },
-  { src: IMG + "hollins.avif", hold: 1350, era: "archive", face: "50% 34%" },
-  { src: IMG + "hollins-swing.avif", hold: 700, era: "archive", focus: "60% 18%" },
-  // Act three: today, in colour, faster and faster.
-  { src: IMG + "course-wide.jpg", hold: 420, era: "today" },
-  { src: IMG + "aerial.avif", hold: 300, era: "today" },
-  { src: IMG + "sixteenth.jpg", hold: 240, era: "today" },
-  { src: IMG + "clubhouse.avif", hold: 200, era: "today" },
-  { src: IMG + "course-green.jpg", hold: 170, era: "today" },
-  { src: IMG + "formats.avif", hold: 150, era: "today" },
-  { src: IMG + "bunkers-green.avif", hold: 130, era: "today" },
-  { src: IMG + "course-bunkers.jpg", hold: 115, era: "today" },
+  // ---- Act two: 1929, on film. Slow, each photo with its own move. --------
+  // Opening day: the crowd round the tee, the bay beyond. A slow rise.
+  {
+    src: A("1929-tee-shot-bay.jpg"), hold: 1500, era: "archive", focus: "center 70%",
+    move: { from: [1.18, 0, 4], to: [1.04, 0, -2] },
+  },
+  // The foursome on the first tee: push in across the four of them.
+  {
+    src: A("1929-opening-foursome.jpg"), hold: 1700, era: "archive", focus: "center 8%",
+    move: { from: [1.02, 0, 0], to: [1.2, 0, 0], origin: "45% 14%" },
+  },
+  { src: IMG + "mackenzie.jpg", hold: 1150, era: "archive", face: "53% 17%", zoom: 2.1 },
+  // The gallery round the green, under the oak: a slow pan left.
+  {
+    src: A("1929-gallery-oak.jpg"), hold: 1050, era: "archive", focus: "center 60%",
+    move: { from: [1.16, 3, 0], to: [1.16, -3, 0] },
+  },
+  { src: IMG + "hollins.avif", hold: 1150, era: "archive", face: "50% 34%" },
+  // A lone golfer under the oak: push in on him.
+  {
+    src: A("1929-golfer-oak.jpg"), hold: 850, era: "archive", focus: "center 70%",
+    move: { from: [1.04, 0, 0], to: [1.22, 0, 0], origin: "42% 75%" },
+  },
+  // ...then the archive starts to race.
+  { src: A("mackenzie-house-1933.jpg"), hold: 380, era: "archive", focus: "center 70%" },
+  { src: IMG + "hollins-swing.avif", hold: 320, era: "archive", focus: "60% 18%" },
+  {
+    src: A("1929-opening-foursome.jpg"), hold: 260, era: "archive", focus: "70% 10%",
+    move: { from: [1.4, 0, 0], to: [1.5, 0, 0], origin: "68% 16%" },
+  },
+  {
+    src: A("1929-tee-shot-bay.jpg"), hold: 220, era: "archive", focus: "center 85%",
+    move: { from: [1.4, 0, 0], to: [1.5, 0, 0], origin: "50% 80%" },
+  },
+  { src: A("mackenzie-house-1933b.jpg"), hold: 190, era: "archive", focus: "center 40%" },
+  {
+    src: A("1929-gallery-oak.jpg"), hold: 170, era: "archive", focus: "center 65%",
+    move: { from: [1.45, 0, 0], to: [1.55, 0, 0], origin: "35% 62%" },
+  },
+  // The 1929 bunkered green holds a beat...
+  {
+    src: A("1929-bunkered-green.jpg"), hold: 1100, era: "archive", focus: "center 60%",
+    move: { from: [1.06, 0, 0], to: [1.16, 0, 0], origin: "55% 60%" },
+  },
+  // ---- Act three: ...and dissolves into a bunkered green today. ----------
+  {
+    src: IMG + "course-green.jpg", hold: 750, era: "today", match: true, focus: "center 60%",
+    move: { from: [1.16, 0, 0], to: [1.08, 0, 0], origin: "55% 60%" },
+  },
+  { src: IMG + "aerial.avif", hold: 330, era: "today" },
+  { src: IMG + "course-wide.jpg", hold: 270, era: "today" },
+  { src: IMG + "sixteenth.jpg", hold: 220, era: "today" },
+  { src: IMG + "clubhouse.avif", hold: 185, era: "today" },
+  { src: IMG + "formats.avif", hold: 160, era: "today" },
+  { src: IMG + "bunkers-green.avif", hold: 140, era: "today" },
+  { src: IMG + "course-bunkers.jpg", hold: 120, era: "today" },
   { src: IMG + "schedule.avif", hold: 105, era: "today" },
   { src: IMG + "clubhouse-green.jpg", hold: 95, era: "today" },
   { src: IMG + "hero.avif", hold: 90, era: "today" },
@@ -70,17 +129,17 @@ const FRAMES: Frame[] = [
 
 /** Photos that run through the letters of PASATIEMPO — then and now. */
 const FILL = [
-  "archive-mackenzie-house-1933.jpg",
-  "course-wide.jpg",
-  "hollins-swing.avif",
-  "course-green.jpg",
-  "mackenzie.jpg",
-  "sixteenth.jpg",
-  "hollins.avif",
-  "hero.avif",
-].map((f) => IMG + f);
+  A("1929-tee-shot-bay.jpg"),
+  IMG + "course-wide.jpg",
+  A("1929-opening-foursome.jpg"),
+  IMG + "course-green.jpg",
+  A("1929-bunkered-green.jpg"),
+  IMG + "sixteenth.jpg",
+  A("1929-gallery-oak.jpg"),
+  IMG + "hero.avif",
+];
 
-const CREST_MS = 1500; // act one
+const CREST_MS = 1400; // act one
 const TITLE_MS = 2500; // PASATIEMPO on screen
 const SOLID_AT = 1150; // ...letters stop flickering and settle
 const EXIT_MS = 1100; // the reel lifts away
@@ -182,7 +241,7 @@ export default function IntroReel({
     const prev = html.style.overflow;
     html.style.overflow = "hidden";
     let alive = true;
-    preload([LOGO, ...new Set([...FRAMES.map((f) => f.src), ...FILL])], 3500).then(() => {
+    preload([LOGO, ...new Set([...FRAMES.map((f) => f.src), ...FILL])], 4000).then(() => {
       if (alive) setPhase("crest");
     });
     return () => {
@@ -257,7 +316,7 @@ export default function IntroReel({
   const frame = FRAMES[i];
   const prevFrame = i > 0 ? FRAMES[i - 1] : null;
   const inReel = phase === "reel";
-  const era: Era | "none" = inReel ? frame.era : "none";
+  const era: Era | "none" = inReel ? frame.era : phase === "crest" ? "archive" : "none";
   const total = CREST_MS + FRAMES.reduce((s, f) => s + f.hold, 0);
   const progress =
     phase === "load"
@@ -283,22 +342,26 @@ export default function IntroReel({
       {/* Act one: the crest. */}
       {phase === "crest" && (
         <div className="mci-crest-act" aria-hidden>
-          <Crest size={210} />
+          <Medal size={210} />
         </div>
       )}
 
       {/* Acts two and three: the reel. */}
       {(inReel || phase === "title" || phase === "exit") && (
         <div className="mci-reel" aria-hidden>
-          {/* Same key it had while current, so React keeps the element and its drift
-              carries on rather than restarting under the cut. */}
+          {/* Same key it had while current, so React keeps the element and its
+              move carries on rather than restarting under the cut. */}
           {prevFrame && inReel && <FrameView key={"f" + (i - 1)} f={prevFrame} under />}
           <FrameView key={"f" + i} f={frame} />
-          <div className="mci-reel-flash" key={"x" + i} />
+          {!frame.match && <div className="mci-reel-flash" key={"x" + i} />}
           {/* The moment the film turns to colour. */}
           {inReel && i === FIRST_TODAY && <div className="mci-reel-burst" />}
         </div>
       )}
+
+      {/* Letterbox over the archive; it opens when the colour comes in. */}
+      <div className="mci-letterbox is-top" aria-hidden />
+      <div className="mci-letterbox is-bottom" aria-hidden />
 
       {inReel && (
         <div className={"mci-reel-year" + (frame.era === "today" ? " is-running" : "")} aria-hidden>
@@ -309,7 +372,7 @@ export default function IntroReel({
       {(phase === "title" || phase === "exit") && (
         <div className="mci-reel-title">
           <div className="mci-reel-title-crest">
-            <Crest size={118} />
+            <Medal size={118} />
           </div>
           <div className="mci-reel-word-wrap">
             <div
@@ -349,7 +412,7 @@ export default function IntroReel({
 }
 
 /** The club's logo on a cream medallion, a gold ring drawing round it. */
-function Crest({ size }: { size: number }) {
+function Medal({ size }: { size: number }) {
   return (
     <div className="mci-medal" style={{ "--crest": size + "px" } as CSSProperties}>
       <svg className="mci-medal-ring" viewBox="0 0 100 100" aria-hidden>
@@ -365,11 +428,19 @@ function Crest({ size }: { size: number }) {
 }
 
 function FrameView({ f, under }: { f: Frame; under?: boolean }) {
+  const m = f.move ?? DRIFT;
   const style = {
     "--hold": f.hold + "ms",
     "--focus": f.focus ?? "center",
     "--face": f.face ?? "center",
     "--zoom": f.zoom ?? 1.45,
+    "--fs": m.from[0],
+    "--fx": m.from[1] + "%",
+    "--fy": m.from[2] + "%",
+    "--ts": m.to[0],
+    "--tx": m.to[1] + "%",
+    "--ty": m.to[2] + "%",
+    "--origin": m.origin ?? "center",
   } as CSSProperties;
   return (
     <div
@@ -377,6 +448,7 @@ function FrameView({ f, under }: { f: Frame; under?: boolean }) {
         "mci-reel-frame era-" +
         f.era +
         (f.face ? " is-face" : "") +
+        (f.match ? " is-match" : "") +
         (under ? " is-under" : "")
       }
       style={style}

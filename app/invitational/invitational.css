@@ -409,8 +409,20 @@ body:has(.mci){margin:0;}
 @keyframes mci-dissolve{from{opacity:0;filter:brightness(1.8) contrast(.7);}to{opacity:1;filter:none;}}
 
 .mci-reel-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:var(--focus);
-  animation:mci-drift var(--hold) linear both;}
-@keyframes mci-drift{from{transform:scale(1.14) translateX(1.5%);}to{transform:scale(1.02) translateX(-1%);}}
+  transform-origin:var(--origin,center);animation:mci-drift var(--hold) cubic-bezier(.3,.15,.4,1) both;}
+/* Each photo's own camera move (IntroReel sets the from/to per frame). */
+@keyframes mci-drift{from{transform:translate(var(--fx,1.5%),var(--fy,0)) scale(var(--fs,1.14));}to{transform:translate(var(--tx,-1%),var(--ty,0)) scale(var(--ts,1.02));}}
+
+/* Then → now: the 1929 green dissolves into today's, the colour coming up through it. */
+.mci-reel-frame.is-match{animation:mci-match .9s ease-in-out both !important;}
+@keyframes mci-match{from{opacity:0;filter:grayscale(1) sepia(.35);}55%{filter:grayscale(.5) sepia(.15);}to{opacity:1;filter:none;}}
+
+/* Cinema letterbox over the archive; it opens when the colour comes in. */
+.mci-letterbox{position:absolute;left:0;right:0;z-index:6;height:0;background:#000;pointer-events:none;
+  transition:height 1s cubic-bezier(.6,0,.2,1);}
+.mci-letterbox.is-top{top:0;}
+.mci-letterbox.is-bottom{bottom:0;}
+.mci-intro.era-archive .mci-letterbox{height:9vh;}
 
 /* Black-and-white film: warm silver print, gate weave, flicker. */
 .mci-reel-frame.era-archive .mci-reel-img,.mci-reel-frame.era-archive .mci-reel-card img,.mci-reel-frame.era-archive .mci-reel-blur{
@@ -444,6 +456,7 @@ body:has(.mci){margin:0;}
   font-size:clamp(64px,11vw,170px);line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.02em;
   color:transparent;-webkit-text-stroke:1.2px rgba(236,216,164,.75);text-shadow:0 0 40px rgba(0,0,0,.35);
   animation:mci-year-in 1s .3s cubic-bezier(.2,.7,.2,1) both;pointer-events:none;}
+.mci-intro.era-archive .mci-reel-year{bottom:calc(9vh + 3vh);}
 .mci-reel-year.is-running{color:rgba(245,240,226,.9);-webkit-text-stroke:0;text-shadow:0 0 50px rgba(210,171,94,.5),0 4px 30px rgba(0,0,0,.6);}
 @keyframes mci-year-in{from{opacity:0;transform:translateY(16px);filter:blur(8px);}to{opacity:1;transform:none;filter:none;}}
 
@@ -504,3 +517,4 @@ body:has(.mci){margin:0;}
   font-family:var(--disp);font-weight:600;text-transform:uppercase;letter-spacing:.18em;font-size:12px;transition:background .2s,border-color .2s;}
 .mci .mci-replay:hover{background:rgba(210,171,94,.12);border-color:var(--gold-bright);}
 @media (prefers-reduced-motion:reduce){.mci .mci-replay{display:none;}}
+.mci-reel-year{transition:bottom .9s cubic-bezier(.6,0,.2,1);}
