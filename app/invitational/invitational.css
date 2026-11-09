@@ -350,3 +350,118 @@ body:has(.mci){margin:0;}
   .mci *,.mci *::before,.mci *::after{animation:none !important;transition:none !important;}
   .mci [data-parallax]{transform:none !important;}
 }
+
+/* =====================================================================
+   Opening reel (components/invitational/IntroReel.tsx)
+   ===================================================================== */
+/* The hero waits underneath until the reel lifts. (When the reel is skipped,
+   IntroReel lifts this on mount, before motion is switched on.) */
+.mci-intro-on .mci-hero *,
+.mci-intro-on .mci-hero *::before,
+.mci-intro-on .mci-hero *::after{animation-play-state:paused !important;}
+
+.mci-intro{
+  position:fixed;inset:0;z-index:1000;background:#05080f;color:#f5f0e2;cursor:pointer;overflow:hidden;
+  transition:opacity 1.1s cubic-bezier(.6,0,.3,1);
+}
+.mci-intro.is-exit{opacity:0;pointer-events:none;}
+.mci-intro-loading{position:absolute;inset:0;display:grid;place-items:center;}
+.mci-intro-loading img{opacity:.85;animation:mci-intro-pulse 1.4s ease-in-out infinite;}
+@keyframes mci-intro-pulse{0%,100%{transform:scale(.94);opacity:.5;}50%{transform:scale(1.04);opacity:.95;}}
+
+.mci-reel{position:absolute;inset:0;transition:opacity .7s ease,filter .7s ease,transform 1.1s cubic-bezier(.6,0,.3,1);}
+.mci-intro.is-title .mci-reel,.mci-intro.is-exit .mci-reel{opacity:.28;filter:blur(7px) saturate(.6);}
+
+/* One frame of the reel: it turns in like a page, then drifts while it holds. */
+.mci-reel-frame{position:absolute;inset:0;z-index:0;overflow:hidden;background:#05080f;
+  animation:mci-turn calc(min(var(--hold) * .5, 360ms)) cubic-bezier(.2,.7,.2,1) both;}
+.mci-reel-frame.is-under{animation:none;}
+@keyframes mci-turn{
+  from{clip-path:inset(0 0 0 100%);transform:perspective(1600px) rotateY(-14deg) translateX(4%);filter:brightness(1.5);}
+  to{clip-path:inset(0 0 0 0);transform:none;filter:none;}
+}
+.mci-reel-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:var(--focus);
+  animation:mci-drift var(--hold) linear both;}
+@keyframes mci-drift{from{transform:scale(1.14) translateX(1.5%);}to{transform:scale(1.02) translateX(-1%);}}
+.mci-reel-frame.is-mono .mci-reel-img,.mci-reel-frame.is-mono .mci-reel-card img{filter:grayscale(1) sepia(.28) contrast(1.12) brightness(.96);}
+.mci-reel-frame.has-cap::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg,rgba(5,8,15,.82) 0%,rgba(5,8,15,.35) 48%,rgba(5,8,15,0) 70%),linear-gradient(0deg,rgba(5,8,15,.6),transparent 45%);}
+
+/* The faces: a portrait card pushing in on the face, over a blur of itself. */
+.mci-reel-blur{position:absolute;inset:-6%;width:112%;height:112%;object-fit:cover;object-position:var(--face);
+  filter:grayscale(1) sepia(.35) blur(26px) brightness(.38);}
+.mci-reel-card{position:absolute;z-index:1;top:50%;right:11vw;height:min(80vh,760px);aspect-ratio:3/4;max-width:46vw;
+  transform:translateY(-50%);overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,.85),0 0 0 1px rgba(210,171,94,.55);
+  animation:mci-card-in .9s cubic-bezier(.2,.7,.2,1) both;}
+@keyframes mci-card-in{from{transform:translateY(-46%) scale(.94);opacity:0;}to{transform:translateY(-50%);opacity:1;}}
+.mci-reel-card img{width:100%;height:100%;object-fit:cover;object-position:var(--face);transform-origin:var(--face);
+  animation:mci-pushin var(--hold) cubic-bezier(.3,.1,.3,1) both;}
+@keyframes mci-pushin{from{transform:scale(1.02);}to{transform:scale(var(--zoom,1.45));}}
+.mci-reel-frame.is-face.has-cap::after{background:linear-gradient(90deg,rgba(5,8,15,.7) 0%,rgba(5,8,15,0) 60%);}
+
+/* Captions: the name lands, tracking in from wide. */
+.mci-reel-cap{position:absolute;z-index:2;left:7vw;bottom:14vh;max-width:min(640px,48vw);font-family:var(--disp);}
+.mci-reel-cap-eyebrow{text-transform:uppercase;letter-spacing:.42em;font-size:clamp(11px,1.2vw,14px);font-weight:600;color:var(--gold-bright);
+  animation:mci-cap-up .7s .15s cubic-bezier(.2,.7,.2,1) both;}
+.mci-reel-cap-name{text-transform:uppercase;font-weight:700;line-height:.95;font-size:clamp(40px,6.6vw,96px);margin:.18em 0 .16em;
+  text-shadow:0 6px 40px rgba(0,0,0,.6);animation:mci-cap-name 1.1s .25s cubic-bezier(.16,.8,.2,1) both;}
+.mci-reel-cap-line{font-style:italic;font-size:clamp(16px,1.8vw,22px);color:#d9d2bf;
+  animation:mci-cap-up .8s .55s cubic-bezier(.2,.7,.2,1) both;}
+@keyframes mci-cap-up{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+@keyframes mci-cap-name{from{opacity:0;letter-spacing:.32em;filter:blur(10px);}to{opacity:1;letter-spacing:.01em;filter:none;}}
+.mci-reel-cap-name::after{content:"";display:block;height:2px;width:90px;margin-top:.28em;background:linear-gradient(90deg,var(--gold-bright),transparent);
+  transform-origin:left;animation:mci-draw .9s .6s cubic-bezier(.2,.7,.2,1) both;}
+
+/* A flash on every cut. */
+.mci-reel-flash{position:absolute;inset:0;z-index:3;pointer-events:none;background:#fff8e6;mix-blend-mode:soft-light;
+  animation:mci-flash .22s ease-out both;}
+@keyframes mci-flash{from{opacity:.55;}to{opacity:0;}}
+
+/* PASATIEMPO, with the archive running through the letters. */
+.mci-reel-title{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 4vw;
+  font-family:var(--disp);transition:transform 1.1s cubic-bezier(.6,0,.3,1),filter 1.1s;}
+.mci-intro.is-exit .mci-reel-title{transform:scale(1.12);filter:blur(6px);}
+.mci-reel-eyebrow{text-transform:uppercase;letter-spacing:.42em;font-size:clamp(11px,1.3vw,15px);font-weight:600;color:var(--gold-bright);
+  animation:mci-cap-up .8s .2s cubic-bezier(.2,.7,.2,1) both;}
+.mci-reel-word-wrap{position:relative;margin:.12em 0 .05em;}
+.mci-reel-word{font-weight:700;text-transform:uppercase;line-height:.9;letter-spacing:.03em;font-size:clamp(52px,14.5vw,220px);white-space:nowrap;}
+.mci-reel-word.is-photo{color:transparent;-webkit-text-fill-color:transparent;background-size:cover;background-position:center;
+  -webkit-background-clip:text;background-clip:text;animation:mci-word-in 1s cubic-bezier(.16,.8,.2,1) both;}
+@keyframes mci-word-in{from{opacity:0;transform:scale(1.35);letter-spacing:.24em;}to{opacity:1;transform:none;letter-spacing:.03em;}}
+.mci-reel-word.is-solid{position:absolute;inset:0;color:#f5f0e2;opacity:0;transition:opacity .8s ease;
+  text-shadow:0 0 50px rgba(210,171,94,.45),0 6px 30px rgba(0,0,0,.5);}
+.mci-intro.is-solid .mci-reel-word.is-solid{opacity:1;}
+.mci-reel-rule{width:min(420px,60vw);height:1px;margin:14px auto 0;background:linear-gradient(90deg,transparent,var(--gold-bright),transparent);
+  animation:mci-draw 1s .9s cubic-bezier(.2,.7,.2,1) both;}
+.mci-reel-sub{margin-top:16px;font-style:italic;font-size:clamp(18px,2.4vw,30px);color:var(--gold-pale);
+  animation:mci-cap-up .9s 1.15s cubic-bezier(.2,.7,.2,1) both;}
+
+/* Film grain-ish vignette, progress bar, skip. */
+.mci-reel-grain{position:absolute;inset:0;z-index:5;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55) 100%),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px);}
+.mci-reel-bar{position:absolute;left:0;right:0;bottom:0;height:2px;z-index:6;background:rgba(255,255,255,.08);}
+.mci-reel-bar span{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--gold-bright));transform-origin:left;transform:scaleX(0);transition:transform .35s linear;}
+.mci .mci-reel-skip{position:absolute;z-index:7;right:22px;bottom:20px;appearance:none;cursor:pointer;
+  background:rgba(5,8,15,.45);color:#e9e2cf;border:1px solid rgba(236,216,164,.4);border-radius:99px;padding:8px 18px;
+  font-family:var(--disp);font-weight:600;text-transform:uppercase;letter-spacing:.2em;font-size:12px;
+  backdrop-filter:blur(6px);animation:mci-cap-up .6s .8s both;transition:background .2s,border-color .2s;}
+.mci .mci-reel-skip:hover{background:rgba(5,8,15,.75);border-color:var(--gold-bright);}
+
+@media (max-width:760px){
+  .mci-reel-card{right:50%;top:9vh;height:auto;width:min(66vw,340px);max-width:none;transform:translateX(50%);}
+  @keyframes mci-card-in{from{transform:translateX(50%) translateY(3%) scale(.94);opacity:0;}to{transform:translateX(50%);opacity:1;}}
+  .mci-reel-cap{left:6vw;right:6vw;bottom:11vh;max-width:none;}
+  .mci-reel-word{font-size:clamp(38px,12.4vw,90px);letter-spacing:.01em;}
+  @keyframes mci-word-in{from{opacity:0;transform:scale(1.3);}to{opacity:1;transform:none;}}
+  .mci-reel-frame.has-cap::after{background:linear-gradient(0deg,rgba(5,8,15,.92) 0%,rgba(5,8,15,.4) 45%,transparent 70%);}
+  .mci-reel-frame.is-face.has-cap::after{background:linear-gradient(0deg,rgba(5,8,15,.9) 0%,transparent 55%);}
+}
+
+/* Replay, in the footer. */
+.mci .mci-replay{margin-top:18px;display:inline-flex;align-items:center;gap:8px;appearance:none;cursor:pointer;background:none;
+  border:1px solid rgba(210,171,94,.45);color:var(--gold-pale);border-radius:99px;padding:7px 16px;
+  font-family:var(--disp);font-weight:600;text-transform:uppercase;letter-spacing:.18em;font-size:12px;transition:background .2s,border-color .2s;}
+.mci .mci-replay:hover{background:rgba(210,171,94,.12);border-color:var(--gold-bright);}
+@media (prefers-reduced-motion:reduce){.mci .mci-replay{display:none;}}
