@@ -491,3 +491,7 @@ body:has(.mci){margin:0;}
   opacity:.75;transition:opacity .2s,background .2s;}
 .mci .mci-loop-toggle:hover,.mci .mci-loop-toggle:focus-visible{opacity:1;background:rgba(11,23,41,.7);}
 @media (prefers-reduced-motion:reduce){.mci .mci-loop-toggle{display:none;}}
+
+/* Hero course films: stacked, crossfading one into the next. */
+.mci-hero-bg .mci-hero-film{position:absolute;inset:0;opacity:0;transition:opacity 1.2s ease;}
+.mci-hero-bg .mci-hero-film.is-on{opacity:1;}

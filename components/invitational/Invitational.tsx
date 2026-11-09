@@ -282,18 +282,28 @@ function Header({
 
 function Home({ go }: { go: (t: TabKey) => void }) {
   const word = "Invitational";
-  const { ref: heroRef, paused: heroPaused, toggle: heroToggle } = useFilm();
+  const hero = useFilmReel(HERO_FILMS.length);
   return (
     <>
       <section className="mci-hero">
         <div className="mci-hero-bg" data-parallax="0.18">
-          {/* A drone pass over the bunkers to the 4th green, the clubhouse beyond. */}
-          <LoopVideo
-            videoRef={heroRef}
-            src={VID + "hole-4-approach.mp4"}
-            poster={IMG + "hole-4-approach-poster.jpg"}
-            eager
-          />
+          {/* The course films, one after another, crossfading. */}
+          {HERO_FILMS.map((f, k) => (
+            <video
+              key={f.src}
+              ref={hero.setRef(k)}
+              className={"mci-hero-film" + (k === hero.index ? " is-on" : "")}
+              src={f.src}
+              poster={f.poster}
+              muted
+              playsInline
+              loop={HERO_FILMS.length === 1}
+              preload={k === 0 ? "auto" : "none"}
+              disablePictureInPicture
+              aria-hidden
+              onEnded={hero.next}
+            />
+          ))}
         </div>
         <div className="mci-hero-veil" />
         <div className="mci-hero-sheen" aria-hidden />
@@ -334,7 +344,7 @@ function Home({ go }: { go: (t: TabKey) => void }) {
             <path d="M12 4v14M6 12l6 6 6-6" />
           </svg>
         </button>
-        <FilmToggle paused={heroPaused} toggle={heroToggle} label="the course film" />
+        <FilmToggle paused={hero.paused} toggle={hero.toggle} label="the course films" />
       </section>
 
       <section className="mci-block" id="mci-intro">
@@ -547,6 +557,101 @@ function PhotoBand({
  * moving background video needs one. The state lives in a hook so the film
  * can sit in a parallax layer while its button stays put in the section.
  */
+/** The home page's hero films, played in order and looped. */
+const HERO_FILMS = [
+  // TODO(hole 8): put the 8th-hole film first once it's on file.
+  { src: VID + "hole-4-approach.mp4", poster: IMG + "hole-4-approach-poster.jpg" },
+  { src: VID + "hole-11-approach.mp4", poster: IMG + "hole-11-approach-poster.jpg" },
+];
+
+/**
+ * A run of course films: each plays once and crossfades into the next, and
+ * the run loops. Only the first loads up front; each next film starts
+ * loading while the one before it plays. Plays only while on screen, keeps
+ * the first still for visitors who ask for reduced motion, and pauses on
+ * request.
+ */
+function useFilmReel(count: number) {
+  const vids = useRef<(HTMLVideoElement | null)[]>([]);
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const userPaused = useRef(false);
+  const visible = useRef(false);
+  const still = useRef(false);
+  const indexRef = useRef(0);
+
+  const setRef = useCallback(
+    (k: number) => (el: HTMLVideoElement | null) => {
+      vids.current[k] = el;
+    },
+    [],
+  );
+
+  const playCurrent = useCallback((k: number) => {
+    const v = vids.current[k];
+    if (!v || still.current || userPaused.current || !visible.current) return;
+    v.muted = true;
+    v.play().catch(() => {});
+    // Warm up the next film while this one plays.
+    const nxt = vids.current[(k + 1) % vids.current.length];
+    if (nxt && nxt !== v && nxt.preload === "none") nxt.preload = "auto";
+  }, []);
+
+  // Watch the first film's box: the whole run plays only while it's on screen.
+  useEffect(() => {
+    still.current = prefersReducedMotion();
+    const first = vids.current[0];
+    if (!first || still.current) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        visible.current = e.isIntersecting;
+        const cur = vids.current[indexRef.current];
+        if (e.isIntersecting) playCurrent(indexRef.current);
+        else cur?.pause();
+      },
+      { rootMargin: "200px 0px" },
+    );
+    io.observe(first);
+    return () => io.disconnect();
+  }, [playCurrent]);
+
+  // A new film comes up: rewind and play it; the others rest at their start.
+  useEffect(() => {
+    indexRef.current = index;
+    vids.current.forEach((v, k) => {
+      if (!v || k === index) return;
+      // Let the outgoing film hold its last frame while it fades, then rewind.
+      setTimeout(() => {
+        if (indexRef.current !== k) {
+          v.pause();
+          v.currentTime = 0;
+        }
+      }, 1300);
+    });
+    playCurrent(index);
+  }, [index, playCurrent]);
+
+  const next = useCallback(() => {
+    if (count > 1) setIndex((k) => (k + 1) % count);
+  }, [count]);
+
+  const toggle = () => {
+    const v = vids.current[indexRef.current];
+    if (!v) return;
+    if (v.paused) {
+      userPaused.current = false;
+      playCurrent(indexRef.current);
+      setPaused(false);
+    } else {
+      userPaused.current = true;
+      v.pause();
+      setPaused(true);
+    }
+  };
+
+  return { index, paused, setRef, next, toggle };
+}
+
 function useFilm() {
   const ref = useRef<HTMLVideoElement>(null);
   const [paused, setPaused] = useState(false);
