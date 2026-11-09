@@ -29,6 +29,7 @@ import {
   type TabMeta,
 } from "./content";
 import { Icon } from "./icons";
+import IntroReel, { INTRO_GATE, allowReplay } from "./IntroReel";
 
 // Men's Club Invitational — the public event page. Same family as El Sombrero
 // (serif, cream and gold, tabbed), with its own navy identity. All the words
@@ -55,6 +56,10 @@ function prefersReducedMotion() {
 export default function Invitational() {
   const [tab, setTab] = useState<TabKey>("home");
   const [scrolled, setScrolled] = useState(false);
+  // The opening reel: "on" while it plays (the hero waits), "revealing" as it
+  // lifts (the hero starts), "done" once it's gone. IntroReel itself decides
+  // on mount whether this visit gets it at all.
+  const [intro, setIntro] = useState<"on" | "revealing" | "done">("on");
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Follow the address bar: #schedule opens the Schedule tab, Back works.
@@ -143,7 +148,16 @@ export default function Invitational() {
   }, [tab]);
 
   return (
-    <div className="mci" ref={rootRef}>
+    <div className={"mci" + (intro === "on" ? " mci-intro-on" : "")} ref={rootRef}>
+      {/* Before first paint: skip the reel for returning visitors, deep links
+          and reduced motion, so it never flashes up. */}
+      <script dangerouslySetInnerHTML={{ __html: INTRO_GATE }} />
+      {intro !== "done" && (
+        <IntroReel
+          onReveal={() => setIntro((s) => (s === "on" ? "revealing" : s))}
+          onDone={() => setIntro("done")}
+        />
+      )}
       <Header tab={tab} go={go} scrolled={scrolled} />
       <main>
         {/* Keyed so each tab mounts fresh and plays its entrance. */}
@@ -157,7 +171,13 @@ export default function Invitational() {
           {tab === "home" ? <Home go={go} /> : <TabView meta={tabMeta(tab)} />}
         </div>
       </main>
-      <Footer />
+      <Footer
+        onReplay={() => {
+          allowReplay();
+          go("home");
+          setIntro("on");
+        }}
+      />
     </div>
   );
 }
@@ -906,7 +926,7 @@ function Contact({ name, role, phone }: { name: string; role: string; phone: str
 // Footer
 // ---------------------------------------------------------------------------
 
-function Footer(): ReactNode {
+function Footer({ onReplay }: { onReplay: () => void }): ReactNode {
   return (
     <footer className="mci-footer">
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -935,6 +955,12 @@ function Footer(): ReactNode {
       <p className="mci-legacy">
         {`The ${EVENT.name} — Pasatiempo Golf Club · Santa Cruz, California`}
       </p>
+      <button type="button" className="mci-replay" onClick={onReplay}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <path d="M8 5v14l11-7z" />
+        </svg>
+        Play the intro
+      </button>
     </footer>
   );
 }
