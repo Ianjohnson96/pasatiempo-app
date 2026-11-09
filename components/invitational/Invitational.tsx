@@ -559,8 +559,11 @@ function PhotoBand({
  */
 /** The home page's hero films, played in order and looped. */
 const HERO_FILMS = [
-  // TODO(hole 8): put the 8th-hole film first once it's on file.
+  // Up the 8th under the cypresses to the green.
+  { src: VID + "hole-8-approach.mp4", poster: IMG + "hole-8-approach-poster.jpg" },
+  // Over the bunkers to the 4th green, the clubhouse beyond.
   { src: VID + "hole-4-approach.mp4", poster: IMG + "hole-4-approach-poster.jpg" },
+  // Down the barranca, over the bridge, to the 11th.
   { src: VID + "hole-11-approach.mp4", poster: IMG + "hole-11-approach-poster.jpg" },
 ];
 
