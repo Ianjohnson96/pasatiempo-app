@@ -99,9 +99,15 @@ const BEHIND = FRAMES.map((f) => f.src);
 const SETTLE_ON = T("chairs-bay.jpg");
 
 const LEAD_MS = 250; // a beat of black before the first page
-const TITLE_MS = 2000; // PASATIEMPO on screen
-const SOLID_AT = 1000; // ...letters stop flickering and settle
-const EXIT_MS = 600; // the reel lifts away
+const TITLE_MS = 3200; // PASATIEMPO on screen
+const SOLID_AT = 1100; // ...letters stop flickering and settle
+// The handoff into the page, in two stages: the title fades out first, then
+// the dark lifts slowly off the page (the CSS times both). The page's own
+// title starts rising once the first stage is done, so the two never overlap.
+const EXIT_MS = 1900; // the whole lift
+const REVEAL_AT = 700; // ...when the page underneath starts its entrance
+// A skip shouldn't make anyone wait: it lifts in a blink.
+const QUICK_EXIT_MS = 500;
 const FOUNDED = 1929;
 
 const FIRST_TODAY = FRAMES.findIndex((f) => f.era === "today");
@@ -182,6 +188,7 @@ export default function IntroReel({
   const [i, setI] = useState(0);
   const [fill, setFill] = useState(0);
   const [solid, setSolid] = useState(false);
+  const [quick, setQuick] = useState(false);
   const done = useRef({ onReveal, onDone });
   useEffect(() => {
     done.current = { onReveal, onDone };
@@ -210,6 +217,7 @@ export default function IntroReel({
   // The clock: a beat of black, each page's hold, the title, the exit.
   useEffect(() => {
     let t: ReturnType<typeof setTimeout> | undefined;
+    let r: ReturnType<typeof setTimeout> | undefined;
     if (phase === "lead") {
       t = setTimeout(() => setPhase("reel"), LEAD_MS);
     } else if (phase === "reel") {
@@ -221,11 +229,19 @@ export default function IntroReel({
       t = setTimeout(() => setPhase("exit"), TITLE_MS);
     } else if (phase === "exit") {
       markSeen();
-      done.current.onReveal();
-      t = setTimeout(() => done.current.onDone(), EXIT_MS);
+      if (quick) {
+        done.current.onReveal();
+        t = setTimeout(() => done.current.onDone(), QUICK_EXIT_MS);
+      } else {
+        r = setTimeout(() => done.current.onReveal(), REVEAL_AT);
+        t = setTimeout(() => done.current.onDone(), EXIT_MS);
+      }
     }
-    return () => clearTimeout(t);
-  }, [phase, i]);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(r);
+    };
+  }, [phase, i, quick]);
 
   // Under the title, the pages keep turning — through the letters and behind
   // them — then stop and the letters settle solid.
@@ -247,6 +263,7 @@ export default function IntroReel({
     const onKey = (e: KeyboardEvent) => {
       if (["Escape", "Enter", " "].includes(e.key)) {
         e.preventDefault();
+        setQuick(true);
         setPhase("exit");
       }
     };
@@ -254,7 +271,10 @@ export default function IntroReel({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const skip = () => setPhase("exit");
+  const skip = () => {
+    setQuick(true);
+    setPhase("exit");
+  };
   const inReel = phase === "reel";
   const inTitle = phase === "title" || phase === "exit";
   const frame = FRAMES[i];
@@ -279,7 +299,9 @@ export default function IntroReel({
 
   return (
     <div
-      className={"mci-intro is-" + phase + " era-" + era + (solid ? " is-solid" : "")}
+      className={
+        "mci-intro is-" + phase + " era-" + era + (solid ? " is-solid" : "") + (quick ? " is-quick" : "")
+      }
       onClick={skip}
       role="presentation"
     >
