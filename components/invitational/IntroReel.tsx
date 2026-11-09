@@ -3,21 +3,20 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { EVENT } from "./content";
 
-// The opening title sequence for the Invitational page — about seven
-// seconds, in three acts:
+// The opening title sequence for the Invitational page — a studio-style
+// flip-book, about six and a half seconds:
 //
-//   1. THE CREST — the club's palm-and-figure logo on a cream medallion, a
-//      gold ring drawing round it.
-//   2. 1929, ON FILM — letterboxed black-and-white with grain and flicker:
-//      the opening-day crowd, the foursome on the first tee, the galleries
-//      round MacKenzie's greens, the Doctor and Marion Hollins themselves,
-//      each photo with its own quick camera move.
-//   3. TODAY — the 1929 bunkered green dissolves into a bunkered green
-//      today, in colour; the letterbox opens on the club clock ("Est. 1929")
-//      as the year starts to run, the cuts race, and it lands on two chairs
-//      looking out to the bay, then PASATIEMPO with the crest above it.
+//   1929 — the club's archive flips past like pages turning, black-and-white
+//   on film: the opening-day crowd, the foursome on the first tee, the
+//   Doctor and Marion Hollins, the galleries round MacKenzie's greens. Slow
+//   enough at first to catch the faces, then faster and faster.
+//   2027 — a flash, and the pages turn to colour: the clock, the bridge,
+//   the greens, the bay, racing.
+//   PASATIEMPO — the photos keep flipping, through the letters and behind
+//   them, until the letters settle solid with the crest above, and it all
+//   lifts away into the page.
 //
-// No captions: the faces, the course and the years carry it.
+// No captions; the years are the only words until the title.
 //
 // Plays once per browser session, on the home tab, never for visitors who ask
 // for reduced motion. Skippable at any point (button, Esc, Enter, Space, or a
@@ -25,115 +24,87 @@ import { EVENT } from "./content";
 // reel lifts. A replay button lives in the footer.
 //
 // Photographs: the 1929 course and opening-day photographs (archive-1929-*)
-// and the present-day clock, bridge, dawn aerial, flag and chairs
-// (today-*) are the club's own. "House of Dr. Alister MacKenzie, Pasatiempo
-// Estates" (archive-mackenzie-house-1933*) is by Sturtevant for The Architect
-// and Engineer, April 1933 (San Francisco Public Library scan via the
-// Internet Archive; Wikimedia Commons files 14598027017 and 14784188652, "No
-// known copyright restrictions"). MacKenzie's portrait is from the Library of
+// and the present-day clock, bridge, dawn aerial, flag and chairs (today-*)
+// are the club's own, as are the two drone films the hole-* stills come from.
+// "House of Dr. Alister MacKenzie, Pasatiempo Estates"
+// (archive-mackenzie-house-1933*) is by Sturtevant for The Architect and
+// Engineer, April 1933 (San Francisco Public Library scan via the Internet
+// Archive; Wikimedia Commons files 14598027017 and 14784188652, "No known
+// copyright restrictions"). MacKenzie's portrait is from the Library of
 // Congress; Hollins's from the MHI site.
 
 const IMG = "/invitational/img/";
 const LOGO = "/logo-full.png";
-
-type Era = "archive" | "today";
-
-/** A camera move over a full-bleed photo: scale and offset (in %), from → to. */
-interface Move {
-  from: [scale: number, x: number, y: number];
-  to: [scale: number, x: number, y: number];
-  /** transform-origin, e.g. "40% 20%" to push in on a face. */
-  origin?: string;
-}
-const DRIFT: Move = { from: [1.14, 1.5, 0], to: [1.02, -1, 0] };
-
-interface Frame {
-  src: string;
-  /** How long the frame holds, in ms. */
-  hold: number;
-  era: Era;
-  /** object-position for the crop. */
-  focus?: string;
-  move?: Move;
-  /** Portrait card with a push-in toward the face (transform-origin). */
-  face?: string;
-  /** How far the portrait push-in goes (default 1.45). */
-  zoom?: number;
-  /** Dissolve in over the previous frame instead of cutting (then → now). */
-  match?: boolean;
-}
-
 const A = (f: string) => IMG + "archive-" + f;
 const T = (f: string) => IMG + "today-" + f;
 
-// About seven seconds in all: 0.7s crest + 2.6s archive + 1.8s today +
-// 1.3s title, then a 0.6s lift into the page.
+type Era = "archive" | "today";
+interface Frame {
+  src: string;
+  /** How long the page holds, in ms. */
+  hold: number;
+  era: Era;
+  /** object-position for the crop — on the faces for the portraits. */
+  focus?: string;
+}
+
 const FRAMES: Frame[] = [
-  // ---- Act two: 1929, on film, each photo with its own camera move. ------
-  {
-    src: A("1929-tee-shot-bay.jpg"), hold: 400, era: "archive", focus: "center 70%",
-    move: { from: [1.12, 0, 3], to: [1.04, 0, -1] },
-  },
-  {
-    src: A("1929-opening-foursome.jpg"), hold: 500, era: "archive", focus: "center 8%",
-    move: { from: [1.02, 0, 0], to: [1.14, 0, 0], origin: "45% 14%" },
-  },
-  { src: IMG + "mackenzie.jpg", hold: 420, era: "archive", face: "53% 17%", zoom: 1.7 },
-  {
-    src: A("1929-gallery-oak.jpg"), hold: 280, era: "archive", focus: "center 60%",
-    move: { from: [1.14, 2, 0], to: [1.14, -1, 0] },
-  },
-  { src: IMG + "hollins.avif", hold: 420, era: "archive", face: "50% 34%", zoom: 1.3 },
-  {
-    src: A("1929-golfer-oak.jpg"), hold: 230, era: "archive", focus: "center 70%",
-    move: { from: [1.04, 0, 0], to: [1.1, 0, 0], origin: "42% 75%" },
-  },
-  {
-    src: A("1929-bunkered-green.jpg"), hold: 350, era: "archive", focus: "center 60%",
-    move: { from: [1.06, 0, 0], to: [1.12, 0, 0], origin: "55% 60%" },
-  },
-  // ---- Act three: the 1929 green dissolves into a bunkered green today. ---
-  {
-    src: IMG + "course-green.jpg", hold: 380, era: "today", match: true, focus: "center 60%",
-    move: { from: [1.12, 0, 0], to: [1.08, 0, 0], origin: "55% 60%" },
-  },
-  // The club clock — "Est. 1929 · An Alister MacKenzie Design".
-  {
-    src: T("clock-1929.jpg"), hold: 380, era: "today", focus: "18% center",
-    move: { from: [1.04, 0, 0], to: [1.14, 0, 0], origin: "21% 30%" },
-  },
-  { src: T("bridge.jpg"), hold: 220, era: "today", focus: "center 60%", move: { from: [1.02, 0, 0], to: [1.08, 0, 0], origin: "50% 62%" } },
-  { src: T("aerial-dawn.jpg"), hold: 180, era: "today", focus: "center 55%" },
-  { src: T("flag-green.jpg"), hold: 150, era: "today", focus: "70% 60%" },
-  { src: IMG + "course-wide.jpg", hold: 130, era: "today" },
-  { src: IMG + "sixteenth.jpg", hold: 120, era: "today" },
-  // ...landing on two chairs looking out over the course to the bay.
-  {
-    src: T("chairs-bay.jpg"), hold: 240, era: "today", focus: "center 42%",
-    move: { from: [1.0, 0, 0], to: [1.03, 0, 0], origin: "50% 42%" },
-  },
+  // ---- 1929: the archive, slowing on the faces, then speeding up ---------
+  { src: A("1929-tee-shot-bay.jpg"), hold: 320, era: "archive", focus: "center 70%" },
+  { src: IMG + "mackenzie.jpg", hold: 290, era: "archive", focus: "53% 16%" },
+  { src: A("1929-opening-foursome.jpg"), hold: 260, era: "archive", focus: "center 10%" },
+  { src: IMG + "hollins.avif", hold: 240, era: "archive", focus: "50% 30%" },
+  { src: A("1929-gallery-oak.jpg"), hold: 220, era: "archive", focus: "center 60%" },
+  { src: A("mackenzie-house-1933.jpg"), hold: 200, era: "archive", focus: "center 70%" },
+  { src: IMG + "hollins-swing.avif", hold: 180, era: "archive", focus: "60% 15%" },
+  { src: A("1929-golfer-oak.jpg"), hold: 165, era: "archive", focus: "center 70%" },
+  { src: A("1929-bunkered-green.jpg"), hold: 150, era: "archive", focus: "center 60%" },
+  { src: A("mackenzie-house-1933b.jpg"), hold: 140, era: "archive", focus: "center 40%" },
+  { src: A("1929-opening-foursome.jpg"), hold: 130, era: "archive", focus: "72% 10%" },
+  { src: IMG + "mackenzie.jpg", hold: 120, era: "archive", focus: "53% 14%" },
+  // ---- 2027: a flash, and the pages race on in colour --------------------
+  { src: T("clock-1929.jpg"), hold: 110, era: "today", focus: "18% center" },
+  { src: IMG + "course-green.jpg", hold: 100, era: "today" },
+  { src: T("bridge.jpg"), hold: 95, era: "today", focus: "center 60%" },
+  { src: T("aerial-dawn.jpg"), hold: 90, era: "today" },
+  { src: T("flag-green.jpg"), hold: 85, era: "today", focus: "70% 60%" },
+  { src: T("chairs-bay.jpg"), hold: 80, era: "today", focus: "center 45%" },
+  { src: IMG + "course-wide.jpg", hold: 75, era: "today" },
+  { src: IMG + "clubhouse.avif", hold: 70, era: "today" },
+  { src: IMG + "hole-4-approach-poster.jpg", hold: 65, era: "today" },
+  { src: IMG + "aerial.avif", hold: 65, era: "today" },
+  { src: IMG + "bunkers-green.avif", hold: 60, era: "today" },
+  { src: IMG + "hole-11-approach-poster.jpg", hold: 60, era: "today" },
+  { src: IMG + "clubhouse-green.jpg", hold: 60, era: "today" },
+  { src: IMG + "course-bunkers.jpg", hold: 60, era: "today" },
+  { src: IMG + "schedule.avif", hold: 60, era: "today" },
+  { src: IMG + "hero.avif", hold: 60, era: "today" },
 ];
 
 /** Photos that run through the letters of PASATIEMPO — then and now. */
 const FILL = [
   A("1929-tee-shot-bay.jpg"),
-  IMG + "course-wide.jpg",
+  T("aerial-dawn.jpg"),
   A("1929-opening-foursome.jpg"),
   IMG + "course-green.jpg",
   A("1929-bunkered-green.jpg"),
-  T("aerial-dawn.jpg"),
-  A("1929-gallery-oak.jpg"),
   T("bridge.jpg"),
+  A("1929-gallery-oak.jpg"),
+  IMG + "hole-4-approach-poster.jpg",
+  IMG + "mackenzie.jpg",
+  T("flag-green.jpg"),
 ];
+/** ...and the pages that keep turning behind the title until it settles. */
+const BEHIND = FRAMES.map((f) => f.src);
+const SETTLE_ON = T("chairs-bay.jpg");
 
-const CREST_MS = 700; // act one
-const TITLE_MS = 1300; // PASATIEMPO on screen
-const SOLID_AT = 650; // ...letters stop flickering and settle
+const LEAD_MS = 250; // a beat of black before the first page
+const TITLE_MS = 2000; // PASATIEMPO on screen
+const SOLID_AT = 1000; // ...letters stop flickering and settle
 const EXIT_MS = 600; // the reel lifts away
 const FOUNDED = 1929;
 
 const FIRST_TODAY = FRAMES.findIndex((f) => f.era === "today");
-const TODAY_MS = FRAMES.slice(FIRST_TODAY).reduce((s, f) => s + f.hold, 0);
 
 const SEEN_KEY = "mci-intro-seen";
 const SKIP_STYLE = "mci-intro-skip";
@@ -196,7 +167,7 @@ function preload(srcs: string[], maxMs: number) {
   return Promise.race([Promise.all(imgs), new Promise((r) => setTimeout(r, maxMs))]);
 }
 
-type Phase = "load" | "crest" | "reel" | "title" | "exit";
+type Phase = "load" | "lead" | "reel" | "title" | "exit";
 
 export default function IntroReel({
   onReveal,
@@ -211,7 +182,6 @@ export default function IntroReel({
   const [i, setI] = useState(0);
   const [fill, setFill] = useState(0);
   const [solid, setSolid] = useState(false);
-  const [year, setYear] = useState(FOUNDED);
   const done = useRef({ onReveal, onDone });
   useEffect(() => {
     done.current = { onReveal, onDone };
@@ -228,8 +198,8 @@ export default function IntroReel({
     const prev = html.style.overflow;
     html.style.overflow = "hidden";
     let alive = true;
-    preload([LOGO, ...new Set([...FRAMES.map((f) => f.src), ...FILL])], 3000).then(() => {
-      if (alive) setPhase("crest");
+    preload([LOGO, ...new Set([...BEHIND, ...FILL])], 3000).then(() => {
+      if (alive) setPhase("lead");
     });
     return () => {
       alive = false;
@@ -237,11 +207,11 @@ export default function IntroReel({
     };
   }, []);
 
-  // The clock: the crest, each frame's hold, the title, the exit.
+  // The clock: a beat of black, each page's hold, the title, the exit.
   useEffect(() => {
     let t: ReturnType<typeof setTimeout> | undefined;
-    if (phase === "crest") {
-      t = setTimeout(() => setPhase("reel"), CREST_MS);
+    if (phase === "lead") {
+      t = setTimeout(() => setPhase("reel"), LEAD_MS);
     } else if (phase === "reel") {
       t = setTimeout(() => {
         if (i < FRAMES.length - 1) setI(i + 1);
@@ -257,26 +227,11 @@ export default function IntroReel({
     return () => clearTimeout(t);
   }, [phase, i]);
 
-  // Act three: the year runs from 1929 to the Invitational's own, eased so
-  // it races through the middle decades and slows onto the final number.
-  useEffect(() => {
-    if (phase !== "reel" || i !== FIRST_TODAY) return;
-    let raf = 0;
-    const start = performance.now();
-    const step = (now: number) => {
-      const t = Math.min(1, (now - start) / TODAY_MS);
-      const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-      setYear(Math.round(FOUNDED + (EVENT.year - FOUNDED) * eased));
-      if (t < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [phase, i]);
-
-  // Photos flicker through the letters, then settle to solid.
+  // Under the title, the pages keep turning — through the letters and behind
+  // them — then stop and the letters settle solid.
   useEffect(() => {
     if (phase !== "title") return;
-    const flick = setInterval(() => setFill((n) => (n + 1) % FILL.length), 80);
+    const flick = setInterval(() => setFill((n) => n + 1), 75);
     const settle = setTimeout(() => {
       clearInterval(flick);
       setSolid(true);
@@ -300,19 +255,27 @@ export default function IntroReel({
   }, []);
 
   const skip = () => setPhase("exit");
+  const inReel = phase === "reel";
+  const inTitle = phase === "title" || phase === "exit";
   const frame = FRAMES[i];
   const prevFrame = i > 0 ? FRAMES[i - 1] : null;
-  const inReel = phase === "reel";
-  const era: Era | "none" = inReel ? frame.era : phase === "crest" ? "archive" : "none";
-  const total = CREST_MS + FRAMES.reduce((s, f) => s + f.hold, 0);
+  const era: Era | "none" = inReel ? frame.era : "none";
+  // Behind the title: the pages keep turning, then rest on the bay.
+  const behind: Frame = solid
+    ? { src: SETTLE_ON, hold: 900, era: "today", focus: "center 45%" }
+    : { src: BEHIND[(FIRST_TODAY + fill) % BEHIND.length], hold: 75, era: "today" };
+  const behindPrev: Frame | null =
+    !solid && fill > 0
+      ? { src: BEHIND[(FIRST_TODAY + fill - 1) % BEHIND.length], hold: 75, era: "today" }
+      : null;
+
+  const total = FRAMES.reduce((s, f) => s + f.hold, 0);
   const progress =
-    phase === "load"
+    phase === "load" || phase === "lead"
       ? 0
-      : phase === "crest"
-        ? 0.04
-        : phase === "reel"
-          ? ((CREST_MS + FRAMES.slice(0, i).reduce((s, f) => s + f.hold, 0)) / total) * 0.82
-          : 1;
+      : inReel
+        ? (FRAMES.slice(0, i).reduce((s, f) => s + f.hold, 0) / total) * 0.75
+        : 1;
 
   return (
     <div
@@ -326,50 +289,51 @@ export default function IntroReel({
         </div>
       )}
 
-      {/* Act one: the crest. */}
-      {phase === "crest" && (
-        <div className="mci-crest-act" aria-hidden>
-          <Medal size={210} />
-        </div>
-      )}
-
-      {/* Acts two and three: the reel. */}
-      {(inReel || phase === "title" || phase === "exit") && (
-        <div className="mci-reel" aria-hidden>
-          {/* Same key it had while current, so React keeps the element and its
-              move carries on rather than restarting under the cut. */}
-          {prevFrame && inReel && <FrameView key={"f" + (i - 1)} f={prevFrame} under />}
-          <FrameView key={"f" + i} f={frame} />
-          {!frame.match && <div className="mci-reel-flash" key={"x" + i} />}
-          {/* The moment the film turns to colour. */}
-          {inReel && i === FIRST_TODAY && <div className="mci-reel-burst" />}
-        </div>
-      )}
-
-      {/* Letterbox over the archive; it opens when the colour comes in. */}
-      <div className="mci-letterbox is-top" aria-hidden />
-      <div className="mci-letterbox is-bottom" aria-hidden />
-
+      {/* The flip-book. The page underneath keeps its key, so React keeps the
+          element and nothing restarts under the turn. */}
       {inReel && (
-        <div className={"mci-reel-year" + (frame.era === "today" ? " is-running" : "")} aria-hidden>
-          {year}
+        <div className="mci-reel" aria-hidden>
+          {prevFrame && <Page key={"p" + (i - 1)} f={prevFrame} under />}
+          <Page key={"p" + i} f={frame} />
+          {i === FIRST_TODAY && <div className="mci-reel-burst" />}
+        </div>
+      )}
+      {inTitle && (
+        <div className="mci-reel is-behind" aria-hidden>
+          {behindPrev && <Page key={"b" + (fill - 1)} f={behindPrev} under />}
+          <Page key={solid ? "b-settle" : "b" + fill} f={behind} />
         </div>
       )}
 
-      {(phase === "title" || phase === "exit") && (
+      {/* The years: 1929 over the archive, a hard cut to 2027 with the colour. */}
+      {inReel && (
+        <div
+          className={"mci-reel-year" + (frame.era === "today" ? " is-now" : "")}
+          key={frame.era}
+          aria-hidden
+        >
+          {frame.era === "today" ? EVENT.year : FOUNDED}
+        </div>
+      )}
+
+      {inTitle && (
         <div className="mci-reel-title">
           <div className="mci-reel-title-crest">
-            <Medal size={118} />
+            <Medal size={110} />
           </div>
           <div className="mci-reel-word-wrap">
             <div
               className="mci-reel-word is-photo"
               aria-hidden
-              style={{ backgroundImage: `url(${FILL[fill]})` }}
+              style={{ backgroundImage: `url(${FILL[fill % FILL.length]})` }}
             >
               Pasatiempo
             </div>
             <div className="mci-reel-word is-solid" aria-hidden>
+              Pasatiempo
+            </div>
+            {/* A light sweeping across the letters as they settle. */}
+            <div className="mci-reel-word mci-reel-sweep" aria-hidden>
               Pasatiempo
             </div>
           </div>
@@ -378,7 +342,6 @@ export default function IntroReel({
         </div>
       )}
 
-      {/* Film: grain and flicker over the archive, a vignette always. */}
       <div className="mci-reel-grain" aria-hidden />
       <div className="mci-reel-vignette" aria-hidden />
       <div className="mci-reel-bar" aria-hidden>
@@ -414,45 +377,15 @@ function Medal({ size }: { size: number }) {
   );
 }
 
-function FrameView({ f, under }: { f: Frame; under?: boolean }) {
-  const m = f.move ?? DRIFT;
-  const style = {
-    "--hold": f.hold + "ms",
-    "--focus": f.focus ?? "center",
-    "--face": f.face ?? "center",
-    "--zoom": f.zoom ?? 1.45,
-    "--fs": m.from[0],
-    "--fx": m.from[1] + "%",
-    "--fy": m.from[2] + "%",
-    "--ts": m.to[0],
-    "--tx": m.to[1] + "%",
-    "--ty": m.to[2] + "%",
-    "--origin": m.origin ?? "center",
-  } as CSSProperties;
+/** One full-bleed page of the flip-book: it swings in on its left edge. */
+function Page({ f, under }: { f: Frame; under?: boolean }) {
   return (
     <div
-      className={
-        "mci-reel-frame era-" +
-        f.era +
-        (f.face ? " is-face" : "") +
-        (f.match ? " is-match" : "") +
-        (under ? " is-under" : "")
-      }
-      style={style}
+      className={"mci-page era-" + f.era + (under ? " is-under" : "")}
+      style={{ "--hold": f.hold + "ms", "--focus": f.focus ?? "center" } as CSSProperties}
     >
-      {f.face ? (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="mci-reel-blur" src={f.src} alt="" />
-          <div className="mci-reel-card">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={f.src} alt="" />
-          </div>
-        </>
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img className="mci-reel-img" src={f.src} alt="" />
-      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={f.src} alt="" />
     </div>
   );
 }

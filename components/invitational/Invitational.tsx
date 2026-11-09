@@ -388,7 +388,7 @@ function Home({ go }: { go: (t: TabKey) => void }) {
           </div>
           <div className="mci-gallery">
             <Photo src={IMG + "course-green.jpg"} alt="Restored MacKenzie bunkers around a Pasatiempo green" cap="MacKenzie's bunkering, restored to its original scale" i={0} />
-            <Photo src={IMG + "sixteenth.jpg"} alt="The 16th hole at Pasatiempo seen from above" cap="The 16th, from above" i={1} tall />
+            <Photo src={IMG + "today-chairs-bay.jpg"} alt="Two chairs looking out over the course to Monterey Bay" cap="Looking out over the course to the bay" i={1} tall />
             <Photo src={IMG + "course-bunkers.jpg"} alt="Cascading MacKenzie bunkers at Pasatiempo" cap="Cascading sand — a MacKenzie signature" i={2} />
           </div>
           <div className="mci-numbers" data-reveal>
