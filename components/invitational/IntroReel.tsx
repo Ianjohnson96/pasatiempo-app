@@ -3,19 +3,19 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { EVENT } from "./content";
 
-// The opening title sequence for the Invitational page, in three acts:
+// The opening title sequence for the Invitational page — about seven
+// seconds, in three acts:
 //
 //   1. THE CREST — the club's palm-and-figure logo on a cream medallion, a
 //      gold ring drawing round it.
-//   2. 1929, ON FILM — letterboxed black-and-white with grain, flicker and
-//      gate weave: the opening-day crowd looking out to the bay, the
-//      foursome on the first tee, the galleries round MacKenzie's greens,
-//      the Doctor and Marion Hollins themselves. Slow at first, each photo
-//      with its own camera move, then cutting faster and faster.
-//   3. TODAY — the 1929 bunkered green dissolves into the same kind of green
-//      today, in colour; the letterbox opens, the cuts race, and the year
-//      runs from 1929 to the Invitational's own before landing on
-//      PASATIEMPO, the crest above it, and lifting away into the page.
+//   2. 1929, ON FILM — letterboxed black-and-white with grain and flicker:
+//      the opening-day crowd, the foursome on the first tee, the galleries
+//      round MacKenzie's greens, the Doctor and Marion Hollins themselves,
+//      each photo with its own quick camera move.
+//   3. TODAY — the 1929 bunkered green dissolves into a bunkered green
+//      today, in colour; the letterbox opens on the club clock ("Est. 1929")
+//      as the year starts to run, the cuts race, and it lands on two chairs
+//      looking out to the bay, then PASATIEMPO with the crest above it.
 //
 // No captions: the faces, the course and the years carry it.
 //
@@ -24,8 +24,9 @@ import { EVENT } from "./content";
 // click). The page's own hero animation waits underneath and starts as the
 // reel lifts. A replay button lives in the footer.
 //
-// Photographs: the 1929 course and opening-day photographs are the club's
-// own archive (archive-1929-*). "House of Dr. Alister MacKenzie, Pasatiempo
+// Photographs: the 1929 course and opening-day photographs (archive-1929-*)
+// and the present-day clock, bridge, dawn aerial, flag and chairs
+// (today-*) are the club's own. "House of Dr. Alister MacKenzie, Pasatiempo
 // Estates" (archive-mackenzie-house-1933*) is by Sturtevant for The Architect
 // and Engineer, April 1933 (San Francisco Public Library scan via the
 // Internet Archive; Wikimedia Commons files 14598027017 and 14784188652, "No
@@ -63,68 +64,54 @@ interface Frame {
 }
 
 const A = (f: string) => IMG + "archive-" + f;
+const T = (f: string) => IMG + "today-" + f;
 
+// About seven seconds in all: 0.7s crest + 2.6s archive + 1.8s today +
+// 1.3s title, then a 0.6s lift into the page.
 const FRAMES: Frame[] = [
-  // ---- Act two: 1929, on film. Slow, each photo with its own move. --------
-  // Opening day: the crowd round the tee, the bay beyond. A slow rise.
+  // ---- Act two: 1929, on film, each photo with its own camera move. ------
   {
-    src: A("1929-tee-shot-bay.jpg"), hold: 1500, era: "archive", focus: "center 70%",
-    move: { from: [1.18, 0, 4], to: [1.04, 0, -2] },
-  },
-  // The foursome on the first tee: push in across the four of them.
-  {
-    src: A("1929-opening-foursome.jpg"), hold: 1700, era: "archive", focus: "center 8%",
-    move: { from: [1.02, 0, 0], to: [1.2, 0, 0], origin: "45% 14%" },
-  },
-  { src: IMG + "mackenzie.jpg", hold: 1150, era: "archive", face: "53% 17%", zoom: 2.1 },
-  // The gallery round the green, under the oak: a slow pan left.
-  {
-    src: A("1929-gallery-oak.jpg"), hold: 1050, era: "archive", focus: "center 60%",
-    move: { from: [1.16, 3, 0], to: [1.16, -3, 0] },
-  },
-  { src: IMG + "hollins.avif", hold: 1150, era: "archive", face: "50% 34%" },
-  // A lone golfer under the oak: push in on him.
-  {
-    src: A("1929-golfer-oak.jpg"), hold: 850, era: "archive", focus: "center 70%",
-    move: { from: [1.04, 0, 0], to: [1.22, 0, 0], origin: "42% 75%" },
-  },
-  // ...then the archive starts to race.
-  { src: A("mackenzie-house-1933.jpg"), hold: 380, era: "archive", focus: "center 70%" },
-  { src: IMG + "hollins-swing.avif", hold: 320, era: "archive", focus: "60% 18%" },
-  {
-    src: A("1929-opening-foursome.jpg"), hold: 260, era: "archive", focus: "70% 10%",
-    move: { from: [1.4, 0, 0], to: [1.5, 0, 0], origin: "68% 16%" },
+    src: A("1929-tee-shot-bay.jpg"), hold: 400, era: "archive", focus: "center 70%",
+    move: { from: [1.12, 0, 3], to: [1.04, 0, -1] },
   },
   {
-    src: A("1929-tee-shot-bay.jpg"), hold: 220, era: "archive", focus: "center 85%",
-    move: { from: [1.4, 0, 0], to: [1.5, 0, 0], origin: "50% 80%" },
+    src: A("1929-opening-foursome.jpg"), hold: 500, era: "archive", focus: "center 8%",
+    move: { from: [1.02, 0, 0], to: [1.14, 0, 0], origin: "45% 14%" },
   },
-  { src: A("mackenzie-house-1933b.jpg"), hold: 190, era: "archive", focus: "center 40%" },
+  { src: IMG + "mackenzie.jpg", hold: 420, era: "archive", face: "53% 17%", zoom: 1.7 },
   {
-    src: A("1929-gallery-oak.jpg"), hold: 170, era: "archive", focus: "center 65%",
-    move: { from: [1.45, 0, 0], to: [1.55, 0, 0], origin: "35% 62%" },
+    src: A("1929-gallery-oak.jpg"), hold: 280, era: "archive", focus: "center 60%",
+    move: { from: [1.14, 2, 0], to: [1.14, -1, 0] },
   },
-  // The 1929 bunkered green holds a beat...
+  { src: IMG + "hollins.avif", hold: 420, era: "archive", face: "50% 34%", zoom: 1.3 },
   {
-    src: A("1929-bunkered-green.jpg"), hold: 1100, era: "archive", focus: "center 60%",
-    move: { from: [1.06, 0, 0], to: [1.16, 0, 0], origin: "55% 60%" },
+    src: A("1929-golfer-oak.jpg"), hold: 230, era: "archive", focus: "center 70%",
+    move: { from: [1.04, 0, 0], to: [1.1, 0, 0], origin: "42% 75%" },
   },
-  // ---- Act three: ...and dissolves into a bunkered green today. ----------
   {
-    src: IMG + "course-green.jpg", hold: 750, era: "today", match: true, focus: "center 60%",
-    move: { from: [1.16, 0, 0], to: [1.08, 0, 0], origin: "55% 60%" },
+    src: A("1929-bunkered-green.jpg"), hold: 350, era: "archive", focus: "center 60%",
+    move: { from: [1.06, 0, 0], to: [1.12, 0, 0], origin: "55% 60%" },
   },
-  { src: IMG + "aerial.avif", hold: 330, era: "today" },
-  { src: IMG + "course-wide.jpg", hold: 270, era: "today" },
-  { src: IMG + "sixteenth.jpg", hold: 220, era: "today" },
-  { src: IMG + "clubhouse.avif", hold: 185, era: "today" },
-  { src: IMG + "formats.avif", hold: 160, era: "today" },
-  { src: IMG + "bunkers-green.avif", hold: 140, era: "today" },
-  { src: IMG + "course-bunkers.jpg", hold: 120, era: "today" },
-  { src: IMG + "schedule.avif", hold: 105, era: "today" },
-  { src: IMG + "clubhouse-green.jpg", hold: 95, era: "today" },
-  { src: IMG + "hero.avif", hold: 90, era: "today" },
-  { src: IMG + "aerial.avif", hold: 90, era: "today" },
+  // ---- Act three: the 1929 green dissolves into a bunkered green today. ---
+  {
+    src: IMG + "course-green.jpg", hold: 380, era: "today", match: true, focus: "center 60%",
+    move: { from: [1.12, 0, 0], to: [1.08, 0, 0], origin: "55% 60%" },
+  },
+  // The club clock — "Est. 1929 · An Alister MacKenzie Design".
+  {
+    src: T("clock-1929.jpg"), hold: 380, era: "today", focus: "18% center",
+    move: { from: [1.04, 0, 0], to: [1.14, 0, 0], origin: "21% 30%" },
+  },
+  { src: T("bridge.jpg"), hold: 220, era: "today", focus: "center 60%", move: { from: [1.02, 0, 0], to: [1.08, 0, 0], origin: "50% 62%" } },
+  { src: T("aerial-dawn.jpg"), hold: 180, era: "today", focus: "center 55%" },
+  { src: T("flag-green.jpg"), hold: 150, era: "today", focus: "70% 60%" },
+  { src: IMG + "course-wide.jpg", hold: 130, era: "today" },
+  { src: IMG + "sixteenth.jpg", hold: 120, era: "today" },
+  // ...landing on two chairs looking out over the course to the bay.
+  {
+    src: T("chairs-bay.jpg"), hold: 240, era: "today", focus: "center 42%",
+    move: { from: [1.0, 0, 0], to: [1.03, 0, 0], origin: "50% 42%" },
+  },
 ];
 
 /** Photos that run through the letters of PASATIEMPO — then and now. */
@@ -134,15 +121,15 @@ const FILL = [
   A("1929-opening-foursome.jpg"),
   IMG + "course-green.jpg",
   A("1929-bunkered-green.jpg"),
-  IMG + "sixteenth.jpg",
+  T("aerial-dawn.jpg"),
   A("1929-gallery-oak.jpg"),
-  IMG + "hero.avif",
+  T("bridge.jpg"),
 ];
 
-const CREST_MS = 1400; // act one
-const TITLE_MS = 2500; // PASATIEMPO on screen
-const SOLID_AT = 1150; // ...letters stop flickering and settle
-const EXIT_MS = 1100; // the reel lifts away
+const CREST_MS = 700; // act one
+const TITLE_MS = 1300; // PASATIEMPO on screen
+const SOLID_AT = 650; // ...letters stop flickering and settle
+const EXIT_MS = 600; // the reel lifts away
 const FOUNDED = 1929;
 
 const FIRST_TODAY = FRAMES.findIndex((f) => f.era === "today");
@@ -198,7 +185,7 @@ function markSeen() {
 }
 
 function preload(srcs: string[], maxMs: number) {
-  const each = srcs.map(
+  const imgs = srcs.map(
     (src) =>
       new Promise<void>((resolve) => {
         const img = new Image();
@@ -206,7 +193,7 @@ function preload(srcs: string[], maxMs: number) {
         img.src = src;
       }),
   );
-  return Promise.race([Promise.all(each), new Promise((r) => setTimeout(r, maxMs))]);
+  return Promise.race([Promise.all(imgs), new Promise((r) => setTimeout(r, maxMs))]);
 }
 
 type Phase = "load" | "crest" | "reel" | "title" | "exit";
@@ -241,7 +228,7 @@ export default function IntroReel({
     const prev = html.style.overflow;
     html.style.overflow = "hidden";
     let alive = true;
-    preload([LOGO, ...new Set([...FRAMES.map((f) => f.src), ...FILL])], 4000).then(() => {
+    preload([LOGO, ...new Set([...FRAMES.map((f) => f.src), ...FILL])], 3000).then(() => {
       if (alive) setPhase("crest");
     });
     return () => {
@@ -289,7 +276,7 @@ export default function IntroReel({
   // Photos flicker through the letters, then settle to solid.
   useEffect(() => {
     if (phase !== "title") return;
-    const flick = setInterval(() => setFill((n) => (n + 1) % FILL.length), 110);
+    const flick = setInterval(() => setFill((n) => (n + 1) % FILL.length), 80);
     const settle = setTimeout(() => {
       clearInterval(flick);
       setSolid(true);
