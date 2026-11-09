@@ -282,18 +282,28 @@ function Header({
 
 function Home({ go }: { go: (t: TabKey) => void }) {
   const word = "Invitational";
-  const { ref: heroRef, paused: heroPaused, toggle: heroToggle } = useFilm();
+  const hero = useFilmReel(HERO_FILMS.length);
   return (
     <>
       <section className="mci-hero">
         <div className="mci-hero-bg" data-parallax="0.18">
-          {/* A drone pass over the bunkers to the 4th green, the clubhouse beyond. */}
-          <LoopVideo
-            videoRef={heroRef}
-            src={VID + "hole-4-approach.mp4"}
-            poster={IMG + "hole-4-approach-poster.jpg"}
-            eager
-          />
+          {/* The course films, one after another, crossfading. */}
+          {HERO_FILMS.map((f, k) => (
+            <video
+              key={f.src}
+              ref={hero.setRef(k)}
+              className={"mci-hero-film" + (k === hero.index ? " is-on" : "")}
+              src={f.src}
+              poster={f.poster}
+              muted
+              playsInline
+              loop={HERO_FILMS.length === 1}
+              preload={k === 0 ? "auto" : "none"}
+              disablePictureInPicture
+              aria-hidden
+              onEnded={hero.next}
+            />
+          ))}
         </div>
         <div className="mci-hero-veil" />
         <div className="mci-hero-sheen" aria-hidden />
@@ -334,7 +344,7 @@ function Home({ go }: { go: (t: TabKey) => void }) {
             <path d="M12 4v14M6 12l6 6 6-6" />
           </svg>
         </button>
-        <FilmToggle paused={heroPaused} toggle={heroToggle} label="the course film" />
+        <FilmToggle paused={hero.paused} toggle={hero.toggle} label="the course films" />
       </section>
 
       <section className="mci-block" id="mci-intro">
@@ -400,10 +410,11 @@ function Home({ go }: { go: (t: TabKey) => void }) {
         </div>
       </section>
 
+      <ArchiveStrip />
+
       <PhotoBand
-        photo={IMG + "hole-11-approach-poster.jpg"}
-        video={VID + "hole-11-approach.mp4"}
-        focus="center 50%"
+        photo={IMG + "today-aerial-dawn.jpg"}
+        focus="center 45%"
         tall
         quote="The chief object of every golf course architect worth his salt is to imitate the beauties of nature so closely as to make his work indistinguishable from nature itself."
         attribution="Dr. Alister MacKenzie · Golf Architecture, 1920"
@@ -472,6 +483,66 @@ function StatusChip({ posted }: { posted: boolean }) {
       <span className="mci-pulse" aria-hidden />
       Coming soon
     </span>
+  );
+}
+
+/** The club's early photographs, on a strip of film you can scroll through. */
+const ARCHIVE = [
+  { src: "archive-1929-tee-shot-bay.jpg", alt: "A crowd lines a tee at Pasatiempo, Monterey Bay beyond", cap: "A crowd lines the tee, the bay beyond", focus: "center 70%" },
+  { src: "archive-1929-opening-foursome.jpg", alt: "Two men and two women stand on a tee before a large gallery", cap: "Players and gallery on the first tee", focus: "center 20%" },
+  { src: "archive-1929-gallery-oak.jpg", alt: "A gallery circles a green, framed by an oak", cap: "The gallery circles a green, framed by the oaks", focus: "center 60%" },
+  { src: "archive-1929-bunkered-green.jpg", alt: "Spectators walk past deep, sprawling bunkers to a green", cap: "MacKenzie's bunkering, new-cut", focus: "center 60%" },
+  { src: "archive-1929-golfer-oak.jpg", alt: "A lone golfer plays beneath the oaks", cap: "A lone golfer beneath the oaks", focus: "center 70%" },
+  { src: "archive-mackenzie-house-1933.jpg", alt: "Dr. Alister MacKenzie's house beside the course, 1933", cap: "Dr. MacKenzie's house on the course, 1933", focus: "center 70%" },
+];
+
+function ArchiveStrip() {
+  const strip = useRef<HTMLDivElement>(null);
+  const step = (dir: 1 | -1) => {
+    const el = strip.current;
+    if (!el) return;
+    const frame = el.querySelector<HTMLElement>(".mci-film-frame");
+    el.scrollBy({
+      left: dir * ((frame?.offsetWidth ?? 400) + 18),
+      behavior: prefersReducedMotion() ? "auto" : "smooth",
+    });
+  };
+  return (
+    <section className="mci-archive">
+      <div className="mci-wrap mci-center">
+        <div className="mci-orn mci-orn-dark" data-reveal>
+          <span className="mci-eyebrow">From the Club Archive</span>
+        </div>
+        <h3 data-reveal style={stagger(1)}>
+          The Early Years
+        </h3>
+        <p className="mci-lead mci-center" data-reveal style={stagger(2)}>
+          Galleries round MacKenzie&rsquo;s new greens, the Doctor&rsquo;s own house on the
+          course &mdash; Pasatiempo as it first was.
+        </p>
+      </div>
+      <div className="mci-film" data-reveal style={stagger(3)}>
+        <div className="mci-film-track" ref={strip} tabIndex={0} aria-label="Archive photographs — scroll sideways">
+          {ARCHIVE.map((a) => (
+            <figure className="mci-film-frame" key={a.src}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={IMG + a.src} alt={a.alt} loading="lazy" style={{ objectPosition: a.focus }} />
+              <figcaption>{a.cap}</figcaption>
+            </figure>
+          ))}
+        </div>
+        <button type="button" className="mci-film-btn is-prev" onClick={() => step(-1)} aria-label="Previous photograph">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <path d="M15 5l-7 7 7 7" />
+          </svg>
+        </button>
+        <button type="button" className="mci-film-btn is-next" onClick={() => step(1)} aria-label="Next photograph">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <path d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -547,6 +618,104 @@ function PhotoBand({
  * moving background video needs one. The state lives in a hook so the film
  * can sit in a parallax layer while its button stays put in the section.
  */
+/** The home page's hero films, played in order and looped. */
+const HERO_FILMS = [
+  // Up the 8th under the cypresses to the green.
+  { src: VID + "hole-8-approach.mp4", poster: IMG + "hole-8-approach-poster.jpg" },
+  // Over the bunkers to the 4th green, the clubhouse beyond.
+  { src: VID + "hole-4-approach.mp4", poster: IMG + "hole-4-approach-poster.jpg" },
+  // Down the barranca, over the bridge, to the 11th.
+  { src: VID + "hole-11-approach.mp4", poster: IMG + "hole-11-approach-poster.jpg" },
+];
+
+/**
+ * A run of course films: each plays once and crossfades into the next, and
+ * the run loops. Only the first loads up front; each next film starts
+ * loading while the one before it plays. Plays only while on screen, keeps
+ * the first still for visitors who ask for reduced motion, and pauses on
+ * request.
+ */
+function useFilmReel(count: number) {
+  const vids = useRef<(HTMLVideoElement | null)[]>([]);
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const userPaused = useRef(false);
+  const visible = useRef(false);
+  const still = useRef(false);
+  const indexRef = useRef(0);
+
+  const setRef = useCallback(
+    (k: number) => (el: HTMLVideoElement | null) => {
+      vids.current[k] = el;
+    },
+    [],
+  );
+
+  const playCurrent = useCallback((k: number) => {
+    const v = vids.current[k];
+    if (!v || still.current || userPaused.current || !visible.current) return;
+    v.muted = true;
+    v.play().catch(() => {});
+    // Warm up the next film while this one plays.
+    const nxt = vids.current[(k + 1) % vids.current.length];
+    if (nxt && nxt !== v && nxt.preload === "none") nxt.preload = "auto";
+  }, []);
+
+  // Watch the first film's box: the whole run plays only while it's on screen.
+  useEffect(() => {
+    still.current = prefersReducedMotion();
+    const first = vids.current[0];
+    if (!first || still.current) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        visible.current = e.isIntersecting;
+        const cur = vids.current[indexRef.current];
+        if (e.isIntersecting) playCurrent(indexRef.current);
+        else cur?.pause();
+      },
+      { rootMargin: "200px 0px" },
+    );
+    io.observe(first);
+    return () => io.disconnect();
+  }, [playCurrent]);
+
+  // A new film comes up: rewind and play it; the others rest at their start.
+  useEffect(() => {
+    indexRef.current = index;
+    vids.current.forEach((v, k) => {
+      if (!v || k === index) return;
+      // Let the outgoing film hold its last frame while it fades, then rewind.
+      setTimeout(() => {
+        if (indexRef.current !== k) {
+          v.pause();
+          v.currentTime = 0;
+        }
+      }, 1300);
+    });
+    playCurrent(index);
+  }, [index, playCurrent]);
+
+  const next = useCallback(() => {
+    if (count > 1) setIndex((k) => (k + 1) % count);
+  }, [count]);
+
+  const toggle = () => {
+    const v = vids.current[indexRef.current];
+    if (!v) return;
+    if (v.paused) {
+      userPaused.current = false;
+      playCurrent(indexRef.current);
+      setPaused(false);
+    } else {
+      userPaused.current = true;
+      v.pause();
+      setPaused(true);
+    }
+  };
+
+  return { index, paused, setRef, next, toggle };
+}
+
 function useFilm() {
   const ref = useRef<HTMLVideoElement>(null);
   const [paused, setPaused] = useState(false);
