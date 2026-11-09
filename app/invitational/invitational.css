@@ -364,9 +364,12 @@ body:has(.mci){margin:0;}
 
 .mci-intro{
   position:fixed;inset:0;z-index:1000;background:#050403;color:#f5f0e2;cursor:pointer;overflow:hidden;
-  transition:opacity .6s cubic-bezier(.6,0,.3,1);
+  transition:opacity 1.4s cubic-bezier(.45,0,.25,1) .5s;
 }
+/* The lift, stage two: the dark dissolves slowly off the page (after the
+   title has faded, hence the delay). A skip lifts at once. */
 .mci-intro.is-exit{opacity:0;pointer-events:none;}
+.mci-intro.is-quick{transition:opacity .45s ease;}
 .mci-intro-loading{position:absolute;inset:0;display:grid;place-items:center;}
 .mci-intro-dot{width:8px;height:8px;border-radius:50%;background:var(--gold-bright);animation:mci-intro-pulse 1.1s ease-in-out infinite;}
 @keyframes mci-intro-pulse{0%,100%{transform:scale(.7);opacity:.35;}50%{transform:scale(1.3);opacity:1;}}
@@ -413,11 +416,12 @@ body:has(.mci){margin:0;}
 /* ---- PASATIEMPO, the pages turning through it and behind it ---- */
 .mci-reel.is-behind{opacity:.34;filter:blur(5px) saturate(.75);}
 .mci-intro.is-solid .mci-reel.is-behind{opacity:.3;}
-.mci-intro.is-exit .mci-reel.is-behind{opacity:.2;}
+/* The lift, stage one: the title and the pages behind it fade out first. */
+.mci-intro.is-exit .mci-reel.is-behind{opacity:0;transition:opacity .7s ease;}
 .mci-reel-title{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 4vw;
-  font-family:var(--disp);animation:mci-title-push 2.6s linear both;transition:filter .6s,opacity .6s;}
+  font-family:var(--disp);animation:mci-title-push 5.2s cubic-bezier(.3,.2,.4,1) both;transition:filter .7s ease,opacity .7s ease;}
 @keyframes mci-title-push{from{transform:scale(1);}to{transform:scale(1.05);}}
-.mci-intro.is-exit .mci-reel-title{filter:blur(5px);}
+.mci-intro.is-exit .mci-reel-title{opacity:0;filter:blur(2px);}
 .mci-reel-title-crest{margin-bottom:6px;}
 .mci-reel-title-crest .mci-medal{animation:mci-title-crest .5s .05s cubic-bezier(.2,.7,.2,1) both;}
 @keyframes mci-title-crest{from{opacity:0;transform:translateY(-12px) scale(.9);}to{opacity:1;transform:none;}}
