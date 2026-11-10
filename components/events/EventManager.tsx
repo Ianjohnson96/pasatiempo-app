@@ -12,6 +12,7 @@ import {
   setRegStatus,
 } from "@/lib/events/actions";
 import {
+  answerText,
   formatSlot,
   formatSlotShort,
   formatWhen,
@@ -124,7 +125,7 @@ export default function EventManager({
       String(r.partySize),
       ...(event.slots.length ? [slotLabels(event, r.slotIds)] : []),
       ...(event.collectGuestNames ? [r.guestNames.join("; ")] : []),
-      ...event.customFields.map((f) => r.answers[f.id] ?? ""),
+      ...event.customFields.map((f) => answerText(r.answers[f.id])),
       new Date(r.createdAt).toLocaleString(),
     ]);
     const csv = [cols, ...rows]
@@ -201,7 +202,7 @@ export default function EventManager({
           {event.customFields.map((f) =>
             r.answers[f.id] ? (
               <div key={f.id} className="muted" style={{ fontSize: 13 }}>
-                {f.label}: {r.answers[f.id]}
+                {f.label}: {answerText(r.answers[f.id])}
               </div>
             ) : null,
           )}

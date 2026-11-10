@@ -7,7 +7,7 @@ import {
   updateMyRegistration,
   type MyRegistration,
 } from "@/lib/events/actions";
-import { formatSlot } from "@/lib/events/format";
+import { answerText, formatSlot } from "@/lib/events/format";
 import type { EventRec } from "@/lib/events/types";
 
 // Attendee self-service: look up by the email you registered with, then edit
@@ -57,7 +57,11 @@ export default function ManageRegistration({ event }: { event: EventRec }) {
     setDParty(String(r.partySize));
     setDGuests(r.guestNames);
     setDSlots(r.slotIds);
-    setDAnswers(r.answers);
+    setDAnswers(
+      Object.fromEntries(
+        Object.entries(r.answers).map(([k, v]) => [k, answerText(v)]),
+      ),
+    );
   }
 
   async function saveEdit(regId: string) {

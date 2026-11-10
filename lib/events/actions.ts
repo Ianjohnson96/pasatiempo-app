@@ -9,6 +9,7 @@ import { newId, newSlug, slugify } from "./ids";
 import { availability, rosterCount, onRoster } from "./data";
 import { formatSlot } from "./format";
 import type {
+  Answers,
   CustomField,
   EventRec,
   EventType,
@@ -511,7 +512,7 @@ export interface MyRegistration {
   phone: string;
   guestNames: string[];
   slotIds: string[];
-  answers: Record<string, string>;
+  answers: Answers;
 }
 
 export async function lookupMyRegistrations(

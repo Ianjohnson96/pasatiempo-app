@@ -171,7 +171,14 @@ export default function EventEditor({ event }: { event?: EventRec }) {
   function addField() {
     setFields((f) => [
       ...f,
-      { id: tmpId(), label: "", type: "short_text", required: false, options: [] },
+      {
+        id: tmpId(),
+        label: "",
+        type: "short_text",
+        required: false,
+        options: [],
+        scope: "team",
+      },
     ]);
   }
   function updField(id: string, patch: Partial<CustomField>) {

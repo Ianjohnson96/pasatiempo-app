@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateRegistration } from "@/lib/events/actions";
-import { formatSlot } from "@/lib/events/format";
+import { answerText, formatSlot } from "@/lib/events/format";
 import type { EventRec, RegStatus, Registration } from "@/lib/events/types";
 
 // Staff editor for an existing sign-up. Lets the golf shop fix anything a
@@ -25,7 +25,11 @@ export default function RegistrationEditor({
   const [partySize, setPartySize] = useState(String(reg.partySize));
   const [guestNames, setGuestNames] = useState<string[]>(reg.guestNames);
   const [slotIds, setSlotIds] = useState<string[]>(reg.slotIds);
-  const [answers, setAnswers] = useState<Record<string, string>>(reg.answers);
+  const [answers, setAnswers] = useState<Record<string, string>>(
+    Object.fromEntries(
+      Object.entries(reg.answers).map(([k, v]) => [k, answerText(v)]),
+    ),
+  );
   const [status, setStatus] = useState<RegStatus>(reg.status);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");

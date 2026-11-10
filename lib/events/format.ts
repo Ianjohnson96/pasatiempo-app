@@ -1,10 +1,17 @@
-import type { EventType, RosterStyle, Slot } from "./types";
+import type { Answer, EventType, RosterStyle, Slot } from "./types";
 
 export const TYPE_LABEL: Record<EventType, string> = {
   dinner: "Dinner / Social",
   clinic: "Clinic / Lesson",
   general: "General",
+  tournament: "Tournament",
 };
+
+// A custom-question answer as display text (multi-select answers are arrays).
+export function answerText(a: Answer | undefined): string {
+  if (a === undefined) return "";
+  return Array.isArray(a) ? a.join(", ") : a;
+}
 
 export function formatWhen(
   startsAt: string | null,
