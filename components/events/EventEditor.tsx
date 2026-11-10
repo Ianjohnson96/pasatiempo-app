@@ -4,24 +4,16 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { saveEvent, type EventInput } from "@/lib/events/actions";
 import RichTextField from "@/components/events/RichTextField";
+import QuestionBuilder from "@/components/events/QuestionBuilder";
 import { formatSlot } from "@/lib/events/format";
 import type {
   CustomField,
   EventRec,
   EventType,
-  FieldType,
   RosterStyle,
   ScheduleMode,
   Slot,
 } from "@/lib/events/types";
-
-const FIELD_TYPES: { value: FieldType; label: string }[] = [
-  { value: "short_text", label: "Short text" },
-  { value: "long_text", label: "Paragraph" },
-  { value: "select", label: "Choose one (dropdown)" },
-  { value: "checkbox", label: "Checkbox (yes/no)" },
-  { value: "number", label: "Number" },
-];
 
 function toLocalInput(iso: string | null): string {
   if (!iso) return "";
@@ -165,27 +157,6 @@ export default function EventEditor({ event }: { event?: EventRec }) {
     }
     setSlots((s) => [...s, ...made]);
     setAllowMultiSlot(true);
-  }
-
-  // ---- custom fields ----
-  function addField() {
-    setFields((f) => [
-      ...f,
-      {
-        id: tmpId(),
-        label: "",
-        type: "short_text",
-        required: false,
-        options: [],
-        scope: "team",
-      },
-    ]);
-  }
-  function updField(id: string, patch: Partial<CustomField>) {
-    setFields((f) => f.map((x) => (x.id === id ? { ...x, ...patch } : x)));
-  }
-  function rmField(id: string) {
-    setFields((f) => f.filter((x) => x.id !== id));
   }
 
   async function submit() {
@@ -718,68 +689,11 @@ export default function EventEditor({ event }: { event?: EventRec }) {
           Meal choice, dietary notes, skill level — anything else you want to
           ask.
         </p>
-        {fields.map((f) => (
-          <div
-            key={f.id}
-            style={{
-              border: "1px solid var(--line)",
-              borderRadius: 10,
-              padding: 12,
-              marginBottom: 10,
-            }}
-          >
-            <div className="builder-row">
-              <input
-                type="text"
-                value={f.label}
-                onChange={(e) => updField(f.id, { label: e.target.value })}
-                placeholder="Question label"
-                style={{ flex: 2 }}
-              />
-              <select
-                value={f.type}
-                onChange={(e) =>
-                  updField(f.id, { type: e.target.value as FieldType })
-                }
-              >
-                {FIELD_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className="btn ghost small"
-                onClick={() => rmField(f.id)}
-              >
-                Remove
-              </button>
-            </div>
-            {f.type === "select" && (
-              <input
-                type="text"
-                value={f.options.join(", ")}
-                onChange={(e) =>
-                  updField(f.id, { options: e.target.value.split(",") })
-                }
-                placeholder="Options, comma-separated (e.g. Chicken, Salmon, Vegetarian)"
-                style={{ marginBottom: 8 }}
-              />
-            )}
-            <label className="check" style={{ fontSize: 14 }}>
-              <input
-                type="checkbox"
-                checked={f.required}
-                onChange={(e) => updField(f.id, { required: e.target.checked })}
-              />
-              <span>Required</span>
-            </label>
-          </div>
-        ))}
-        <button type="button" className="btn secondary small" onClick={addField}>
-          + Add question
-        </button>
+        <QuestionBuilder
+          fields={fields}
+          onChange={setFields}
+          tournament={type === "tournament"}
+        />
       </div>
 
       {/* Roster */}
