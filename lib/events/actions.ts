@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { assertCanManageEvent, assertCanManageRegistration, assertEventsViewer } from "./auth";
 import { eventToRow, rowToEvent, rowToReg } from "./map";
 import { newId, newSlug, slugify } from "./ids";
-import { availability, rosterCount, onRoster } from "./data";
+import { availability, rosterCount, onRoster } from "./seats";
 import { formatSlot } from "./format";
 import type {
   Answers,
