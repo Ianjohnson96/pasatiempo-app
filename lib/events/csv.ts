@@ -3,8 +3,17 @@
 import { answerText, formatSlot } from "./format";
 import type { EventRec, Player, Registration } from "./types";
 
-export function csvCell(v: string): string {
-  if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+// A cell a spreadsheet would run as a formula gets a leading ' so it opens as
+// text. A plain negative number ("-12") is left alone.
+function guardFormula(v: string): string {
+  if (/^[=+@\t\r]/.test(v)) return `'${v}`;
+  if (v.startsWith("-") && !/^-\d+(\.\d+)?$/.test(v)) return `'${v}`;
+  return v;
+}
+
+export function csvCell(raw: string): string {
+  const v = guardFormula(raw);
+  if (/[",\n\r]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
   return v;
 }
 

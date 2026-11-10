@@ -1,3 +1,4 @@
+-- Run this BEFORE opening (setting to Open) any Tournament event. Existing dinners and clinics work with or without it.
 -- Tournament events (Event Planner): two-player Member + Guest teams.
 -- players holds the two players of a team (role, name, email, GHIN, per-player answers);
 -- email_failed flags a registration whose confirmation email could not be sent.

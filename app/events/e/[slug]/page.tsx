@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import Gallery from "@/components/events/Gallery";
 import ManageRegistration from "@/components/events/ManageRegistration";
@@ -93,10 +94,16 @@ export default async function PublicEventPage({
         100,
         Math.round((eventAvail.taken / event.capacity) * 100),
       );
+      // A tournament's capacity is in teams, not people.
       spotsFact = {
-        text: eventAvail.full
-          ? "Full — waitlist open"
-          : `${eventAvail.remaining} of ${event.capacity} spots left`,
+        text:
+          event.type === "tournament"
+            ? eventAvail.full
+              ? "Full"
+              : `${eventAvail.remaining} of ${event.capacity} teams left`
+            : eventAvail.full
+              ? "Full — waitlist open"
+              : `${eventAvail.remaining} of ${event.capacity} spots left`,
         pct,
       };
     }
@@ -357,9 +364,9 @@ export default async function PublicEventPage({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-mark.png" alt="" />
         <div className="est">Pasatiempo Golf Club · Est. 1929</div>
-        <a className="foot-admin" href="/admin/events">
+        <Link className="foot-admin" href="/admin/events">
           Pasatiempo staff — manage events →
-        </a>
+        </Link>
       </footer>
     </main>
   );

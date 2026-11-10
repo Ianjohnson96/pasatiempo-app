@@ -59,6 +59,23 @@ describe("csvCell / toCsv", () => {
     expect(csvCell('No nuts, "severe"')).toBe('"No nuts, ""severe"""');
     expect(csvCell("plain")).toBe("plain");
   });
+  it("guards cells a spreadsheet would run as a formula", () => {
+    expect(csvCell("=SUM(A1)")).toBe("'=SUM(A1)");
+    expect(csvCell("+1")).toBe("'+1");
+    expect(csvCell("@cmd")).toBe("'@cmd");
+    expect(csvCell("\tx")).toBe("'\tx");
+    // A carriage return also needs quoting so it can't split the row.
+    expect(csvCell("\rx")).toBe("\"'\rx\"");
+    expect(csvCell("-cmd")).toBe("'-cmd");
+    // The guard goes on first, then the usual quoting.
+    expect(csvCell('=HYPERLINK("x","y")')).toBe(`"'=HYPERLINK(""x"",""y"")"`);
+  });
+  it("leaves plain negative numbers and ordinary text alone", () => {
+    expect(csvCell("-12")).toBe("-12");
+    expect(csvCell("-1.5")).toBe("-1.5");
+    expect(csvCell("a=b")).toBe("a=b");
+    expect(csvCell("")).toBe("");
+  });
   it("joins with CRLF", () => {
     expect(toCsv([["a", "b,c"], ["d", "e"]])).toBe('a,"b,c"\r\nd,e');
   });
