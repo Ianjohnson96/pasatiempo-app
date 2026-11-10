@@ -3,8 +3,11 @@
 import { useMemo, useState } from "react";
 import { register } from "@/lib/events/actions";
 import { formatSlot } from "@/lib/events/format";
+import { isAnswered } from "@/lib/events/tournament";
+import QuestionInput from "@/components/events/QuestionInput";
+import TeamEntryForm from "@/components/events/TeamEntryForm";
 import Toast from "@/components/events/Toast";
-import type { EventRec } from "@/lib/events/types";
+import type { Answers, EventRec } from "@/lib/events/types";
 
 export interface SeatInfo {
   remaining: number | null; // event-level (null = unlimited)
@@ -19,6 +22,13 @@ export default function RegistrationForm({
   event: EventRec;
   seats: SeatInfo;
 }) {
+  if (event.type === "tournament")
+    return <TeamEntryForm event={event} seats={seats} mode="public" />;
+  return <StandardForm event={event} seats={seats} />;
+}
+
+// Dinners, clinics and general events: one registrant (plus guests).
+function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
   const isSlots = event.scheduleMode === "slots";
   const multi = isSlots && event.allowMultiSlot;
 
@@ -34,7 +44,7 @@ export default function RegistrationForm({
     );
     return first ? [first.id] : event.slots[0] ? [event.slots[0].id] : [];
   });
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Answers>({});
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<
     { status: "confirmed" | "waitlist" } | null
@@ -80,7 +90,7 @@ export default function RegistrationForm({
       return;
     }
     for (const f of event.customFields) {
-      if (f.required && !answers[f.id]?.trim()) {
+      if (f.required && !isAnswered(answers[f.id])) {
         setError(`Please answer: ${f.label}`);
         return;
       }
@@ -114,8 +124,7 @@ export default function RegistrationForm({
               <h2>You&apos;re registered!</h2>
               <p className="muted">
                 Thanks, {name.split(" ")[0]}. We&apos;ve got you down for{" "}
-                <strong>{event.title}</strong>. A confirmation will be sent to{" "}
-                <strong>{email}</strong>.
+                <strong>{event.title}</strong>.
               </p>
             </>
           ) : (
@@ -264,55 +273,12 @@ export default function RegistrationForm({
       )}
 
       {event.customFields.map((f) => (
-        <div className="field" key={f.id}>
-          <label>
-            {f.label} {f.required && <span className="req">*</span>}
-          </label>
-          {f.type === "long_text" ? (
-            <textarea
-              value={answers[f.id] ?? ""}
-              onChange={(e) =>
-                setAnswers((a) => ({ ...a, [f.id]: e.target.value }))
-              }
-            />
-          ) : f.type === "select" ? (
-            <select
-              value={answers[f.id] ?? ""}
-              onChange={(e) =>
-                setAnswers((a) => ({ ...a, [f.id]: e.target.value }))
-              }
-            >
-              <option value="">Choose…</option>
-              {f.options.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
-          ) : f.type === "checkbox" ? (
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={answers[f.id] === "Yes"}
-                onChange={(e) =>
-                  setAnswers((a) => ({
-                    ...a,
-                    [f.id]: e.target.checked ? "Yes" : "",
-                  }))
-                }
-              />
-              <span>Yes</span>
-            </label>
-          ) : (
-            <input
-              type={f.type === "number" ? "number" : "text"}
-              value={answers[f.id] ?? ""}
-              onChange={(e) =>
-                setAnswers((a) => ({ ...a, [f.id]: e.target.value }))
-              }
-            />
-          )}
-        </div>
+        <QuestionInput
+          key={f.id}
+          field={f}
+          value={answers[f.id]}
+          onChange={(v) => setAnswers((a) => ({ ...a, [f.id]: v }))}
+        />
       ))}
 
       <button className="btn block" type="submit" disabled={submitting}>

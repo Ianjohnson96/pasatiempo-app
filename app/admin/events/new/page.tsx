@@ -9,7 +9,7 @@ export default async function NewEventPage() {
   return (
     <>
       <AppBar admin email={viewer.email} />
-      <main className="container">
+      <main className="container wide">
         <div className="page-head">
           <div>
             <h1>New event</h1>

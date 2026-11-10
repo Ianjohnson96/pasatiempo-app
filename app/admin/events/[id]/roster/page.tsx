@@ -5,6 +5,7 @@ import { canManageEvent, requireEventsViewer } from "@/lib/events/auth";
 import { formatSlot, formatSlotShort, formatWhen } from "@/lib/events/format";
 import type { Registration } from "@/lib/events/types";
 import PrintButton from "@/components/events/PrintButton";
+import TournamentRoster from "@/components/events/TournamentRoster";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,8 @@ export default async function RosterPage({
   if (!canManageEvent(viewer, event)) redirect("/admin");
 
   const regs = await registrationsFor(id);
+  if (event.type === "tournament")
+    return <TournamentRoster event={event} regs={regs} />;
   const confirmed = regs.filter((r) => r.status === "confirmed");
   const waitlist = regs.filter((r) => r.status === "waitlist");
 

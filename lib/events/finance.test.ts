@@ -43,6 +43,8 @@ function reg(over: Partial<Registration> & { id: string }): Registration {
     guestNames: [],
     slotIds: [],
     answers: {},
+    players: null,
+    emailFailed: false,
     status: "confirmed" as RegStatus,
     createdAt: "2026-08-01T00:00:00Z",
     paid: false,

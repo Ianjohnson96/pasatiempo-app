@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import Gallery from "@/components/events/Gallery";
 import ManageRegistration from "@/components/events/ManageRegistration";
+import PublicTeamRoster from "@/components/events/PublicTeamRoster";
 import RichText from "@/components/events/RichText";
 import RegistrationForm, {
   type SeatInfo,
@@ -12,6 +14,7 @@ import {
   registrationsFor,
 } from "@/lib/events/data";
 import { formatSlot, formatWhen, rosterName, TYPE_LABEL } from "@/lib/events/format";
+import { teamLines } from "@/lib/events/cards";
 import { publicEvent } from "@/lib/events/map";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +44,10 @@ export default async function PublicEventPage({
   const confirmed = regs.filter((r) => r.status === "confirmed");
   const goingCount = confirmed.reduce((n, r) => n + Math.max(1, r.partySize), 0);
   const isSlots = event.scheduleMode === "slots";
+
+  // Tournament roster: pre-formatted "<member> & <guest>" strings only, so no
+  // email, GHIN or answer can reach the page. Confirmed teams only.
+  const teams = teamLines(regs, event.rosterStyle);
 
   const whenLine = isSlots
     ? event.slots.length === 1
@@ -87,10 +94,16 @@ export default async function PublicEventPage({
         100,
         Math.round((eventAvail.taken / event.capacity) * 100),
       );
+      // A tournament's capacity is in teams, not people.
       spotsFact = {
-        text: eventAvail.full
-          ? "Full — waitlist open"
-          : `${eventAvail.remaining} of ${event.capacity} spots left`,
+        text:
+          event.type === "tournament"
+            ? eventAvail.full
+              ? "Full"
+              : `${eventAvail.remaining} of ${event.capacity} teams left`
+            : eventAvail.full
+              ? "Full — waitlist open"
+              : `${eventAvail.remaining} of ${event.capacity} spots left`,
         pct,
       };
     }
@@ -313,7 +326,14 @@ export default async function PublicEventPage({
 
         {open && <ManageRegistration event={publicEvent(event)} />}
 
-        {event.showRoster && !isSlots && (
+        {event.showRoster && !isSlots && event.type === "tournament" && (
+          <PublicTeamRoster
+            teams={teams}
+            countOnly={event.rosterStyle === "count_only"}
+          />
+        )}
+
+        {event.showRoster && !isSlots && event.type !== "tournament" && (
           <section className="pub-section reveal">
             <h2>Who&apos;s coming · {goingCount}</h2>
             <div style={{ marginTop: 14 }}>
@@ -344,9 +364,9 @@ export default async function PublicEventPage({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-mark.png" alt="" />
         <div className="est">Pasatiempo Golf Club · Est. 1929</div>
-        <a className="foot-admin" href="/admin/events">
+        <Link className="foot-admin" href="/admin/events">
           Pasatiempo staff — manage events →
-        </a>
+        </Link>
       </footer>
     </main>
   );

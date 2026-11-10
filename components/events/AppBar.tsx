@@ -17,9 +17,14 @@ export default function AppBar({
         </Link>
         <span className="spacer" />
         {admin && (
-          <Link href="/admin/events" className="navlink">
-            All events
-          </Link>
+          <>
+            <Link href="/admin" className="navlink">
+              ← Club Hub
+            </Link>
+            <Link href="/admin/events" className="navlink">
+              All events
+            </Link>
+          </>
         )}
         {email && (
           <>
