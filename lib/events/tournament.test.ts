@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   cleanTeam,
+  coerceAnswers,
+  coerceTeam,
   duplicateMessage,
   findDuplicate,
   isAnswered,
   isValidGhin,
+  missingRequired,
   normalizeGhin,
   validateTeam,
   type TeamInput,
@@ -141,6 +144,65 @@ describe("findDuplicate", () => {
     expect(duplicateMessage("member")).toBe(
       "You're already entered on another team. Questions? Contact the golf shop.",
     );
+  });
+});
+
+describe("coerceAnswers", () => {
+  it("keeps strings and string arrays, drops anything else", () => {
+    expect(
+      coerceAnswers({ a: "x", b: ["y", 3, null, "z"], c: null, d: 5, e: { f: 1 } }),
+    ).toEqual({ a: "x", b: ["y", "z"] });
+    expect(coerceAnswers(null)).toEqual({});
+    expect(coerceAnswers("nope")).toEqual({});
+    expect(coerceAnswers([1, 2])).toEqual({});
+  });
+
+  it("makes missingRequired safe on hostile answers", () => {
+    const fields = [field("q", "Dietary needs", "team")];
+    expect(missingRequired(fields, coerceAnswers({ q: 42 }), "all")?.label).toBe(
+      "Dietary needs",
+    );
+    expect(missingRequired(fields, coerceAnswers({ q: "none" }), "all")).toBeNull();
+  });
+});
+
+describe("coerceTeam", () => {
+  it("turns junk into two empty players", () => {
+    for (const raw of [null, undefined, 7, "x", {}, { players: "no" }]) {
+      const t = coerceTeam(raw);
+      expect(t.players).toHaveLength(2);
+      expect(t.players.map((p) => p.role)).toEqual(["member", "guest"]);
+      expect(t.players[1]).toEqual({
+        role: "guest",
+        name: "",
+        email: "",
+        ghin: "",
+        answers: {},
+      });
+      expect(t.teamAnswers).toEqual({});
+    }
+  });
+
+  it("stringifies fields, takes at most two players and survives cleanTeam", () => {
+    const t = coerceTeam({
+      players: [
+        { name: null, email: 5, ghin: 1234567, answers: { s: 9, m: ["a", 1] } },
+        null,
+        { name: "Third" },
+      ],
+      teamAnswers: { tn: "Aces", bad: true },
+    });
+    expect(t.players).toHaveLength(2);
+    expect(t.players[0]).toMatchObject({
+      name: "",
+      email: "5",
+      ghin: "1234567",
+      answers: { m: ["a"] },
+    });
+    expect(t.players[1].name).toBe("");
+    expect(t.teamAnswers).toEqual({ tn: "Aces" });
+    const fields = [field("s", "S", "player"), field("m", "M", "player")];
+    expect(() => cleanTeam(t, fields)).not.toThrow();
   });
 });
 

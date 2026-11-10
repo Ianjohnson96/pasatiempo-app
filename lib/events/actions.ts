@@ -8,12 +8,25 @@ import { eventToRow, rowToEvent, rowToReg } from "./map";
 import { newId, newSlug, slugify } from "./ids";
 import { availability, rosterCount, onRoster } from "./seats";
 import { formatSlot } from "./format";
+import {
+  cleanTeam,
+  coerceAnswers,
+  coerceTeam,
+  duplicateMessage,
+  findDuplicate,
+  missingRequired,
+  validateTeam,
+  type TeamInput,
+} from "./tournament";
+import { teamEmails } from "./tournament-email";
+import { sendMail } from "@/lib/mail";
 import type {
   Answers,
   CustomField,
   EventRec,
   EventType,
   GalleryMode,
+  Player,
   RegStatus,
   Registration,
   RosterStyle,
@@ -114,6 +127,7 @@ async function saveEventInner(input: EventInput): Promise<SaveEventResult> {
       id: f.id && !f.id.startsWith("tmp_") ? f.id : newId(),
       label: f.label.trim(),
       options: f.options.map((o) => o.trim()).filter(Boolean),
+      scope: f.scope ?? "team",
     }));
 
   const fields: Partial<EventRec> = {
@@ -145,6 +159,20 @@ async function saveEventInner(input: EventInput): Promise<SaveEventResult> {
     managers: input.managers.map((e) => e.trim().toLowerCase()).filter(Boolean),
     status: input.status,
   };
+
+  // A tournament is one date, a Member + Guest team, capacity in teams.
+  if (input.type === "tournament") {
+    Object.assign(fields, {
+      scheduleMode: "single",
+      allowMultiSlot: false,
+      slotsPrompt: "",
+      slots: [],
+      rosterLimit: null,
+      allowGuests: true,
+      maxGuests: 1,
+      collectGuestNames: true,
+    } satisfies Partial<EventRec>);
+  }
 
   const requestedSlug = input.slug ? slugify(input.slug) : "";
 
@@ -385,7 +413,10 @@ export interface RegisterInput {
   partySize: number;
   guestNames: string[];
   slotIds: string[];
-  answers: Record<string, string>;
+  answers: Answers;
+  // Tournaments only: the Member + Guest team. name/email are then taken from
+  // the member; phone still comes from `phone`.
+  team?: TeamInput;
 }
 
 export interface RegisterResult {
@@ -394,12 +425,62 @@ export interface RegisterResult {
   error?: string;
 }
 
+// Columns a tournament team writes, derived from a cleaned team.
+function teamColumns(team: TeamInput) {
+  const [member, guest] = team.players;
+  return {
+    name: member.name,
+    email: member.email,
+    party_size: 2,
+    guest_names: [guest.name],
+    players: team.players,
+    answers: team.teamAnswers,
+  };
+}
+
+// Best-effort: email the member and the guest. Never throws and never fails the
+// registration; any failure is logged and flagged on the row.
+async function sendTeamConfirmation(
+  regId: string,
+  event: EventRec,
+  team: TeamInput,
+  status: "confirmed" | "waitlist",
+): Promise<void> {
+  try {
+    const errors: string[] = [];
+    for (const m of teamEmails(event, team.players, team.teamAnswers, status)) {
+      try {
+        const err = await sendMail(m);
+        if (err) errors.push(err);
+      } catch (e) {
+        errors.push(e instanceof Error ? e.message : String(e));
+      }
+    }
+    if (errors.length === 0) return;
+    console.error(
+      `Tournament confirmation email failed for registration ${regId}: ${errors.join("; ")}`,
+    );
+    const supa = createAdminClient("events");
+    const { error } = await supa
+      .from("registrations")
+      .update({ email_failed: true })
+      .eq("id", regId);
+    if (error)
+      console.error(`Could not flag email_failed on ${regId}: ${error.message}`);
+  } catch (e) {
+    console.error(`Tournament confirmation email crashed for ${regId}:`, e);
+  }
+}
+
 export async function register(input: RegisterInput): Promise<RegisterResult> {
-  const name = input.name.trim();
-  const email = input.email.trim().toLowerCase();
-  if (!name) return { ok: false, error: "Please enter your name." };
-  if (!email || !email.includes("@"))
-    return { ok: false, error: "Please enter a valid email." };
+  const name = String(input.name ?? "").trim();
+  const email = String(input.email ?? "").trim().toLowerCase();
+  // Tournament entries carry their names and emails in `team` instead.
+  if (input.team === undefined) {
+    if (!name) return { ok: false, error: "Please enter your name." };
+    if (!email || !email.includes("@"))
+      return { ok: false, error: "Please enter a valid email." };
+  }
 
   const supa = createAdminClient("events");
   const { data: evRow, error: evErr } = await supa
@@ -413,6 +494,11 @@ export async function register(input: RegisterInput): Promise<RegisterResult> {
 
   if (ev.status !== "open")
     return { ok: false, error: "Registration for this event is closed." };
+  if (ev.type === "tournament") return registerTeam(supa, ev, input);
+
+  if (!name) return { ok: false, error: "Please enter your name." };
+  if (!email || !email.includes("@"))
+    return { ok: false, error: "Please enter a valid email." };
   if (ev.inviteOnly && !ev.allowlist.includes(email))
     return {
       ok: false,
@@ -420,6 +506,12 @@ export async function register(input: RegisterInput): Promise<RegisterResult> {
         ev.inviteOnlyMessage ||
         "This event is invite-only and that email isn't on the list.",
     };
+  const missing = missingRequired(
+    ev.customFields,
+    coerceAnswers(input.answers),
+    "all",
+  );
+  if (missing) return { ok: false, error: `Please answer: ${missing.label}` };
 
   const { data: regRows } = await supa
     .from("registrations")
@@ -497,6 +589,61 @@ export async function register(input: RegisterInput): Promise<RegisterResult> {
   return { ok: true, status };
 }
 
+// register() for a tournament: one Member + Guest team, capacity in teams.
+async function registerTeam(
+  supa: ReturnType<typeof createAdminClient>,
+  ev: EventRec,
+  input: RegisterInput,
+): Promise<RegisterResult> {
+  const team = cleanTeam(coerceTeam(input.team), ev.customFields);
+  const invalid = validateTeam(ev, team, { enforceRequired: true });
+  if (invalid) return { ok: false, error: invalid };
+  const member = team.players[0];
+  if (ev.inviteOnly && !ev.allowlist.includes(member.email))
+    return {
+      ok: false,
+      error:
+        ev.inviteOnlyMessage ||
+        "This event is invite-only and that email isn't on the list.",
+    };
+
+  const { data: regRows, error: regErr } = await supa
+    .from("registrations")
+    .select("*")
+    .eq("event_id", ev.id);
+  if (regErr) return { ok: false, error: "Something went wrong." };
+  const regs: Registration[] = (regRows ?? []).map(rowToReg);
+
+  const dup = findDuplicate(regs, team);
+  if (dup) return { ok: false, error: duplicateMessage(dup) };
+
+  // availability() counts teams for a tournament; there's no roster cap.
+  const a = availability(ev, regs, null);
+  let status: "confirmed" | "waitlist";
+  if (a.capacity == null || (a.remaining ?? Infinity) >= 1) status = "confirmed";
+  else if (ev.waitlistEnabled) status = "waitlist";
+  else return { ok: false, error: "Sorry, this event is full." };
+
+  const { data, error: insErr } = await supa
+    .from("registrations")
+    .insert({
+      event_id: ev.id,
+      ...teamColumns(team),
+      phone: String(input.phone ?? "").trim(),
+      slot_ids: [],
+      status,
+    })
+    .select("id")
+    .single();
+  if (insErr || !data)
+    return { ok: false, error: "Could not save your registration." };
+
+  await sendTeamConfirmation(data.id as string, ev, team, status);
+
+  revalidatePath(`/events/e/${input.slug}`);
+  return { ok: true, status };
+}
+
 // ---------------------------------------------------------------------------
 // Self-service (public): an attendee looks up and cancels their own sign-up.
 // Identified by the email they registered with (club context — no login).
@@ -513,6 +660,7 @@ export interface MyRegistration {
   guestNames: string[];
   slotIds: string[];
   answers: Answers;
+  players: Player[] | null; // tournament team; null for other event types
 }
 
 export async function lookupMyRegistrations(
@@ -556,6 +704,7 @@ export async function lookupMyRegistrations(
       guestNames: r.guestNames,
       slotIds: r.slotIds,
       answers: r.answers,
+      players: r.players,
     })),
   };
 }
@@ -572,7 +721,9 @@ export interface MyRegistrationEdit {
   partySize: number;
   guestNames: string[];
   slotIds: string[];
-  answers: Record<string, string>;
+  answers: Answers;
+  // Tournaments only: the edited team (name comes from the member).
+  team?: TeamInput;
 }
 
 export async function updateMyRegistration(
@@ -582,8 +733,9 @@ export async function updateMyRegistration(
   input: MyRegistrationEdit,
 ): Promise<{ ok: boolean; error?: string }> {
   const e = email.trim().toLowerCase();
-  const name = input.name.trim();
-  if (!name) return { ok: false, error: "Please enter your name." };
+  const name = String(input.name ?? "").trim();
+  if (input.team === undefined && !name)
+    return { ok: false, error: "Please enter your name." };
 
   const supa = createAdminClient("events");
   const { data: evRow } = await supa
@@ -609,6 +761,32 @@ export async function updateMyRegistration(
   const mine = all.find((r) => r.id === regId);
   if (!mine || mine.email.trim().toLowerCase() !== e)
     return { ok: false, error: "That registration wasn't found for that email." };
+
+  if (ev.type === "tournament") {
+    const team = cleanTeam(coerceTeam(input.team), ev.customFields);
+    const invalid = validateTeam(ev, team, { enforceRequired: true });
+    if (invalid) return { ok: false, error: invalid };
+    if (team.players[0].email !== mine.email.trim().toLowerCase())
+      return {
+        ok: false,
+        error: "To change the member's email, contact the golf shop.",
+      };
+    const dup = findDuplicate(all, team, regId);
+    if (dup) return { ok: false, error: duplicateMessage(dup) };
+
+    // email is unchanged (checked above). No emails are re-sent on edits.
+    const { error } = await supa
+      .from("registrations")
+      .update({ ...teamColumns(team), phone: String(input.phone ?? "").trim() })
+      .eq("id", regId);
+    if (error) return { ok: false, error: "Could not save your changes." };
+
+    revalidatePath(`/events/e/${slug}`);
+    revalidatePath(`/admin/events/${ev.id}`);
+    revalidatePath(`/admin/events/${ev.id}/roster`);
+    return { ok: true };
+  }
+  if (!name) return { ok: false, error: "Please enter your name." };
 
   const partySize = Math.max(1, Math.floor(input.partySize || 1));
   if (ev.allowGuests === false && partySize > 1)
@@ -762,8 +940,10 @@ export interface RegistrationEdit {
   partySize: number;
   guestNames: string[];
   slotIds: string[];
-  answers: Record<string, string>;
+  answers: Answers;
   status: RegStatus;
+  // Tournaments only: the edited team (name/email derive from the member).
+  team?: TeamInput;
 }
 
 export async function updateRegistration(
@@ -774,6 +954,25 @@ export async function updateRegistration(
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
+  const supa = createAdminClient("events");
+
+  const { data: regRow, error: regErr } = await supa
+    .from("registrations")
+    .select("event_id")
+    .eq("id", input.id)
+    .maybeSingle();
+  if (regErr) return { ok: false, error: regErr.message };
+  if (!regRow) return { ok: false, error: "Registration not found." };
+  const { data: evRow, error: evErr } = await supa
+    .from("events")
+    .select("*")
+    .eq("id", regRow.event_id)
+    .maybeSingle();
+  if (evErr) return { ok: false, error: evErr.message };
+  if (!evRow) return { ok: false, error: "Event not found." };
+  const ev = rowToEvent(evRow);
+  if (ev.type === "tournament") return updateTeamRegistration(supa, ev, input);
+
   const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
   if (!name) return { ok: false, error: "Please enter a name." };
@@ -781,7 +980,6 @@ export async function updateRegistration(
     return { ok: false, error: "Please enter a valid email." };
 
   const partySize = Math.max(1, Math.floor(input.partySize || 1));
-  const supa = createAdminClient("events");
 
   const { data, error } = await supa
     .from("registrations")
@@ -805,6 +1003,100 @@ export async function updateRegistration(
 
   revalidatePath(`/admin/events/${data.event_id}`);
   revalidatePath(`/admin/events/${data.event_id}/roster`);
+  return { ok: true };
+}
+
+// Staff edit of a tournament team: skips Required and capacity, but still
+// checks name/email/GHIN and duplicates.
+async function updateTeamRegistration(
+  supa: ReturnType<typeof createAdminClient>,
+  ev: EventRec,
+  input: RegistrationEdit,
+): Promise<{ ok: boolean; error?: string }> {
+  const { data: regRows, error: regErr } = await supa
+    .from("registrations")
+    .select("*")
+    .eq("event_id", ev.id);
+  if (regErr) return { ok: false, error: regErr.message };
+  const regs: Registration[] = (regRows ?? []).map(rowToReg);
+
+  const team = cleanTeam(coerceTeam(input.team), ev.customFields);
+  const invalid = validateTeam(ev, team, { enforceRequired: false });
+  if (invalid) return { ok: false, error: invalid };
+  const dup = findDuplicate(regs, team, input.id);
+  if (dup) return { ok: false, error: duplicateMessage(dup) };
+
+  const { error } = await supa
+    .from("registrations")
+    .update({
+      ...teamColumns(team),
+      phone: String(input.phone ?? "").trim(),
+      status: input.status,
+    })
+    .eq("id", input.id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/events/${ev.id}`);
+  revalidatePath(`/admin/events/${ev.id}/roster`);
+  return { ok: true };
+}
+
+// Staff add a team directly: confirmed, ignoring capacity and Required.
+export async function adminAddTeam(
+  eventId: string,
+  team: TeamInput,
+  phone: string,
+  sendEmails: boolean,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await assertCanManageEvent(eventId);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+  const supa = createAdminClient("events");
+  const { data: evRow, error: evErr } = await supa
+    .from("events")
+    .select("*")
+    .eq("id", eventId)
+    .maybeSingle();
+  if (evErr) return { ok: false, error: evErr.message };
+  if (!evRow) return { ok: false, error: "Event not found." };
+  const ev = rowToEvent(evRow);
+  if (ev.type !== "tournament")
+    return { ok: false, error: "Teams can only be added to a tournament." };
+
+  const clean = cleanTeam(coerceTeam(team), ev.customFields);
+  const invalid = validateTeam(ev, clean, { enforceRequired: false });
+  if (invalid) return { ok: false, error: invalid };
+
+  const { data: regRows, error: regErr } = await supa
+    .from("registrations")
+    .select("*")
+    .eq("event_id", ev.id);
+  if (regErr) return { ok: false, error: regErr.message };
+  const dup = findDuplicate((regRows ?? []).map(rowToReg), clean);
+  if (dup) return { ok: false, error: duplicateMessage(dup) };
+
+  const { data, error } = await supa
+    .from("registrations")
+    .insert({
+      event_id: ev.id,
+      ...teamColumns(clean),
+      phone: String(phone ?? "").trim(),
+      slot_ids: [],
+      status: "confirmed",
+    })
+    .select("id")
+    .single();
+  if (error || !data)
+    return { ok: false, error: error?.message ?? "Could not add the team." };
+
+  if (sendEmails === true)
+    await sendTeamConfirmation(data.id as string, ev, clean, "confirmed");
+
+  revalidatePath(`/admin/events/${eventId}`);
+  revalidatePath(`/admin/events/${eventId}/roster`);
+  revalidatePath(`/events/e/${ev.slug}`);
   return { ok: true };
 }
 

@@ -69,6 +69,40 @@ function cleanAnswers(
   return out;
 }
 
+// Server actions receive client data. Keep only string or string[] answers so
+// the trim-based checks below can't throw on null, numbers or objects.
+export function coerceAnswers(raw: unknown): Answers {
+  const out: Answers = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v === "string") out[k] = v;
+    else if (Array.isArray(v))
+      out[k] = v.filter((x): x is string => typeof x === "string");
+  }
+  return out;
+}
+
+// Shape untrusted input into a TeamInput: exactly two players (missing ones
+// empty), string fields, string/string[] answers. Roles follow position.
+export function coerceTeam(raw: unknown): TeamInput {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const list = Array.isArray(r.players) ? r.players.slice(0, 2) : [];
+  const players = ROLES.map((role, i) => {
+    const p = (list[i] && typeof list[i] === "object" ? list[i] : {}) as Record<
+      string,
+      unknown
+    >;
+    return {
+      role,
+      name: String(p.name ?? ""),
+      email: String(p.email ?? ""),
+      ghin: String(p.ghin ?? ""),
+      answers: coerceAnswers(p.answers),
+    };
+  });
+  return { players, teamAnswers: coerceAnswers(r.teamAnswers) };
+}
+
 export function cleanTeam(input: TeamInput, fields: CustomField[]): TeamInput {
   const players = ROLES.map((role, i) => {
     const p = input.players[i];
