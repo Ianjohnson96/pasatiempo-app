@@ -8,6 +8,7 @@ import type {
   FieldScope,
   Player,
   PlayerRole,
+  RegStatus,
   Registration,
 } from "./types";
 
@@ -186,6 +187,13 @@ export function findDuplicate(
     if ((e && emails.has(e)) || (g && ghins.has(g))) return role;
   }
   return null;
+}
+
+// A status change that brings a cancelled team back onto the live list
+// (confirmed or waitlist) must be checked for duplicates first: its players
+// may have entered another team while it was cancelled.
+export function needsDuplicateCheck(from: RegStatus, to: RegStatus): boolean {
+  return from === "cancelled" && (to === "confirmed" || to === "waitlist");
 }
 
 export function duplicateMessage(role: PlayerRole): string {

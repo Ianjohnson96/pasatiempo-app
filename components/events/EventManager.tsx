@@ -55,6 +55,8 @@ export default function EventManager({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  // A status change the server refused (e.g. Restore would duplicate a player).
+  const [regError, setRegError] = useState("");
   const isTournament = event.type === "tournament";
   const avail = availability(event, registrations);
   // Same Team # as the CSV and the printed roster; cancelled teams have none.
@@ -89,8 +91,10 @@ export default function EventManager({
 
   function changeReg(id: string, s: RegStatus) {
     setBusyId(id);
+    setRegError("");
     start(async () => {
-      await setRegStatus(id, s);
+      const res = await setRegStatus(id, s);
+      if (!res.ok) setRegError(res.error ?? "Could not change the status.");
       router.refresh();
       setBusyId(null);
     });
@@ -530,6 +534,12 @@ export default function EventManager({
             </button>
           )}
         </div>
+
+        {regError && (
+          <div className="notice err" role="alert" style={{ marginTop: 12 }}>
+            {regError}
+          </div>
+        )}
 
         {isTournament && adding && (
           <div className="tc-add">

@@ -17,6 +17,7 @@ import {
   duplicateMessage,
   findDuplicate,
   missingRequired,
+  needsDuplicateCheck,
   validateTeam,
   type TeamInput,
 } from "./tournament";
@@ -652,8 +653,10 @@ async function registerTeam(
     })
     .select("id")
     .single();
-  if (insErr || !data)
+  if (insErr || !data) {
+    console.error("registerTeam: insert failed", insErr);
     return { ok: false, error: "Could not save your registration." };
+  }
 
   await sendTeamConfirmation(data.id as string, ev, team, status);
 
@@ -933,17 +936,54 @@ export async function dropMySlot(
 export async function setRegStatus(
   regId: string,
   status: RegStatus,
-): Promise<void> {
-  await assertCanManageRegistration(regId);
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await assertCanManageRegistration(regId);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
   const supa = createAdminClient("events");
-  const { data, error } = await supa
+
+  const { data: row, error: rowErr } = await supa
+    .from("registrations")
+    .select("*")
+    .eq("id", regId)
+    .maybeSingle();
+  if (rowErr) return { ok: false, error: rowErr.message };
+  if (!row) return { ok: false, error: "Registration not found." };
+  const reg = rowToReg(row);
+
+  // Restoring a cancelled team: its players may have entered another team
+  // while it was cancelled, so check before putting it back on the list.
+  if (reg.players && needsDuplicateCheck(reg.status, status)) {
+    const { data: evRow, error: evErr } = await supa
+      .from("events")
+      .select("type")
+      .eq("id", reg.eventId)
+      .maybeSingle();
+    if (evErr) return { ok: false, error: evErr.message };
+    if (evRow?.type === "tournament") {
+      const { data: regRows, error: regErr } = await supa
+        .from("registrations")
+        .select("*")
+        .eq("event_id", reg.eventId);
+      if (regErr) return { ok: false, error: regErr.message };
+      const dup = findDuplicate(
+        (regRows ?? []).map(rowToReg),
+        { players: reg.players, teamAnswers: {} },
+        regId,
+      );
+      if (dup) return { ok: false, error: duplicateMessage(dup) };
+    }
+  }
+
+  const { error } = await supa
     .from("registrations")
     .update({ status })
-    .eq("id", regId)
-    .select("event_id")
-    .single();
-  if (error) throw error;
-  revalidatePath(`/admin/events/${data.event_id}`);
+    .eq("id", regId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/admin/events/${reg.eventId}`);
+  return { ok: true };
 }
 
 // Full staff edit of an existing sign-up. Unlike the public register() path this
@@ -1040,8 +1080,11 @@ async function updateTeamRegistration(
   const team = cleanTeam(coerceTeam(input.team), ev.customFields);
   const invalid = validateTeam(ev, team, { enforceRequired: false });
   if (invalid) return { ok: false, error: invalid };
-  const dup = findDuplicate(regs, team, input.id);
-  if (dup) return { ok: false, error: duplicateMessage(dup) };
+  // A team being cancelled can't clash with anyone, so don't block the save.
+  if (input.status !== "cancelled") {
+    const dup = findDuplicate(regs, team, input.id);
+    if (dup) return { ok: false, error: duplicateMessage(dup) };
+  }
 
   const { error } = await supa
     .from("registrations")
@@ -1105,8 +1148,10 @@ export async function adminAddTeam(
     })
     .select("id")
     .single();
-  if (error || !data)
+  if (error || !data) {
+    console.error("adminAddTeam: insert failed", error);
     return { ok: false, error: error?.message ?? "Could not add the team." };
+  }
 
   if (sendEmails === true)
     await sendTeamConfirmation(data.id as string, ev, clean, "confirmed");

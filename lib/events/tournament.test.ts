@@ -8,6 +8,7 @@ import {
   isAnswered,
   isValidGhin,
   missingRequired,
+  needsDuplicateCheck,
   normalizeGhin,
   validateTeam,
   type TeamInput,
@@ -144,6 +145,21 @@ describe("findDuplicate", () => {
     expect(duplicateMessage("member")).toBe(
       "You're already entered on another team. Questions? Contact the golf shop.",
     );
+  });
+});
+
+describe("needsDuplicateCheck", () => {
+  it("is true when a cancelled team comes back to life", () => {
+    expect(needsDuplicateCheck("cancelled", "confirmed")).toBe(true);
+    expect(needsDuplicateCheck("cancelled", "waitlist")).toBe(true);
+  });
+  it("is false for every other move", () => {
+    expect(needsDuplicateCheck("cancelled", "cancelled")).toBe(false);
+    expect(needsDuplicateCheck("confirmed", "cancelled")).toBe(false);
+    expect(needsDuplicateCheck("waitlist", "cancelled")).toBe(false);
+    expect(needsDuplicateCheck("waitlist", "confirmed")).toBe(false);
+    expect(needsDuplicateCheck("confirmed", "waitlist")).toBe(false);
+    expect(needsDuplicateCheck("confirmed", "confirmed")).toBe(false);
   });
 });
 
