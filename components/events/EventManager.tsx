@@ -6,6 +6,12 @@ import { useState, useTransition } from "react";
 import CopyLink from "@/components/events/CopyLink";
 import RegistrationEditor from "@/components/events/RegistrationEditor";
 import {
+  csvFilename,
+  signupRows,
+  toCsv,
+  tournamentRows,
+} from "@/lib/events/csv";
+import {
   deleteEvent,
   deleteRegistration,
   setEventStatus,
@@ -19,19 +25,6 @@ import {
   TYPE_LABEL,
 } from "@/lib/events/format";
 import type { EventRec, RegStatus, Registration } from "@/lib/events/types";
-
-function slotLabels(ev: EventRec, slotIds: string[]): string {
-  return slotIds
-    .map((id) => ev.slots.find((s) => s.id === id))
-    .filter((s): s is NonNullable<typeof s> => !!s)
-    .map((s) => formatSlot(s))
-    .join("; ");
-}
-
-function csvCell(v: string): string {
-  if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
-  return v;
-}
 
 export default function EventManager({
   event,
@@ -106,35 +99,14 @@ export default function EventManager({
   }
 
   function exportCsv() {
-    const cols = [
-      "Status",
-      "Name",
-      "Email",
-      "Phone",
-      "Party size",
-      ...(event.slots.length ? ["Slot"] : []),
-      ...(event.collectGuestNames ? ["Guests"] : []),
-      ...event.customFields.map((f) => f.label),
-      "Registered at",
-    ];
-    const rows = registrations.map((r) => [
-      r.status,
-      r.name,
-      r.email,
-      r.phone,
-      String(r.partySize),
-      ...(event.slots.length ? [slotLabels(event, r.slotIds)] : []),
-      ...(event.collectGuestNames ? [r.guestNames.join("; ")] : []),
-      ...event.customFields.map((f) => answerText(r.answers[f.id])),
-      new Date(r.createdAt).toLocaleString(),
-    ]);
-    const csv = [cols, ...rows]
-      .map((row) => row.map((c) => csvCell(String(c))).join(","))
-      .join("\r\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const rows =
+      event.type === "tournament"
+        ? tournamentRows(event, registrations)
+        : signupRows(event, registrations);
+    const blob = new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${event.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-signups.csv`;
+    a.download = csvFilename(event);
     a.click();
     URL.revokeObjectURL(a.href);
   }
