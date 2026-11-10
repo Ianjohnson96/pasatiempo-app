@@ -56,21 +56,35 @@ function TypeIcon({ type }: { type: EventType }) {
 export default function TypeTiles({
   value,
   onChange,
+  isDisabled,
+  describedBy,
 }: {
   value: EventType;
   onChange: (t: EventType) => void;
+  isDisabled?: (t: EventType) => boolean;
+  describedBy?: string;
 }) {
   return (
-    <div className="type-tiles" role="radiogroup" aria-label="Event type">
+    <div
+      className="type-tiles"
+      role="radiogroup"
+      aria-label="Event type"
+      aria-describedby={describedBy}
+    >
       {TYPE_TILES.map((t) => {
         const on = value === t.type;
+        const off = !on && (isDisabled?.(t.type) ?? false);
         return (
-          <label key={t.type} className={`type-tile${on ? " on" : ""}`}>
+          <label
+            key={t.type}
+            className={`type-tile${on ? " on" : ""}${off ? " disabled" : ""}`}
+          >
             <input
               type="radio"
               name="event-type"
               value={t.type}
               checked={on}
+              disabled={off}
               onChange={() => onChange(t.type)}
             />
             <span className="type-tile-ico">

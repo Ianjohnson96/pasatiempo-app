@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   EDITOR_SECTIONS,
   TYPE_TILES,
+  TYPE_SWITCH_BLOCKED,
   buildEventInput,
+  crossesTournamentBoundary,
   editorError,
   fromLocalInput,
   previewEvent,
@@ -272,5 +274,22 @@ describe("previewEvent", () => {
   it("leaves the whole capacity open for a single date", () => {
     const ev = previewEvent(buildEventInput(state({ capacity: "40" })));
     expect(previewSeats(ev)).toEqual({ remaining: 40, full: false, slots: [] });
+  });
+});
+
+describe("crossesTournamentBoundary", () => {
+  it("is true only when exactly one side is a tournament", () => {
+    expect(crossesTournamentBoundary("dinner", "tournament")).toBe(true);
+    expect(crossesTournamentBoundary("clinic", "tournament")).toBe(true);
+    expect(crossesTournamentBoundary("tournament", "general")).toBe(true);
+    expect(crossesTournamentBoundary("tournament", "tournament")).toBe(false);
+    expect(crossesTournamentBoundary("dinner", "clinic")).toBe(false);
+    expect(crossesTournamentBoundary("general", "general")).toBe(false);
+  });
+
+  it("tells staff why the save was refused", () => {
+    expect(TYPE_SWITCH_BLOCKED).toBe(
+      "This event already has sign-ups, so it can't be switched to or from Tournament. Make a new event instead.",
+    );
   });
 });

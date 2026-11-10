@@ -2833,6 +2833,14 @@ body:has(.container.wide) .appbar-inner {
   font-size: 12px;
   font-weight: 700;
 }
+.type-tile.disabled {
+  cursor: not-allowed;
+  background: var(--bg);
+  opacity: 0.5;
+}
+.type-tile.disabled:hover {
+  border-color: var(--line);
+}
 .type-tile input {
   position: absolute;
   opacity: 0;

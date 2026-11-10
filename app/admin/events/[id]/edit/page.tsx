@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import AppBar from "@/components/events/AppBar";
 import EventEditor from "@/components/events/EventEditor";
-import { getEvent } from "@/lib/events/data";
+import { getEvent, registrationsFor } from "@/lib/events/data";
 import { canManageEvent, requireEventsViewer } from "@/lib/events/auth";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +16,7 @@ export default async function EditEventPage({
   const event = await getEvent(id);
   if (!event) notFound();
   if (!canManageEvent(viewer, event)) redirect("/admin");
+  const registrationCount = (await registrationsFor(event.id)).length;
 
   return (
     <>
@@ -27,7 +28,7 @@ export default async function EditEventPage({
             <div className="sub">{event.title}</div>
           </div>
         </div>
-        <EventEditor event={event} />
+        <EventEditor event={event} registrationCount={registrationCount} />
       </main>
     </>
   );

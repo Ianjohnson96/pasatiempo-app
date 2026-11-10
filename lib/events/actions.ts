@@ -9,6 +9,7 @@ import { newId, newSlug, slugify } from "./ids";
 import { availability, rosterCount, onRoster } from "./seats";
 import { formatSlot } from "./format";
 import { normalizeFields } from "./question-builder";
+import { TYPE_SWITCH_BLOCKED, crossesTournamentBoundary } from "./editor";
 import {
   cleanTeam,
   coerceAnswers,
@@ -192,11 +193,23 @@ async function saveEventInner(input: EventInput): Promise<SaveEventResult> {
   if (input.id) {
     const { data: existingRow, error: e1 } = await supa
       .from("events")
-      .select("slug")
+      .select("slug, type")
       .eq("id", input.id)
       .maybeSingle();
     if (e1) throw e1;
     if (!existingRow) throw new Error("Event not found");
+
+    // Tournament entries are stored as teams, everything else as single
+    // registrants: once anyone has signed up, the type can't cross that line.
+    if (crossesTournamentBoundary(existingRow.type as EventType, input.type)) {
+      const { count, error: e2 } = await supa
+        .from("registrations")
+        .select("id", { count: "exact", head: true })
+        .eq("event_id", input.id);
+      if (e2) throw e2;
+      if ((count ?? 0) > 0)
+        return { ok: false, error: TYPE_SWITCH_BLOCKED };
+    }
 
     let slug = existingRow.slug as string;
     if (requestedSlug && requestedSlug !== slug) {

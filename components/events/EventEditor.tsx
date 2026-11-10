@@ -20,6 +20,7 @@ import {
 import { formatSlot } from "@/lib/events/format";
 import {
   buildEventInput,
+  crossesTournamentBoundary,
   editorError,
   previewEvent,
   typeRules,
@@ -92,7 +93,14 @@ function SectionHead({
   );
 }
 
-export default function EventEditor({ event }: { event?: EventRec }) {
+export default function EventEditor({
+  event,
+  registrationCount = 0,
+}: {
+  event?: EventRec;
+  // sign-ups already on the event; any at all lock the Tournament boundary
+  registrationCount?: number;
+}) {
   const router = useRouter();
   const editing = !!event;
   const hydrated = useHydrated();
@@ -279,8 +287,9 @@ export default function EventEditor({ event }: { event?: EventRec }) {
     }
   }
 
-  const switchingTournament =
-    editing && (event.type === "tournament") !== rules.tournament;
+  // Teams and single registrants are stored differently, so once anyone has
+  // signed up the type can't cross the Tournament line (the server checks too).
+  const typeLocked = editing && registrationCount > 0;
 
   return (
     <div className="editor-shell">
@@ -296,11 +305,20 @@ export default function EventEditor({ event }: { event?: EventRec }) {
           />
           <div className="field">
             <label>Type</label>
-            <TypeTiles value={type} onChange={setType} />
-            {switchingTournament && (
-              <div className="notice warn" style={{ marginTop: 10 }}>
-                Switching to or from <strong>Tournament</strong> changes how
-                entries are stored. Only do this before anyone has registered.
+            <TypeTiles
+              value={type}
+              onChange={setType}
+              isDisabled={
+                typeLocked && event
+                  ? (t) => crossesTournamentBoundary(event.type, t)
+                  : undefined
+              }
+              describedBy={typeLocked ? "type-lock-note" : undefined}
+            />
+            {typeLocked && (
+              <div id="type-lock-note" className="hint" style={{ marginTop: 8 }}>
+                Switching to or from Tournament isn&apos;t possible once people
+                have signed up.
               </div>
             )}
           </div>

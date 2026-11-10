@@ -62,6 +62,18 @@ export function typeRules(type: EventType): TypeRules {
   };
 }
 
+// Tournament entries are stored as two-player teams and every other type as
+// single registrants, so an event with sign-ups can't switch between them.
+export function crossesTournamentBoundary(
+  oldType: EventType,
+  newType: EventType,
+): boolean {
+  return (oldType === "tournament") !== (newType === "tournament");
+}
+
+export const TYPE_SWITCH_BLOCKED =
+  "This event already has sign-ups, so it can't be switched to or from Tournament. Make a new event instead.";
+
 // A tournament is always a single date, whatever the hidden switch says.
 export function effectiveScheduleMode(
   type: EventType,
