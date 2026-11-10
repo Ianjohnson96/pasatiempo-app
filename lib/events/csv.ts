@@ -46,6 +46,21 @@ export function signupRows(event: EventRec, regs: Registration[]): string[][] {
   return [cols, ...rows];
 }
 
+const byCreated = (a: Registration, b: Registration) =>
+  a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0;
+
+// The one team numbering, shared by the CSV, the Manage page and the printed
+// roster: every non-cancelled team (confirmed and waitlist) in entry order.
+// Cancelled teams get no number.
+export function teamNumbers(regs: Registration[]): Map<string, number> {
+  const nums = new Map<string, number>();
+  regs
+    .filter((r) => r.status !== "cancelled")
+    .sort(byCreated)
+    .forEach((r, i) => nums.set(r.id, i + 1));
+  return nums;
+}
+
 export function tournamentRows(event: EventRec, regs: Registration[]): string[][] {
   const playerFields = event.customFields.filter((f) => f.scope !== "team");
   const teamFields = event.customFields.filter((f) => f.scope === "team");
@@ -62,8 +77,7 @@ export function tournamentRows(event: EventRec, regs: Registration[]): string[][
     "Registered at",
   ];
 
-  const byCreated = (a: Registration, b: Registration) =>
-    a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0;
+  const nums = teamNumbers(regs);
   const active = regs.filter((r) => r.status !== "cancelled").sort(byCreated);
   const cancelled = regs.filter((r) => r.status === "cancelled").sort(byCreated);
 
@@ -88,7 +102,7 @@ export function tournamentRows(event: EventRec, regs: Registration[]): string[][
       ]);
     }
   };
-  active.forEach((r, i) => emit(r, String(i + 1)));
+  active.forEach((r) => emit(r, String(nums.get(r.id))));
   cancelled.forEach((r) => emit(r, ""));
   return [header, ...rows];
 }

@@ -9,6 +9,7 @@ import TeamEntryForm from "@/components/events/TeamEntryForm";
 import {
   csvFilename,
   signupRows,
+  teamNumbers,
   toCsv,
   tournamentRows,
 } from "@/lib/events/csv";
@@ -56,6 +57,8 @@ export default function EventManager({
   const [adding, setAdding] = useState(false);
   const isTournament = event.type === "tournament";
   const avail = availability(event, registrations);
+  // Same Team # as the CSV and the printed roster; cancelled teams have none.
+  const teamNo = teamNumbers(registrations);
 
   const confirmed = registrations.filter((r) => r.status === "confirmed");
   const waitlist = registrations.filter((r) => r.status === "waitlist");
@@ -242,7 +245,8 @@ export default function EventManager({
   }
 
   // A tournament team: both players with their answers, then team answers.
-  function teamCard(r: Registration, num: number | null) {
+  function teamCard(r: Registration) {
+    const num = teamNo.get(r.id);
     if (editId === r.id) {
       return (
         <RegistrationEditor
@@ -270,7 +274,7 @@ export default function EventManager({
     return (
       <div key={r.id} className={`team-card ${r.status}`}>
         <div className="tc-head">
-          {num != null && <span className="tc-num">Team {num}</span>}
+          {num !== undefined && <span className="tc-num">Team {num}</span>}
           <span className={`tc-status ${r.status}`}>
             {STATUS_LABEL[r.status]}
           </span>
@@ -557,7 +561,7 @@ export default function EventManager({
               {confirmed.length === 0 ? (
                 <div className="empty">No confirmed teams.</div>
               ) : (
-                confirmed.map((r, i) => teamCard(r, i + 1))
+                confirmed.map(teamCard)
               )}
             </div>
             {waitlist.length > 0 && (
@@ -566,7 +570,7 @@ export default function EventManager({
                   Waitlist
                 </div>
                 <div className="tc-stack">
-                  {waitlist.map((r) => teamCard(r, null))}
+                  {waitlist.map(teamCard)}
                 </div>
               </>
             )}
@@ -576,7 +580,7 @@ export default function EventManager({
                   Cancelled
                 </div>
                 <div className="tc-stack">
-                  {cancelled.map((r) => teamCard(r, null))}
+                  {cancelled.map(teamCard)}
                 </div>
               </>
             )}

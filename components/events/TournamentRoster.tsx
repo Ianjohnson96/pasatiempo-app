@@ -1,6 +1,7 @@
 import Link from "next/link";
 import PrintButton from "@/components/events/PrintButton";
 import { formatWhen } from "@/lib/events/format";
+import { teamNumbers } from "@/lib/events/csv";
 import type { EventRec, Player, Registration } from "@/lib/events/types";
 
 // Printable tournament field: one row per team, waitlist below.
@@ -11,7 +12,8 @@ export default function TournamentRoster({
   event: EventRec;
   regs: Registration[];
 }) {
-  // registrationsFor() returns entry order, which numbers the teams.
+  // Same Team # as the CSV and the Manage page (waitlist included).
+  const nums = teamNumbers(regs);
   const confirmed = regs.filter((r) => r.status === "confirmed");
   const waitlist = regs.filter((r) => r.status === "waitlist");
 
@@ -57,13 +59,13 @@ export default function TournamentRoster({
         {confirmed.length === 0 ? (
           <p className="rs-empty">No teams are entered yet.</p>
         ) : (
-          <TeamTable regs={confirmed} numbered />
+          <TeamTable regs={confirmed} nums={nums} />
         )}
 
         {waitlist.length > 0 && (
           <>
             <h2 className="rs-h2 rs-away">Waitlist &middot; {waitlist.length}</h2>
-            <TeamTable regs={waitlist} muted />
+            <TeamTable regs={waitlist} nums={nums} muted />
           </>
         )}
 
@@ -77,30 +79,30 @@ export default function TournamentRoster({
 
 function TeamTable({
   regs,
-  numbered = false,
+  nums,
   muted = false,
 }: {
   regs: Registration[];
-  numbered?: boolean;
+  nums: Map<string, number>;
   muted?: boolean;
 }) {
   return (
     <table className={`rs-table rs-teams${muted ? " rs-muted" : ""}`}>
       <thead>
         <tr>
-          <th className="rs-num">{numbered ? "Team #" : "#"}</th>
+          <th className="rs-num">Team #</th>
           <th>Member</th>
           <th>Guest</th>
           <th>Contact</th>
         </tr>
       </thead>
       <tbody>
-        {regs.map((r, i) => {
+        {regs.map((r) => {
           const member = playerFor(r, "member");
           const guest = playerFor(r, "guest");
           return (
             <tr key={r.id}>
-              <td className="rs-num">{i + 1}</td>
+              <td className="rs-num">{nums.get(r.id) ?? ""}</td>
               <td>
                 <PlayerCell p={member} />
               </td>
