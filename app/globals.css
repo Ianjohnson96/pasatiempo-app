@@ -3256,3 +3256,178 @@ body:has(.container.wide) .appbar-inner {
     transition: none;
   }
 }
+
+/* ---- Event cards (admin events list) ------------------------------------- */
+.evcard {
+  --ev-color: var(--muted);
+  position: relative;
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.evcard[data-type="tournament"] {
+  --ev-color: var(--green);
+}
+.evcard[data-type="dinner"] {
+  --ev-color: var(--gold);
+}
+.evcard[data-type="clinic"] {
+  --ev-color: var(--accent);
+}
+.evcard-stripe {
+  flex: 0 0 5px;
+  background: var(--ev-color);
+}
+.evcard-body {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 16px;
+  display: grid;
+  gap: 12px;
+}
+.evcard-top {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  min-width: 0;
+}
+.datebox {
+  flex: 0 0 auto;
+  width: 54px;
+  height: 58px;
+  border-radius: 10px;
+  background: var(--green-tint);
+  color: var(--green-dark);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
+}
+.datebox-mo {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ev-color, var(--green));
+}
+.evcard[data-type="clinic"] .datebox-mo {
+  color: var(--green);
+}
+.datebox-day {
+  font-size: 22px;
+  font-weight: 800;
+}
+.datebox-tbd {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.evcard-main {
+  flex: 1;
+  min-width: 0;
+}
+.evcard-title {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.evcard-title .ev-title {
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.evcard .ev-meta {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 3px;
+  display: flex;
+  gap: 4px 14px;
+  flex-wrap: wrap;
+}
+.evcard-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--green-dark);
+  font-weight: 600;
+}
+.fillbar-text {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.fillbar-wait {
+  color: var(--warn);
+}
+.fillbar {
+  margin-top: 6px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--green-tint);
+  overflow: hidden;
+}
+.fillbar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--green);
+}
+.evcard-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.evcard-link {
+  flex: 1 1 220px;
+  min-width: 0;
+  max-width: 460px;
+}
+@media (max-width: 560px) {
+  .evcard-body {
+    padding: 12px;
+  }
+  .evcard-link {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}
+
+/* public team roster: one line per team */
+.team-roster {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+}
+.team-roster li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 12px;
+  background: var(--green-tint);
+  border-radius: 10px;
+  color: var(--green-dark);
+  font-weight: 600;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.team-roster .tr-n {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 12px;
+  min-width: 1.6em;
+}

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Gallery from "@/components/events/Gallery";
 import ManageRegistration from "@/components/events/ManageRegistration";
+import PublicTeamRoster from "@/components/events/PublicTeamRoster";
 import RichText from "@/components/events/RichText";
 import RegistrationForm, {
   type SeatInfo,
@@ -12,6 +13,7 @@ import {
   registrationsFor,
 } from "@/lib/events/data";
 import { formatSlot, formatWhen, rosterName, TYPE_LABEL } from "@/lib/events/format";
+import { teamLines } from "@/lib/events/cards";
 import { publicEvent } from "@/lib/events/map";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +43,10 @@ export default async function PublicEventPage({
   const confirmed = regs.filter((r) => r.status === "confirmed");
   const goingCount = confirmed.reduce((n, r) => n + Math.max(1, r.partySize), 0);
   const isSlots = event.scheduleMode === "slots";
+
+  // Tournament roster: pre-formatted "<member> & <guest>" strings only, so no
+  // email, GHIN or answer can reach the page. Confirmed teams only.
+  const teams = teamLines(regs, event.rosterStyle);
 
   const whenLine = isSlots
     ? event.slots.length === 1
@@ -313,7 +319,14 @@ export default async function PublicEventPage({
 
         {open && <ManageRegistration event={publicEvent(event)} />}
 
-        {event.showRoster && !isSlots && (
+        {event.showRoster && !isSlots && event.type === "tournament" && (
+          <PublicTeamRoster
+            teams={teams}
+            countOnly={event.rosterStyle === "count_only"}
+          />
+        )}
+
+        {event.showRoster && !isSlots && event.type !== "tournament" && (
           <section className="pub-section reveal">
             <h2>Who&apos;s coming · {goingCount}</h2>
             <div style={{ marginTop: 14 }}>
