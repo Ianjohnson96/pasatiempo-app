@@ -1863,3 +1863,254 @@ textarea {
   background: var(--green);
   color: #fff;
 }
+
+/* ---- Tournament team entry (TeamEntryForm, QuestionInput) ---------------- */
+.team-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.team-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 719px) {
+  .team-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+.player-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--gold);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 20px 6px;
+  min-width: 0;
+  transition: border-color 0.15s;
+}
+.player-card.has-err {
+  border-color: #f4caca;
+  border-top-color: var(--danger);
+}
+.player-card.team-qs {
+  margin-top: 18px;
+}
+.player-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 16px;
+}
+.player-card-kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.player-card-sub {
+  font-family: var(--serif);
+  font-size: 17px;
+  color: var(--green-dark);
+}
+.player-card-rule {
+  height: 1px;
+  background: var(--line);
+  margin: 4px 0 18px;
+}
+.player-card .notice {
+  margin-bottom: 14px;
+}
+.player-card input[readonly] {
+  background: var(--green-tint);
+  color: var(--muted);
+}
+
+/* inline field errors */
+.field-err {
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+  margin: 6px 0 0;
+}
+.field-err::before {
+  content: "! ";
+}
+.field.has-err input,
+.field.has-err select,
+.field.has-err textarea {
+  border-color: var(--danger);
+}
+.field.has-err input:focus,
+.field.has-err select:focus,
+.field.has-err textarea:focus {
+  box-shadow: 0 0 0 3px rgba(179, 38, 30, 0.12);
+}
+.field.has-err .choice-chips .chip {
+  border-color: #f0b8b4;
+}
+
+/* single / multi-select chips */
+.choice-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.choice-chips .chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  min-width: 52px;
+  padding: 9px 16px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
+}
+.choice-chips .chip:hover {
+  border-color: var(--green);
+}
+.choice-chips .chip.on {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+.choice-chips .chip.multi.on::before {
+  content: "✓";
+  font-size: 13px;
+}
+/* the native input stays focusable for keyboards and screen readers */
+.choice-chips .chip input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  pointer-events: none;
+}
+.choice-chips .chip:has(input:focus-visible) {
+  box-shadow: 0 0 0 3px rgba(31, 93, 58, 0.25);
+}
+.choice-chips .chip:has(input:disabled) {
+  cursor: default;
+}
+
+.team-summary-err {
+  text-align: center;
+  margin: 16px 0 0;
+}
+.team-send {
+  margin: 18px 0 0;
+}
+.team-submit {
+  margin-top: 18px;
+  min-height: 48px;
+  font-size: 16px;
+}
+.team-preview-note {
+  text-align: center;
+  font-size: 13px;
+  margin: 10px 0 0;
+}
+/* the editor's preview is read-only but should look like the live form */
+.team-entry.preview input:disabled,
+.team-entry.preview select:disabled,
+.team-entry.preview textarea:disabled {
+  background: #fff;
+  color: var(--ink);
+  opacity: 1;
+}
+
+/* review + confirmation */
+.review-team .review-head h3 {
+  font-family: var(--serif);
+  font-size: 22px;
+  color: var(--green-dark);
+  margin: 0 0 4px;
+}
+.review-team .review-head p {
+  margin: 0 0 18px;
+}
+.review-body {
+  margin-bottom: 18px;
+}
+.review-player {
+  background: var(--green-tint);
+  border: 1px solid var(--green-light);
+  border-radius: 12px;
+  padding: 16px 18px;
+  min-width: 0;
+}
+.review-teamqs {
+  margin-top: 14px;
+}
+/* full width: keep the label column the same size as in a player box */
+.review-teamqs .review-row {
+  grid-template-columns: minmax(84px, calc((100% - 18px) / 2 * 0.38)) 1fr;
+}
+@media (max-width: 719px) {
+  .review-teamqs .review-row {
+    grid-template-columns: minmax(84px, 38%) 1fr;
+  }
+}
+.review-name {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--green-dark);
+  margin: 2px 0 10px;
+  overflow-wrap: anywhere;
+}
+.review-list {
+  margin: 0;
+}
+.review-row {
+  display: grid;
+  grid-template-columns: minmax(84px, 38%) 1fr;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--green-light);
+  font-size: 14px;
+}
+.review-row:first-child {
+  border-top: none;
+}
+.review-row dt {
+  color: var(--muted);
+}
+.review-row dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.review-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+.review-actions .btn {
+  min-height: 48px;
+  min-width: 140px;
+}
+@media (max-width: 719px) {
+  .review-actions .btn {
+    flex: 1;
+    min-width: 0;
+  }
+}
