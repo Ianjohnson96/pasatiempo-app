@@ -12,6 +12,7 @@ export default async function NewEventPage() {
       <main className="container wide">
         <div className="page-head">
           <div>
+            <p className="ph-eyebrow">Event Planner</p>
             <h1>New event</h1>
             <div className="sub">
               You can edit any of this later. A private link is created when you

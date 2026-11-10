@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Icon from "@/components/events/Icon";
 import { formatSlot } from "@/lib/events/format";
 import {
   centsToDollarInput,
@@ -391,7 +392,7 @@ function PrizesCard({
                 aria-label={`Remove ${p.description}`}
                 onClick={() => run(() => deletePrize(event.id, p.id))}
               >
-                ✕
+                <Icon name="close" />
               </button>
             </div>
           ))}

@@ -136,7 +136,9 @@ export default async function RosterPage({
               <tbody>
                 {d.attending.map((r) => (
                   <tr key={r.id}>
-                    <td className="rs-chk">☐</td>
+                    <td className="rs-chk">
+                      <span className="rs-box" aria-hidden="true" />
+                    </td>
                     <td>
                       <strong>{r.name}</strong>
                       {r.partySize > 1 && <span className="rs-party"> +{r.partySize - 1}</span>}

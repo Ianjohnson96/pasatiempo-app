@@ -3,6 +3,7 @@
 import { memo, useEffect, useRef } from "react";
 import RegistrationForm from "@/components/events/RegistrationForm";
 import TeamEntryForm from "@/components/events/TeamEntryForm";
+import Icon from "@/components/events/Icon";
 import { previewSeats } from "@/lib/events/editor";
 import { TYPE_LABEL, formatWhen } from "@/lib/events/format";
 import type { EventRec } from "@/lib/events/types";
@@ -76,7 +77,8 @@ function PreviewHead({
       <span className="ep-head-tools">
         {publicHref && (
           <a href={publicHref} target="_blank" rel="noopener noreferrer">
-            Open saved page ↗
+            Open saved page
+            <Icon name="external" />
           </a>
         )}
         {onClose && (
@@ -86,7 +88,7 @@ function PreviewHead({
             onClick={onClose}
             aria-label="Close preview"
           >
-            ✕
+            <Icon name="close" />
           </button>
         )}
       </span>

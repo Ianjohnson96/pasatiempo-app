@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import CopyLink from "@/components/events/CopyLink";
+import Icon from "@/components/events/Icon";
 import RegistrationEditor from "@/components/events/RegistrationEditor";
 import TeamEntryForm from "@/components/events/TeamEntryForm";
 import {
@@ -227,8 +228,9 @@ export default function EventManager({
           disabled={busy}
           onClick={() => removeReg(r.id)}
           title="Delete"
+          aria-label="Delete"
         >
-          ✕
+          <Icon name="close" />
         </button>
       </>
     );
@@ -403,17 +405,28 @@ export default function EventManager({
         >
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <h2 style={{ margin: 0, fontSize: 22 }}>{event.title}</h2>
+              <h2 className="ev-manage-title">{event.title}</h2>
               <span className={`badge ${event.status}`}>{event.status}</span>
             </div>
             <div className="ev-meta" style={{ marginTop: 6 }}>
               <span>{TYPE_LABEL[event.type]}</span>
               <span>{formatWhen(event.startsAt, event.endsAt)}</span>
-              {event.location && <span>📍 {event.location}</span>}
-              {event.inviteOnly && <span>🔒 Invite-only</span>}
+              {event.location && (
+                <span>
+                  <Icon name="pin" />
+                  {event.location}
+                </span>
+              )}
+              {event.inviteOnly && (
+                <span>
+                  <Icon name="lock" />
+                  Invite-only
+                </span>
+              )}
               {event.rosterLimit != null && (
                 <span style={{ color: rosterFull ? "var(--danger)" : "var(--muted)" }}>
-                  👥 Roster {rosterPeople}/{event.rosterLimit}
+                  <Icon name="people" />
+                  Roster {rosterPeople}/{event.rosterLimit}
                   {rosterFull ? " · full" : ""}
                 </span>
               )}
@@ -426,13 +439,15 @@ export default function EventManager({
               rel="noopener noreferrer"
               className="btn secondary"
             >
-              View page ↗
+              View page
+              <Icon name="external" />
             </a>
             <Link
               href={`/admin/events/${event.id}/roster`}
               className="btn secondary"
             >
-              🖨 Roster
+              <Icon name="print" />
+              Roster
             </Link>
             <Link
               href={`/admin/events/${event.id}/edit`}
@@ -464,7 +479,7 @@ export default function EventManager({
           {(["open", "draft", "closed"] as const).map((s) => (
             <button
               key={s}
-              className={`btn small ${event.status === s ? "" : "secondary"}`}
+              className={`btn small ${event.status === s ? "is-current" : "secondary"}`}
               disabled={pending || event.status === s}
               onClick={() => changeStatus(s)}
             >
@@ -507,7 +522,7 @@ export default function EventManager({
             disabled={confirmedEmails.length === 0}
             title="Copy confirmed registrants' emails to paste into your email app"
           >
-            {copied ? "Copied ✓" : "Copy emails"}
+            {copied ? "Copied" : "Copy emails"}
           </button>
           <button
             className="btn small secondary"

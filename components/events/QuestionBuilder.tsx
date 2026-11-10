@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Icon from "@/components/events/Icon";
 import type { CustomField, FieldType } from "@/lib/events/types";
 import {
   COMMON_QUESTIONS,
@@ -160,7 +161,7 @@ export default function QuestionBuilder({
                   aria-label={`Move question ${i + 1} up`}
                   title="Move up"
                 >
-                  ↑
+                  <Icon name="up" />
                 </button>
                 <button
                   type="button"
@@ -170,7 +171,7 @@ export default function QuestionBuilder({
                   aria-label={`Move question ${i + 1} down`}
                   title="Move down"
                 >
-                  ↓
+                  <Icon name="down" />
                 </button>
                 <button
                   type="button"
@@ -235,7 +236,7 @@ export default function QuestionBuilder({
                       aria-label={`Remove option ${j + 1}`}
                       title="Remove option"
                     >
-                      ✕
+                      <Icon name="close" size={14} />
                     </button>
                   </div>
                 ))}

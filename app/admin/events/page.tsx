@@ -27,6 +27,7 @@ export default async function AdminHome() {
       <main className="container">
         <div className="page-head">
           <div>
+            <p className="ph-eyebrow">Event Planner</p>
             <h1>Events</h1>
             <div className="sub">
               Create an event, then copy its private link to send out.
