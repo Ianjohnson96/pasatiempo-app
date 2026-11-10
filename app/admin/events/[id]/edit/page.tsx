@@ -20,7 +20,7 @@ export default async function EditEventPage({
   return (
     <>
       <AppBar admin email={viewer.email} />
-      <main className="container">
+      <main className="container wide">
         <div className="page-head">
           <div>
             <h1>Edit event</h1>

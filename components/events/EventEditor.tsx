@@ -1,11 +1,30 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { saveEvent, type EventInput } from "@/lib/events/actions";
+import {
+  useCallback,
+  useDeferredValue,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { saveEvent } from "@/lib/events/actions";
 import RichTextField from "@/components/events/RichTextField";
 import QuestionBuilder from "@/components/events/QuestionBuilder";
+import TypeTiles from "@/components/events/editor/TypeTiles";
+import EditorSteps from "@/components/events/editor/EditorSteps";
+import {
+  PreviewOverlay,
+  PreviewPanel,
+} from "@/components/events/editor/EditorPreview";
 import { formatSlot } from "@/lib/events/format";
+import {
+  buildEventInput,
+  editorError,
+  previewEvent,
+  typeRules,
+  type EditorState,
+} from "@/lib/events/editor";
 import type {
   CustomField,
   EventRec,
@@ -22,9 +41,6 @@ function toLocalInput(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
     d.getHours(),
   )}:${pad(d.getMinutes())}`;
-}
-function fromLocalInput(v: string): string | null {
-  return v ? new Date(v).toISOString() : null;
 }
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -43,9 +59,43 @@ function slugPreview(s: string) {
     .slice(0, 60);
 }
 
+// true once hydrated: the preview formats dates in the browser's time zone, so
+// it renders on the client only.
+const noopSubscribe = () => () => {};
+function useHydrated() {
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
+}
+
+function SectionHead({
+  n,
+  title,
+  sub,
+}: {
+  n: number;
+  title: string;
+  sub: string;
+}) {
+  return (
+    <header className="editor-sec-head">
+      <span className="editor-sec-num" aria-hidden>
+        {n}
+      </span>
+      <div>
+        <h2>{title}</h2>
+        <p>{sub}</p>
+      </div>
+    </header>
+  );
+}
+
 export default function EventEditor({ event }: { event?: EventRec }) {
   const router = useRouter();
   const editing = !!event;
+  const hydrated = useHydrated();
 
   const [title, setTitle] = useState(event?.title ?? "");
   const [slug, setSlug] = useState(event?.slug ?? "");
@@ -110,6 +160,8 @@ export default function EventEditor({ event }: { event?: EventRec }) {
   const [status, setStatus] = useState(event?.status ?? "open");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const closePreview = useCallback(() => setPreviewOpen(false), []);
 
   // recurring generator state
   const [genDate, setGenDate] = useState("");
@@ -117,6 +169,50 @@ export default function EventEditor({ event }: { event?: EventRec }) {
   const [genEnd, setGenEnd] = useState("");
   const [genWeeks, setGenWeeks] = useState("4");
   const [genCap, setGenCap] = useState("");
+
+  const rules = typeRules(type);
+  const isSlots = rules.slots && scheduleMode === "slots";
+
+  const state: EditorState = {
+    title,
+    slug,
+    type,
+    description,
+    info,
+    location,
+    scheduleMode,
+    startsAt,
+    endsAt,
+    allowMultiSlot,
+    slotsPrompt,
+    slots,
+    hasCapacity,
+    capacity,
+    waitlistEnabled,
+    hasRosterLimit,
+    rosterLimit,
+    allowGuests,
+    maxGuests,
+    collectGuestNames,
+    inviteOnly,
+    allowlistText,
+    inviteOnlyMessage,
+    pricingEnabled,
+    pricing,
+    fields,
+    showRoster,
+    rosterStyle,
+    managersText,
+    status,
+  };
+
+  // The preview lags a keystroke behind under load rather than slowing typing.
+  const deferred = useDeferredValue(state);
+  const preview = useMemo(
+    () => previewEvent(buildEventInput(deferred)),
+    [deferred],
+  );
+  const publicHref = event ? `/events/e/${event.slug}` : null;
 
   // ---- slots ----
   function addSlot() {
@@ -161,51 +257,13 @@ export default function EventEditor({ event }: { event?: EventRec }) {
 
   async function submit() {
     setError("");
-    if (!title.trim()) {
-      setError("Please give the event a title.");
-      return;
-    }
-    if (scheduleMode === "slots" && slots.length === 0) {
-      setError("Add at least one date/time slot, or switch to a single date.");
+    const problem = editorError(state);
+    if (problem) {
+      setError(problem);
       return;
     }
     setSaving(true);
-    const input: EventInput = {
-      id: event?.id,
-      slug: slug.trim(),
-      title,
-      type,
-      description,
-      info,
-      location,
-      startsAt: scheduleMode === "single" ? fromLocalInput(startsAt) : null,
-      endsAt: scheduleMode === "single" ? fromLocalInput(endsAt) : null,
-      scheduleMode,
-      allowMultiSlot: scheduleMode === "slots" ? allowMultiSlot : false,
-      slotsPrompt,
-      slots,
-      capacity:
-        scheduleMode === "single" && hasCapacity
-          ? Math.max(1, parseInt(capacity, 10) || 1)
-          : null,
-      rosterLimit: hasRosterLimit
-        ? Math.max(1, parseInt(rosterLimit, 10) || 1)
-        : null,
-      waitlistEnabled,
-      allowGuests,
-      maxGuests: allowGuests ? Math.max(1, parseInt(maxGuests, 10) || 1) : null,
-      collectGuestNames: allowGuests && collectGuestNames,
-      inviteOnly,
-      allowlist: inviteOnly ? allowlistText.split(/[\n,;]+/) : [],
-      inviteOnlyMessage: inviteOnly ? inviteOnlyMessage : "",
-      customFields: fields,
-      pricingEnabled,
-      pricing,
-      showRoster,
-      rosterStyle,
-      managers: managersText.split(/[\n,;]+/),
-      status,
-    };
+    const input = buildEventInput(state, event?.id);
     try {
       const res = await saveEvent(input);
       if (!res.ok) {
@@ -221,612 +279,674 @@ export default function EventEditor({ event }: { event?: EventRec }) {
     }
   }
 
-  return (
-    <div className="stack">
-      {error && <div className="notice err">{error}</div>}
+  const switchingTournament =
+    editing && (event.type === "tournament") !== rules.tournament;
 
-      <div className="card">
-        <div className="section-title">Event details</div>
-        <div className="field">
-          <label>
-            Title <span className="req">*</span>
-          </label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Member Twilight Dinner"
+  return (
+    <div className="editor-shell">
+      <EditorSteps />
+
+      <div className="editor-main">
+        {/* 1. Details */}
+        <section id="details" className="card editor-section">
+          <SectionHead
+            n={1}
+            title="Details"
+            sub="What kind of event it is, and what members read first."
           />
-        </div>
-        <div className="field">
-          <label>Custom link {editing ? "" : "(optional)"}</label>
-          <div className="hint">
-            The web address people use to register. Letters, numbers and hyphens
-            only.
+          <div className="field">
+            <label>Type</label>
+            <TypeTiles value={type} onChange={setType} />
+            {switchingTournament && (
+              <div className="notice warn" style={{ marginTop: 10 }}>
+                Switching to or from <strong>Tournament</strong> changes how
+                entries are stored. Only do this before anyone has registered.
+              </div>
+            )}
           </div>
-          <div
-            className="sharebox"
-            style={{ borderStyle: "solid", background: "#fff" }}
-          >
-            <span className="muted" style={{ fontSize: 13, whiteSpace: "nowrap" }}>
-              …/events/e/
-            </span>
+          <div className="field">
+            <label>
+              Title <span className="req">*</span>
+            </label>
             <input
               type="text"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              placeholder={editing ? "" : "auto-generated if left blank"}
-              style={{ border: "none", boxShadow: "none", padding: "4px 6px" }}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={
+                rules.tournament
+                  ? "e.g. Member-Guest Invitational"
+                  : "e.g. Member Twilight Dinner"
+              }
             />
           </div>
-          {slug.trim() && (
-            <div className="hint" style={{ marginTop: 6 }}>
-              Your link will be <strong>…/events/e/{slugPreview(slug)}</strong>
+          <div className="field">
+            <label>Custom link {editing ? "" : "(optional)"}</label>
+            <div className="hint">
+              The web address people use to register. Letters, numbers and
+              hyphens only.
+            </div>
+            <div
+              className="sharebox"
+              style={{ borderStyle: "solid", background: "#fff" }}
+            >
+              <span className="muted" style={{ fontSize: 13, whiteSpace: "nowrap" }}>
+                …/events/e/
+              </span>
+              <input
+                type="text"
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                placeholder={editing ? "" : "auto-generated if left blank"}
+                style={{ border: "none", boxShadow: "none", padding: "4px 6px" }}
+              />
+            </div>
+            {slug.trim() && (
+              <div className="hint" style={{ marginTop: 6 }}>
+                Your link will be <strong>…/events/e/{slugPreview(slug)}</strong>
+              </div>
+            )}
+          </div>
+          <div className="field">
+            <label>Description</label>
+            <div className="hint">
+              Shown at the top of the registration page. Menu, agenda, what to
+              bring, etc.
+            </div>
+            <RichTextField
+              value={description}
+              onChange={setDescription}
+              placeholder="Tell guests what to expect…"
+            />
+          </div>
+          <div className="field">
+            <label>What to know (optional)</label>
+            <div className="hint">
+              Shown as its own section on the page — what to bring, dress code,
+              parking, arrival time, etc.
+            </div>
+            <RichTextField
+              value={info}
+              onChange={setInfo}
+              placeholder="e.g. Arrive 15 minutes early. Soft spikes required. Balls provided."
+            />
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Location</label>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. The Hollins House"
+            />
+          </div>
+        </section>
+
+        {/* 2. Schedule */}
+        <section id="schedule" className="card editor-section">
+          <SectionHead
+            n={2}
+            title="Schedule"
+            sub={
+              rules.tournament
+                ? "One date, and how many teams can enter."
+                : "When it happens and how many people can come."
+            }
+          />
+          {rules.scheduleSwitch && (
+            <div className="seg" style={{ marginBottom: 16 }}>
+              <label className={`segbtn ${scheduleMode === "single" ? "on" : ""}`}>
+                <input
+                  type="radio"
+                  name="smode"
+                  checked={scheduleMode === "single"}
+                  onChange={() => setScheduleMode("single")}
+                />
+                One date / time
+              </label>
+              <label className={`segbtn ${scheduleMode === "slots" ? "on" : ""}`}>
+                <input
+                  type="radio"
+                  name="smode"
+                  checked={scheduleMode === "slots"}
+                  onChange={() => setScheduleMode("slots")}
+                />
+                Multiple dates / time slots
+              </label>
             </div>
           )}
-        </div>
-        <div className="field">
-          <label>Type</label>
-          <select value={type} onChange={(e) => setType(e.target.value as EventType)}>
-            <option value="dinner">Dinner / Social</option>
-            <option value="clinic">Clinic / Lesson</option>
-            <option value="general">General</option>
-          </select>
-        </div>
-        <div className="field">
-          <label>Description</label>
-          <div className="hint">
-            Shown at the top of the registration page. Menu, agenda, what to
-            bring, etc.
-          </div>
-          <RichTextField
-            value={description}
-            onChange={setDescription}
-            placeholder="Tell guests what to expect…"
-          />
-        </div>
-        <div className="field">
-          <label>What to know (optional)</label>
-          <div className="hint">
-            Shown as its own section on the page — what to bring, dress code,
-            parking, arrival time, etc.
-          </div>
-          <RichTextField
-            value={info}
-            onChange={setInfo}
-            placeholder="e.g. Arrive 15 minutes early. Soft spikes required. Balls provided."
-          />
-        </div>
-        <div className="field" style={{ marginBottom: 0 }}>
-          <label>Location</label>
-          <input
-            type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="e.g. The Hollins House"
-          />
-        </div>
-      </div>
 
-      {/* Schedule */}
-      <div className="card">
-        <div className="section-title">Schedule</div>
-        <div className="seg" style={{ marginBottom: 16 }}>
-          <label className={`segbtn ${scheduleMode === "single" ? "on" : ""}`}>
-            <input
-              type="radio"
-              name="smode"
-              checked={scheduleMode === "single"}
-              onChange={() => setScheduleMode("single")}
-            />
-            One date / time
-          </label>
-          <label className={`segbtn ${scheduleMode === "slots" ? "on" : ""}`}>
-            <input
-              type="radio"
-              name="smode"
-              checked={scheduleMode === "slots"}
-              onChange={() => setScheduleMode("slots")}
-            />
-            Multiple dates / time slots
-          </label>
-        </div>
-
-        {scheduleMode === "single" ? (
-          <>
-            <div className="row">
-              <div className="field">
-                <label>Starts</label>
-                <input
-                  type="datetime-local"
-                  value={startsAt}
-                  onChange={(e) => setStartsAt(e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label>Ends (optional)</label>
-                <input
-                  type="datetime-local"
-                  value={endsAt}
-                  onChange={(e) => setEndsAt(e.target.value)}
-                />
-              </div>
-            </div>
-            <label className="check" style={{ marginBottom: 12 }}>
-              <input
-                type="checkbox"
-                checked={hasCapacity}
-                onChange={(e) => setHasCapacity(e.target.checked)}
-              />
-              <span>
-                <span className="ck-label">Limit the number of spots</span>
-                <br />
-                <span className="ck-hint">
-                  Registration closes when full. Leave off for unlimited.
-                </span>
-              </span>
-            </label>
-            {hasCapacity && (
-              <div className="row" style={{ marginBottom: 12 }}>
-                <div className="field" style={{ marginBottom: 0, maxWidth: 200 }}>
-                  <label>Total spots</label>
+          {!isSlots ? (
+            <>
+              <div className="row">
+                <div className="field">
+                  <label>Starts</label>
                   <input
-                    type="number"
-                    min={1}
-                    value={capacity}
-                    onChange={(e) => setCapacity(e.target.value)}
+                    type="datetime-local"
+                    value={startsAt}
+                    onChange={(e) => setStartsAt(e.target.value)}
+                  />
+                </div>
+                <div className="field">
+                  <label>Ends (optional)</label>
+                  <input
+                    type="datetime-local"
+                    value={endsAt}
+                    onChange={(e) => setEndsAt(e.target.value)}
                   />
                 </div>
               </div>
-            )}
-          </>
-        ) : (
-          <>
-            <p className="hint" style={{ marginTop: -4 }}>
-              Each slot has its own date, time and capacity — the SignUpGenius
-              style. Use the generator for a recurring series, or add slots one
-              at a time.
-            </p>
+              <label className="check" style={{ marginBottom: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={hasCapacity}
+                  onChange={(e) => setHasCapacity(e.target.checked)}
+                />
+                <span>
+                  <span className="ck-label">{rules.capacityToggle}</span>
+                  <br />
+                  <span className="ck-hint">{rules.capacityHint}</span>
+                </span>
+              </label>
+              {hasCapacity && (
+                <div className="row" style={{ marginBottom: 12 }}>
+                  <div className="field" style={{ marginBottom: 0, maxWidth: 200 }}>
+                    <label htmlFor="ev-capacity">{rules.capacityLabel}</label>
+                    <input
+                      id="ev-capacity"
+                      type="number"
+                      min={1}
+                      value={capacity}
+                      onChange={(e) => setCapacity(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="hint" style={{ marginTop: -4 }}>
+                Each slot has its own date, time and capacity — the SignUpGenius
+                style. Use the generator for a recurring series, or add slots one
+                at a time.
+              </p>
 
-            <div className="field">
-              <label>Instruction above the dates (optional)</label>
-              <div className="hint">
-                Shown to registrants right above the date picker.
-              </div>
-              <input
-                type="text"
-                value={slotsPrompt}
-                onChange={(e) => setSlotsPrompt(e.target.value)}
-                placeholder="e.g. Please choose all the dates you can attend"
-              />
-            </div>
-
-            {/* recurring generator */}
-            <div
-              style={{
-                border: "1px solid var(--line)",
-                borderRadius: 10,
-                padding: 14,
-                marginBottom: 14,
-                background: "var(--green-tint)",
-              }}
-            >
-              <div style={{ fontWeight: 600, marginBottom: 8 }}>
-                ↻ Generate a recurring weekly series
-              </div>
-              <div className="builder-row">
-                <input
-                  type="date"
-                  value={genDate}
-                  onChange={(e) => setGenDate(e.target.value)}
-                  title="First date"
-                />
-                <input
-                  type="time"
-                  value={genStart}
-                  onChange={(e) => setGenStart(e.target.value)}
-                  title="Start time"
-                />
-                <input
-                  type="time"
-                  value={genEnd}
-                  onChange={(e) => setGenEnd(e.target.value)}
-                  title="End time (optional)"
-                />
-                <input
-                  type="number"
-                  min={1}
-                  max={52}
-                  value={genWeeks}
-                  onChange={(e) => setGenWeeks(e.target.value)}
-                  placeholder="# weeks"
-                  style={{ maxWidth: 90 }}
-                  title="Number of weeks"
-                />
-                <input
-                  type="number"
-                  min={1}
-                  value={genCap}
-                  onChange={(e) => setGenCap(e.target.value)}
-                  placeholder="Spots ea."
-                  style={{ maxWidth: 100 }}
-                  title="Capacity per date"
-                />
-                <button
-                  type="button"
-                  className="btn small"
-                  onClick={generateWeekly}
-                >
-                  Generate
-                </button>
-              </div>
-            </div>
-
-            {slots.map((s) => (
-              <div
-                key={s.id}
-                style={{
-                  border: "1px solid var(--line)",
-                  borderRadius: 10,
-                  padding: 10,
-                  marginBottom: 8,
-                }}
-              >
-                <div className="builder-row" style={{ marginBottom: 6 }}>
-                <input
-                  type="date"
-                  value={s.date ?? ""}
-                  onChange={(e) => updSlot(s.id, { date: e.target.value })}
-                  title="Date"
-                />
-                <input
-                  type="time"
-                  value={s.startTime}
-                  onChange={(e) => updSlot(s.id, { startTime: e.target.value })}
-                  title="Start"
-                />
-                <input
-                  type="time"
-                  value={s.endTime}
-                  onChange={(e) => updSlot(s.id, { endTime: e.target.value })}
-                  title="End"
-                />
-                <input
-                  type="text"
-                  value={s.label}
-                  onChange={(e) => updSlot(s.id, { label: e.target.value })}
-                  placeholder="Label (optional)"
-                  style={{ flex: 2 }}
-                />
-                <input
-                  type="number"
-                  min={1}
-                  value={s.capacity ?? ""}
-                  onChange={(e) =>
-                    updSlot(s.id, {
-                      capacity: e.target.value
-                        ? Math.max(1, parseInt(e.target.value, 10))
-                        : null,
-                    })
-                  }
-                  placeholder="Spots"
-                  style={{ maxWidth: 90 }}
-                />
-                <button
-                  type="button"
-                  className="btn ghost small"
-                  onClick={() => rmSlot(s.id)}
-                >
-                  ✕
-                </button>
+              <div className="field">
+                <label>Instruction above the dates (optional)</label>
+                <div className="hint">
+                  Shown to registrants right above the date picker.
                 </div>
                 <input
                   type="text"
-                  value={s.note ?? ""}
-                  maxLength={80}
-                  onChange={(e) => updSlot(s.id, { note: e.target.value })}
-                  placeholder="Short note — what we're doing this session (e.g. Chipping & bunkers)"
+                  value={slotsPrompt}
+                  onChange={(e) => setSlotsPrompt(e.target.value)}
+                  placeholder="e.g. Please choose all the dates you can attend"
                 />
-                <div className="hint" style={{ marginTop: 4 }}>
-                  {(s.note ?? "").length}/80 — shown in the middle of the schedule
+              </div>
+
+              {/* recurring generator */}
+              <div className="editor-generator">
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>
+                  ↻ Generate a recurring weekly series
+                </div>
+                <div className="builder-row">
+                  <input
+                    type="date"
+                    value={genDate}
+                    onChange={(e) => setGenDate(e.target.value)}
+                    title="First date"
+                  />
+                  <input
+                    type="time"
+                    value={genStart}
+                    onChange={(e) => setGenStart(e.target.value)}
+                    title="Start time"
+                  />
+                  <input
+                    type="time"
+                    value={genEnd}
+                    onChange={(e) => setGenEnd(e.target.value)}
+                    title="End time (optional)"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={52}
+                    value={genWeeks}
+                    onChange={(e) => setGenWeeks(e.target.value)}
+                    placeholder="# weeks"
+                    style={{ maxWidth: 90 }}
+                    title="Number of weeks"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    value={genCap}
+                    onChange={(e) => setGenCap(e.target.value)}
+                    placeholder="Spots ea."
+                    style={{ maxWidth: 100 }}
+                    title="Capacity per date"
+                  />
+                  <button
+                    type="button"
+                    className="btn small"
+                    onClick={generateWeekly}
+                  >
+                    Generate
+                  </button>
                 </div>
               </div>
-            ))}
-            <button type="button" className="btn secondary small" onClick={addSlot}>
-              + Add a slot
-            </button>
 
-            <div className="divider" />
-            <label className="check" style={{ marginBottom: 10 }}>
-              <input
-                type="checkbox"
-                checked={allowMultiSlot}
-                onChange={(e) => setAllowMultiSlot(e.target.checked)}
-              />
-              <span>
-                <span className="ck-label">
-                  Let people sign up for more than one
+              {slots.map((s) => (
+                <div key={s.id} className="editor-slot">
+                  <div className="builder-row" style={{ marginBottom: 6 }}>
+                    <input
+                      type="date"
+                      value={s.date ?? ""}
+                      onChange={(e) => updSlot(s.id, { date: e.target.value })}
+                      title="Date"
+                    />
+                    <input
+                      type="time"
+                      value={s.startTime}
+                      onChange={(e) => updSlot(s.id, { startTime: e.target.value })}
+                      title="Start"
+                    />
+                    <input
+                      type="time"
+                      value={s.endTime}
+                      onChange={(e) => updSlot(s.id, { endTime: e.target.value })}
+                      title="End"
+                    />
+                    <input
+                      type="text"
+                      value={s.label}
+                      onChange={(e) => updSlot(s.id, { label: e.target.value })}
+                      placeholder="Label (optional)"
+                      style={{ flex: 2 }}
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      value={s.capacity ?? ""}
+                      onChange={(e) =>
+                        updSlot(s.id, {
+                          capacity: e.target.value
+                            ? Math.max(1, parseInt(e.target.value, 10))
+                            : null,
+                        })
+                      }
+                      placeholder="Spots"
+                      style={{ maxWidth: 90 }}
+                    />
+                    <button
+                      type="button"
+                      className="btn ghost small"
+                      onClick={() => rmSlot(s.id)}
+                      aria-label="Remove slot"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={s.note ?? ""}
+                    maxLength={80}
+                    onChange={(e) => updSlot(s.id, { note: e.target.value })}
+                    placeholder="Short note — what we're doing this session (e.g. Chipping & bunkers)"
+                  />
+                  <div className="hint" style={{ marginTop: 4 }}>
+                    {(s.note ?? "").length}/80 — shown in the middle of the schedule
+                  </div>
+                </div>
+              ))}
+              <button type="button" className="btn secondary small" onClick={addSlot}>
+                + Add a slot
+              </button>
+              {slots.length > 0 && (
+                <p className="muted" style={{ fontSize: 13, margin: "10px 0 0" }}>
+                  {slots.map((s) => formatSlot(s)).slice(0, 3).join("  •  ")}
+                  {slots.length > 3 ? `  • +${slots.length - 3} more` : ""}
+                </p>
+              )}
+
+              <div className="divider" />
+              <label className="check" style={{ marginBottom: 10 }}>
+                <input
+                  type="checkbox"
+                  checked={allowMultiSlot}
+                  onChange={(e) => setAllowMultiSlot(e.target.checked)}
+                />
+                <span>
+                  <span className="ck-label">
+                    Let people sign up for more than one
+                  </span>
+                  <br />
+                  <span className="ck-hint">
+                    On for a recurring series (pick the dates you&apos;ll attend);
+                    off to choose exactly one.
+                  </span>
                 </span>
-                <br />
-                <span className="ck-hint">
-                  On for a recurring series (pick the dates you&apos;ll attend);
-                  off to choose exactly one.
+              </label>
+            </>
+          )}
+
+          {rules.rosterCap && (
+            <>
+              <label className="check" style={{ marginBottom: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={hasRosterLimit}
+                  onChange={(e) => setHasRosterLimit(e.target.checked)}
+                />
+                <span>
+                  <span className="ck-label">Cap the total program roster</span>
+                  <br />
+                  <span className="ck-hint">
+                    Limits how many <strong>different people</strong> can enroll
+                    across the whole event. Someone who signs up counts once no
+                    matter how many dates they pick, and can still add more dates
+                    after the cap is hit — but new people are turned away when
+                    it&apos;s full. Separate from the per-date spots above.
+                  </span>
                 </span>
+              </label>
+              {hasRosterLimit && (
+                <div className="row" style={{ marginBottom: 12 }}>
+                  <div className="field" style={{ marginBottom: 0, maxWidth: 200 }}>
+                    <label>Max people on roster</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={rosterLimit}
+                      onChange={(e) => setRosterLimit(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={waitlistEnabled}
+              onChange={(e) => setWaitlistEnabled(e.target.checked)}
+            />
+            <span>
+              <span className="ck-label">Enable waitlist when full</span>
+              <br />
+              <span className="ck-hint">
+                {rules.tournament
+                  ? "Extra teams are collected as a waitlist instead of being turned away."
+                  : "Extra sign-ups are collected as a waitlist instead of being turned away."}
               </span>
-            </label>
-          </>
-        )}
-
-        <label className="check" style={{ marginBottom: 12 }}>
-          <input
-            type="checkbox"
-            checked={hasRosterLimit}
-            onChange={(e) => setHasRosterLimit(e.target.checked)}
-          />
-          <span>
-            <span className="ck-label">Cap the total program roster</span>
-            <br />
-            <span className="ck-hint">
-              Limits how many <strong>different people</strong> can enroll across
-              the whole event. Someone who signs up counts once no matter how many
-              dates they pick, and can still add more dates after the cap is hit —
-              but new people are turned away when it&apos;s full. Separate from the
-              per-date spots above.
             </span>
-          </span>
-        </label>
-        {hasRosterLimit && (
-          <div className="row" style={{ marginBottom: 12 }}>
-            <div className="field" style={{ marginBottom: 0, maxWidth: 200 }}>
-              <label>Max people on roster</label>
-              <input
-                type="number"
-                min={1}
-                value={rosterLimit}
-                onChange={(e) => setRosterLimit(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
+          </label>
+        </section>
 
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={waitlistEnabled}
-            onChange={(e) => setWaitlistEnabled(e.target.checked)}
+        {/* 3. Players & Questions */}
+        <section id="questions" className="card editor-section">
+          <SectionHead
+            n={3}
+            title="Players & Questions"
+            sub={
+              rules.tournament
+                ? "Every entry is a Member + Guest team. Add anything else you need to ask."
+                : "Guests, and anything else you want to ask."
+            }
           />
-          <span>
-            <span className="ck-label">Enable waitlist when full</span>
-            <br />
-            <span className="ck-hint">
-              Extra sign-ups are collected as a waitlist instead of being turned
-              away.
-            </span>
-          </span>
-        </label>
-      </div>
-
-      {/* Guests */}
-      <div className="card">
-        <div className="section-title">Guests</div>
-        <label className="check" style={{ marginBottom: 12 }}>
-          <input
-            type="checkbox"
-            checked={allowGuests}
-            onChange={(e) => setAllowGuests(e.target.checked)}
-          />
-          <span>
-            <span className="ck-label">Allow registrants to bring guests</span>
-            <br />
-            <span className="ck-hint">
-              Each guest counts toward the capacity.
-            </span>
-          </span>
-        </label>
-        {allowGuests && (
-          <>
-            <div className="row" style={{ marginBottom: 12 }}>
-              <div className="field" style={{ marginBottom: 0, maxWidth: 260 }}>
-                <label>Max additional guests per registration</label>
+          {rules.guests && (
+            <div className="editor-block">
+              <h3 className="editor-sub">Guests</h3>
+              <label className="check" style={{ marginBottom: 12 }}>
                 <input
-                  type="number"
-                  min={1}
-                  value={maxGuests}
-                  onChange={(e) => setMaxGuests(e.target.value)}
+                  type="checkbox"
+                  checked={allowGuests}
+                  onChange={(e) => setAllowGuests(e.target.checked)}
                 />
-              </div>
+                <span>
+                  <span className="ck-label">Allow registrants to bring guests</span>
+                  <br />
+                  <span className="ck-hint">
+                    Each guest counts toward the capacity.
+                  </span>
+                </span>
+              </label>
+              {allowGuests && (
+                <>
+                  <div className="row" style={{ marginBottom: 12 }}>
+                    <div className="field" style={{ marginBottom: 0, maxWidth: 260 }}>
+                      <label>Max additional guests per registration</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={maxGuests}
+                        onChange={(e) => setMaxGuests(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={collectGuestNames}
+                      onChange={(e) => setCollectGuestNames(e.target.checked)}
+                    />
+                    <span className="ck-label">Ask for each guest&apos;s name</span>
+                  </label>
+                </>
+              )}
             </div>
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={collectGuestNames}
-                onChange={(e) => setCollectGuestNames(e.target.checked)}
-              />
-              <span className="ck-label">Ask for each guest&apos;s name</span>
-            </label>
-          </>
-        )}
-      </div>
-
-      {/* Pricing */}
-      <div className="card">
-        <div className="section-title">Pricing</div>
-        <label className="check" style={{ marginBottom: 12 }}>
-          <input
-            type="checkbox"
-            checked={pricingEnabled}
-            onChange={(e) => setPricingEnabled(e.target.checked)}
-          />
-          <span>
-            <span className="ck-label">Show a pricing section</span>
-            <br />
-            <span className="ck-hint">
-              Displays a Pricing block on the event page. (Sign-ups stay free —
-              this is for display only.)
-            </span>
-          </span>
-        </label>
-        {pricingEnabled && (
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label>Pricing details</label>
-            <div className="hint">
-              One item per line, e.g. &quot;Members — $40&quot; / &quot;Guests —
-              $55&quot;. Add any notes about how to pay.
-            </div>
-            <textarea
-              value={pricing}
-              onChange={(e) => setPricing(e.target.value)}
-              placeholder={"Members — $40\nGuests — $55\nBilled to your member account"}
+          )}
+          <div className="editor-block">
+            <h3 className="editor-sub">Questions</h3>
+            <p className="hint" style={{ marginTop: -4 }}>
+              {rules.tournament
+                ? "Shirt size, dietary notes, cart preference — ask each player, or the team once."
+                : "Meal choice, dietary notes, skill level — anything else you want to ask."}
+            </p>
+            <QuestionBuilder
+              fields={fields}
+              onChange={setFields}
+              tournament={rules.tournament}
             />
           </div>
-        )}
-      </div>
+        </section>
 
-      {/* Custom questions */}
-      <div className="card">
-        <div className="section-title">Custom questions</div>
-        <p className="hint" style={{ marginTop: -4 }}>
-          Meal choice, dietary notes, skill level — anything else you want to
-          ask.
-        </p>
-        <QuestionBuilder
-          fields={fields}
-          onChange={setFields}
-          tournament={type === "tournament"}
-        />
-      </div>
-
-      {/* Roster */}
-      <div className="card">
-        <div className="section-title">Roster (who&apos;s coming)</div>
-        <label className="check" style={{ marginBottom: 12 }}>
-          <input
-            type="checkbox"
-            checked={showRoster}
-            onChange={(e) => setShowRoster(e.target.checked)}
+        {/* 4. Pricing */}
+        <section id="pricing" className="card editor-section">
+          <SectionHead
+            n={4}
+            title="Pricing"
+            sub="An optional price list on the event page. Sign-ups stay free."
           />
-          <span>
-            <span className="ck-label">Show the roster on the public page</span>
-            <br />
-            <span className="ck-hint">
-              Let registrants see who else has signed up. Off keeps it private
-              (only you see it).
+          <label className="check" style={{ marginBottom: pricingEnabled ? 12 : 0 }}>
+            <input
+              type="checkbox"
+              checked={pricingEnabled}
+              onChange={(e) => setPricingEnabled(e.target.checked)}
+            />
+            <span>
+              <span className="ck-label">Show a pricing section</span>
+              <br />
+              <span className="ck-hint">
+                Displays a Pricing block on the event page. (Sign-ups stay free —
+                this is for display only.)
+              </span>
             </span>
-          </span>
-        </label>
-        {showRoster && (
-          <div className="field" style={{ marginBottom: 0, maxWidth: 320 }}>
-            <label>How names appear</label>
-            <select
-              value={rosterStyle}
-              onChange={(e) => setRosterStyle(e.target.value as RosterStyle)}
-            >
-              <option value="first_initial">First name + last initial</option>
-              <option value="first_last">Full name</option>
-              <option value="count_only">Just a count (no names)</option>
-            </select>
-          </div>
-        )}
-      </div>
-
-      {/* Access */}
-      <div className="card">
-        <div className="section-title">Access</div>
-        <label className="check" style={{ marginBottom: 12 }}>
-          <input
-            type="checkbox"
-            checked={inviteOnly}
-            onChange={(e) => setInviteOnly(e.target.checked)}
-          />
-          <span>
-            <span className="ck-label">Invite-only (email allowlist)</span>
-            <br />
-            <span className="ck-hint">
-              Only the email addresses you list can register, even if the link
-              is forwarded.
-            </span>
-          </span>
-        </label>
-        {inviteOnly && (
-          <>
-            <div className="field">
-              <label>Allowed emails</label>
-              <div className="hint">One per line (or comma-separated).</div>
-              <textarea
-                value={allowlistText}
-                onChange={(e) => setAllowlistText(e.target.value)}
-                placeholder={"jane@example.com\njohn@example.com"}
-              />
-            </div>
+          </label>
+          {pricingEnabled && (
             <div className="field" style={{ marginBottom: 0 }}>
-              <label>Message when someone isn&apos;t on the list (optional)</label>
+              <label>Pricing details</label>
               <div className="hint">
-                Shown to anyone who tries to register with an email that
-                isn&apos;t on your list. Leave blank for the default.
+                One item per line, e.g. &quot;Members — $40&quot; / &quot;Guests —
+                $55&quot;. Add any notes about how to pay.
               </div>
               <textarea
-                value={inviteOnlyMessage}
-                onChange={(e) => setInviteOnlyMessage(e.target.value)}
-                placeholder="e.g. This event is for Men's Club members only. Questions? Call the pro shop at (831) 459-9155."
+                value={pricing}
+                onChange={(e) => setPricing(e.target.value)}
+                placeholder={"Members — $40\nGuests — $55\nBilled to your member account"}
               />
             </div>
-          </>
-        )}
-      </div>
+          )}
+        </section>
 
-      {/* Managers */}
-      <div className="card">
-        <div className="section-title">Co-managers</div>
-        <div className="field" style={{ marginBottom: 0 }}>
-          <label>Manager emails</label>
-          <div className="hint">
-            One per line. They&apos;ll be able to manage this event once logins
-            are turned on (after deploy).
-          </div>
-          <textarea
-            value={managersText}
-            onChange={(e) => setManagersText(e.target.value)}
-            placeholder={"colleague@pasatiempo.com"}
+        {/* 5. Roster */}
+        <section id="roster" className="card editor-section">
+          <SectionHead
+            n={5}
+            title="Roster"
+            sub="Whether members can see who's coming."
           />
+          <label className="check" style={{ marginBottom: showRoster ? 12 : 0 }}>
+            <input
+              type="checkbox"
+              checked={showRoster}
+              onChange={(e) => setShowRoster(e.target.checked)}
+            />
+            <span>
+              <span className="ck-label">Show the roster on the public page</span>
+              <br />
+              <span className="ck-hint">
+                Let registrants see who else has signed up. Off keeps it private
+                (only you see it).
+              </span>
+            </span>
+          </label>
+          {showRoster && (
+            <div className="field" style={{ marginBottom: 0, maxWidth: 320 }}>
+              <label>How names appear</label>
+              <select
+                value={rosterStyle}
+                onChange={(e) => setRosterStyle(e.target.value as RosterStyle)}
+              >
+                <option value="first_initial">First name + last initial</option>
+                <option value="first_last">Full name</option>
+                <option value="count_only">Just a count (no names)</option>
+              </select>
+            </div>
+          )}
+        </section>
+
+        {/* 6. Access */}
+        <section id="access" className="card editor-section">
+          <SectionHead n={6} title="Access" sub="Who is allowed to register." />
+          <label className="check" style={{ marginBottom: inviteOnly ? 12 : 0 }}>
+            <input
+              type="checkbox"
+              checked={inviteOnly}
+              onChange={(e) => setInviteOnly(e.target.checked)}
+            />
+            <span>
+              <span className="ck-label">Invite-only (email allowlist)</span>
+              <br />
+              <span className="ck-hint">
+                Only the email addresses you list can register, even if the link
+                is forwarded.
+              </span>
+            </span>
+          </label>
+          {inviteOnly && (
+            <>
+              <div className="field">
+                <label>Allowed emails</label>
+                <div className="hint">One per line (or comma-separated).</div>
+                <textarea
+                  value={allowlistText}
+                  onChange={(e) => setAllowlistText(e.target.value)}
+                  placeholder={"jane@example.com\njohn@example.com"}
+                />
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Message when someone isn&apos;t on the list (optional)</label>
+                <div className="hint">
+                  Shown to anyone who tries to register with an email that
+                  isn&apos;t on your list. Leave blank for the default.
+                </div>
+                <textarea
+                  value={inviteOnlyMessage}
+                  onChange={(e) => setInviteOnlyMessage(e.target.value)}
+                  placeholder="e.g. This event is for Men's Club members only. Questions? Call the pro shop at (831) 459-9155."
+                />
+              </div>
+            </>
+          )}
+        </section>
+
+        {/* 7. Publish */}
+        <section id="publish" className="card editor-section">
+          <SectionHead
+            n={7}
+            title="Publish"
+            sub="Whether sign-ups are open, and who else can manage the event."
+          />
+          <div className="field" style={{ maxWidth: 360 }}>
+            <label htmlFor="ev-status">Status</label>
+            <select
+              id="ev-status"
+              value={status}
+              onChange={(e) =>
+                setStatus(e.target.value as "draft" | "open" | "closed")
+              }
+            >
+              <option value="open">Open — accepting sign-ups</option>
+              <option value="draft">Draft — link works only for you</option>
+              <option value="closed">Closed — no new sign-ups</option>
+            </select>
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Co-managers</label>
+            <div className="hint">
+              One email per line. They&apos;ll be able to manage this event once
+              logins are turned on (after deploy).
+            </div>
+            <textarea
+              value={managersText}
+              onChange={(e) => setManagersText(e.target.value)}
+              placeholder={"colleague@pasatiempo.com"}
+            />
+          </div>
+        </section>
+
+        {/* the one save */}
+        <div className="editor-savebar">
+          {error && (
+            <div className="notice err" role="alert">
+              {error}
+            </div>
+          )}
+          <div className="editor-savebar-row">
+            <span className="editor-savebar-note">
+              All sections save together.
+            </span>
+            <button
+              type="button"
+              className="btn secondary editor-preview-btn"
+              onClick={() => setPreviewOpen(true)}
+            >
+              Preview
+            </button>
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={() => router.back()}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button className="btn" onClick={submit} disabled={saving}>
+              {saving ? "Saving…" : editing ? "Save changes" : "Create event"}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Status + save */}
-      <div className="card">
-        <div className="section-title">Status</div>
-        <div className="field" style={{ marginBottom: 0, maxWidth: 360 }}>
-          <select
-            value={status}
-            onChange={(e) =>
-              setStatus(e.target.value as "draft" | "open" | "closed")
-            }
-          >
-            <option value="open">Open — accepting sign-ups</option>
-            <option value="draft">Draft — link works only for you</option>
-            <option value="closed">Closed — no new sign-ups</option>
-          </select>
-        </div>
-      </div>
-
-      <div style={{ display: "flex", gap: 12 }}>
-        <button className="btn" onClick={submit} disabled={saving}>
-          {saving ? "Saving…" : editing ? "Save changes" : "Create event"}
-        </button>
-        <button
-          type="button"
-          className="btn secondary"
-          onClick={() => router.back()}
-          disabled={saving}
-        >
-          Cancel
-        </button>
-      </div>
-
-      {scheduleMode === "slots" && slots.length > 0 && (
-        <p className="muted" style={{ fontSize: 13 }}>
-          Preview: {slots.map((s) => formatSlot(s)).slice(0, 3).join("  •  ")}
-          {slots.length > 3 ? `  • +${slots.length - 3} more` : ""}
-        </p>
+      {hydrated && <PreviewPanel event={preview} publicHref={publicHref} />}
+      {hydrated && previewOpen && (
+        <PreviewOverlay
+          event={preview}
+          publicHref={publicHref}
+          onClose={closePreview}
+        />
       )}
     </div>
   );
