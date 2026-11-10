@@ -678,9 +678,13 @@ function TeamSummary({
   );
 }
 
+// A long label (usually an admin's question) sits over its answer instead of
+// squeezing into the label column.
+const LONG_LABEL = 24;
+
 function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="review-row">
+    <div className={`review-row${label.length > LONG_LABEL ? " long" : ""}`}>
       <dt>{label}</dt>
       <dd>{value || <span className="muted">—</span>}</dd>
     </div>

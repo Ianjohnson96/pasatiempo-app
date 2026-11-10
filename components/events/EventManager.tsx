@@ -653,9 +653,13 @@ export default function EventManager({
   );
 }
 
+// A long label (usually an admin's question) sits over its answer instead of
+// squeezing into the label column.
+const LONG_LABEL = 24;
+
 function TcRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="tc-row">
+    <div className={`tc-row${label.length > LONG_LABEL ? " long" : ""}`}>
       <dt>{label}</dt>
       <dd>{value.trim() || <span className="muted">—</span>}</dd>
     </div>

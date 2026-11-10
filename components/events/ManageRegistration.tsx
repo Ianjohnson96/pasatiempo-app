@@ -128,10 +128,14 @@ export function TeamRegistration({
   );
 }
 
+// A long label (usually an admin's question) sits over its answer instead of
+// squeezing into the label column.
+const LONG_LABEL = 24;
+
 function SummaryRow({ label, value }: { label: string; value: string }) {
   const v = value.trim();
   return (
-    <div className="review-row">
+    <div className={`review-row${label.length > LONG_LABEL ? " long" : ""}`}>
       <dt>{label}</dt>
       <dd>{v || <span className="muted">—</span>}</dd>
     </div>

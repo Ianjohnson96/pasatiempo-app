@@ -233,7 +233,10 @@ export default async function PublicEventPage({
                 if (!line.trim()) return null;
                 const parts = priceParts(line.trim());
                 return parts ? (
-                  <div className="price-line split" key={i}>
+                  <div
+                    className={`price-line split${parts[1].length <= 14 ? " short" : ""}`}
+                    key={i}
+                  >
                     <span className="pl-item">{parts[0]}</span>
                     <span className="pl-leader" aria-hidden="true" />
                     <span className="pl-amt">{parts[1]}</span>

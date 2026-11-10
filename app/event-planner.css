@@ -472,18 +472,22 @@
 .ep .field {
   margin-bottom: 22px;
 }
+/* every form field label, built-in or an admin's question: one quiet,
+   sentence-case style. Small caps are kept for card and section headers. */
 .ep .field > label:not(.check):not(.slot) {
   display: block;
   margin-bottom: 8px;
-  font-size: 11.5px;
+  font-family: var(--sans);
+  font-size: 14px;
   font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--muted);
+  line-height: 1.45;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
 }
 .ep .req {
   color: var(--brass-ink);
+  font-weight: 600;
 }
 .ep .field .hint,
 .ep .hint {
@@ -582,6 +586,10 @@
 .ep .slot input[type="radio"] {
   border-radius: 50%;
 }
+.ep .slot input {
+  margin: 0;
+  align-self: center;
+}
 .ep .check input[type="checkbox"]:checked,
 .ep .slot input[type="checkbox"]:checked,
 .ep td input[type="checkbox"]:checked {
@@ -606,15 +614,7 @@
   gap: 12px;
   font-size: 15px;
 }
-/* a custom question reads as a question: sentence case, not an eyebrow */
-.ep .field > label[id]:not(.check) {
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 1.45;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--ink);
-}
+
 .ep .check .ck-label {
   font-weight: 600;
 }
@@ -1376,7 +1376,9 @@
 
 /* ---- Registration forms -------------------------------------------------- */
 .ep .slot {
-  gap: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   min-height: 52px;
   padding: 12px 16px;
   border: 1px solid var(--hairline);
@@ -1520,6 +1522,30 @@
 .ep .tc-row dt {
   color: var(--muted);
   font-size: 13.5px;
+  line-height: 1.45;
+}
+.ep .review-row,
+.ep .review-teamqs .review-row {
+  grid-template-columns: minmax(112px, 40%) minmax(0, 1fr);
+  gap: 16px;
+}
+@media (min-width: 720px) {
+  /* full width: line the key column up with the player boxes above */
+  .ep .review-teamqs .review-row {
+    grid-template-columns: minmax(112px, calc((100% - 40px) / 2 * 0.4)) minmax(0, 1fr);
+  }
+}
+.ep .tc-row,
+.ep .tc-team .tc-row {
+  grid-template-columns: minmax(96px, 38%) minmax(0, 1fr);
+  gap: 14px;
+}
+.ep .review-row.long,
+.ep .review-teamqs .review-row.long,
+.ep .tc-row.long,
+.ep .tc-team .tc-row.long {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
 }
 .ep .review-row dd,
 .ep .tc-row dd {
@@ -2670,6 +2696,32 @@
   .ep .review-team.card {
     padding: 32px 22px 26px;
   }
+  .ep .review-row,
+  .ep .review-teamqs .review-row {
+    grid-template-columns: minmax(88px, 32%) minmax(0, 1fr);
+    gap: 12px;
+  }
+  .ep .review-row dd {
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+  /* stacked field pairs keep the same rhythm as single fields */
+  .ep .row:has(> .field) {
+    row-gap: 0;
+  }
+  .ep .slot {
+    padding: 10px 12px;
+  }
+  .ep .slot-cap {
+    margin-left: 4px;
+    padding-left: 10px;
+    font-size: 12.5px;
+  }
+  .ep .review-actions .btn {
+    padding: 0 12px;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
   .ep .manage-cta {
     grid-template-columns: 1fr;
     padding: 24px 20px;
@@ -2679,6 +2731,33 @@
   }
   .ep .slideshow .slide {
     height: 240px;
+  }
+  .ep .pricing-card .price-line.split {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  .ep .pricing-card .price-line.split .pl-leader {
+    display: none;
+  }
+  .ep .pricing-card .price-line.split .pl-amt {
+    max-width: none;
+    text-align: left;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  /* a short amount ("$2,400") stays on the item's line */
+  .ep .pricing-card .price-line.split.short {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .ep .pricing-card .price-line.split.short .pl-amt {
+    color: var(--ink);
+    font-weight: 500;
+    text-align: right;
+    white-space: nowrap;
   }
 
   /* admin */
