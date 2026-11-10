@@ -2114,3 +2114,197 @@ textarea {
     min-width: 0;
   }
 }
+
+/* ---- Tournament teams on the admin Manage page -------------------------- */
+.tc-stack {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+.team-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--green);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px 16px;
+  min-width: 0;
+}
+.team-card.waitlist {
+  border-left-color: var(--warn);
+}
+.team-card.cancelled {
+  border-left-color: var(--line);
+  opacity: 0.6;
+}
+.team-card.editing {
+  border: 1px solid var(--green);
+  background: var(--green-tint);
+  box-shadow: none;
+}
+.tc-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-bottom: 12px;
+}
+.tc-num {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--green-dark);
+}
+.tc-status {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #e3f7ec;
+  color: #136b3a;
+}
+.tc-status.waitlist {
+  background: #fff1df;
+  color: var(--warn);
+}
+.tc-status.cancelled {
+  background: #eef0ef;
+  color: var(--muted);
+}
+.flag-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #fff1df;
+  color: var(--warn);
+  border: 1px solid #f3d3a6;
+}
+.flag-warn::before {
+  content: "!";
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--warn);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+}
+.tc-actions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tc-players {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.tc-player,
+.tc-team {
+  background: var(--green-tint);
+  border: 1px solid var(--green-light);
+  border-radius: 12px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+.tc-team {
+  margin-top: 12px;
+}
+.tc-role {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.tc-name {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--green-dark);
+  margin: 2px 0 6px;
+  overflow-wrap: anywhere;
+}
+.tc-list {
+  margin: 0;
+}
+.tc-row {
+  display: grid;
+  grid-template-columns: minmax(76px, 34%) 1fr;
+  gap: 10px;
+  padding: 5px 0;
+  border-top: 1px solid var(--green-light);
+  font-size: 14px;
+}
+.tc-row:first-child {
+  border-top: none;
+}
+.tc-row dt {
+  color: var(--muted);
+}
+.tc-row dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+/* full width: keep the label column the same size as in a player box */
+.tc-team .tc-row {
+  grid-template-columns: minmax(76px, calc((100% - 12px) / 2 * 0.34)) 1fr;
+}
+.tc-add {
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid var(--green);
+  border-radius: var(--radius);
+  background: var(--green-tint);
+}
+.tc-status-field {
+  margin: 0 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tc-status-field label {
+  margin: 0;
+}
+.tc-status-field select {
+  width: auto;
+}
+@media (max-width: 719px) {
+  .tc-players {
+    grid-template-columns: 1fr;
+  }
+  .tc-team .tc-row {
+    grid-template-columns: minmax(76px, 34%) 1fr;
+  }
+  .tc-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+/* printed tournament field */
+.rs-teams .rs-num {
+  width: 68px;
+  white-space: nowrap;
+  color: var(--muted);
+  font-weight: 700;
+}
+.rs-teams th:nth-child(2),
+.rs-teams th:nth-child(3) {
+  width: 30%;
+}
+.rs-ghin {
+  color: var(--muted);
+  font-size: 13px;
+}

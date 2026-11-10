@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import CopyLink from "@/components/events/CopyLink";
 import RegistrationEditor from "@/components/events/RegistrationEditor";
+import TeamEntryForm from "@/components/events/TeamEntryForm";
 import {
   csvFilename,
   signupRows,
@@ -12,6 +13,7 @@ import {
   tournamentRows,
 } from "@/lib/events/csv";
 import {
+  adminAddTeam,
   deleteEvent,
   deleteRegistration,
   setEventStatus,
@@ -24,7 +26,21 @@ import {
   formatWhen,
   TYPE_LABEL,
 } from "@/lib/events/format";
-import type { EventRec, RegStatus, Registration } from "@/lib/events/types";
+import { availability } from "@/lib/events/seats";
+import type { TeamInput } from "@/lib/events/tournament";
+import type {
+  CustomField,
+  EventRec,
+  Player,
+  RegStatus,
+  Registration,
+} from "@/lib/events/types";
+
+const STATUS_LABEL: Record<RegStatus, string> = {
+  confirmed: "Confirmed",
+  waitlist: "Waitlist",
+  cancelled: "Cancelled",
+};
 
 export default function EventManager({
   event,
@@ -37,6 +53,9 @@ export default function EventManager({
   const [pending, start] = useTransition();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const isTournament = event.type === "tournament";
+  const avail = availability(event, registrations);
 
   const confirmed = registrations.filter((r) => r.status === "confirmed");
   const waitlist = registrations.filter((r) => r.status === "waitlist");
@@ -111,9 +130,17 @@ export default function EventManager({
     URL.revokeObjectURL(a.href);
   }
 
-  // unique confirmed-registrant emails
+  // unique confirmed-registrant emails (both players on a tournament team)
   const confirmedEmails = Array.from(
-    new Set(confirmed.map((r) => r.email).filter(Boolean)),
+    new Set(
+      confirmed
+        .flatMap((r) =>
+          isTournament && r.players?.length
+            ? r.players.map((p) => p.email)
+            : [r.email],
+        )
+        .filter(Boolean),
+    ),
   );
   const [copied, setCopied] = useState(false);
 
@@ -141,8 +168,154 @@ export default function EventManager({
     )}&subject=${subject}`;
   }
 
-  function regRow(r: Registration) {
+  // Edit, status moves and delete: shared by table rows and team cards.
+  function regActions(r: Registration) {
     const busy = busyId === r.id;
+    return (
+      <>
+        <button
+          className="btn small secondary"
+          disabled={busy}
+          onClick={() => setEditId(r.id)}
+        >
+          Edit
+        </button>
+        {r.status === "waitlist" && (
+          <button
+            className="btn small"
+            disabled={busy}
+            onClick={() => changeReg(r.id, "confirmed")}
+          >
+            Confirm
+          </button>
+        )}
+        {r.status === "confirmed" && (
+          <button
+            className="btn small secondary"
+            disabled={busy}
+            onClick={() => changeReg(r.id, "waitlist")}
+          >
+            → Waitlist
+          </button>
+        )}
+        {r.status === "cancelled" ? (
+          <button
+            className="btn small secondary"
+            disabled={busy}
+            onClick={() => changeReg(r.id, "confirmed")}
+          >
+            Restore
+          </button>
+        ) : (
+          <button
+            className="btn small ghost"
+            disabled={busy}
+            onClick={() => changeReg(r.id, "cancelled")}
+          >
+            Cancel
+          </button>
+        )}
+        <button
+          className="btn small danger"
+          disabled={busy}
+          onClick={() => removeReg(r.id)}
+          title="Delete"
+        >
+          ✕
+        </button>
+      </>
+    );
+  }
+
+  async function addTeam(
+    team: TeamInput,
+    phone: string,
+    sendEmails: boolean,
+  ): Promise<string | null> {
+    const res = await adminAddTeam(event.id, team, phone, sendEmails);
+    if (!res.ok) return res.error ?? "Could not add the team.";
+    // The form stays filled after a save, so close it before a second click
+    // could add the same team again.
+    setAdding(false);
+    router.refresh();
+    return null;
+  }
+
+  // A tournament team: both players with their answers, then team answers.
+  function teamCard(r: Registration, num: number | null) {
+    if (editId === r.id) {
+      return (
+        <RegistrationEditor
+          key={r.id}
+          event={event}
+          reg={r}
+          onClose={() => setEditId(null)}
+        />
+      );
+    }
+    const players: Player[] =
+      r.players && r.players.length > 0
+        ? r.players
+        : [
+            {
+              role: "member",
+              name: r.name,
+              email: r.email,
+              ghin: "",
+              answers: {},
+            },
+          ];
+    const playerFields = event.customFields.filter((f) => f.scope === "player");
+    const teamFields = event.customFields.filter((f) => f.scope === "team");
+    return (
+      <div key={r.id} className={`team-card ${r.status}`}>
+        <div className="tc-head">
+          {num != null && <span className="tc-num">Team {num}</span>}
+          <span className={`tc-status ${r.status}`}>
+            {STATUS_LABEL[r.status]}
+          </span>
+          {r.emailFailed && (
+            <span
+              className="flag-warn"
+              title="The confirmation email could not be sent"
+            >
+              Email not sent
+            </span>
+          )}
+          <span className="tc-actions">{regActions(r)}</span>
+        </div>
+        <div className="tc-players">
+          {players.map((p) => (
+            <div className="tc-player" key={p.role}>
+              <div className="tc-role">
+                {p.role === "member" ? "Member" : "Guest"}
+              </div>
+              <div className="tc-name">{p.name}</div>
+              <dl className="tc-list">
+                <TcRow label="Email" value={p.email} />
+                <TcRow label="GHIN #" value={p.ghin} />
+                {p.role === "member" && r.phone && (
+                  <TcRow label="Phone" value={r.phone} />
+                )}
+                {playerFields.map((f) => (
+                  <TcRow
+                    key={f.id}
+                    label={f.label}
+                    value={answerText(p.answers[f.id])}
+                  />
+                ))}
+              </dl>
+            </div>
+          ))}
+        </div>
+        {teamFields.length > 0 && (
+          <TeamAnswers fields={teamFields} answers={r.answers} />
+        )}
+      </div>
+    );
+  }
+
+  function regRow(r: Registration) {
     const cols = event.slots.length > 0 ? 4 : 3;
     if (editId === r.id) {
       return (
@@ -208,58 +381,7 @@ export default function EventManager({
             </div>
           </td>
         )}
-        <td style={{ whiteSpace: "nowrap" }}>
-          <button
-            className="btn small secondary"
-            disabled={busy}
-            onClick={() => setEditId(r.id)}
-          >
-            Edit
-          </button>
-          {r.status === "waitlist" && (
-            <button
-              className="btn small"
-              disabled={busy}
-              onClick={() => changeReg(r.id, "confirmed")}
-            >
-              Confirm
-            </button>
-          )}
-          {r.status === "confirmed" && (
-            <button
-              className="btn small secondary"
-              disabled={busy}
-              onClick={() => changeReg(r.id, "waitlist")}
-            >
-              → Waitlist
-            </button>
-          )}
-          {r.status === "cancelled" ? (
-            <button
-              className="btn small secondary"
-              disabled={busy}
-              onClick={() => changeReg(r.id, "confirmed")}
-            >
-              Restore
-            </button>
-          ) : (
-            <button
-              className="btn small ghost"
-              disabled={busy}
-              onClick={() => changeReg(r.id, "cancelled")}
-            >
-              Cancel
-            </button>
-          )}
-          <button
-            className="btn small danger"
-            disabled={busy}
-            onClick={() => removeReg(r.id)}
-            title="Delete"
-          >
-            ✕
-          </button>
-        </td>
+        <td style={{ whiteSpace: "nowrap" }}>{regActions(r)}</td>
       </tr>
     );
   }
@@ -354,10 +476,18 @@ export default function EventManager({
             Registrations
           </div>
           <span className="spacer" style={{ flex: 1 }} />
-          <span className="pill">
-            {seats}
-            {event.capacity ? ` / ${event.capacity}` : ""} confirmed
-          </span>
+          {isTournament ? (
+            <span className="pill">
+              {avail.taken}
+              {avail.capacity != null ? ` of ${avail.capacity}` : ""}{" "}
+              {(avail.capacity ?? avail.taken) === 1 ? "team" : "teams"}
+            </span>
+          ) : (
+            <span className="pill">
+              {seats}
+              {event.capacity ? ` / ${event.capacity}` : ""} confirmed
+            </span>
+          )}
           {waitlist.length > 0 && (
             <span className="pill" style={{ background: "#fff1df", color: "var(--warn)" }}>
               {waitlist.length} waitlist
@@ -386,10 +516,71 @@ export default function EventManager({
           >
             Export CSV
           </button>
+          {isTournament && (
+            <button
+              className="btn small"
+              onClick={() => setAdding((a) => !a)}
+              aria-expanded={adding}
+            >
+              {adding ? "Close" : "+ Add team"}
+            </button>
+          )}
         </div>
+
+        {isTournament && adding && (
+          <div className="tc-add">
+            <div className="section-title" style={{ marginBottom: 12 }}>
+              Add a team
+            </div>
+            <TeamEntryForm
+              event={event}
+              seats={{ remaining: avail.remaining, full: avail.full, slots: [] }}
+              mode="admin"
+              onSubmit={addTeam}
+            />
+            <button
+              type="button"
+              className="btn secondary block"
+              style={{ marginTop: 10 }}
+              onClick={() => setAdding(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         {registrations.length === 0 ? (
           <div className="empty">No sign-ups yet.</div>
+        ) : isTournament ? (
+          <>
+            <div className="tc-stack">
+              {confirmed.length === 0 ? (
+                <div className="empty">No confirmed teams.</div>
+              ) : (
+                confirmed.map((r, i) => teamCard(r, i + 1))
+              )}
+            </div>
+            {waitlist.length > 0 && (
+              <>
+                <div className="section-title" style={{ marginTop: 22 }}>
+                  Waitlist
+                </div>
+                <div className="tc-stack">
+                  {waitlist.map((r) => teamCard(r, null))}
+                </div>
+              </>
+            )}
+            {cancelled.length > 0 && (
+              <>
+                <div className="section-title" style={{ marginTop: 22 }}>
+                  Cancelled
+                </div>
+                <div className="tc-stack">
+                  {cancelled.map((r) => teamCard(r, null))}
+                </div>
+              </>
+            )}
+          </>
         ) : (
           <>
             <table className="table" style={{ marginTop: 14 }}>
@@ -429,6 +620,34 @@ export default function EventManager({
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function TcRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="tc-row">
+      <dt>{label}</dt>
+      <dd>{value.trim() || <span className="muted">—</span>}</dd>
+    </div>
+  );
+}
+
+function TeamAnswers({
+  fields,
+  answers,
+}: {
+  fields: CustomField[];
+  answers: Registration["answers"];
+}) {
+  return (
+    <div className="tc-team">
+      <div className="tc-role">Team</div>
+      <dl className="tc-list">
+        {fields.map((f) => (
+          <TcRow key={f.id} label={f.label} value={answerText(answers[f.id])} />
+        ))}
+      </dl>
     </div>
   );
 }
