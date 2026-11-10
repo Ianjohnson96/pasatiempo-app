@@ -25,8 +25,15 @@ describe("dateBoxParts", () => {
   const single = (startsAt: string | null) =>
     ({ startsAt, scheduleMode: "single" }) as const;
   it("reads month and day from startsAt", () => {
-    const iso = new Date(2026, 6, 18, 18, 0).toISOString();
+    const iso = "2026-07-18T18:00:00-07:00";
     expect(dateBoxParts(single(iso), [])).toEqual({ month: "Jul", day: "18" });
+  });
+  it("uses the club's (Los Angeles) date, not the server's", () => {
+    // 02:00 UTC on Jun 15 is 7:00 PM on Jun 14 in California.
+    expect(dateBoxParts(single("2027-06-15T02:00:00Z"), [])).toEqual({
+      month: "Jun",
+      day: "14",
+    });
   });
   it("is null with no date at all", () => {
     expect(dateBoxParts(single(null), [])).toBeNull();

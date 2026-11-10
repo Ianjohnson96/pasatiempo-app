@@ -1,5 +1,5 @@
 // Pure text for the events list cards (no database, no React).
-import { rosterName } from "./format";
+import { CLUB_TIME_ZONE, rosterName } from "./format";
 import type { EventRec, Registration, RosterStyle, Slot } from "./types";
 
 // "28 of 36 teams" / "42 of 60 spots" / "42 signed up".
@@ -32,7 +32,15 @@ export function dateBoxParts(
   if (event.scheduleMode !== "slots" && event.startsAt) {
     const d = new Date(event.startsAt);
     if (!Number.isNaN(d.getTime())) {
-      return { month: MONTHS[d.getMonth()], day: String(d.getDate()) };
+      // The club's (LA) date, so the box agrees with formatWhen on any server.
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: CLUB_TIME_ZONE,
+        month: "numeric",
+        day: "numeric",
+      }).formatToParts(d);
+      const mo = Number(parts.find((p) => p.type === "month")?.value);
+      const day = parts.find((p) => p.type === "day")?.value;
+      if (mo >= 1 && mo <= 12 && day) return { month: MONTHS[mo - 1], day };
     }
   }
   const dates = slots
