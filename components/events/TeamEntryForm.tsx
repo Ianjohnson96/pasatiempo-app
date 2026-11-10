@@ -284,7 +284,15 @@ export default function TeamEntryForm({
         <div className="card">
           <div className="success-box">
             <div className="check-circle" aria-hidden="true">
-              ✓
+              <svg
+                className="check-mark"
+                viewBox="0 0 48 48"
+                width="44"
+                height="44"
+                aria-hidden="true"
+              >
+                <path d="M12 25.5l8 8L36 16" />
+              </svg>
             </div>
             {isEdit ? (
               <>

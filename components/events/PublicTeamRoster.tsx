@@ -8,7 +8,8 @@ export default function PublicTeamRoster({
   countOnly: boolean;
 }) {
   return (
-    <section className="pub-section reveal">
+    <section className="pub-section reveal stacked">
+      <p className="sec-eyebrow">The field</p>
       <h2>Teams entered &middot; {teams.length}</h2>
       <div style={{ marginTop: 14 }}>
         {teams.length === 0 ? (
