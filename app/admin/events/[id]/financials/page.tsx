@@ -45,6 +45,7 @@ export default async function FinancialsPage({
         </div>
         <div className="page-head">
           <div className="ph-text">
+            <p className="ph-eyebrow">Accounts</p>
             <h1>Financials</h1>
             <div className="sub">{event.title}</div>
           </div>

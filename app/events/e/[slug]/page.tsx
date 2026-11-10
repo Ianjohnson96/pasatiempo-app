@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Gallery from "@/components/events/Gallery";
+import Icon from "@/components/events/Icon";
 import ManageRegistration from "@/components/events/ManageRegistration";
 import PublicTeamRoster from "@/components/events/PublicTeamRoster";
 import RichText from "@/components/events/RichText";
@@ -129,6 +130,13 @@ export default async function PublicEventPage({
     ? { backgroundImage: `url(${heroImg})` }
     : undefined;
 
+  // A price line reads as "item — amount" when it has a dash separator; the
+  // two halves are set apart with a dotted leader. Anything else stays whole.
+  const priceParts = (line: string): [string, string] | null => {
+    const m = line.match(/^(.*\S)\s+[—–]\s+(\S.*)$/);
+    return m ? [m[1], m[2]] : null;
+  };
+
   return (
     <main className="pub">
       <nav className="pub-nav">
@@ -136,22 +144,20 @@ export default async function PublicEventPage({
         <img src="/logo-full.png" alt="Pasatiempo Golf Club" />
       </nav>
 
-      <section
-        className={`pub-hero ${heroImg ? "has-img" : ""}`}
-        style={heroStyle}
-      >
+      <section className={`pub-hero ${heroImg ? "has-img" : ""}`}>
+        <div className="pub-hero-photo" style={heroStyle} aria-hidden="true" />
         <div className="hero-inner reveal">
           <span className="kicker">{TYPE_LABEL[event.type]}</span>
           <h1>{event.title}</h1>
           <hr className="hairline" />
           <div className="hero-meta">
             <span>
-              <span className="ico">🗓️</span>
+              <Icon name="calendar" className="ico" />
               {whenLine}
             </span>
             {event.location && (
               <span>
-                <span className="ico">📍</span>
+                <Icon name="pin" className="ico" />
                 {event.location}
               </span>
             )}
@@ -204,6 +210,7 @@ export default async function PublicEventPage({
 
         {event.description && (
           <section className="pub-section reveal">
+            <p className="sec-eyebrow">Overview</p>
             <h2>About this event</h2>
             <RichText text={event.description} className="prose" />
           </section>
@@ -211,6 +218,7 @@ export default async function PublicEventPage({
 
         {event.info && (
           <section className="pub-section reveal">
+            <p className="sec-eyebrow">Particulars</p>
             <h2>What you need to know</h2>
             <RichText text={event.info} className="prose" />
           </section>
@@ -218,21 +226,34 @@ export default async function PublicEventPage({
 
         {event.pricingEnabled && event.pricing && (
           <section className="pub-section reveal">
+            <p className="sec-eyebrow">Entry fees</p>
             <h2>Pricing</h2>
             <div className="pricing-card">
-              {event.pricing.split("\n").map((line, i) =>
-                line.trim() ? (
+              {event.pricing.split("\n").map((line, i) => {
+                if (!line.trim()) return null;
+                const parts = priceParts(line.trim());
+                return parts ? (
+                  <div
+                    className={`price-line split${parts[1].length <= 14 ? " short" : ""}`}
+                    key={i}
+                  >
+                    <span className="pl-item">{parts[0]}</span>
+                    <span className="pl-leader" aria-hidden="true" />
+                    <span className="pl-amt">{parts[1]}</span>
+                  </div>
+                ) : (
                   <div className="price-line" key={i}>
                     {line}
                   </div>
-                ) : null,
-              )}
+                );
+              })}
             </div>
           </section>
         )}
 
         {isSlots && event.slots.length > 1 && (
           <section className="pub-section reveal">
+            <p className="sec-eyebrow">Calendar</p>
             <h2>Schedule</h2>
             <div style={{ marginTop: 12 }}>
               {event.slots.map((s) => {
@@ -285,6 +306,7 @@ export default async function PublicEventPage({
 
         {event.photos.length > 1 && (
           <section className="pub-section reveal">
+            <p className="sec-eyebrow">Photographs</p>
             <h2>Gallery</h2>
             <div style={{ marginTop: 14 }}>
               <Gallery photos={event.photos} mode={event.galleryMode} />
@@ -304,8 +326,11 @@ export default async function PublicEventPage({
           </div>
         )}
 
+        {open && <div className="ornament" aria-hidden="true" />}
+
         {open && (
-          <section className="pub-section reveal" id="register">
+          <section className="pub-section reveal stacked" id="register">
+            <p className="sec-eyebrow">Registration</p>
             <h2>Register</h2>
             {rosterAvail.full && (
               <div className="notice warn" style={{ marginTop: 14 }}>
@@ -335,6 +360,7 @@ export default async function PublicEventPage({
 
         {event.showRoster && !isSlots && event.type !== "tournament" && (
           <section className="pub-section reveal">
+            <p className="sec-eyebrow">The roster</p>
             <h2>Who&apos;s coming · {goingCount}</h2>
             <div style={{ marginTop: 14 }}>
               {goingCount === 0 ? (

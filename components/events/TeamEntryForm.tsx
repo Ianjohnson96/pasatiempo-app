@@ -284,7 +284,15 @@ export default function TeamEntryForm({
         <div className="card">
           <div className="success-box">
             <div className="check-circle" aria-hidden="true">
-              ✓
+              <svg
+                className="check-mark"
+                viewBox="0 0 48 48"
+                width="44"
+                height="44"
+                aria-hidden="true"
+              >
+                <path d="M12 25.5l8 8L36 16" />
+              </svg>
             </div>
             {isEdit ? (
               <>
@@ -670,9 +678,13 @@ function TeamSummary({
   );
 }
 
+// A long label (usually an admin's question) sits over its answer instead of
+// squeezing into the label column.
+const LONG_LABEL = 24;
+
 function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="review-row">
+    <div className={`review-row${label.length > LONG_LABEL ? " long" : ""}`}>
       <dt>{label}</dt>
       <dd>{value || <span className="muted">—</span>}</dd>
     </div>

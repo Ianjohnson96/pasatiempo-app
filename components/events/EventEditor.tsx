@@ -10,6 +10,7 @@ import {
 } from "react";
 import { saveEvent } from "@/lib/events/actions";
 import RichTextField from "@/components/events/RichTextField";
+import Icon from "@/components/events/Icon";
 import QuestionBuilder from "@/components/events/QuestionBuilder";
 import TypeTiles from "@/components/events/editor/TypeTiles";
 import EditorSteps from "@/components/events/editor/EditorSteps";
@@ -503,8 +504,9 @@ export default function EventEditor({
 
               {/* recurring generator */}
               <div className="editor-generator">
-                <div style={{ fontWeight: 600, marginBottom: 8 }}>
-                  ↻ Generate a recurring weekly series
+                <div className="editor-generator-title">
+                  <Icon name="repeat" />
+                  Generate a recurring weekly series
                 </div>
                 <div className="builder-row">
                   <input
@@ -602,7 +604,7 @@ export default function EventEditor({
                       onClick={() => rmSlot(s.id)}
                       aria-label="Remove slot"
                     >
-                      ✕
+                      <Icon name="close" />
                     </button>
                   </div>
                   <input
@@ -622,8 +624,8 @@ export default function EventEditor({
               </button>
               {slots.length > 0 && (
                 <p className="muted" style={{ fontSize: 13, margin: "10px 0 0" }}>
-                  {slots.map((s) => formatSlot(s)).slice(0, 3).join("  •  ")}
-                  {slots.length > 3 ? `  • +${slots.length - 3} more` : ""}
+                  {slots.map((s) => formatSlot(s)).slice(0, 3).join("  ·  ")}
+                  {slots.length > 3 ? `  · +${slots.length - 3} more` : ""}
                 </p>
               )}
 

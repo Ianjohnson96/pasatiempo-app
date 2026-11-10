@@ -1,5 +1,6 @@
 import Link from "next/link";
 import CopyLink from "@/components/events/CopyLink";
+import Icon from "@/components/events/Icon";
 import TypeIcon from "@/components/events/TypeIcon";
 import { dateBoxParts, fillLabel, fillPercent } from "@/lib/events/cards";
 import { formatWhen, TYPE_LABEL } from "@/lib/events/format";
@@ -52,8 +53,18 @@ export default function EventCard({
                 {TYPE_LABEL[ev.type]}
               </span>
               <span>{when}</span>
-              {ev.location && <span>📍 {ev.location}</span>}
-              {ev.inviteOnly && <span>🔒 Invite-only</span>}
+              {ev.location && (
+                <span>
+                  <Icon name="pin" />
+                  {ev.location}
+                </span>
+              )}
+              {ev.inviteOnly && (
+                <span>
+                  <Icon name="lock" />
+                  Invite-only
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -89,7 +100,8 @@ export default function EventCard({
             rel="noopener noreferrer"
             className="btn secondary small"
           >
-            View ↗
+            View
+            <Icon name="external" />
           </a>
           <Link href={`/admin/events/${ev.id}`} className="btn secondary small">
             Manage

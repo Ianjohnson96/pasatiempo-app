@@ -24,6 +24,7 @@ export default async function EditEventPage({
       <main className="container wide">
         <div className="page-head">
           <div>
+            <p className="ph-eyebrow">Event Planner</p>
             <h1>Edit event</h1>
             <div className="sub">{event.title}</div>
           </div>
