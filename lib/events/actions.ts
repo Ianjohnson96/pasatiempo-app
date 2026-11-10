@@ -8,6 +8,7 @@ import { eventToRow, rowToEvent, rowToReg } from "./map";
 import { newId, newSlug, slugify } from "./ids";
 import { availability, rosterCount, onRoster } from "./seats";
 import { formatSlot } from "./format";
+import { normalizeFields } from "./question-builder";
 import {
   cleanTeam,
   coerceAnswers,
@@ -120,15 +121,18 @@ async function saveEventInner(input: EventInput): Promise<SaveEventResult> {
       capacity: s.capacity == null ? null : Math.max(1, Math.floor(s.capacity)),
     }));
 
-  const cleanFields: CustomField[] = input.customFields
-    .filter((f) => f.label.trim())
-    .map((f) => ({
-      ...f,
-      id: f.id && !f.id.startsWith("tmp_") ? f.id : newId(),
-      label: f.label.trim(),
-      options: f.options.map((o) => o.trim()).filter(Boolean),
-      scope: f.scope ?? "team",
-    }));
+  const normalized = normalizeFields(
+    input.customFields
+      .filter((f) => f.label.trim())
+      .map((f) => ({
+        ...f,
+        id: f.id && !f.id.startsWith("tmp_") ? f.id : newId(),
+        label: f.label.trim(),
+      })),
+    input.type === "tournament",
+  );
+  if (!normalized.ok) return { ok: false, error: normalized.error };
+  const cleanFields: CustomField[] = normalized.fields;
 
   const fields: Partial<EventRec> = {
     title: input.title.trim() || "Untitled event",

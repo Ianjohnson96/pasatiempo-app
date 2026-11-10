@@ -86,6 +86,35 @@ export function withType(field: CustomField, type: FieldType): CustomField {
   return { ...field, type, options };
 }
 
+// The save-time cleanup of an event's questions (the server is authoritative;
+// the builder only warns). Outside a tournament every question is asked once,
+// so scope is forced to "team"; otherwise a question added while the type was
+// tournament would keep a hidden "player" scope. Non-list types carry no
+// options; list types keep their trimmed, non-empty options and must have at
+// least one, or the question could never be answered.
+export function normalizeFields(
+  fields: CustomField[],
+  tournament: boolean,
+): { ok: true; fields: CustomField[] } | { ok: false; error: string } {
+  const out: CustomField[] = [];
+  for (const f of fields) {
+    const list = hasOptions(f.type);
+    const options = list
+      ? (f.options ?? []).map((o) => o.trim()).filter(Boolean)
+      : [];
+    if (list && options.length === 0) {
+      return {
+        ok: false,
+        error: `Add at least one choice for "${f.label.trim()}".`,
+      };
+    }
+    const scope: FieldScope =
+      tournament && f.scope === "player" ? "player" : "team";
+    out.push({ ...f, options, scope });
+  }
+  return { ok: true, fields: out };
+}
+
 // Move the question at `index` one place up (-1) or down (+1). Out-of-range
 // moves return the same list unchanged.
 export function moveQuestion(

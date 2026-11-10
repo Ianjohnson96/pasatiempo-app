@@ -5,6 +5,7 @@ import {
   blankQuestion,
   fromPreset,
   moveQuestion,
+  normalizeFields,
   presetAdded,
   withType,
 } from "./question-builder";
@@ -128,5 +129,61 @@ describe("moveQuestion", () => {
   it("does not change the list it was given", () => {
     moveQuestion(list, 0, 1);
     expect(list.map((f) => f.id)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("normalizeFields", () => {
+  const f = (over: Partial<CustomField>): CustomField => ({ ...q("x", "Q"), ...over });
+
+  it("forces scope to team when the event is not a tournament", () => {
+    const res = normalizeFields([f({ scope: "player" }), f({ scope: "team" })], false);
+    expect(res.ok && res.fields.map((x) => x.scope)).toEqual(["team", "team"]);
+  });
+
+  it("keeps player scope in a tournament and defaults a missing scope to team", () => {
+    const noScope = { ...f({}), scope: undefined } as unknown as CustomField;
+    const res = normalizeFields([f({ scope: "player" }), f({ scope: "team" }), noScope], true);
+    expect(res.ok && res.fields.map((x) => x.scope)).toEqual(["player", "team", "team"]);
+  });
+
+  it("clears options on non-list types", () => {
+    const types = ["short_text", "long_text", "number", "checkbox"] as const;
+    const res = normalizeFields(
+      types.map((type) => f({ type, options: ["A", "B"] })),
+      true,
+    );
+    expect(res.ok && res.fields.map((x) => x.options)).toEqual([[], [], [], []]);
+  });
+
+  it("trims list options and drops empty ones", () => {
+    const res = normalizeFields(
+      [f({ type: "radio", options: [" S ", "", "  ", "M"] })],
+      true,
+    );
+    expect(res.ok && res.fields[0].options).toEqual(["S", "M"]);
+  });
+
+  it.each(["select", "radio", "multi"] as const)(
+    "rejects a %s question with no real options",
+    (type) => {
+      const res = normalizeFields(
+        [f({ type, label: " Meal choice ", options: ["", "  "] })],
+        false,
+      );
+      expect(res).toEqual({
+        ok: false,
+        error: 'Add at least one choice for "Meal choice".',
+      });
+    },
+  );
+
+  it("keeps order and other properties", () => {
+    const a = f({ id: "a", label: "A", required: true });
+    const b = f({ id: "b", label: "B", type: "multi", options: ["x"] });
+    const res = normalizeFields([a, b], true);
+    expect(res.ok && res.fields.map((x) => [x.id, x.label, x.required, x.type])).toEqual([
+      ["a", "A", true, "short_text"],
+      ["b", "B", false, "multi"],
+    ]);
   });
 });
