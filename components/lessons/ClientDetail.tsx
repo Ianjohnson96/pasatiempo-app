@@ -6,6 +6,8 @@ import PackageCard from "./PackageCard";
 import ClientLessons from "./ClientLessons";
 import { mailHref, smsHref, telHref } from "@/lib/lessons/contact";
 import { createPackage, updateClient } from "@/lib/lessons/actions";
+import { paidTotals, type MethodKey } from "@/lib/lessons/catchup";
+import { METHOD_LABEL } from "@/lib/lessons/income";
 import {
   money,
   type ClientRec,
@@ -55,6 +57,11 @@ export default function ClientDetail({
     .filter((p) => p.paymentStatus === "unpaid")
     .reduce((t, p) => t + (p.priceCents ?? 0), 0);
   const unpriced = packages.filter((p) => p.priceCents === null).length;
+  const paid = paidTotals(packages);
+  const paidSplit = (Object.entries(paid.byMethod) as [MethodKey, number][])
+    .sort((a, b) => b[1] - a[1])
+    .map(([m, c]) => `${m === "none" ? "Not recorded" : METHOD_LABEL[m]} ${money(c)}`)
+    .join(" · ");
   // Not on any bill yet: neither in a package nor billed as a single.
   const unbilled = lessons.filter(
     (l) => !l.packageId && (l.status === "completed" || l.status === "scheduled"),
@@ -98,8 +105,16 @@ export default function ClientDetail({
             </div>
           )}
         </div>
-        <div>
+        <div style={{ textAlign: "right" }}>
           {owed > 0 && <div style={{ fontWeight: 700 }}>{money(owed)} owed</div>}
+          {paid.totalCents > 0 && (
+            <>
+              <div style={{ fontWeight: 700 }}>{money(paid.totalCents)} paid</div>
+              <div className="muted" style={{ fontSize: 12 }}>
+                {paidSplit}
+              </div>
+            </>
+          )}
           {pending > 0 && (
             <div className="muted" style={{ fontSize: 13 }}>
               {money(pending)} pending

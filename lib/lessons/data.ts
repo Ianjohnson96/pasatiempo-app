@@ -1,5 +1,6 @@
 import { lessonBookClient } from "./db";
-import { billingDefaults, matchExisting } from "./calc";
+import { billingDefaults, courseDay, matchExisting } from "./calc";
+import { catchUpGaps, paidTotals } from "./catchup";
 import { hintSummary, readTitle } from "./sync-plan";
 import { packageTitle } from "./types";
 import type {
@@ -79,11 +80,27 @@ function toPackage(r: Row): PackageRec {
 
 export async function listClientSummaries(): Promise<ClientSummary[]> {
   const supa = await lessonBookClient();
-  const { data, error } = await supa
-    .from("lesson_client_summary")
-    .select("*")
-    .order("name");
+  // The summary view only knows what is owed; money taken in is added up from
+  // the bills themselves, by the same rule the client page uses.
+  const [{ data, error }, bills] = await Promise.all([
+    supa.from("lesson_client_summary").select("*").order("name"),
+    supa
+      .from("lesson_packages")
+      .select("client_id, price_cents, payment_status, payment_method"),
+  ]);
   if (error) throw new Error(error.message);
+  if (bills.error) throw new Error(bills.error.message);
+  const byClient = new Map<string, Parameters<typeof paidTotals>[0]>();
+  for (const b of bills.data ?? []) {
+    const id = b.client_id as string;
+    const list = byClient.get(id) ?? [];
+    list.push({
+      paymentStatus: ((b.payment_status as string) ?? "unpaid") as PaymentStatus,
+      priceCents: b.price_cents === null ? null : num(b.price_cents),
+      paymentMethod: str(b.payment_method),
+    });
+    byClient.set(id, list);
+  }
   return (data ?? []).map((r) => ({
     id: r.id as string,
     name: r.name as string,
@@ -93,6 +110,7 @@ export async function listClientSummaries(): Promise<ClientSummary[]> {
     lastLessonAt: str(r.last_lesson_at),
     packageCount: num(r.package_count),
     owedCents: num(r.owed_cents),
+    paidCents: paidTotals(byClient.get(r.id as string) ?? []).totalCents,
     unbilled: num(r.unbilled_lessons),
   }));
 }
@@ -400,7 +418,7 @@ export async function dashboardData(): Promise<DashboardData> {
  */
 export async function billingData(): Promise<BillingData> {
   const supa = await lessonBookClient();
-  const [lessonsRes, clientsRes, packages, rates] = await Promise.all([
+  const [lessonsRes, clientsRes, packages, rates, billedRes] = await Promise.all([
     supa
       .from("lesson_numbered")
       .select("id, client_id, starts_at, status, title_raw")
@@ -411,9 +429,24 @@ export async function billingData(): Promise<BillingData> {
     supa.from("lesson_clients").select("id, name, is_member"),
     listPackages(),
     singleRates(),
+    // When each bill's lessons start: a series counts as paid on its first.
+    supa
+      .from("lessons")
+      .select("package_id, starts_at")
+      .not("package_id", "is", null)
+      .neq("status", "cancelled"),
   ]);
   if (lessonsRes.error) throw new Error(lessonsRes.error.message);
   if (clientsRes.error) throw new Error(clientsRes.error.message);
+  if (billedRes.error) throw new Error(billedRes.error.message);
+
+  const firstLesson = new Map<string, string>();
+  for (const l of billedRes.data ?? []) {
+    const id = l.package_id as string;
+    const at = l.starts_at as string;
+    const seen = firstLesson.get(id);
+    if (!seen || at < seen) firstLesson.set(id, at);
+  }
 
   const client = new Map(
     (clientsRes.data ?? []).map((c) => [
@@ -470,9 +503,21 @@ export async function billingData(): Promise<BillingData> {
     clients: [...byClient.values()].sort(
       (a, b) => b.lessons.length - a.lessons.length || a.name.localeCompare(b.name),
     ),
-    unpaid: packages
-      .filter((p) => p.paymentStatus !== "paid")
-      .sort((a, b) => (a.soldOn ?? "").localeCompare(b.soldOn ?? "")),
+    catchUp: packages
+      .map((p) => {
+        const first = firstLesson.get(p.id);
+        return {
+          ...p,
+          firstLessonOn: first ? courseDay(first) : null,
+          gaps: catchUpGaps(p),
+        };
+      })
+      .filter((p) => p.gaps.length > 0)
+      .sort((a, b) =>
+        (a.firstLessonOn ?? a.soldOn ?? "").localeCompare(
+          b.firstLessonOn ?? b.soldOn ?? "",
+        ),
+      ),
   };
 }
 
@@ -500,7 +545,7 @@ export async function lessonLedger(): Promise<LedgerData> {
     supa
       .from("lesson_packages")
       .select(
-        "id, client_id, kind, size, price_cents, payment_status, payment_method, sold_on",
+        "id, client_id, kind, size, price_cents, payment_status, payment_method, sold_on, paid_on",
       ),
     supa
       .from("lesson_payments")
@@ -638,6 +683,7 @@ export async function lessonLedger(): Promise<LedgerData> {
             paymentStatus: ((raw.payment_status as string) ?? "unpaid") as PaymentStatus,
             paymentMethod: str(raw.payment_method),
             soldOn: str(raw.sold_on),
+            paidOn: str(raw.paid_on),
           }
         : null,
       hint: hintSummary(hints),

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Icon from "@/components/events/Icon";
 import {
   movePhoto,
   removePhoto,
@@ -144,8 +145,8 @@ export default function PhotoManager({
                     ›
                   </button>
                 )}
-                <button title="Remove" onClick={() => remove(p)}>
-                  ✕
+                <button title="Remove" aria-label="Remove" onClick={() => remove(p)}>
+                  <Icon name="close" size={14} />
                 </button>
               </div>
             </div>

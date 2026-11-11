@@ -1,10 +1,31 @@
-import type { EventType, RosterStyle, Slot } from "./types";
+import type { Answer, EventType, RosterStyle, Slot } from "./types";
 
 export const TYPE_LABEL: Record<EventType, string> = {
   dinner: "Dinner / Social",
   clinic: "Clinic / Lesson",
   general: "General",
+  tournament: "Tournament",
 };
+
+// A custom-question answer as display text (multi-select answers are arrays).
+export function answerText(a: Answer | undefined): string {
+  if (a === undefined) return "";
+  return Array.isArray(a) ? a.join(", ") : a;
+}
+
+// The club's time zone. Event times are shown in it whatever the server's or
+// viewer's zone (Vercel runs in UTC), so emails and pages agree.
+export const CLUB_TIME_ZONE = "America/Los_Angeles";
+
+// The calendar date of an instant in the club's time zone, for same-day checks.
+function clubDateKey(d: Date): string {
+  return d.toLocaleDateString("en-US", {
+    timeZone: CLUB_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
 
 export function formatWhen(
   startsAt: string | null,
@@ -13,24 +34,28 @@ export function formatWhen(
   if (!startsAt) return "Date TBD";
   const start = new Date(startsAt);
   const dateStr = start.toLocaleDateString(undefined, {
+    timeZone: CLUB_TIME_ZONE,
     weekday: "short",
     month: "short",
     day: "numeric",
     year: "numeric",
   });
   const timeStr = start.toLocaleTimeString(undefined, {
+    timeZone: CLUB_TIME_ZONE,
     hour: "numeric",
     minute: "2-digit",
   });
   if (endsAt) {
     const end = new Date(endsAt);
-    const sameDay = start.toDateString() === end.toDateString();
+    const sameDay = clubDateKey(start) === clubDateKey(end);
     const endTime = end.toLocaleTimeString(undefined, {
+      timeZone: CLUB_TIME_ZONE,
       hour: "numeric",
       minute: "2-digit",
     });
     if (sameDay) return `${dateStr} · ${timeStr} – ${endTime}`;
     return `${dateStr} ${timeStr} – ${end.toLocaleDateString(undefined, {
+      timeZone: CLUB_TIME_ZONE,
       month: "short",
       day: "numeric",
     })} ${endTime}`;

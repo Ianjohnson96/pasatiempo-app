@@ -7,7 +7,7 @@ import { formatDay, money, type ClientSummary } from "@/lib/lessons/types";
 // The roster. Sorted by who owes money first, because that is the question
 // this screen exists to answer; alphabetical is there for looking somebody up.
 
-type Sort = "owed" | "name" | "recent" | "unbilled";
+type Sort = "owed" | "paid" | "name" | "recent" | "unbilled";
 
 export default function ClientList({
   clients,
@@ -33,6 +33,8 @@ export default function ClientList({
           return (b.lastLessonAt ?? "").localeCompare(a.lastLessonAt ?? "");
         if (sort === "unbilled" && b.unbilled !== a.unbilled)
           return b.unbilled - a.unbilled;
+        if (sort === "paid" && b.paidCents !== a.paidCents)
+          return b.paidCents - a.paidCents;
         if (b.owedCents !== a.owedCents) return b.owedCents - a.owedCents;
         return a.name.localeCompare(b.name);
       });
@@ -55,6 +57,7 @@ export default function ClientList({
           onChange={(e) => setSort(e.target.value as Sort)}
         >
           <option value="owed">Owes most</option>
+          <option value="paid">Paid most</option>
           <option value="name">Name</option>
           <option value="recent">Most recent</option>
           <option value="unbilled">Not billed</option>
@@ -108,13 +111,18 @@ export default function ClientList({
                   </span>
                 )}
               </div>
-              <div style={{ fontWeight: 700 }}>
-                {c.owedCents > 0 ? (
-                  money(c.owedCents)
+              {/* Owed first - that is the question this screen answers -
+                  and what has come in under it. */}
+              <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                {c.owedCents > 0 && (
+                  <div style={{ fontWeight: 700 }}>{money(c.owedCents)} owed</div>
+                )}
+                {c.paidCents > 0 ? (
+                  <div className="muted" style={{ fontSize: 13 }}>
+                    {money(c.paidCents)} paid
+                  </div>
                 ) : (
-                  <span className="muted" style={{ fontWeight: 400 }}>
-                    &mdash;
-                  </span>
+                  c.owedCents === 0 && <span className="muted">&mdash;</span>
                 )}
               </div>
             </div>

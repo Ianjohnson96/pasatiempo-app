@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Icon from "@/components/events/Icon";
 
 // A small popup notification (auto-dismisses). Used for registration errors
 // like the invite-only rejection message.
@@ -21,7 +22,9 @@ export default function Toast({
   return (
     <div className="toast-wrap" role="alert">
       <div className={`toast ${tone}`}>
-        <span className="toast-ico">{tone === "ok" ? "✓" : "!"}</span>
+        <span className="toast-ico">
+          {tone === "ok" ? <Icon name="check" size={14} /> : "!"}
+        </span>
         <span className="toast-msg">{message}</span>
         <button
           type="button"
@@ -29,7 +32,7 @@ export default function Toast({
           aria-label="Dismiss"
           onClick={onClose}
         >
-          ✕
+          <Icon name="close" size={14} />
         </button>
       </div>
     </div>

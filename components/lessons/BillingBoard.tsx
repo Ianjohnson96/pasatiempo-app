@@ -4,29 +4,24 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   billLessons,
-  markPaidMany,
   unbillSingles,
   type BillItem,
 } from "@/lib/lessons/actions";
 import { defaultBillStatus, parseDollars } from "@/lib/lessons/calc";
-import { METHOD_LABEL } from "@/lib/lessons/income";
 import {
   formatDay,
   formatWhen,
-  money,
-  packageTitle,
-  PAYMENT_LABEL,
   type BillingClient,
   type BillingData,
-  type PayMethod,
 } from "@/lib/lessons/types";
 import BillChoices, { type BillChoiceValue } from "./BillChoices";
+import CatchUpList from "./CatchUpList";
 
 // One screen for every lesson on no bill yet. A row per client, pre-filled
 // with what they paid last time (or the member / guest rate and their usual
 // method), so most clients are one tap: each lesson becomes its own single,
-// never bundled. Below it, every bill still waiting for money, to mark paid
-// several at a time.
+// never bundled. Below it, the catch-up list: every bill still unpaid,
+// unpriced or missing how it was paid.
 
 type Undo = { text: string; run: () => Promise<void> };
 
@@ -108,7 +103,7 @@ export default function BillingBoard({ data }: { data: BillingData }) {
         </div>
       )}
 
-      <Waiting bills={data.unpaid} />
+      <CatchUpList bills={data.catchUp} />
     </>
   );
 }
@@ -255,112 +250,5 @@ function ClientRow({
         </button>
       </div>
     </div>
-  );
-}
-
-/** Bills still waiting for money: tick, pick how, mark paid. */
-function Waiting({ bills }: { bills: BillingData["unpaid"] }) {
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [method, setMethod] = useState<PayMethod>("member_charge");
-  const [paid, setPaid] = useState<Set<string>>(new Set());
-  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
-  const [busy, start] = useTransition();
-  const left = bills.filter((b) => !paid.has(b.id));
-
-  function mark() {
-    const ids = [...picked];
-    start(async () => {
-      const r = await markPaidMany(ids, method);
-      if (!r.ok) {
-        setNote({ ok: false, text: r.error });
-        return;
-      }
-      setPaid((s) => new Set([...s, ...ids]));
-      setPicked(new Set());
-      setNote({
-        ok: true,
-        text: `Marked ${r.value} paid · ${METHOD_LABEL[method]}.`,
-      });
-    });
-  }
-
-  return (
-    <>
-      <div className="lb-sechead">
-        <h2 className="section-title">Waiting for payment</h2>
-        <span className="lb-sub">{left.length} bills</span>
-      </div>
-      {note && (
-        <p className={note.ok ? "notice ok" : "notice err"}>{note.text}</p>
-      )}
-      {left.length === 0 ? (
-        <p className="empty">Nothing waiting &mdash; everything billed is paid.</p>
-      ) : (
-        <div className="card">
-          <div className="lb-billbar">
-            <label className="lb-billpick">
-              <input
-                type="checkbox"
-                checked={picked.size > 0 && picked.size === left.length}
-                onChange={(e) =>
-                  setPicked(
-                    e.target.checked ? new Set(left.map((b) => b.id)) : new Set(),
-                  )
-                }
-              />
-              <span>All</span>
-            </label>
-            <select
-              className="field"
-              value={method}
-              onChange={(e) => setMethod(e.target.value as PayMethod)}
-              aria-label="Paid with"
-            >
-              {(Object.keys(METHOD_LABEL) as PayMethod[]).map((m) => (
-                <option key={m} value={m}>
-                  {METHOD_LABEL[m]}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              className="btn small"
-              disabled={busy || picked.size === 0}
-              onClick={mark}
-            >
-              {busy ? "Saving…" : `Mark ${picked.size} paid`}
-            </button>
-          </div>
-          <ul className="lb-flist">
-            {left.map((b) => (
-              <li key={b.id}>
-                <label className="lb-billpick lb-frow">
-                  <input
-                    type="checkbox"
-                    checked={picked.has(b.id)}
-                    onChange={() =>
-                      setPicked((s) => {
-                        const next = new Set(s);
-                        if (next.has(b.id)) next.delete(b.id);
-                        else next.add(b.id);
-                        return next;
-                      })
-                    }
-                  />
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span className="lb-name">{b.clientName}</span>
-                    <span className="lb-sub" style={{ display: "block" }}>
-                      {packageTitle(b)} ·{" "}
-                      {b.priceCents === null ? "no price" : money(b.priceCents)} ·{" "}
-                      {PAYMENT_LABEL[b.paymentStatus]}
-                    </span>
-                  </span>
-                </label>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </>
   );
 }

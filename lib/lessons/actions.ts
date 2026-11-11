@@ -15,6 +15,7 @@ import {
   parseDollars,
   singleRate,
 } from "./calc";
+import { markPaidOn } from "./catchup";
 import type { PayMethod, PaymentStatus, Result } from "./types";
 
 // Write-side for the lesson book.
@@ -69,6 +70,47 @@ function courseToday(): string {
 }
 
 /**
+ * The day a one-tap "paid" should record - see markPaidOn. Stamping today
+ * put a year of caught-up bills into the month they were entered.
+ */
+async function paidOnFor(
+  supa: Awaited<ReturnType<typeof lessonBookClient>>,
+  packageId: string,
+): Promise<string> {
+  const [pkg, first, venmo] = await Promise.all([
+    supa
+      .from("lesson_packages")
+      .select("payment_status, paid_on, sold_on")
+      .eq("id", packageId)
+      .maybeSingle(),
+    supa
+      .from("lessons")
+      .select("starts_at")
+      .eq("package_id", packageId)
+      .neq("status", "cancelled")
+      .order("starts_at")
+      .limit(1),
+    supa
+      .from("lesson_payments")
+      .select("paid_on")
+      .eq("package_id", packageId)
+      .order("paid_on")
+      .limit(1),
+  ]);
+  for (const r of [pkg, first, venmo]) if (r.error) throw r.error;
+  const starts = first.data?.[0]?.starts_at as string | undefined;
+  const venmoOn = venmo.data?.[0]?.paid_on as string | undefined;
+  return markPaidOn({
+    alreadyPaidOn:
+      pkg.data?.payment_status === "paid" ? ((pkg.data.paid_on as string | null) ?? null) : null,
+    venmoOn: venmoOn ? venmoOn.slice(0, 10) : null,
+    firstLessonOn: starts ? courseDay(starts) : null,
+    soldOn: (pkg.data?.sold_on as string | null) ?? null,
+    today: courseToday(),
+  });
+}
+
+/**
  * Move a package between unpaid / pending / paid.
  *
  * `pending` is a real state, not a halfway house: a member charge submitted to
@@ -87,7 +129,7 @@ export async function setPackagePayment(
     const patch: Record<string, unknown> = { payment_status: status };
     // paid_on only means something once it is actually paid; a stale date left
     // on a reverted package would misreport when the money arrived.
-    patch.paid_on = status === "paid" ? courseToday() : null;
+    patch.paid_on = status === "paid" ? await paidOnFor(supa, packageId) : null;
     if (opts?.method !== undefined) patch.payment_method = opts.method;
 
     const { error } = await supa
@@ -1329,37 +1371,66 @@ export async function unbillSingles(
   }
 }
 
+export interface CatchUpItem {
+  packageId: string;
+  priceCents: number | null;
+  status: PaymentStatus;
+  method: PaymentMethodValue | null;
+  /** The day it counts as paid; required when status is paid. */
+  paidOn: string | null;
+}
+
 /**
- * Mark several unpaid or pending bills paid at once, all by one method,
- * dated today. Only touches bills not already paid.
+ * The Billing catch-up: price, status, method and paid date for many bills
+ * in one save, each as Ian set it.
+ *
+ * The form defaults a series' date to its first lesson so income lands in
+ * the month the money really came in; this action stores whatever day it is
+ * given. An unpaid bill carries no method and no date - a stale one would
+ * misreport when money arrived.
  */
-export async function markPaidMany(
-  packageIds: string[],
-  method: PaymentMethodValue | null,
-): Promise<Result<number>> {
+export async function saveCatchUp(items: CatchUpItem[]): Promise<Result<number>> {
   try {
     await assertLessonBook();
-    if (!packageIds.length) return { ok: true, value: 0 };
-    if (method !== null && !METHODS.has(method)) {
-      return { ok: false, error: "That is not a payment method." };
+    if (!items.length) return { ok: true, value: 0 };
+    for (const it of items) {
+      if (
+        it.priceCents !== null &&
+        (!Number.isInteger(it.priceCents) || it.priceCents < 0)
+      ) {
+        return { ok: false, error: "That is not a valid amount." };
+      }
+      if (!["unpaid", "pending", "paid"].includes(it.status)) {
+        return { ok: false, error: "That is not a payment status." };
+      }
+      if (it.method !== null && !METHODS.has(it.method)) {
+        return { ok: false, error: "That is not a payment method." };
+      }
+      if (it.status === "paid" && !(it.paidOn && /^\d{4}-\d{2}-\d{2}$/.test(it.paidOn))) {
+        return { ok: false, error: "A paid bill needs the day it was paid." };
+      }
     }
     const supa = await lessonBookClient();
-    const { data, error } = await supa
-      .from("lesson_packages")
-      .update({
-        payment_status: "paid",
-        payment_method: method,
-        paid_on: courseToday(),
-      })
-      .in("id", packageIds)
-      .neq("payment_status", "paid")
-      .select("id");
-    if (error) throw error;
+    let saved = 0;
+    for (const it of items) {
+      const { data, error } = await supa
+        .from("lesson_packages")
+        .update({
+          price_cents: it.priceCents,
+          payment_status: it.status,
+          payment_method: it.status === "unpaid" ? null : it.method,
+          paid_on: it.status === "paid" ? it.paidOn : null,
+        })
+        .eq("id", it.packageId)
+        .select("id");
+      if (error) throw error;
+      saved += data?.length ?? 0;
+    }
     touched();
     revalidatePath("/lessons/billing");
-    return { ok: true, value: data?.length ?? 0 };
+    return { ok: true, value: saved };
   } catch (e) {
-    return fail(e, "Could not mark those paid.");
+    return fail(e, "Could not save those bills.");
   }
 }
 

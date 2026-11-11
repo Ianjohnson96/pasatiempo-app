@@ -1,9 +1,8 @@
 import Link from "next/link";
 import AppBar from "@/components/events/AppBar";
-import CopyLink from "@/components/events/CopyLink";
-import { listEvents, registrationsFor, takenSeats } from "@/lib/events/data";
+import EventCard from "@/components/events/EventCard";
+import { availability, listEvents, registrationsFor } from "@/lib/events/data";
 import { canManageEvent, requireEventsViewer } from "@/lib/events/auth";
-import { formatWhen, TYPE_LABEL } from "@/lib/events/format";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +15,7 @@ export default async function AdminHome() {
       const regs = await registrationsFor(e.id);
       return {
         ev: e,
-        confirmed: takenSeats(regs),
+        taken: availability(e, regs).taken,
         waitlist: regs.filter((r) => r.status === "waitlist").length,
       };
     }),
@@ -28,6 +27,7 @@ export default async function AdminHome() {
       <main className="container">
         <div className="page-head">
           <div>
+            <p className="ph-eyebrow">Event Planner</p>
             <h1>Events</h1>
             <div className="sub">
               Create an event, then copy its private link to send out.
@@ -51,58 +51,8 @@ export default async function AdminHome() {
           </div>
         ) : (
           <div className="evlist">
-            {withCounts.map(({ ev, confirmed, waitlist }) => (
-              <div className="evrow" key={ev.id}>
-                <div className="ev-main">
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <Link
-                      href={`/admin/events/${ev.id}`}
-                      className="ev-title"
-                      style={{ color: "var(--ink)" }}
-                    >
-                      {ev.title}
-                    </Link>
-                    <span className={`badge ${ev.status}`}>{ev.status}</span>
-                  </div>
-                  <div className="ev-meta">
-                    <span>{TYPE_LABEL[ev.type]}</span>
-                    <span>{formatWhen(ev.startsAt, ev.endsAt)}</span>
-                    {ev.location && <span>📍 {ev.location}</span>}
-                    {ev.inviteOnly && <span>🔒 Invite-only</span>}
-                  </div>
-                  <div style={{ marginTop: 10, maxWidth: 460 }}>
-                    <CopyLink slug={ev.slug} compact />
-                  </div>
-                </div>
-                <div className="ev-count">
-                  <div className="num">{confirmed}</div>
-                  <div className="lbl">
-                    {ev.capacity ? `of ${ev.capacity}` : "signed up"}
-                  </div>
-                </div>
-                {waitlist > 0 && (
-                  <div className="ev-count">
-                    <div className="num" style={{ color: "var(--warn)" }}>
-                      {waitlist}
-                    </div>
-                    <div className="lbl">waitlist</div>
-                  </div>
-                )}
-                <a
-                  href={`/events/e/${ev.slug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn secondary small"
-                >
-                  View ↗
-                </a>
-                <Link
-                  href={`/admin/events/${ev.id}`}
-                  className="btn secondary small"
-                >
-                  Manage
-                </Link>
-              </div>
+            {withCounts.map(({ ev, taken, waitlist }) => (
+              <EventCard key={ev.id} ev={ev} taken={taken} waitlist={waitlist} />
             ))}
           </div>
         )}

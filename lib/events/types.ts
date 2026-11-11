@@ -4,7 +4,7 @@
 
 import type { Tender } from "./finance-types";
 
-export type EventType = "dinner" | "clinic" | "general";
+export type EventType = "dinner" | "clinic" | "general" | "tournament";
 export type EventStatus = "draft" | "open" | "closed";
 export type RegStatus = "confirmed" | "waitlist" | "cancelled";
 export type ScheduleMode = "single" | "slots";
@@ -16,14 +16,23 @@ export type FieldType =
   | "long_text"
   | "select"
   | "checkbox"
-  | "number";
+  | "number"
+  | "radio"
+  | "multi";
+
+// Who a custom question is asked of: each player on a team, or the team once.
+export type FieldScope = "player" | "team";
+
+export type Answer = string | string[];
+export type Answers = Record<string, Answer>;
 
 export interface CustomField {
   id: string;
   label: string;
   type: FieldType;
   required: boolean;
-  options: string[]; // used when type === "select"
+  options: string[]; // used when type is select, radio or multi
+  scope: FieldScope;
 }
 
 // A sign-up "slot" — a dated and/or timed option people register for.
@@ -98,6 +107,17 @@ export interface EventRec {
   createdAt: string;
 }
 
+export type PlayerRole = "member" | "guest";
+
+// One of the two players on a tournament team.
+export interface Player {
+  role: PlayerRole;
+  name: string;
+  email: string;
+  ghin: string;
+  answers: Answers; // per-player answers, keyed by CustomField.id
+}
+
 export interface Registration {
   id: string;
   eventId: string;
@@ -107,7 +127,9 @@ export interface Registration {
   partySize: number; // 1 = just the registrant; >1 includes guests
   guestNames: string[];
   slotIds: string[]; // which slot(s) they signed up for ([] for single-date events)
-  answers: Record<string, string>; // keyed by CustomField.id
+  answers: Answers; // keyed by CustomField.id
+  players: Player[] | null; // tournament teams only; null for other event types
+  emailFailed: boolean; // the confirmation email could not be sent
   status: RegStatus;
   createdAt: string;
 

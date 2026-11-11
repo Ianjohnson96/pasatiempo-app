@@ -3,21 +3,99 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateRegistration } from "@/lib/events/actions";
-import { formatSlot } from "@/lib/events/format";
+import { answerText, formatSlot } from "@/lib/events/format";
+import type { TeamInput } from "@/lib/events/tournament";
+import TeamEntryForm from "@/components/events/TeamEntryForm";
 import type { EventRec, RegStatus, Registration } from "@/lib/events/types";
 
-// Staff editor for an existing sign-up. Lets the golf shop fix anything a
-// member got wrong (or phoned in): name, contact, party size, guest names,
-// which dates they're attending, custom answers, and status.
-export default function RegistrationEditor({
-  event,
-  reg,
-  onClose,
-}: {
+type EditorProps = {
   event: EventRec;
   reg: Registration;
   onClose: () => void;
-}) {
+};
+
+// Staff editor for an existing sign-up. Lets the golf shop fix anything a
+// member got wrong (or phoned in): name, contact, party size, guest names,
+// which dates they're attending, custom answers, and status. A tournament
+// team gets the full team form instead.
+export default function RegistrationEditor(props: EditorProps) {
+  if (props.event.type === "tournament") return <TeamEditor {...props} />;
+  return <StandardEditor {...props} />;
+}
+
+// Tournament team: both players, their GHINs and answers, plus status.
+function TeamEditor({ event, reg, onClose }: EditorProps) {
+  const router = useRouter();
+  const [status, setStatus] = useState<RegStatus>(reg.status);
+
+  // Raw Answer values (not flattened): the team form edits multi-selects.
+  const initial = {
+    team: { players: reg.players ?? [], teamAnswers: reg.answers },
+    phone: reg.phone,
+  };
+
+  async function save(team: TeamInput, phone: string): Promise<string | null> {
+    const res = await updateRegistration({
+      id: reg.id,
+      name: reg.name,
+      email: reg.email,
+      phone,
+      partySize: reg.partySize,
+      guestNames: reg.guestNames,
+      slotIds: reg.slotIds,
+      answers: reg.answers,
+      status,
+      team,
+    });
+    if (!res.ok) return res.error ?? "Could not save the changes.";
+    onClose();
+    router.refresh();
+    return null;
+  }
+
+  return (
+    <div className="team-card editing">
+      <div className="tc-head">
+        <div className="section-title" style={{ margin: 0 }}>
+          Edit team
+        </div>
+        <div className="field tc-status-field">
+          <label htmlFor={`st-${reg.id}`}>Status</label>
+          <select
+            id={`st-${reg.id}`}
+            value={status}
+            onChange={(e) => setStatus(e.target.value as RegStatus)}
+          >
+            <option value="confirmed">Confirmed</option>
+            <option value="waitlist">Waitlist</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
+      <TeamEntryForm
+        event={event}
+        seats={{ remaining: null, full: false, slots: [] }}
+        mode="admin"
+        initial={initial}
+        onSubmit={save}
+      />
+      <button
+        type="button"
+        className="btn secondary block"
+        style={{ marginTop: 10 }}
+        onClick={onClose}
+      >
+        Cancel
+      </button>
+      <p className="hint" style={{ marginTop: 10, marginBottom: 0 }}>
+        Staff edits skip Required questions and the field limit, but still
+        check GHINs and players already entered.
+      </p>
+    </div>
+  );
+}
+
+function StandardEditor({ event, reg, onClose }: EditorProps) {
   const router = useRouter();
   const [name, setName] = useState(reg.name);
   const [email, setEmail] = useState(reg.email);
@@ -25,7 +103,11 @@ export default function RegistrationEditor({
   const [partySize, setPartySize] = useState(String(reg.partySize));
   const [guestNames, setGuestNames] = useState<string[]>(reg.guestNames);
   const [slotIds, setSlotIds] = useState<string[]>(reg.slotIds);
-  const [answers, setAnswers] = useState<Record<string, string>>(reg.answers);
+  const [answers, setAnswers] = useState<Record<string, string>>(
+    Object.fromEntries(
+      Object.entries(reg.answers).map(([k, v]) => [k, answerText(v)]),
+    ),
+  );
   const [status, setStatus] = useState<RegStatus>(reg.status);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");

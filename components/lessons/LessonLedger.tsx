@@ -7,7 +7,7 @@ import {
   setLessonHappened,
   setLessonPayment,
 } from "@/lib/lessons/actions";
-import { parseDollars } from "@/lib/lessons/calc";
+import { courseDay, parseDollars } from "@/lib/lessons/calc";
 import { METHOD_LABEL } from "@/lib/lessons/income";
 import {
   formatDay,
@@ -194,7 +194,22 @@ function LessonRow({
         </div>
         <div>
           {settled ? (
-            <PackSummary row={row} />
+            <>
+              <PackSummary row={row} />
+              {/* A package was bought once and is priced on its own card;
+                  only a lesson billed on its own can be edited from here. */}
+              {row.pack?.kind === "single" && (
+                <button
+                  type="button"
+                  className="btn secondary small"
+                  style={{ marginTop: 6 }}
+                  onClick={onOpen}
+                  aria-expanded={open}
+                >
+                  {open ? "Close" : "Edit"}
+                </button>
+              )}
+            </>
           ) : row.status === "cancelled" || row.status === "no_show" ? (
             <RestoreButton row={row} onDone={onDone} onError={onError} />
           ) : (
@@ -246,10 +261,11 @@ function LessonRow({
         </div>
       )}
 
-      {open && !settled && (
+      {open && (!settled || row.pack?.kind === "single") && (
         <PayForm
           row={row}
           loose={loose}
+          editing={settled}
           onDone={onDone}
           onError={onError}
           onCancel={onOpen}
@@ -342,31 +358,49 @@ function PackBar({ row }: { row: LedgerRow }) {
 function PayForm({
   row,
   loose,
+  editing,
   onDone,
   onError,
   onCancel,
 }: {
   row: LedgerRow;
   loose: LedgerCandidate[];
+  /** Open on a lesson already billed: start from what it says, not a guess. */
+  editing: boolean;
   onDone: (text: string) => void;
   onError: (text: string) => void;
   onCancel: () => void;
 }) {
+  const pack = editing ? row.pack : null;
   const best = row.candidates[0] ?? null;
-  // Fill from the strongest Venmo candidate when there is one, otherwise from
-  // what this client paid last time. Either beats an empty box.
+  // Editing starts from what is recorded. Otherwise fill from the strongest
+  // Venmo candidate, or what this client paid last time - either beats an
+  // empty box.
   const [dollars, setDollars] = useState(
-    best
-      ? String(best.amountCents / 100)
-      : row.lastPriceCents !== null
-        ? String(row.lastPriceCents / 100)
-        : "",
+    pack?.priceCents != null
+      ? String(pack.priceCents / 100)
+      : best
+        ? String(best.amountCents / 100)
+        : row.lastPriceCents !== null
+          ? String(row.lastPriceCents / 100)
+          : "",
   );
   const [method, setMethod] = useState<PayMethod>(
-    best ? "venmo" : (row.lastMethod ?? (row.isMember ? "member_charge" : "cash")),
+    (pack?.paymentMethod as PayMethod | null) ??
+      (best ? "venmo" : (row.lastMethod ?? (row.isMember ? "member_charge" : "cash"))),
   );
-  const [paidOn, setPaidOn] = useState((best?.paidOn ?? row.startsAt).slice(0, 10));
-  const [tie, setTie] = useState<string | null>(best?.id ?? null);
+  // The lesson's own Pacific day - slicing its UTC instant puts an evening
+  // lesson on tomorrow.
+  const [paidOn, setPaidOn] = useState(
+    (pack?.paidOn ?? best?.paidOn ?? courseDay(row.startsAt)).slice(0, 10),
+  );
+  const [paid, setPaid] = useState(pack ? pack.paymentStatus === "paid" : true);
+  // An edit starts with no new tie: whatever paid it is already recorded, and
+  // pre-picking a guess would tie a second payment to the same bill on save.
+  const [tie, setTie] = useState<string | null>(editing ? null : (best?.id ?? null));
+  // "Not yet" on a member charge already submitted keeps it pending, not unpaid.
+  const notYet: "unpaid" | "pending" =
+    pack?.paymentStatus === "pending" ? "pending" : "unpaid";
   const [showAll, setShowAll] = useState(false);
   const [busy, start] = useTransition();
 
@@ -382,15 +416,20 @@ function PayForm({
     start(async () => {
       const r = await setLessonPayment(row.id, {
         priceCents: cents,
-        method,
-        status: "paid",
-        paidOn,
-        paymentId: method === "venmo" ? tie : null,
+        method: paid || notYet === "pending" ? method : null,
+        status: paid ? "paid" : notYet,
+        paidOn: paid ? paidOn : null,
+        paymentId: paid && method === "venmo" ? tie : null,
       });
       if (!r.ok) onError(r.error);
+      else if (!paid)
+        onDone(
+          `${row.clientName}: ${money(cents)}, ${notYet === "pending" ? "pending" : "not paid yet"}.`,
+        );
       else
         onDone(
-          `${row.clientName}: ${money(cents)} ${METHOD_LABEL[method].toLowerCase()}.`,
+          `${row.clientName}: ${money(cents)} ${METHOD_LABEL[method].toLowerCase()}` +
+            `, ${formatDay(paidOn)}.`,
         );
     });
   }
@@ -409,35 +448,66 @@ function PayForm({
             disabled={busy}
           />
         </label>
-        <label>
-          <span className="lb-led-lbl">Paid on</span>
-          <input
-            className="field"
-            type="date"
-            value={paidOn}
-            onChange={(e) => setPaidOn(e.target.value)}
-            disabled={busy}
-          />
-        </label>
+        {paid && (
+          <label>
+            <span className="lb-led-lbl">Paid on</span>
+            <input
+              className="field"
+              type="date"
+              value={paidOn}
+              onChange={(e) => setPaidOn(e.target.value)}
+              disabled={busy}
+            />
+          </label>
+        )}
       </div>
 
-      <div className="lb-led-lbl">How</div>
+      {/* A bill can be raised before the money lands, and an edit must be
+          able to say so - otherwise "paid on" is a date for a payment that
+          never happened. */}
+      <div className="lb-led-lbl">Paid?</div>
       <div className="lb-chips">
-        {METHODS.map((m) => (
-          <button
-            key={m}
-            type="button"
-            className={m === method ? "btn small" : "btn secondary small"}
-            aria-pressed={m === method}
-            disabled={busy}
-            onClick={() => setMethod(m)}
-          >
-            {METHOD_LABEL[m]}
-          </button>
-        ))}
+        <button
+          type="button"
+          className={paid ? "btn small" : "btn secondary small"}
+          aria-pressed={paid}
+          disabled={busy}
+          onClick={() => setPaid(true)}
+        >
+          Paid
+        </button>
+        <button
+          type="button"
+          className={!paid ? "btn small" : "btn secondary small"}
+          aria-pressed={!paid}
+          disabled={busy}
+          onClick={() => setPaid(false)}
+        >
+          Not yet
+        </button>
       </div>
 
-      {method === "venmo" && (
+      {paid && (
+        <>
+          <div className="lb-led-lbl">How</div>
+          <div className="lb-chips">
+            {METHODS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                className={m === method ? "btn small" : "btn secondary small"}
+                aria-pressed={m === method}
+                disabled={busy}
+                onClick={() => setMethod(m)}
+              >
+                {METHOD_LABEL[m]}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {paid && method === "venmo" && (
         <div className="lb-led-cands">
           <div className="lb-led-lbl">
             {offered.length === 0

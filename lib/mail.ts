@@ -24,6 +24,10 @@ function transporter(): Transporter {
       secure: port === 465, // 587 upgrades with STARTTLS
       requireTLS: port === 587, // the usual submission port: refuse to send the password unencrypted
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      // A hung SMTP server must not stall a registration for minutes.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
     });
   }
   return transport;

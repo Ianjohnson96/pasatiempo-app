@@ -13,13 +13,19 @@ export default function AppBar({
         <Link href={admin ? "/admin/events" : "/"} className="brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-mark.png" alt="" />
-          Pasatiempo Events
+          <span className="brand-word">Pasatiempo</span>
+          <span className="brand-sub">Event Planner</span>
         </Link>
         <span className="spacer" />
         {admin && (
-          <Link href="/admin/events" className="navlink">
-            All events
-          </Link>
+          <nav className="appbar-nav" aria-label="Event Planner">
+            <Link href="/admin" className="navlink">
+              ← Club Hub
+            </Link>
+            <Link href="/admin/events" className="navlink">
+              All events
+            </Link>
+          </nav>
         )}
         {email && (
           <>
