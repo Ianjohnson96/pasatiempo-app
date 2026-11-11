@@ -49,6 +49,8 @@ interface Frame {
   era: Era;
   /** object-position for the crop — on the faces for the portraits. */
   focus?: string;
+  /** A slow camera move (the dissolve cut): scale and offset in %, from → to. */
+  move?: [fromScale: number, fromX: number, fromY: number, toScale: number, toX: number, toY: number];
 }
 
 const FRAMES: Frame[] = [
@@ -92,12 +94,22 @@ const FRAMES: Frame[] = [
 
 /** Six photographs, each dissolving slowly into the next. */
 const DISSOLVE: Frame[] = [
-  { src: A("1929-tee-shot-bay.webp"), hold: 850, era: "archive", focus: "center 70%" },
-  { src: A("1929-opening-foursome.webp"), hold: 850, era: "archive", focus: "center 10%" },
-  { src: IMG + "mackenzie.webp", hold: 850, era: "archive", focus: "53% 16%" },
-  { src: A("1929-bunkered-green.webp"), hold: 850, era: "archive", focus: "center 60%" },
-  { src: IMG + "course-green.webp", hold: 850, era: "today", focus: "center 60%" },
-  { src: T("aerial-dawn.webp"), hold: 850, era: "today" },
+  // 1929 — a slow rise over the crowd at the tee, the bay beyond.
+  { src: A("1929-tee-shot-bay.webp"), hold: 760, era: "archive", focus: "center 70%", move: [1.12, 0, 3, 1.04, 0, -1] },
+  // Push in on the foursome.
+  { src: A("1929-opening-foursome.webp"), hold: 700, era: "archive", focus: "center 10%", move: [1.02, 0, 0, 1.12, 0, 1] },
+  { src: IMG + "mackenzie.webp", hold: 700, era: "archive", focus: "53% 16%", move: [1.14, 0, 0, 1.04, 0, 0] },
+  // Drift across the gallery under the oak.
+  { src: A("1929-gallery-oak.webp"), hold: 700, era: "archive", focus: "center 60%", move: [1.1, 2.5, 0, 1.1, -2, 0] },
+  { src: IMG + "hollins.webp", hold: 700, era: "archive", focus: "50% 30%", move: [1.04, 0, 0, 1.14, 0, 0] },
+  { src: A("1929-bunkered-green.webp"), hold: 760, era: "archive", focus: "center 60%", move: [1.04, 0, 0, 1.12, 0, 0] },
+  // 2027 — the same kind of green, in colour, and the light comes up.
+  { src: IMG + "course-green.webp", hold: 760, era: "today", focus: "center 60%", move: [1.12, 0, 0, 1.04, 0, 0] },
+  // Walk forward across the bridge.
+  { src: T("bridge.webp"), hold: 700, era: "today", focus: "center 60%", move: [1.02, 0, 0, 1.14, 0, 1] },
+  { src: T("flag-green.webp"), hold: 700, era: "today", focus: "70% 60%", move: [1.1, -2, 0, 1.1, 2, 0] },
+  // ...and pull back over the course at dawn, where the title rises.
+  { src: T("aerial-dawn.webp"), hold: 800, era: "today", focus: "center 50%", move: [1.14, 0, 1, 1.05, 0, 0] },
 ];
 /** Then and now: three 1929 photographs, each wiped away by its view today. */
 const WIPE: Frame[] = [
@@ -124,12 +136,14 @@ const VARIANTS: Record<Variant, Frame[]> = {
   wipe: WIPE,
   letters: LETTERS,
 };
+/** The intro visitors get. The others play with ?intro=flip | wipe | letters. */
+const DEFAULT_VARIANT: Variant = "dissolve";
 function readVariant(): Variant {
   try {
     const v = new URLSearchParams(location.search).get("intro");
-    return v && v in VARIANTS ? (v as Variant) : "flip";
+    return v && v in VARIANTS ? (v as Variant) : DEFAULT_VARIANT;
   } catch {
-    return "flip";
+    return DEFAULT_VARIANT;
   }
 }
 
@@ -242,7 +256,7 @@ export default function IntroReel({
   const [fill, setFill] = useState(0);
   const [solid, setSolid] = useState(false);
   const [quick, setQuick] = useState(false);
-  const [variant, setVariant] = useState<Variant>("flip");
+  const [variant, setVariant] = useState<Variant>(DEFAULT_VARIANT);
   const frames = VARIANTS[variant];
   const calm = variant !== "flip";
   const done = useRef({ onReveal, onDone });
@@ -286,7 +300,8 @@ export default function IntroReel({
         else setPhase("title");
       }, frames[i].hold);
     } else if (phase === "title") {
-      t = setTimeout(() => setPhase("exit"), TITLE_MS);
+      // The dissolve's title draws itself across, so it holds a little longer.
+      t = setTimeout(() => setPhase("exit"), variant === "dissolve" ? 4300 : TITLE_MS);
     } else if (phase === "exit") {
       markSeen();
       if (quick) {
@@ -301,7 +316,7 @@ export default function IntroReel({
       clearTimeout(t);
       clearTimeout(r);
     };
-  }, [phase, i, quick, frames]);
+  }, [phase, i, quick, frames, variant]);
 
   // Under the title, the pages keep turning — through the letters and behind
   // them — then stop and the letters settle solid.
@@ -383,6 +398,10 @@ export default function IntroReel({
           {prevFrame && <Page key={"p" + (i - 1)} f={prevFrame} under />}
           <Page key={"p" + i} f={frame} />
           {!calm && i === FIRST_TODAY && <div className="mci-reel-burst" />}
+          {/* The dissolve: a warm bloom of light as 1929 turns to colour. */}
+          {variant === "dissolve" && i > 0 && frame.era === "today" && prevFrame?.era === "archive" && (
+            <div className="mci-reel-bloom" />
+          )}
           {/* Then-and-now: a gold line leads each wipe across. */}
           {variant === "wipe" && i > 0 && <div className="mci-wipe-line" key={"w" + i} />}
         </div>
@@ -444,6 +463,9 @@ export default function IntroReel({
         </div>
       )}
 
+      {/* Widescreen bars over the photographs; they open for the title. */}
+      <div className="mci-bars is-top" aria-hidden />
+      <div className="mci-bars is-bottom" aria-hidden />
       <div className="mci-reel-grain" aria-hidden />
       <div className="mci-reel-vignette" aria-hidden />
       <div className="mci-reel-bar" aria-hidden>
@@ -481,10 +503,22 @@ function Medal({ size }: { size: number }) {
 
 /** One full-bleed page of the flip-book: it swings in on its left edge. */
 function Page({ f, under }: { f: Frame; under?: boolean }) {
+  const m = f.move ?? [1.09, 0, 0, 1.01, 0, 0];
   return (
     <div
       className={"mci-page era-" + f.era + (under ? " is-under" : "")}
-      style={{ "--hold": f.hold + "ms", "--focus": f.focus ?? "center" } as CSSProperties}
+      style={
+        {
+          "--hold": f.hold + "ms",
+          "--focus": f.focus ?? "center",
+          "--fs": m[0],
+          "--fx": m[1] + "%",
+          "--fy": m[2] + "%",
+          "--ts": m[3],
+          "--tx": m[4] + "%",
+          "--ty": m[5] + "%",
+        } as CSSProperties
+      }
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={f.src} alt="" />
