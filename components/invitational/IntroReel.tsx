@@ -33,7 +33,10 @@ import { EVENT } from "./content";
 // copyright restrictions"). MacKenzie's portrait is from the Library of
 // Congress; Hollins's from the MHI site.
 
-const IMG = "/invitational/img/";
+// The reel uses light copies of the photographs (1280px WebP, in img/reel):
+// each page is on screen for a fraction of a second, and the whole set is
+// loaded before the reel starts.
+const IMG = "/invitational/img/reel/";
 const LOGO = "/logo-full.png";
 const A = (f: string) => IMG + "archive-" + f;
 const T = (f: string) => IMG + "today-" + f;
@@ -50,53 +53,53 @@ interface Frame {
 
 const FRAMES: Frame[] = [
   // ---- 1929: the archive, slowing on the faces, then speeding up ---------
-  { src: A("1929-tee-shot-bay.jpg"), hold: 320, era: "archive", focus: "center 70%" },
-  { src: IMG + "mackenzie.jpg", hold: 290, era: "archive", focus: "53% 16%" },
-  { src: A("1929-opening-foursome.jpg"), hold: 260, era: "archive", focus: "center 10%" },
-  { src: IMG + "hollins.avif", hold: 240, era: "archive", focus: "50% 30%" },
-  { src: A("1929-gallery-oak.jpg"), hold: 220, era: "archive", focus: "center 60%" },
-  { src: A("mackenzie-house-1933.jpg"), hold: 200, era: "archive", focus: "center 70%" },
-  { src: IMG + "hollins-swing.avif", hold: 180, era: "archive", focus: "60% 15%" },
-  { src: A("1929-golfer-oak.jpg"), hold: 165, era: "archive", focus: "center 70%" },
-  { src: A("1929-bunkered-green.jpg"), hold: 150, era: "archive", focus: "center 60%" },
-  { src: A("mackenzie-house-1933b.jpg"), hold: 140, era: "archive", focus: "center 40%" },
-  { src: A("1929-opening-foursome.jpg"), hold: 130, era: "archive", focus: "72% 10%" },
-  { src: IMG + "mackenzie.jpg", hold: 120, era: "archive", focus: "53% 14%" },
+  { src: A("1929-tee-shot-bay.webp"), hold: 320, era: "archive", focus: "center 70%" },
+  { src: IMG + "mackenzie.webp", hold: 290, era: "archive", focus: "53% 16%" },
+  { src: A("1929-opening-foursome.webp"), hold: 260, era: "archive", focus: "center 10%" },
+  { src: IMG + "hollins.webp", hold: 240, era: "archive", focus: "50% 30%" },
+  { src: A("1929-gallery-oak.webp"), hold: 220, era: "archive", focus: "center 60%" },
+  { src: A("mackenzie-house-1933.webp"), hold: 200, era: "archive", focus: "center 70%" },
+  { src: IMG + "hollins-swing.webp", hold: 180, era: "archive", focus: "60% 15%" },
+  { src: A("1929-golfer-oak.webp"), hold: 165, era: "archive", focus: "center 70%" },
+  { src: A("1929-bunkered-green.webp"), hold: 150, era: "archive", focus: "center 60%" },
+  { src: A("mackenzie-house-1933b.webp"), hold: 140, era: "archive", focus: "center 40%" },
+  { src: A("1929-opening-foursome.webp"), hold: 130, era: "archive", focus: "72% 10%" },
+  { src: IMG + "mackenzie.webp", hold: 120, era: "archive", focus: "53% 14%" },
   // ---- 2027: a flash, and the pages race on in colour --------------------
-  { src: T("clock-1929.jpg"), hold: 110, era: "today", focus: "18% center" },
-  { src: IMG + "course-green.jpg", hold: 100, era: "today" },
-  { src: T("bridge.jpg"), hold: 95, era: "today", focus: "center 60%" },
-  { src: T("aerial-dawn.jpg"), hold: 90, era: "today" },
-  { src: T("flag-green.jpg"), hold: 85, era: "today", focus: "70% 60%" },
-  { src: T("chairs-bay.jpg"), hold: 80, era: "today", focus: "center 45%" },
-  { src: IMG + "course-wide.jpg", hold: 75, era: "today" },
-  { src: IMG + "clubhouse.avif", hold: 70, era: "today" },
-  { src: IMG + "hole-4-approach-poster.jpg", hold: 65, era: "today" },
-  { src: IMG + "aerial.avif", hold: 65, era: "today" },
-  { src: IMG + "bunkers-green.avif", hold: 60, era: "today" },
-  { src: IMG + "hole-11-approach-poster.jpg", hold: 60, era: "today" },
-  { src: IMG + "clubhouse-green.jpg", hold: 60, era: "today" },
-  { src: IMG + "course-bunkers.jpg", hold: 60, era: "today" },
-  { src: IMG + "schedule.avif", hold: 60, era: "today" },
-  { src: IMG + "hero.avif", hold: 60, era: "today" },
+  { src: T("clock-1929.webp"), hold: 110, era: "today", focus: "18% center" },
+  { src: IMG + "course-green.webp", hold: 100, era: "today" },
+  { src: T("bridge.webp"), hold: 95, era: "today", focus: "center 60%" },
+  { src: T("aerial-dawn.webp"), hold: 90, era: "today" },
+  { src: T("flag-green.webp"), hold: 85, era: "today", focus: "70% 60%" },
+  { src: T("chairs-bay.webp"), hold: 80, era: "today", focus: "center 45%" },
+  { src: IMG + "course-wide.webp", hold: 75, era: "today" },
+  { src: IMG + "clubhouse.webp", hold: 70, era: "today" },
+  { src: IMG + "hole-4-approach-poster.webp", hold: 65, era: "today" },
+  { src: IMG + "aerial.webp", hold: 65, era: "today" },
+  { src: IMG + "bunkers-green.webp", hold: 60, era: "today" },
+  { src: IMG + "hole-11-approach-poster.webp", hold: 60, era: "today" },
+  { src: IMG + "clubhouse-green.webp", hold: 60, era: "today" },
+  { src: IMG + "course-bunkers.webp", hold: 60, era: "today" },
+  { src: IMG + "schedule.webp", hold: 60, era: "today" },
+  { src: IMG + "hero.webp", hold: 60, era: "today" },
 ];
 
 /** Photos that run through the letters of PASATIEMPO — then and now. */
 const FILL = [
-  A("1929-tee-shot-bay.jpg"),
-  T("aerial-dawn.jpg"),
-  A("1929-opening-foursome.jpg"),
-  IMG + "course-green.jpg",
-  A("1929-bunkered-green.jpg"),
-  T("bridge.jpg"),
-  A("1929-gallery-oak.jpg"),
-  IMG + "hole-4-approach-poster.jpg",
-  IMG + "mackenzie.jpg",
-  T("flag-green.jpg"),
+  A("1929-tee-shot-bay.webp"),
+  T("aerial-dawn.webp"),
+  A("1929-opening-foursome.webp"),
+  IMG + "course-green.webp",
+  A("1929-bunkered-green.webp"),
+  T("bridge.webp"),
+  A("1929-gallery-oak.webp"),
+  IMG + "hole-4-approach-poster.webp",
+  IMG + "mackenzie.webp",
+  T("flag-green.webp"),
 ];
 /** ...and the pages that keep turning behind the title until it settles. */
 const BEHIND = FRAMES.map((f) => f.src);
-const SETTLE_ON = T("chairs-bay.jpg");
+const SETTLE_ON = T("chairs-bay.webp");
 
 const LEAD_MS = 250; // a beat of black before the first page
 const TITLE_MS = 3200; // PASATIEMPO on screen
