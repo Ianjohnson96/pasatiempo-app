@@ -519,6 +519,60 @@ body:has(.mci){margin:0;}
 .mci-intro.var-letters.is-solid .mci-reel.is-behind{opacity:.3;filter:blur(5px) saturate(.75);}
 .mci-intro.var-letters.is-exit .mci-reel.is-behind{opacity:0;}
 
+/* ---- The dissolve cut (the default): widescreen, slow camera, a title over the course ---- */
+/* Each photograph's own camera move (set per frame in IntroReel). */
+.mci-intro.is-calm .mci-page img{animation:mci-move 2.6s cubic-bezier(.3,.2,.5,1) both;}
+@keyframes mci-move{from{transform:translate(var(--fx,0),var(--fy,0)) scale(var(--fs,1.09));}to{transform:translate(var(--tx,0),var(--ty,0)) scale(var(--ts,1.01));}}
+.mci-intro.var-dissolve .mci-page{animation-duration:.9s;}
+/* Widescreen bars. */
+.mci-bars{position:absolute;left:0;right:0;height:0;z-index:6;background:#000;pointer-events:none;transition:height 1.1s cubic-bezier(.6,0,.2,1);}
+.mci-bars.is-top{top:0;}
+.mci-bars.is-bottom{bottom:0;}
+.mci-intro.var-dissolve.is-lead .mci-bars,.mci-intro.var-dissolve.is-reel .mci-bars{height:10.5vh;}
+/* The year, as a film title card above the lower bar. */
+.mci-intro.var-dissolve .mci-reel-year,.mci-intro.var-dissolve .mci-reel-year.is-now{
+  left:6vw;right:auto;bottom:calc(10.5vh + 22px);width:auto;text-align:left;transform:none;
+  font-size:clamp(22px,2.6vw,38px);font-weight:600;letter-spacing:.42em;color:#f5f0e2;-webkit-text-stroke:0;
+  text-shadow:0 2px 18px rgba(0,0,0,.7);animation:mci-year-card .9s ease both;}
+.mci-intro.var-dissolve .mci-reel-year::before{content:"";display:block;width:44px;height:1px;margin-bottom:12px;background:var(--gold-bright);}
+@keyframes mci-year-card{from{opacity:0;letter-spacing:.7em;}to{opacity:1;letter-spacing:.42em;}}
+/* The bloom as the film turns to colour. */
+.mci-reel-bloom{position:absolute;inset:0;z-index:3;pointer-events:none;mix-blend-mode:screen;
+  background:radial-gradient(ellipse at 70% 35%,rgba(255,226,170,.75),rgba(236,190,120,.3) 40%,transparent 72%);
+  animation:mci-bloom 1.5s ease-out both;}
+@keyframes mci-bloom{0%{opacity:0;}25%{opacity:1;}100%{opacity:0;}}
+
+/* The title: the course stays in view; a soft scrim sits only behind the words. */
+.mci-intro.var-dissolve .mci-reel.is-behind{opacity:.92;filter:saturate(1.05);animation:none;}
+.mci-intro.var-dissolve.is-exit .mci-reel.is-behind{opacity:0;}
+.mci-intro.var-dissolve .mci-reel.is-behind .mci-page img{animation:mci-title-drift 7s linear both;}
+@keyframes mci-title-drift{from{transform:scale(1.05);}to{transform:scale(1.13);}}
+.mci-intro.var-dissolve .mci-reel-title{background:
+  radial-gradient(ellipse 62% 46% at 50% 52%,rgba(6,10,18,.62),rgba(6,10,18,.28) 60%,transparent 100%);}
+.mci-intro.var-dissolve.is-title .mci-reel-vignette,.mci-intro.var-dissolve.is-exit .mci-reel-vignette{
+  background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.45) 100%);}
+/* A larger crest. */
+.mci-intro.var-dissolve .mci-reel-title .mci-medal{--crest:clamp(132px,15vw,196px) !important;}
+.mci-intro.var-dissolve .mci-reel-title-crest{margin-bottom:14px;}
+.mci-intro.var-dissolve .mci-reel-title-crest .mci-medal{animation:mci-crest-rise 1.1s .1s cubic-bezier(.2,.7,.2,1) both;}
+@keyframes mci-crest-rise{from{opacity:0;transform:scale(.8);filter:blur(6px);}to{opacity:1;transform:none;filter:none;}}
+/* PASATIEMPO: solid from the start, drawn across left to right as its tracking settles. */
+.mci-intro.var-dissolve .mci-reel-word{font-size:clamp(46px,11.5vw,176px);}
+.mci-intro.var-dissolve .mci-reel-word.is-photo{visibility:hidden;}
+.mci-intro.var-dissolve .mci-reel-word.is-solid{opacity:1;transition:none;
+  text-shadow:0 0 60px rgba(210,171,94,.4),0 4px 34px rgba(0,0,0,.75);
+  animation:mci-word-draw 1.5s .45s cubic-bezier(.3,.1,.2,1) both;}
+@keyframes mci-word-draw{from{clip-path:inset(-20% 100% -20% 0);letter-spacing:.14em;opacity:.2;}
+  to{clip-path:inset(-20% -5% -20% 0);letter-spacing:.03em;opacity:1;}}
+.mci-intro.var-dissolve .mci-reel-rule{animation-delay:1.5s;}
+.mci-intro.var-dissolve .mci-reel-sub{animation-delay:1.7s;text-shadow:0 2px 16px rgba(0,0,0,.8);}
+.mci-intro.var-dissolve.is-solid .mci-reel-sweep{animation-delay:.9s;}
+@media (max-width:760px){
+  .mci-intro.var-dissolve.is-lead .mci-bars,.mci-intro.var-dissolve.is-reel .mci-bars{height:7vh;}
+  .mci-intro.var-dissolve .mci-reel-year,.mci-intro.var-dissolve .mci-reel-year.is-now{bottom:calc(7vh + 18px);}
+  .mci-intro.var-dissolve .mci-reel-word{font-size:clamp(36px,12vw,90px);}
+}
+
 /* Replay, in the footer. */
 .mci .mci-replay{margin-top:18px;display:inline-flex;align-items:center;gap:8px;appearance:none;cursor:pointer;background:none;
   border:1px solid rgba(210,171,94,.45);color:var(--gold-pale);border-radius:99px;padding:7px 16px;
