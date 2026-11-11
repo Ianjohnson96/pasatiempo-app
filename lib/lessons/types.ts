@@ -6,6 +6,8 @@
 // one-off. Money therefore lives on the package and never on the lesson - the
 // earlier per-lesson model was wrong about how he actually works.
 
+import type { CatchUpGap } from "./catchup";
+
 /** Submitted-but-not-posted member charges are real, so this is not a boolean. */
 export type PaymentStatus = "unpaid" | "pending" | "paid";
 
@@ -157,6 +159,8 @@ export interface ClientSummary {
   lastLessonAt: string | null;
   packageCount: number;
   owedCents: number;
+  /** Money taken in: every paid bill's price. */
+  paidCents: number;
   /** Lessons on no bill yet - neither in a package nor a single. */
   unbilled: number;
 }
@@ -278,10 +282,20 @@ export interface BillingClient {
   roomIn: { id: string; title: string; left: number }[];
 }
 
+/** A bill on the catch-up list, with the date it would count as paid. */
+export interface CatchUpBill extends PackageRec {
+  /** Pacific day of the series' first lesson; null if it has none yet. */
+  firstLessonOn: string | null;
+  gaps: CatchUpGap[];
+}
+
 export interface BillingData {
   clients: BillingClient[];
-  /** Every bill not yet paid (unpaid or pending), oldest first. */
-  unpaid: PackageRec[];
+  /**
+   * Every bill that stops the money adding up - unpaid, pending, or paid
+   * with no price or no method - oldest first.
+   */
+  catchUp: CatchUpBill[];
 }
 
 // ---- payments received ----------------------------------------------------
