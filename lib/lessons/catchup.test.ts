@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { catchUpGaps, paidTotals, seriesPaidOn } from "./catchup";
+import { catchUpGaps, markPaidOn, paidTotals, seriesPaidOn } from "./catchup";
 
 const bill = (p: {
   paymentStatus?: "unpaid" | "pending" | "paid";
@@ -93,5 +93,34 @@ describe("seriesPaidOn", () => {
 
   it("returns null when nothing is known, so the form asks", () => {
     expect(seriesPaidOn({ kind: "package", soldOn: null, paidOn: null }, null)).toBeNull();
+  });
+});
+
+describe("markPaidOn", () => {
+  const base = {
+    alreadyPaidOn: null,
+    venmoOn: null,
+    firstLessonOn: "2025-06-04",
+    soldOn: "2025-06-01",
+    today: "2026-11-10",
+  };
+
+  it("dates a bill marked paid today by its first lesson, not today", () => {
+    expect(markPaidOn(base)).toBe("2025-06-04");
+  });
+
+  it("uses the day the tied Venmo payment arrived when there is one", () => {
+    expect(markPaidOn({ ...base, venmoOn: "2025-06-02" })).toBe("2025-06-02");
+  });
+
+  it("keeps the date of a bill that was already paid", () => {
+    expect(markPaidOn({ ...base, alreadyPaidOn: "2025-07-01", venmoOn: "2025-06-02" })).toBe(
+      "2025-07-01",
+    );
+  });
+
+  it("falls back to the sold date, then today, when nothing else is known", () => {
+    expect(markPaidOn({ ...base, firstLessonOn: null })).toBe("2025-06-01");
+    expect(markPaidOn({ ...base, firstLessonOn: null, soldOn: null })).toBe("2026-11-10");
   });
 });

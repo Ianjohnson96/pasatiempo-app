@@ -15,6 +15,7 @@ import {
   parseDollars,
   singleRate,
 } from "./calc";
+import { markPaidOn } from "./catchup";
 import type { PayMethod, PaymentStatus, Result } from "./types";
 
 // Write-side for the lesson book.
@@ -69,6 +70,47 @@ function courseToday(): string {
 }
 
 /**
+ * The day a one-tap "paid" should record - see markPaidOn. Stamping today
+ * put a year of caught-up bills into the month they were entered.
+ */
+async function paidOnFor(
+  supa: Awaited<ReturnType<typeof lessonBookClient>>,
+  packageId: string,
+): Promise<string> {
+  const [pkg, first, venmo] = await Promise.all([
+    supa
+      .from("lesson_packages")
+      .select("payment_status, paid_on, sold_on")
+      .eq("id", packageId)
+      .maybeSingle(),
+    supa
+      .from("lessons")
+      .select("starts_at")
+      .eq("package_id", packageId)
+      .neq("status", "cancelled")
+      .order("starts_at")
+      .limit(1),
+    supa
+      .from("lesson_payments")
+      .select("paid_on")
+      .eq("package_id", packageId)
+      .order("paid_on")
+      .limit(1),
+  ]);
+  for (const r of [pkg, first, venmo]) if (r.error) throw r.error;
+  const starts = first.data?.[0]?.starts_at as string | undefined;
+  const venmoOn = venmo.data?.[0]?.paid_on as string | undefined;
+  return markPaidOn({
+    alreadyPaidOn:
+      pkg.data?.payment_status === "paid" ? ((pkg.data.paid_on as string | null) ?? null) : null,
+    venmoOn: venmoOn ? venmoOn.slice(0, 10) : null,
+    firstLessonOn: starts ? courseDay(starts) : null,
+    soldOn: (pkg.data?.sold_on as string | null) ?? null,
+    today: courseToday(),
+  });
+}
+
+/**
  * Move a package between unpaid / pending / paid.
  *
  * `pending` is a real state, not a halfway house: a member charge submitted to
@@ -87,7 +129,7 @@ export async function setPackagePayment(
     const patch: Record<string, unknown> = { payment_status: status };
     // paid_on only means something once it is actually paid; a stale date left
     // on a reverted package would misreport when the money arrived.
-    patch.paid_on = status === "paid" ? courseToday() : null;
+    patch.paid_on = status === "paid" ? await paidOnFor(supa, packageId) : null;
     if (opts?.method !== undefined) patch.payment_method = opts.method;
 
     const { error } = await supa

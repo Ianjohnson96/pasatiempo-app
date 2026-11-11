@@ -49,6 +49,23 @@ export function catchUpGaps(b: Billish): CatchUpGap[] {
  * the day it was entered - entering last spring's packages today must not
  * put last spring's money in November. A date already recorded wins.
  */
+/**
+ * The day to record when a bill is marked paid with one tap.
+ *
+ * Marking paid is usually catching up, not money arriving that minute, so
+ * "today" is the last resort: a bill already paid keeps its day, then the
+ * day its Venmo payment landed, then its first lesson, then when it was sold.
+ */
+export function markPaidOn(e: {
+  alreadyPaidOn: string | null;
+  venmoOn: string | null;
+  firstLessonOn: string | null;
+  soldOn: string | null;
+  today: string;
+}): string {
+  return e.alreadyPaidOn ?? e.venmoOn ?? e.firstLessonOn ?? e.soldOn ?? e.today;
+}
+
 export function seriesPaidOn(
   p: { kind: "package" | "single"; soldOn: string | null; paidOn: string | null },
   firstLessonOn: string | null,
