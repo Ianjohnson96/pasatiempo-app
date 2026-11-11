@@ -386,6 +386,8 @@ export interface LedgerPack {
   paymentStatus: PaymentStatus;
   paymentMethod: string | null;
   soldOn: string | null;
+  /** The day it was paid; null until it is. */
+  paidOn: string | null;
 }
 
 export interface LedgerRow {

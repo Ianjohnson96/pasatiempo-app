@@ -545,7 +545,7 @@ export async function lessonLedger(): Promise<LedgerData> {
     supa
       .from("lesson_packages")
       .select(
-        "id, client_id, kind, size, price_cents, payment_status, payment_method, sold_on",
+        "id, client_id, kind, size, price_cents, payment_status, payment_method, sold_on, paid_on",
       ),
     supa
       .from("lesson_payments")
@@ -683,6 +683,7 @@ export async function lessonLedger(): Promise<LedgerData> {
             paymentStatus: ((raw.payment_status as string) ?? "unpaid") as PaymentStatus,
             paymentMethod: str(raw.payment_method),
             soldOn: str(raw.sold_on),
+            paidOn: str(raw.paid_on),
           }
         : null,
       hint: hintSummary(hints),
