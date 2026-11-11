@@ -480,6 +480,45 @@ body:has(.mci){margin:0;}
   .mci .mci-reel-skip{top:14px;right:14px;}
 }
 
+/* ---- Calmer cuts (?intro=dissolve | wipe | letters) ---- */
+/* Shared: no page-turn, no flicker, a slow push on each photograph. */
+.mci-intro.is-calm .mci-reel{perspective:none;}
+.mci-intro.is-calm .mci-page{transform:none;animation:mci-xfade .75s ease both;}
+.mci-intro.is-calm .mci-page::after{display:none;}
+.mci-intro.is-calm .mci-page img{animation:mci-push-slow 2.4s linear both;}
+@keyframes mci-xfade{from{opacity:0;}to{opacity:1;}}
+@keyframes mci-push-slow{from{transform:scale(1.09);}to{transform:scale(1.01);}}
+.mci-intro.is-calm .mci-reel-vignette{animation:none;}
+.mci-intro.is-calm .mci-reel-grain{opacity:.22;}
+.mci-intro.is-calm .mci-reel-year,.mci-intro.is-calm .mci-reel-year.is-now{animation:mci-year-in .6s ease both;}
+/* The title: the last photograph dims behind it; nothing flickers. */
+.mci-intro.is-calm .mci-reel.is-behind{animation:mci-dim .9s ease both;}
+@keyframes mci-dim{from{opacity:1;filter:none;}}
+.mci-intro.is-calm .mci-reel-word.is-photo{animation-duration:.9s;}
+.mci-intro.is-calm.is-exit .mci-reel.is-behind{opacity:0;}
+
+/* Then and now: each photograph is wiped away, a gold line leading. */
+.mci-intro.var-wipe .mci-page{animation:mci-wipe .8s cubic-bezier(.7,0,.2,1) both;}
+@keyframes mci-wipe{from{clip-path:inset(0 100% 0 0);}to{clip-path:inset(0 0 0 0);}}
+.mci-wipe-line{position:absolute;top:0;bottom:0;left:0;width:2px;z-index:3;pointer-events:none;
+  background:linear-gradient(180deg,transparent,var(--gold-bright) 15%,var(--gold-bright) 85%,transparent);
+  box-shadow:0 0 18px rgba(210,171,94,.7);animation:mci-wipe-line .8s cubic-bezier(.7,0,.2,1) both;}
+@keyframes mci-wipe-line{from{transform:translateX(0);opacity:1;}90%{opacity:1;}to{transform:translateX(100vw);opacity:0;}}
+
+/* Letters: a black sheet with PASATIEMPO cut out of it. */
+.mci-knock{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:0 4vw;font-family:var(--disp);background:#000;color:#fff;mix-blend-mode:multiply;
+  animation:mci-title-push 9s cubic-bezier(.3,.2,.4,1) both;transition:opacity .9s ease;}
+.mci-knock .mci-reel-sub{visibility:hidden;animation:none;}
+.mci-intro.var-letters.is-solid .mci-knock{opacity:0;}
+.mci-intro.var-letters .mci-reel-year{display:none;}
+.mci-intro.var-letters .mci-reel-word.is-photo{visibility:hidden;}
+.mci-intro.var-letters .mci-reel-title{animation:none;transform:none;}
+.mci-intro.var-letters .mci-knock{animation:none;}
+.mci-intro.var-letters .mci-reel.is-behind{animation:none;opacity:1;filter:none;transition:opacity .9s ease,filter .9s ease;}
+.mci-intro.var-letters.is-solid .mci-reel.is-behind{opacity:.3;filter:blur(5px) saturate(.75);}
+.mci-intro.var-letters.is-exit .mci-reel.is-behind{opacity:0;}
+
 /* Replay, in the footer. */
 .mci .mci-replay{margin-top:18px;display:inline-flex;align-items:center;gap:8px;appearance:none;cursor:pointer;background:none;
   border:1px solid rgba(210,171,94,.45);color:var(--gold-pale);border-radius:99px;padding:7px 16px;

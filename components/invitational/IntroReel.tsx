@@ -84,6 +84,55 @@ const FRAMES: Frame[] = [
   { src: IMG + "hero.webp", hold: 60, era: "today" },
 ];
 
+// ---- Calmer cuts, for comparison -------------------------------------------
+// Open the page with ?intro=dissolve, ?intro=wipe or ?intro=letters to play
+// one of these in place of the flip-book (it plays even if the intro has
+// already been seen this session). Each uses a handful of photographs, held
+// long enough to look at, and a title that arrives without flicker.
+
+/** Six photographs, each dissolving slowly into the next. */
+const DISSOLVE: Frame[] = [
+  { src: A("1929-tee-shot-bay.webp"), hold: 850, era: "archive", focus: "center 70%" },
+  { src: A("1929-opening-foursome.webp"), hold: 850, era: "archive", focus: "center 10%" },
+  { src: IMG + "mackenzie.webp", hold: 850, era: "archive", focus: "53% 16%" },
+  { src: A("1929-bunkered-green.webp"), hold: 850, era: "archive", focus: "center 60%" },
+  { src: IMG + "course-green.webp", hold: 850, era: "today", focus: "center 60%" },
+  { src: T("aerial-dawn.webp"), hold: 850, era: "today" },
+];
+/** Then and now: three 1929 photographs, each wiped away by its view today. */
+const WIPE: Frame[] = [
+  { src: A("1929-tee-shot-bay.webp"), hold: 800, era: "archive", focus: "center 70%" },
+  { src: T("chairs-bay.webp"), hold: 800, era: "today", focus: "center 45%" },
+  { src: A("1929-bunkered-green.webp"), hold: 800, era: "archive", focus: "center 60%" },
+  { src: IMG + "course-green.webp", hold: 800, era: "today", focus: "center 60%" },
+  { src: A("1929-gallery-oak.webp"), hold: 800, era: "archive", focus: "center 60%" },
+  { src: T("aerial-dawn.webp"), hold: 800, era: "today" },
+];
+/** PASATIEMPO from the first frame, the photographs seen only through its letters. */
+const LETTERS: Frame[] = [
+  { src: A("1929-tee-shot-bay.webp"), hold: 900, era: "archive", focus: "center 70%" },
+  { src: A("1929-opening-foursome.webp"), hold: 900, era: "archive", focus: "center 10%" },
+  { src: A("1929-bunkered-green.webp"), hold: 900, era: "archive", focus: "center 60%" },
+  { src: IMG + "course-green.webp", hold: 900, era: "today", focus: "center 60%" },
+  { src: T("aerial-dawn.webp"), hold: 900, era: "today" },
+];
+
+type Variant = "flip" | "dissolve" | "wipe" | "letters";
+const VARIANTS: Record<Variant, Frame[]> = {
+  flip: FRAMES,
+  dissolve: DISSOLVE,
+  wipe: WIPE,
+  letters: LETTERS,
+};
+function readVariant(): Variant {
+  try {
+    const v = new URLSearchParams(location.search).get("intro");
+    return v && v in VARIANTS ? (v as Variant) : "flip";
+  } catch {
+    return "flip";
+  }
+}
+
 /** Photos that run through the letters of PASATIEMPO — then and now. */
 const FILL = [
   A("1929-tee-shot-bay.webp"),
@@ -131,7 +180,7 @@ declare global {
  * hides the reel with an injected style rather than touching <html>, which
  * React owns and would report as a hydration mismatch.
  */
-export const INTRO_GATE = `(function(){var skip=true;try{var h=location.hash.slice(1);skip=(h&&h!=="home")||!!sessionStorage.getItem("${SEEN_KEY}")||matchMedia("(prefers-reduced-motion: reduce)").matches;}catch(e){}if(skip){window.__mciIntro="skip";var s=document.createElement("style");s.id="${SKIP_STYLE}";s.textContent=".mci-intro{display:none!important}";document.head.appendChild(s);}})();`;
+export const INTRO_GATE = `(function(){var skip=true;try{var h=location.hash.slice(1);skip=(h&&h!=="home")||!!sessionStorage.getItem("${SEEN_KEY}")||matchMedia("(prefers-reduced-motion: reduce)").matches;if(/[?&]intro=/.test(location.search))skip=false;}catch(e){}if(skip){window.__mciIntro="skip";var s=document.createElement("style");s.id="${SKIP_STYLE}";s.textContent=".mci-intro{display:none!important}";document.head.appendChild(s);}})();`;
 
 /** Replay from the footer: lift the before-paint skip. */
 export function allowReplay() {
@@ -144,6 +193,7 @@ export function introSkipped(): boolean {
   if (window.__mciIntro === "play") return false;
   if (window.__mciIntro === "skip") return true;
   try {
+    if (/[?&]intro=/.test(location.search)) return false;
     const h = location.hash.slice(1);
     return (
       (!!h && h !== "home") ||
@@ -192,6 +242,9 @@ export default function IntroReel({
   const [fill, setFill] = useState(0);
   const [solid, setSolid] = useState(false);
   const [quick, setQuick] = useState(false);
+  const [variant, setVariant] = useState<Variant>("flip");
+  const frames = VARIANTS[variant];
+  const calm = variant !== "flip";
   const done = useRef({ onReveal, onDone });
   useEffect(() => {
     done.current = { onReveal, onDone };
@@ -208,8 +261,12 @@ export default function IntroReel({
     const prev = html.style.overflow;
     html.style.overflow = "hidden";
     let alive = true;
-    preload([LOGO, ...new Set([...BEHIND, ...FILL])], 3000).then(() => {
-      if (alive) setPhase("lead");
+    const v = readVariant();
+    const srcs = v === "flip" ? [...BEHIND, ...FILL] : [...VARIANTS[v].map((f) => f.src), SETTLE_ON];
+    preload([LOGO, ...new Set(srcs)], 3000).then(() => {
+      if (!alive) return;
+      setVariant(v);
+      setPhase("lead");
     });
     return () => {
       alive = false;
@@ -225,9 +282,9 @@ export default function IntroReel({
       t = setTimeout(() => setPhase("reel"), LEAD_MS);
     } else if (phase === "reel") {
       t = setTimeout(() => {
-        if (i < FRAMES.length - 1) setI(i + 1);
+        if (i < frames.length - 1) setI(i + 1);
         else setPhase("title");
-      }, FRAMES[i].hold);
+      }, frames[i].hold);
     } else if (phase === "title") {
       t = setTimeout(() => setPhase("exit"), TITLE_MS);
     } else if (phase === "exit") {
@@ -244,13 +301,14 @@ export default function IntroReel({
       clearTimeout(t);
       clearTimeout(r);
     };
-  }, [phase, i, quick]);
+  }, [phase, i, quick, frames]);
 
   // Under the title, the pages keep turning — through the letters and behind
   // them — then stop and the letters settle solid.
   useEffect(() => {
     if (phase !== "title") return;
-    const flick = setInterval(() => setFill((n) => n + 1), 75);
+    // The calm cuts don't flicker: the last photograph holds in the letters.
+    const flick = calm ? undefined : setInterval(() => setFill((n) => n + 1), 75);
     const settle = setTimeout(() => {
       clearInterval(flick);
       setSolid(true);
@@ -259,7 +317,7 @@ export default function IntroReel({
       clearInterval(flick);
       clearTimeout(settle);
     };
-  }, [phase]);
+  }, [phase, calm]);
 
   // Skip from the keyboard.
   useEffect(() => {
@@ -280,30 +338,34 @@ export default function IntroReel({
   };
   const inReel = phase === "reel";
   const inTitle = phase === "title" || phase === "exit";
-  const frame = FRAMES[i];
-  const prevFrame = i > 0 ? FRAMES[i - 1] : null;
+  const frame = frames[i];
+  const prevFrame = i > 0 ? frames[i - 1] : null;
+  const last = frames[frames.length - 1];
   const era: Era | "none" = inReel ? frame.era : "none";
   // Behind the title: the pages keep turning, then rest on the bay.
-  const behind: Frame = solid
+  const behind: Frame = calm
+    ? last
+    : solid
     ? { src: SETTLE_ON, hold: 900, era: "today", focus: "center 45%" }
     : { src: BEHIND[(FIRST_TODAY + fill) % BEHIND.length], hold: 75, era: "today" };
   const behindPrev: Frame | null =
-    !solid && fill > 0
+    !calm && !solid && fill > 0
       ? { src: BEHIND[(FIRST_TODAY + fill - 1) % BEHIND.length], hold: 75, era: "today" }
       : null;
 
-  const total = FRAMES.reduce((s, f) => s + f.hold, 0);
+  const total = frames.reduce((s, f) => s + f.hold, 0);
   const progress =
     phase === "load" || phase === "lead"
       ? 0
       : inReel
-        ? (FRAMES.slice(0, i).reduce((s, f) => s + f.hold, 0) / total) * 0.75
+        ? (frames.slice(0, i).reduce((s, f) => s + f.hold, 0) / total) * 0.75
         : 1;
 
   return (
     <div
       className={
-        "mci-intro is-" + phase + " era-" + era + (solid ? " is-solid" : "") + (quick ? " is-quick" : "")
+        "mci-intro is-" + phase + " era-" + era + " var-" + variant +
+        (calm ? " is-calm" : "") + (solid ? " is-solid" : "") + (quick ? " is-quick" : "")
       }
       onClick={skip}
       role="presentation"
@@ -320,13 +382,28 @@ export default function IntroReel({
         <div className="mci-reel" aria-hidden>
           {prevFrame && <Page key={"p" + (i - 1)} f={prevFrame} under />}
           <Page key={"p" + i} f={frame} />
-          {i === FIRST_TODAY && <div className="mci-reel-burst" />}
+          {!calm && i === FIRST_TODAY && <div className="mci-reel-burst" />}
+          {/* Then-and-now: a gold line leads each wipe across. */}
+          {variant === "wipe" && i > 0 && <div className="mci-wipe-line" key={"w" + i} />}
+        </div>
+      )}
+      {/* Letters: the photographs show only through PASATIEMPO. The black
+          sheet multiplies everything but its white letters to black; it is
+          laid out exactly like the title, so the title takes over in place. */}
+      {variant === "letters" && (inReel || inTitle) && (
+        <div className="mci-knock" aria-hidden>
+          <div className="mci-knock-space" style={{ height: 116 }} />
+          <div className="mci-reel-word-wrap">
+            <div className="mci-reel-word">Pasatiempo</div>
+          </div>
+          <div className="mci-knock-space" style={{ height: 15 }} />
+          <div className="mci-reel-sub">&nbsp;</div>
         </div>
       )}
       {inTitle && (
         <div className="mci-reel is-behind" aria-hidden>
           {behindPrev && <Page key={"b" + (fill - 1)} f={behindPrev} under />}
-          <Page key={solid ? "b-settle" : "b" + fill} f={behind} />
+          <Page key={calm ? "b-calm" : solid ? "b-settle" : "b" + fill} f={behind} under={calm} />
         </div>
       )}
 
@@ -350,7 +427,7 @@ export default function IntroReel({
             <div
               className="mci-reel-word is-photo"
               aria-hidden
-              style={{ backgroundImage: `url(${FILL[fill % FILL.length]})` }}
+              style={{ backgroundImage: `url(${calm ? last.src : FILL[fill % FILL.length]})` }}
             >
               Pasatiempo
             </div>
