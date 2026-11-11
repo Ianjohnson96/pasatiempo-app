@@ -4,6 +4,7 @@ import {
   isLessonTitle,
   nameFromTitle,
   needsSingle,
+  planDelete,
   planEntry,
   readTitle,
 } from "./sync-plan";
@@ -161,5 +162,42 @@ describe("needsSingle", () => {
   });
   it("does not treat existing singles as room", () => {
     expect(needsSingle([{ kind: "single", size: 1, counted: 0 }])).toBe(true);
+  });
+});
+
+describe("planDelete", () => {
+  it("leaves the sync a marker so a calendar lesson never comes back", () => {
+    expect(planDelete({ calendarUid: "AAMk1", bill: null })).toEqual({
+      ok: true,
+      dismissUid: "AAMk1",
+      dropSingle: false,
+    });
+  });
+
+  it("needs no marker for a lesson added by hand", () => {
+    expect(planDelete({ calendarUid: null, bill: null })).toMatchObject({
+      ok: true,
+      dismissUid: null,
+    });
+  });
+
+  it("drops the lesson's own single when it was never paid", () => {
+    for (const status of ["unpaid", "pending"] as const) {
+      expect(
+        planDelete({ calendarUid: "AAMk1", bill: { kind: "single", status } }),
+      ).toMatchObject({ ok: true, dropSingle: true });
+    }
+  });
+
+  it("refuses when its single is paid, so money never quietly disappears", () => {
+    expect(
+      planDelete({ calendarUid: "AAMk1", bill: { kind: "single", status: "paid" } }).ok,
+    ).toBe(false);
+  });
+
+  it("takes a lesson out of a package without touching the package", () => {
+    expect(
+      planDelete({ calendarUid: "AAMk1", bill: { kind: "package", status: "paid" } }),
+    ).toEqual({ ok: true, dismissUid: "AAMk1", dropSingle: false });
   });
 });

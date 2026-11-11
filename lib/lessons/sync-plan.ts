@@ -183,6 +183,31 @@ export function planEntry(e: { matched: boolean; review: ReviewState }): {
 }
 
 /**
+ * Deleting a lesson - typically a calendar entry that was never a lesson.
+ *
+ * A calendar lesson leaves its uid behind as a dismissed Review entry, which
+ * planEntry skips forever; deleting the row alone would only last until the
+ * next sync. Its own single goes with it unless paid: a paid bill is money
+ * received, and deleting it would make that vanish without anyone deciding
+ * so. A package just loses the lesson.
+ */
+export function planDelete(e: {
+  calendarUid: string | null;
+  bill: { kind: string; status: string } | null;
+}):
+  | { ok: true; dismissUid: string | null; dropSingle: boolean }
+  | { ok: false; error: string } {
+  const single = e.bill?.kind === "single";
+  if (single && e.bill?.status === "paid") {
+    return {
+      ok: false,
+      error: "Its bill is marked paid. Set the bill to unpaid first, then delete.",
+    };
+  }
+  return { ok: true, dismissUid: e.calendarUid, dropSingle: single };
+}
+
+/**
  * Should a new calendar lesson be billed as a single?
  *
  * Yes when the client has no package with room left - nothing else it could

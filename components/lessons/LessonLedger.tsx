@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
+  deleteLesson,
   packFromTitle,
   setLessonHappened,
   setLessonPayment,
@@ -271,6 +272,68 @@ function LessonRow({
           onCancel={onOpen}
         />
       )}
+
+      <DeleteRow row={row} onDone={onDone} onError={onError} />
+    </div>
+  );
+}
+
+/**
+ * For a calendar entry that was never a lesson. Asks first, and tells the
+ * sync to skip the event so it does not come back tomorrow.
+ */
+function DeleteRow({
+  row,
+  onDone,
+  onError,
+}: {
+  row: LedgerRow;
+  onDone: (text: string) => void;
+  onError: (text: string) => void;
+}) {
+  const [asking, setAsking] = useState(false);
+  const [busy, start] = useTransition();
+  if (!asking) {
+    return (
+      <button
+        type="button"
+        className="lb-led-more"
+        style={{ marginTop: 8 }}
+        onClick={() => setAsking(true)}
+      >
+        Not a lesson? Delete
+      </button>
+    );
+  }
+  return (
+    <div className="lb-qacts" style={{ marginTop: 8, flexWrap: "wrap" }}>
+      <span className="lb-fhint" style={{ flexBasis: "100%", margin: 0 }}>
+        Delete {row.clientName} &middot; {clockTime(row.startsAt)}? The calendar
+        sync will not bring it back.
+      </span>
+      <button
+        type="button"
+        className="btn danger small"
+        disabled={busy}
+        onClick={() =>
+          start(async () => {
+            const r = await deleteLesson(row.id, row.clientId);
+            setAsking(false);
+            if (!r.ok) onError(r.error);
+            else onDone(`Deleted ${row.clientName} · ${clockTime(row.startsAt)}.`);
+          })
+        }
+      >
+        {busy ? "Deleting…" : "Yes, delete it"}
+      </button>
+      <button
+        type="button"
+        className="btn secondary small"
+        disabled={busy}
+        onClick={() => setAsking(false)}
+      >
+        Keep it
+      </button>
     </div>
   );
 }

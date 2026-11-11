@@ -16,6 +16,7 @@ import {
   singleRate,
 } from "./calc";
 import { markPaidOn } from "./catchup";
+import { planDelete } from "./sync-plan";
 import type { PayMethod, PaymentStatus, Result } from "./types";
 
 // Write-side for the lesson book.
@@ -1086,32 +1087,78 @@ export async function deletePackage(
 }
 
 /**
- * Delete a lesson that was added by hand. Calendar lessons are refused: the
- * next sync would only bring them back - cancel those in Outlook instead.
+ * Delete a lesson - usually a calendar entry that was never a lesson.
+ *
+ * A calendar lesson is dismissed in Review before the row goes, so the sync
+ * skips that event from now on rather than bringing it back (see
+ * planDelete). Its own unpaid single goes with it; a paid one is refused.
  */
 export async function deleteLesson(
   lessonId: string,
-  clientId: string,
+  clientId: string | null,
 ): Promise<Result> {
   try {
     await assertLessonBook();
     const supa = await lessonBookClient();
-    const { data, error } = await supa
+    const { data: lesson, error: lErr } = await supa
       .from("lessons")
-      .delete()
+      .select("id, client_id, package_id, calendar_uid, calendar_source, starts_at, ends_at, title_raw")
       .eq("id", lessonId)
-      .eq("client_id", clientId)
-      .eq("calendar_source", "manual")
-      .select("id");
-    if (error) throw error;
-    if (!data?.length) {
-      return {
-        ok: false,
-        error:
-          "Only lessons added by hand can be deleted here. Cancel calendar lessons in Outlook.",
-      };
+      .maybeSingle();
+    if (lErr) throw lErr;
+    if (!lesson) return { ok: false, error: "That lesson is no longer in the book." };
+
+    const packageId = lesson.package_id as string | null;
+    let bill: { kind: string; status: string } | null = null;
+    if (packageId) {
+      const { data: p, error } = await supa
+        .from("lesson_packages")
+        .select("kind, payment_status")
+        .eq("id", packageId)
+        .maybeSingle();
+      if (error) throw error;
+      if (p) bill = { kind: p.kind as string, status: p.payment_status as string };
     }
-    touched(clientId);
+
+    const plan = planDelete({
+      calendarUid: (lesson.calendar_uid as string | null) ?? null,
+      bill,
+    });
+    if (!plan.ok) return plan;
+
+    // The marker first: if the delete then fails, the worst case is a lesson
+    // the sync no longer refreshes, never one it brings back.
+    if (plan.dismissUid) {
+      const { error } = await supa.from("lesson_review").upsert(
+        {
+          calendar_uid: plan.dismissUid,
+          starts_at: lesson.starts_at,
+          ends_at: lesson.ends_at,
+          title_raw: (lesson.title_raw as string | null) ?? "(deleted lesson)",
+          calendar_source: lesson.calendar_source,
+          dismissed: true,
+        },
+        { onConflict: "calendar_uid" },
+      );
+      if (error) throw error;
+    }
+
+    const { error: dErr } = await supa.from("lessons").delete().eq("id", lessonId);
+    if (dErr) throw dErr;
+
+    if (plan.dropSingle && packageId) {
+      const { error } = await supa
+        .from("lesson_packages")
+        .delete()
+        .eq("id", packageId)
+        .eq("kind", "single")
+        .neq("payment_status", "paid");
+      if (error) throw error;
+    }
+
+    touched((lesson.client_id as string | null) ?? clientId ?? undefined);
+    revalidatePath(REVIEW);
+    revalidatePath("/lessons/billing");
     return { ok: true, value: undefined };
   } catch (e) {
     return fail(e, "Could not delete that lesson.");

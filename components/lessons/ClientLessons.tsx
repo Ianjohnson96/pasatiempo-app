@@ -377,9 +377,7 @@ export default function ClientLessons({
                 </select>
               </div>
               <LessonNote lesson={l} clientId={clientId} onNote={onNote} />
-              {l.calendarSource === "manual" && (
-                <DeleteManual lesson={l} clientId={clientId} onNote={onNote} />
-              )}
+              <DeleteLesson lesson={l} clientId={clientId} onNote={onNote} />
             </div>
           );
         })}
@@ -641,8 +639,11 @@ function LessonNote({
   );
 }
 
-/** Delete, for lessons added by hand only (calendar ones come back on sync). */
-function DeleteManual({
+/**
+ * Delete - for an entry that was never a lesson. A calendar one stays gone:
+ * the sync is told to skip that event from now on.
+ */
+function DeleteLesson({
   lesson,
   clientId,
   onNote,
@@ -665,7 +666,12 @@ function DeleteManual({
     );
   }
   return (
-    <div className="lb-qacts" style={{ marginTop: 8 }}>
+    <div className="lb-qacts" style={{ marginTop: 8, flexWrap: "wrap" }}>
+      {lesson.calendarUid && (
+        <span className="lb-fhint" style={{ flexBasis: "100%", margin: 0 }}>
+          Deletes it here and stops the calendar sync bringing it back.
+        </span>
+      )}
       <button
         type="button"
         className="btn danger small"
