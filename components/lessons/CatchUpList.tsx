@@ -2,7 +2,12 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { saveCatchUp, type CatchUpItem } from "@/lib/lessons/actions";
+import {
+  moveLessonToPackage,
+  saveCatchUp,
+  setLessonHappened,
+  type CatchUpItem,
+} from "@/lib/lessons/actions";
 import { parseDollars } from "@/lib/lessons/calc";
 import { seriesPaidOn } from "@/lib/lessons/catchup";
 import { METHOD_LABEL } from "@/lib/lessons/income";
@@ -11,6 +16,7 @@ import {
   packageTitle,
   PAYMENT_LABEL,
   type CatchUpBill,
+  type PackageOption,
   type PaymentStatus,
   type PayMethod,
 } from "@/lib/lessons/types";
@@ -50,7 +56,14 @@ function same(a: Draft, b: Draft): boolean {
   );
 }
 
-export default function CatchUpList({ bills }: { bills: CatchUpBill[] }) {
+export default function CatchUpList({
+  bills,
+  packages,
+}: {
+  bills: CatchUpBill[];
+  /** Every package (not single) in the book, for "part of a package?". */
+  packages: PackageOption[];
+}) {
   const start0 = useMemo(
     () => new Map(bills.map((b) => [b.id, startDraft(b)])),
     [bills],
@@ -62,12 +75,14 @@ export default function CatchUpList({ bills }: { bills: CatchUpBill[] }) {
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, start] = useTransition();
 
-  // The server sends a fresh list after a save; start again from it.
+  // The server sends a fresh list after any change. Keep what is being typed
+  // on rows still there - moving one lesson must not wipe the rest - and
+  // drop rows that have left the list.
   const [seen, setSeen] = useState(bills);
   if (seen !== bills) {
     setSeen(bills);
-    setDrafts(start0);
-    setPicked(new Set());
+    setDrafts((prev) => new Map(bills.map((b) => [b.id, prev.get(b.id) ?? startDraft(b)])));
+    setPicked((s) => new Set([...s].filter((id) => bills.some((b) => b.id === id))));
   }
 
   const needle = q.trim().toLowerCase();
@@ -304,6 +319,19 @@ export default function CatchUpList({ bills }: { bills: CatchUpBill[] }) {
                       </label>
                     )}
                   </div>
+
+                  {/* A single the sync made may really be the next lesson of
+                      a series - or a lesson that never happened. Paid singles
+                      stay put: that money is already counted. */}
+                  {b.kind === "single" && b.lessonId && b.paymentStatus !== "paid" && (
+                    <SingleFix
+                      bill={b}
+                      lessonId={b.lessonId}
+                      pkgs={packages.filter((p) => p.clientId === b.clientId)}
+                      disabled={busy}
+                      onNote={setNote}
+                    />
+                  )}
                 </li>
               );
             })}
@@ -311,5 +339,102 @@ export default function CatchUpList({ bills }: { bills: CatchUpBill[] }) {
         </div>
       )}
     </>
+  );
+}
+
+/** "5-pack · 3 of 5 · from Sep 23" - short enough for a chip on a phone. */
+function chipLabel(p: PackageOption): string {
+  const bits = [`${p.size}-pack`, `${p.used} of ${p.size}`];
+  if (p.firstLessonAt) bits.push(`from ${formatDay(p.firstLessonAt)}`);
+  return bits.join(" · ");
+}
+
+/**
+ * For a single lesson's bill: put the lesson on one of the client's packages
+ * (or a new one) instead of billing it alone, or say it never happened.
+ * Either way the single goes and the row leaves the list.
+ */
+function SingleFix({
+  bill,
+  lessonId,
+  pkgs,
+  disabled,
+  onNote,
+}: {
+  bill: CatchUpBill;
+  lessonId: string;
+  pkgs: PackageOption[];
+  disabled: boolean;
+  onNote: (n: { ok: boolean; text: string }) => void;
+}) {
+  const [busy, start] = useTransition();
+  const off = disabled || busy;
+  // Ones with room first: the likeliest home for this lesson.
+  const sorted = [...pkgs].sort(
+    (a, b) =>
+      Number(b.size - b.used > 0) - Number(a.size - a.used > 0) ||
+      (b.firstLessonAt ?? "").localeCompare(a.firstLessonAt ?? ""),
+  );
+  const when = bill.soldOn ? formatDay(bill.soldOn) : "this lesson";
+
+  function move(target: { packageId: string } | { newSize: number }, label: string) {
+    start(async () => {
+      const r = await moveLessonToPackage(lessonId, target);
+      onNote(
+        r.ok
+          ? { ok: true, text: `${bill.clientName}: ${when} put on ${label}.` }
+          : { ok: false, text: r.error },
+      );
+    });
+  }
+
+  function never() {
+    start(async () => {
+      const r = await setLessonHappened(lessonId, "cancelled");
+      onNote(
+        r.ok
+          ? { ok: true, text: `${bill.clientName}: ${when} marked didn’t happen.` }
+          : { ok: false, text: r.error },
+      );
+    });
+  }
+
+  return (
+    <div className="lb-catch-fix">
+      <span className="lb-led-lbl">Part of a package?</span>
+      <div className="lb-chips">
+        {sorted.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            className={p.size - p.used > 0 ? "btn small" : "btn secondary small"}
+            disabled={off}
+            onClick={() => move({ packageId: p.id }, `the ${p.size}-pack`)}
+            title={p.size - p.used > 0 ? undefined : "This package is already full"}
+          >
+            {chipLabel(p)}
+          </button>
+        ))}
+        {[3, 5, 10].map((n) => (
+          <button
+            key={n}
+            type="button"
+            className="btn secondary small"
+            disabled={off}
+            onClick={() => move({ newSize: n }, `a new ${n}-pack`)}
+          >
+            New {n}-pack
+          </button>
+        ))}
+        <button
+          type="button"
+          className="btn ghost small"
+          disabled={off}
+          onClick={never}
+        >
+          Didn&rsquo;t happen
+        </button>
+      </div>
+    </div>
   );
 }

@@ -3,17 +3,19 @@ import LessonsHeader from "@/components/lessons/LessonsHeader";
 import BillingBoard from "@/components/lessons/BillingBoard";
 import { requireLessonBook } from "@/lib/lessons/auth";
 import { gateFirst } from "@/lib/lessons/gate";
-import { billingData, reviewCount } from "@/lib/lessons/data";
+import { billingData, listPackageOptions, reviewCount } from "@/lib/lessons/data";
 
 // Put an amount and a payment on every lesson that has none, a client at a
 // time, from one screen - instead of a trip to each client's page.
 export const dynamic = "force-dynamic";
 
 export default async function BillingPage() {
-  const [viewer, [data, waiting]] = await gateFirst(
+  const [viewer, [data, waiting, options]] = await gateFirst(
     requireLessonBook(),
-    Promise.all([billingData(), reviewCount()]),
+    Promise.all([billingData(), reviewCount(), listPackageOptions()]),
   );
+  // For Catch up's "part of a package?" - series only, never a single.
+  const packages = options.filter((p) => p.kind === "package");
 
   return (
     <>
@@ -31,7 +33,7 @@ export default async function BillingPage() {
           method start from what the client paid last time; paid dates are
           each lesson&apos;s own day.
         </p>
-        <BillingBoard data={data} />
+        <BillingBoard data={data} packages={packages} />
       </main>
     </>
   );

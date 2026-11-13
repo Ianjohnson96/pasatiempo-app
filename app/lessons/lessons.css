@@ -1204,3 +1204,17 @@ a.lb-next:hover {
 .lb-pkpick .lb-led-cand:disabled {
   cursor: default;
 }
+
+/* Catch up: a single's "part of a package? / didn't happen" line. */
+.lb-catch-fix {
+  margin-top: 10px;
+  padding-left: 30px;
+}
+.lb-catch-fix .lb-chips {
+  margin-top: 4px;
+}
+@media (max-width: 560px) {
+  .lb-catch-fix {
+    padding-left: 0;
+  }
+}

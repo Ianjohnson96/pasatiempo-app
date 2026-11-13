@@ -432,7 +432,7 @@ export async function billingData(): Promise<BillingData> {
     // When each bill's lessons start: a series counts as paid on its first.
     supa
       .from("lessons")
-      .select("package_id, starts_at")
+      .select("id, package_id, starts_at")
       .not("package_id", "is", null)
       .neq("status", "cancelled"),
   ]);
@@ -441,7 +441,10 @@ export async function billingData(): Promise<BillingData> {
   if (billedRes.error) throw new Error(billedRes.error.message);
 
   const firstLesson = new Map<string, string>();
+  // A single's one lesson, so Catch up can move it onto a package.
+  const lessonOf = new Map<string, string>();
   for (const l of billedRes.data ?? []) {
+    lessonOf.set(l.package_id as string, l.id as string);
     const id = l.package_id as string;
     const at = l.starts_at as string;
     const seen = firstLesson.get(id);
@@ -506,9 +509,11 @@ export async function billingData(): Promise<BillingData> {
     catchUp: packages
       .map((p) => {
         const first = firstLesson.get(p.id);
+        const lessonId = p.kind === "single" ? (lessonOf.get(p.id) ?? null) : null;
         return {
           ...p,
           firstLessonOn: first ? courseDay(first) : null,
+          lessonId,
           gaps: catchUpGaps(p),
         };
       })

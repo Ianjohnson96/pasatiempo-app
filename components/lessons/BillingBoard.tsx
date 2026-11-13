@@ -13,6 +13,7 @@ import {
   formatWhen,
   type BillingClient,
   type BillingData,
+  type PackageOption,
 } from "@/lib/lessons/types";
 import BillChoices, { type BillChoiceValue } from "./BillChoices";
 import CatchUpList from "./CatchUpList";
@@ -25,7 +26,14 @@ import CatchUpList from "./CatchUpList";
 
 type Undo = { text: string; run: () => Promise<void> };
 
-export default function BillingBoard({ data }: { data: BillingData }) {
+export default function BillingBoard({
+  data,
+  packages,
+}: {
+  data: BillingData;
+  /** Every package (not single), for Catch up's "part of a package?". */
+  packages: PackageOption[];
+}) {
   const [done, setDone] = useState<Set<string>>(new Set());
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [undo, setUndo] = useState<Undo | null>(null);
@@ -103,7 +111,7 @@ export default function BillingBoard({ data }: { data: BillingData }) {
         </div>
       )}
 
-      <CatchUpList bills={data.catchUp} />
+      <CatchUpList bills={data.catchUp} packages={packages} />
     </>
   );
 }

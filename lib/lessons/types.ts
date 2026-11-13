@@ -286,6 +286,8 @@ export interface BillingClient {
 export interface CatchUpBill extends PackageRec {
   /** Pacific day of the series' first lesson; null if it has none yet. */
   firstLessonOn: string | null;
+  /** A single's one lesson, to move onto a package; null for a package. */
+  lessonId: string | null;
   gaps: CatchUpGap[];
 }
 
