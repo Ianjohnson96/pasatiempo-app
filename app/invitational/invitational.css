@@ -729,7 +729,10 @@ body:has(.mci){margin:0;}
    photograph, so nothing ever stops on screen. Long, soft dissolves. */
 .mci-intro.var-score .mci-bars{display:none;}
 .mci-intro.var-score .mci-page{animation:mci-xfade 1.35s cubic-bezier(.45,0,.35,1) both;}
-.mci-intro.var-score .mci-page img{transform-origin:var(--focus);animation-duration:4.4s;animation-timing-function:linear;}
+.mci-intro.var-score .mci-page img{transform-origin:var(--focus);animation-duration:var(--zoom,4.4s);animation-timing-function:linear;}
+/* The last photograph stays on under the title (dimmed by the title's scrim)
+   and fades away first as the intro lifts. */
+.mci-intro.var-score.is-exit .mci-reel{opacity:0;transition:opacity .7s ease;}
 .mci-intro.var-score .mci-reel.is-behind .mci-page img{animation:mci-score-title 8s linear both;}
 @keyframes mci-score-title{from{transform:scale(1.04);}to{transform:scale(1.12);}}
 .mci-intro.var-score .mci-reel-grain{opacity:.12;}
