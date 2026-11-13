@@ -67,20 +67,29 @@ export function NextUp({ d }: { d: DashboardData }) {
     );
   }
   const day = courseDay(n.startsAt);
-  const when =
-    day === courseDay(d.now)
-      ? `Today · ${formatTime(n.startsAt)}`
-      : `${formatDay(n.startsAt)} · ${formatTime(n.startsAt)}`;
+  const today = day === courseDay(d.now);
+  // Set like a tee sheet: the time is the anchor, the name follows it.
+  // Split on any space - newer ICU puts a narrow no-break space before PM.
+  const [clock, meridiem = ""] = formatTime(n.startsAt).split(/\s+/);
   const seq = seqLabel(n);
 
   return (
     <Link
       href={n.clientId ? `/lessons/clients/${n.clientId}` : "/lessons/schedule"}
-      className="card lb-next"
+      className="lb-next"
     >
-      <div className="lb-kicker">Next up</div>
-      <div className="lb-next-name">{n.clientName || n.titleRaw}</div>
-      <div className="lb-next-when">{when}</div>
+      <div className="lb-next-time" aria-hidden="true">
+        <span className="lb-next-clock">{clock}</span>
+        <span className="lb-next-ampm">{meridiem}</span>
+      </div>
+      <div className="lb-next-body">
+        <div className="lb-kicker">
+          {today ? "Next up today" : `Next up ${formatDay(n.startsAt)}`}
+          {/* The clock is drawn for the eye; this is the time for a screen
+              reader. */}
+          <span className="lb-sr">, {formatTime(n.startsAt)}</span>
+        </div>
+        <div className="lb-next-name">{n.clientName || n.titleRaw}</div>
       <div className="lb-chips">
         {seq && (
           <span className="badge gray">
@@ -109,6 +118,7 @@ export function NextUp({ d }: { d: DashboardData }) {
           {d.nextLastNote.notes}
         </div>
       )}
+      </div>
     </Link>
   );
 }

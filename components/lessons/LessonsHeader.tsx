@@ -1,4 +1,5 @@
 import Link from "next/link";
+import TabIcon from "./TabIcon";
 
 // Shared chrome for the lesson book.
 //
@@ -8,10 +9,15 @@ import Link from "next/link";
 // The count is passed in rather than fetched here. Fetching it here meant a
 // database trip that could only start once the page's own data had arrived;
 // the pages now load both at once.
+//
+// On a phone the same nav becomes a bar along the bottom of the screen
+// (lessons.css). Six tabs scrolled sideways across the top hid Clients and
+// Review off the edge - and with them the Review badge, the one thing in this
+// row that asks for attention.
 
 const TABS = [
-  // "Home", not "Dashboard": these have to fit across a phone, and at six the
-  // row scrolls sideways rather than wrapping onto a second line.
+  // "Home", not "Dashboard": six short labels, each under its icon, have to
+  // fit across a phone.
   { href: "/lessons", key: "dashboard", label: "Home" },
   { href: "/lessons/schedule", key: "schedule", label: "Schedule" },
   { href: "/lessons/ledger", key: "ledger", label: "Lessons" },
@@ -49,18 +55,24 @@ export default function LessonsHeader({
         </div>
       </div>
 
-      <div className="container" style={{ paddingBottom: 0 }}>
-        <nav className="seg lb-tabs" style={{ marginTop: 18 }}>
+      <div className="container lb-tabwrap">
+        <nav className="lb-tabs" aria-label="Lesson book">
           {TABS.map((t) => (
             <Link
               key={t.key}
               href={t.href}
-              className={t.key === active ? "segbtn on" : "segbtn"}
+              className={t.key === active ? "lb-tab on" : "lb-tab"}
               aria-current={t.key === active ? "page" : undefined}
             >
-              {t.label}
+              <TabIcon name={t.key} />
+              <span className="lb-tab-label">{t.label}</span>
               {t.key === "review" && waiting > 0 && (
-                <span className="badge open">{waiting}</span>
+                <span
+                  className="lb-tab-count"
+                  aria-label={`${waiting} waiting`}
+                >
+                  {waiting}
+                </span>
               )}
             </Link>
           ))}

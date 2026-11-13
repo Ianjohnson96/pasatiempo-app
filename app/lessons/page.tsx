@@ -33,33 +33,46 @@ export default async function LessonBookHome() {
         waiting={d.reviewCount}
       />
       <main className="container lb-dash">
-        <NextUp d={d} />
+        {/* Two columns on a desktop - what is next on the left, money and
+            who to chase on the right - one column, in this order, on a
+            phone. Teaching runs full width underneath. */}
+        <div className="lb-dash-grid">
+          <div className="lb-dash-main">
+            <NextUp d={d} />
 
-        <div className="lb-sechead">
-          <h2 className="section-title">This week</h2>
-          <Link href="/lessons/schedule">Full schedule &rarr;</Link>
-        </div>
-        <Agenda
-          lessons={d.week}
-          today={today}
-          empty="Nothing on the calendar for the next seven days."
-        />
+            <div className="lb-sechead">
+              <h2 className="section-title">This week</h2>
+              <Link href="/lessons/schedule">Full schedule</Link>
+            </div>
+            <Agenda
+              lessons={d.week}
+              today={today}
+              empty="Nothing on the calendar for the next seven days."
+            />
+          </div>
 
-        <div className="lb-sechead">
-          <h2 className="section-title">Money</h2>
-          <Link href="/lessons/prices">Prices &rarr;</Link>
-        </div>
-        <MoneyTiles d={d} />
+          <div className="lb-dash-side">
+            <div className="lb-sechead lb-sechead-first">
+              <h2 className="section-title">Money</h2>
+              <Link href="/lessons/prices">Prices</Link>
+            </div>
+            <MoneyTiles d={d} />
 
-        <div className="lb-sechead">
-          <h2 className="section-title">Follow up</h2>
-        </div>
-        <FollowUps d={d} />
+            <div className="lb-sechead">
+              <h2 className="section-title">Follow up</h2>
+            </div>
+            <FollowUps d={d} />
+          </div>
 
-        <div className="lb-sechead">
-          <h2 className="section-title">Teaching</h2>
+          {/* Last on a phone; on a desktop it fills the left column under
+              the week instead of waiting below the follow-up list. */}
+          <div className="lb-dash-teach">
+            <div className="lb-sechead">
+              <h2 className="section-title">Teaching</h2>
+            </div>
+            <Volume d={d} />
+          </div>
         </div>
-        <Volume d={d} />
 
         <SyncLine d={d} />
       </main>

@@ -6,6 +6,269 @@
  * edge of a phone. Everything here is `lb-*` and sized on purpose.
  */
 
+/* ===========================================================================
+   The clubhouse look
+
+   The club's own style, from the Event Planner: ivory page, paper cards,
+   club green, brass, Garamond for titles and figures, hairline rules in place
+   of soft shadows, 2px corners. The values are copied here rather than shared
+   with event-planner.css, so a change to the planner cannot reach in and
+   restyle this book.
+
+   It works the way the planner's does: the shared tokens globals.css defines
+   are re-declared on `.lb`, so every component already reading var(--green)
+   or var(--line) changes with no edit of its own.
+
+   Two places this book departs from the planner, both for a phone held in one
+   hand on the tee: buttons and tabs are sentence case, not spaced capitals,
+   because they are read at a glance between lessons; and on a phone the tabs
+   sit along the bottom of the screen, where a thumb already is.
+   ========================================================================= */
+.lb {
+  --ivory: #f5f1e6;
+  --paper: #fbf8f1;
+  --club: #173a2a;
+  --club-2: #21503a;
+  --brass: #a2814a;
+  --brass-soft: #d4c29a;
+  --brass-ink: #7d6332; /* brass for small text: 5:1 on ivory */
+  --hairline: #ddd4c0;
+  --rule-strong: #c9bea6;
+  --slate: #4f6470;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  --green: #173a2a;
+  --green-dark: #10291e;
+  --green-light: #cfdccf;
+  --green-tint: #e9efe8;
+  --accent: #a2814a;
+  --ink: #1b201d;
+  --muted: #5b635d;
+  --line: #ddd4c0;
+  --bg: #f5f1e6;
+  --card: #fbf8f1;
+  --cream: #f5f1e6;
+  --gold: #a2814a;
+  --serif: var(--font-display), "EB Garamond", Garamond, Georgia, serif;
+  --sans: var(--font-text), "Libre Franklin", "Helvetica Neue", Arial, sans-serif;
+  --radius: 2px;
+  --shadow: none;
+  --danger: #9a2b20;
+  --warn: #8a5a12;
+  /* Wide enough for two columns on a desktop; a phone never reaches it. */
+  --maxw: 1180px;
+
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-feature-settings: "kern" 1;
+  text-rendering: optimizeLegibility;
+}
+
+.lb h1,
+.lb h2,
+.lb h3 {
+  font-family: var(--serif);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+/* Figures line up in columns of money and counts. */
+.lb .badge,
+.lb input,
+.lb select,
+.lb table {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.lb a {
+  color: var(--club);
+}
+.lb a:focus-visible,
+.lb button:focus-visible,
+.lb summary:focus-visible,
+.lb input:focus-visible,
+.lb select:focus-visible,
+.lb textarea:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/* ---- App bar ------------------------------------------------------------ */
+.lb .appbar {
+  background: var(--club);
+  color: var(--ivory);
+  box-shadow: none;
+  border-bottom: 1px solid rgba(162, 129, 74, 0.55);
+}
+.lb .appbar-inner {
+  min-height: 60px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.lb .appbar .brand {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 21px;
+  letter-spacing: 0;
+  color: var(--ivory);
+}
+.lb .appbar .brand .mark {
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid var(--brass);
+  color: var(--brass-soft);
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 16px;
+}
+.lb .appbar .u-email {
+  color: rgba(245, 241, 230, 0.72);
+}
+.lb .appbar .btn.secondary {
+  background: transparent;
+  color: var(--ivory);
+  border-color: rgba(245, 241, 230, 0.45);
+}
+.lb .appbar .btn.secondary:hover {
+  background: rgba(245, 241, 230, 0.1);
+}
+
+/* ---- Sections ----------------------------------------------------------- */
+/* The club's small-caps label, kept to section heads only. */
+.lb .section-title {
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brass-ink);
+}
+
+.lb .card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  box-shadow: none;
+}
+
+.lb .empty {
+  color: var(--muted);
+}
+
+/* ---- Buttons ------------------------------------------------------------ */
+.lb .btn {
+  border-radius: var(--radius);
+  border-color: var(--club);
+  background: var(--club);
+  color: var(--ivory);
+  font-family: var(--sans);
+  font-weight: 600;
+  min-height: 44px;
+  transition:
+    background-color 0.16s var(--ease),
+    border-color 0.16s var(--ease);
+}
+.lb .btn:hover {
+  background: var(--club-2);
+  border-color: var(--club-2);
+}
+.lb .btn.secondary {
+  background: var(--paper);
+  color: var(--club);
+  border-color: var(--rule-strong);
+}
+.lb .btn.secondary:hover {
+  background: var(--green-tint);
+  border-color: var(--club);
+}
+.lb .btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--club);
+}
+.lb .btn.danger {
+  background: var(--paper);
+  color: var(--danger);
+  border-color: var(--hairline);
+}
+.lb .btn.danger:hover {
+  background: #f7e9e4;
+  border-color: var(--danger);
+}
+.lb .btn.small {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
+  border-radius: var(--radius);
+}
+
+/* ---- Badges ------------------------------------------------------------- */
+/* Quieter than the shared pill: a tinted label in sentence case, not a
+   shouting capsule. "Last one - sell the next" reads; LAST ONE did not. */
+.lb .badge {
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 2px 8px;
+  background: var(--green-tint);
+  color: var(--club);
+}
+.lb .badge.gray {
+  background: #ece6d8;
+  color: var(--muted);
+}
+.lb .badge.open {
+  background: var(--green-tint);
+  color: var(--club);
+}
+.lb .badge.closed {
+  background: #f4e4df;
+  color: var(--danger);
+}
+.lb .badge.full {
+  background: #f3e9d3;
+  color: var(--warn);
+}
+
+/* ---- Notices ------------------------------------------------------------ */
+.lb .notice {
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline);
+  background: var(--paper);
+  color: var(--ink);
+}
+.lb .notice.ok {
+  background: var(--green-tint);
+  border-color: var(--green-light);
+  color: var(--club);
+}
+.lb .notice.warn {
+  background: #f6eedc;
+  border-color: var(--brass-soft);
+  color: var(--warn);
+}
+.lb .notice.err {
+  background: #f6e6e1;
+  border-color: #e3c1b8;
+  color: var(--danger);
+}
+
+/* ---- Fields ------------------------------------------------------------- */
+.lb input.field,
+.lb select.field,
+.lb textarea.field,
+.lb .field input,
+.lb .field select,
+.lb .field textarea {
+  border-radius: var(--radius);
+  border-color: var(--rule-strong);
+  background: #fffdf8;
+}
+
 /* Controls here carry className="field", which globally is the WRAPPER class
    and adds a 16px bottom margin - enough to knock every toolbar out of line.
    Search boxes also miss the shared input styling, which lists types. */
@@ -97,13 +360,121 @@
   white-space: nowrap;
 }
 
+/* ---- Tabs ---------------------------------------------------------------
+   Desktop: a row under the app bar, the open tab underlined in brass.
+   Phone: the same nav pinned along the bottom of the screen, icon over
+   label, six across - nothing scrolls off the edge, so the Review count is
+   always in sight. */
+.lb-tabwrap {
+  padding-top: 0;
+  padding-bottom: 0;
+}
 .lb-tabs {
   display: flex;
-  overflow-x: auto;
-  scrollbar-width: none;
+  gap: 4px;
+  margin-top: 4px;
+  border-bottom: 1px solid var(--hairline);
 }
-.lb-tabs::-webkit-scrollbar {
-  display: none;
+.lb-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.16s var(--ease);
+}
+.lb-tab:hover {
+  color: var(--club);
+  text-decoration: none;
+}
+.lb-tab.on {
+  color: var(--club);
+}
+.lb-tab.on::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -1px;
+  height: 2px;
+  background: var(--brass);
+}
+.lb-tab-icon {
+  flex: 0 0 auto;
+}
+.lb-tab-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--brass);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .lb-tabwrap {
+    padding: 0;
+  }
+  .lb-tabs {
+    position: fixed;
+    z-index: 30;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
+    gap: 0;
+    border-bottom: 0;
+    border-top: 1px solid var(--hairline);
+    background: var(--paper);
+    /* clear the iPhone's home bar */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .lb-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    min-height: 58px;
+    padding: 6px 2px;
+    font-size: 10.5px;
+    font-weight: 600;
+  }
+  .lb-tab.on {
+    background: var(--green-tint);
+  }
+  /* On the bar the mark sits above the icon, not under a label. */
+  .lb-tab.on::after {
+    left: 22%;
+    right: 22%;
+    top: 0;
+    bottom: auto;
+  }
+  .lb-tab-count {
+    position: absolute;
+    top: 5px;
+    left: calc(50% + 4px);
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    font-size: 10px;
+    line-height: 17px;
+  }
+  /* Room under the last thing on the page, so the bar never covers it. */
+  .lb main {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  }
 }
 
 .lb-actions {
@@ -150,34 +521,160 @@
   white-space: nowrap;
 }
 
+/* ---- Next up: the starter's card ---------------------------------------
+   The one dark thing on an ivory page, and the one place this book is bold.
+   Set like a tee sheet - the time large on the left as the anchor, the name
+   beside it - because a time and a name is what Ian reads walking to the
+   tee. Everything else on Home stays quiet so this is found first. */
 .lb-next {
   display: block;
   margin-top: 4px;
-  border-left: 4px solid var(--green);
   color: inherit;
   text-decoration: none;
 }
+a.lb-next {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+  padding: 22px 24px 24px;
+  background: var(--club);
+  color: var(--ivory);
+  border: 1px solid var(--club);
+  border-radius: var(--radius);
+  transition: background-color 0.18s var(--ease);
+}
 a.lb-next:hover {
+  background: var(--club-2);
   text-decoration: none;
-  box-shadow: 0 0 0 2px var(--green-light), var(--shadow);
+}
+.lb-next-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-right: 22px;
+  border-right: 1px solid rgba(212, 194, 154, 0.38);
+  font-family: var(--serif);
+  color: var(--brass-soft);
+  line-height: 0.9;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.lb-next-clock {
+  font-size: 54px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.lb-next-ampm {
+  margin-top: 8px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: rgba(212, 194, 154, 0.85);
+}
+.lb-next-body {
+  min-width: 0;
 }
 .lb-kicker {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--green);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--club);
+}
+a.lb-next .lb-kicker {
+  color: rgba(245, 241, 230, 0.78);
 }
 .lb-next-name {
-  font-size: 22px;
-  font-weight: 700;
-  margin-top: 4px;
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin-top: 2px;
   overflow-wrap: anywhere;
 }
-.lb-next-when {
-  font-size: 15px;
-  color: var(--muted);
-  margin-top: 2px;
+/* Labels on green: an outline in ivory, not a tinted pill that would read
+   as a hole cut through the card. */
+a.lb-next .lb-chips {
+  margin-top: 12px;
+}
+/* `.lb a.lb-next` out-ranks every `.lb .badge.<state>` rule, so a payment
+   badge (full / closed / draft) cannot keep its light fill on the green. */
+.lb a.lb-next .badge {
+  background: transparent;
+  border: 1px solid rgba(245, 241, 230, 0.4);
+  color: var(--ivory);
+}
+/* Unpaid still has to read as a flag. */
+.lb a.lb-next .badge.closed {
+  border-color: #e7b3a6;
+  color: #f2c9bf;
+}
+a.lb-next .lb-lastnote {
+  background: rgba(245, 241, 230, 0.08);
+  border: 1px solid rgba(245, 241, 230, 0.16);
+  color: var(--ivory);
+}
+a.lb-next .lb-lastnote span {
+  color: rgba(245, 241, 230, 0.7);
+}
+/* ---- Home on a desktop: two columns ------------------------------------
+   A phone reads Home top to bottom, which is the order below. A desktop has
+   the width to show what is next beside the money, so nothing important
+   waits two screens down. */
+.lb-dash-grid {
+  display: grid;
+  gap: 0 40px;
+}
+.lb-dash-main,
+.lb-dash-side,
+.lb-dash-teach {
+  min-width: 0;
+}
+@media (min-width: 960px) {
+  .lb-dash {
+    padding-top: 32px;
+  }
+  /* Teaching fills the left column under the week; the money and
+     follow-up column runs down the right beside both. On a phone none of
+     this applies and the three stack in source order. */
+  .lb-dash-grid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    grid-template-areas:
+      "main side"
+      "teach side";
+    grid-template-rows: auto 1fr;
+    align-items: start;
+  }
+  .lb-dash-main {
+    grid-area: main;
+  }
+  .lb-dash-side {
+    grid-area: side;
+  }
+  .lb-dash-teach {
+    grid-area: teach;
+  }
+  /* The right column starts level with the starter's card, not a section
+     gap below it. */
+  .lb-dash-side .lb-sechead-first {
+    margin-top: 4px;
+  }
+}
+
+@media (max-width: 420px) {
+  a.lb-next {
+    gap: 16px;
+    padding: 18px;
+  }
+  .lb-next-time {
+    padding-right: 16px;
+  }
+  .lb-next-clock {
+    font-size: 44px;
+  }
+  .lb-next-name {
+    font-size: 26px;
+  }
 }
 
 /* Agenda: lessons grouped by day */
@@ -232,12 +729,16 @@ a.lb-next:hover {
   color: var(--muted);
 }
 .lb-time {
-  /* "10:30 AM" in bold, on one line */
+  /* "10:30 AM" on one line, in the same Garamond figures as the starter's
+     card - a time reads the same wherever it appears in the book. */
   flex: 0 0 78px;
   white-space: nowrap;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  padding-top: 1px;
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.2;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--club);
 }
 .lb-awho {
   min-width: 0;
@@ -250,8 +751,20 @@ a.lb-next:hover {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
+/* In Home's money column there is room for two across, not four: at four,
+   "$13,615 Collected this season" was squeezed into a hundred pixels. */
+.lb-dash-side .lb-tiles {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+/* Key figures in the club's Garamond, lined up in columns. */
 .lb-tiles .n {
-  font-size: 22px;
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--club);
 }
 .lb-banner {
   display: flex;
@@ -633,21 +1146,6 @@ a.lb-next:hover {
   .lb-num.small .field {
     width: 100%;
     min-height: 44px;
-  }
-  .lb-tabs {
-    width: 100%;
-  }
-  /* Six tabs and a badge across ~343px. They no longer fit, so stop them
-     sharing the width and let the row scroll: squeezed to a quarter of a
-     label each, "Schedule" and "Lessons" both read as a smear. */
-  .lb-tabs .segbtn {
-    flex: 0 0 auto;
-    min-height: 44px;
-    padding: 8px 10px;
-    gap: 4px;
-  }
-  .lb-tabs .segbtn .badge {
-    padding: 1px 6px;
   }
   .lb-lesson select {
     flex: 1 1 100%;
