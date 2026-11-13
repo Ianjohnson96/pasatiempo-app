@@ -781,24 +781,26 @@ body:has(.mci){margin:0;}
 
 /* The closing title of the scored dissolve: the club's 1929 logo, then
    PASATIEMPO in the logo's own script — each fading up in turn. */
-.mci-intro.var-score .mci-reel-title.mci-st{gap:0;animation:mci-title-push 7s cubic-bezier(.3,.2,.4,1) both;
-  background:radial-gradient(ellipse 70% 62% at 50% 50%,rgba(5,8,12,.72),rgba(5,8,12,.38) 58%,transparent 100%);}
+.mci-intro.var-score .mci-reel-title.mci-st{gap:0;animation:mci-title-push 8s cubic-bezier(.3,.2,.4,1) both;
+  background:radial-gradient(ellipse 72% 64% at 50% 50%,rgba(5,8,12,.78),rgba(5,8,12,.42) 58%,transparent 100%);}
 .mci-intro.var-score .mci-reel-title.mci-st::before{content:"";position:absolute;inset:0;z-index:-1;background:rgba(5,8,12,.18);
   animation:mci-st-fade 1.2s ease both;}
+/* No filters on the logo or the wordmark (no blur, no drop-shadow): iPhone
+   Safari draws a filtered image as a white box or a soft bitmap. They fade and
+   settle with opacity and scale alone, crisp at any size; the dark backdrop
+   behind them gives the contrast. */
 .mci-st-mark{height:clamp(170px,33vh,300px);width:auto;
-  filter:blur(0) drop-shadow(0 12px 34px rgba(0,0,0,.65));
-  animation:mci-st-rise 1.2s .1s cubic-bezier(.25,.6,.3,1) both;}
+  animation:mci-st-rise 1.3s .1s cubic-bezier(.25,.6,.3,1) both;}
 .mci-st-word{display:block;width:min(74vw,800px);height:auto;margin-top:clamp(8px,1.6vh,18px);
-  filter:blur(0) drop-shadow(0 4px 26px rgba(0,0,0,.7)) drop-shadow(0 0 40px rgba(210,171,94,.22));
-  animation:mci-st-word 1.6s .95s cubic-bezier(.25,.6,.3,1) both;}
+  animation:mci-st-word 1.7s .95s cubic-bezier(.25,.6,.3,1) both;}
 .mci-st-rule{width:min(360px,52vw);height:1px;margin:clamp(14px,2.2vh,22px) auto 0;
   background:linear-gradient(90deg,transparent,var(--gold-bright),transparent);animation:mci-draw .9s 1.9s cubic-bezier(.2,.7,.2,1) both;}
 .mci-st-sub{margin-top:12px;font-family:var(--disp);font-style:italic;font-size:clamp(17px,2.1vw,27px);color:var(--gold-pale);
   text-shadow:0 2px 16px rgba(0,0,0,.85);animation:mci-st-fade 1s 2.15s ease both;}
 @keyframes mci-st-fade{from{opacity:0;}to{opacity:1;}}
-@keyframes mci-st-rise{from{opacity:0;transform:translateY(10px) scale(.97);filter:blur(6px) drop-shadow(0 12px 34px rgba(0,0,0,.65));}to{opacity:1;transform:none;}}
-@keyframes mci-st-word{from{opacity:0;transform:scale(.975);filter:blur(10px) drop-shadow(0 4px 26px rgba(0,0,0,.7)) drop-shadow(0 0 40px rgba(210,171,94,.22));}60%{opacity:1;}to{opacity:1;transform:none;}}
-.mci-intro.var-score.is-exit .mci-reel-title.mci-st{opacity:0;filter:blur(2px);}
+@keyframes mci-st-rise{from{opacity:0;transform:translateY(12px) scale(.96);}to{opacity:1;transform:none;}}
+@keyframes mci-st-word{from{opacity:0;transform:scale(.97);}to{opacity:1;transform:none;}}
+.mci-intro.var-score.is-exit .mci-reel-title.mci-st{opacity:0;filter:none;}
 @media (max-width:760px){.mci-st-word{width:86vw;}}
 
 /* Replay, in the footer. */
