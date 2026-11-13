@@ -723,6 +723,19 @@ body:has(.mci){margin:0;}
 @keyframes mci-sound-glow{0%,100%{box-shadow:0 0 0 0 rgba(210,171,94,0);}50%{box-shadow:0 0 0 6px rgba(210,171,94,.18);}}
 @media (max-width:760px){.mci .mci-reel-skip.mci-reel-sound{left:14px;top:14px;}}
 
+/* ---- The scored dissolve (?intro=score, the default) ---- */
+/* Full screen, nothing but the photographs and the year. Each one eases in
+   about 6% toward its subject at one constant speed, and the move outlasts the
+   photograph, so nothing ever stops on screen. Long, soft dissolves. */
+.mci-intro.var-score .mci-bars{display:none;}
+.mci-intro.var-score .mci-page{animation:mci-xfade 1.35s cubic-bezier(.45,0,.35,1) both;}
+.mci-intro.var-score .mci-page img{transform-origin:var(--focus);animation-duration:3.4s;animation-timing-function:linear;}
+.mci-intro.var-score .mci-reel.is-behind .mci-page img{animation:mci-score-title 8s linear both;}
+@keyframes mci-score-title{from{transform:scale(1.04);}to{transform:scale(1.12);}}
+.mci-intro.var-score .mci-reel-grain{opacity:.12;}
+.mci-intro.var-score .mci-reel-year,.mci-intro.var-score .mci-reel-year.is-now{bottom:7vh;}
+@media (max-width:760px){.mci-intro.var-score .mci-reel-year,.mci-intro.var-score .mci-reel-year.is-now{bottom:6vh;}}
+
 /* Replay, in the footer. */
 .mci .mci-replay{margin-top:18px;display:inline-flex;align-items:center;gap:8px;appearance:none;cursor:pointer;background:none;
   border:1px solid rgba(210,171,94,.45);color:var(--gold-pale);border-radius:99px;padding:7px 16px;

@@ -303,6 +303,35 @@ const FILM_TAIL: Frame[] = [
   { src: IMG + "hole-4-approach-poster.webp", hold: 0, era: "today" },
 ];
 
+// ---- The scored dissolve (the default) ---------------------------------------
+// Full-screen photographs, each dissolving slowly into the next under its own
+// slow camera move, set to the same music as the film. Ten from the archive
+// through the first passage; the turn to colour lands on the swell that opens
+// the second (about 15.5 s in); the title rises on the next (about 20.5 s) over
+// the dawn aerial, which keeps drifting as the music fades.
+const SCORE_OLD = 1480; // each archive photograph
+const SCORE_NEW = 1400; // each photograph today
+/** Every photograph eases in, about 6%, toward its subject (the focus point). */
+const ZOOM: Frame["move"] = [1, 0, 0, 1.06, 0, 0];
+const SCORE: Frame[] = (
+  [
+    { src: A("1929-tee-shot-bay.webp"), era: "archive", focus: "center 70%" },
+    { src: A("1929-opening-foursome.webp"), era: "archive", focus: "center 15%" },
+    { src: IMG + "mackenzie.webp", era: "archive", focus: "53% 18%" },
+    { src: A("1929-gallery-oak.webp"), era: "archive", focus: "center 60%" },
+    { src: IMG + "hollins.webp", era: "archive", focus: "50% 30%" },
+    { src: A("1929-golfer-oak.webp"), era: "archive", focus: "center 70%" },
+    { src: A("mackenzie-house-1933.webp"), era: "archive", focus: "center 70%" },
+    { src: IMG + "hollins-swing.webp", era: "archive", focus: "60% 18%" },
+    { src: A("mackenzie-house-1933b.webp"), era: "archive", focus: "center 45%" },
+    { src: A("1929-bunkered-green.webp"), era: "archive", focus: "center 60%" },
+    { src: IMG + "course-green.webp", era: "today", focus: "center 60%" },
+    { src: T("bridge.webp"), era: "today", focus: "center 60%" },
+    { src: T("flag-green.webp"), era: "today", focus: "70% 60%" },
+    { src: T("aerial-dawn.webp"), era: "today", focus: "center 50%" },
+  ] as Omit<Frame, "hold" | "move">[]
+).map((f) => ({ ...f, move: ZOOM, hold: f.era === "archive" ? SCORE_OLD : SCORE_NEW }));
+
 interface ReelLook {
   /** How far the camera pulls back between frames (1 = not at all). */
   out: number;
@@ -312,7 +341,7 @@ interface ReelLook {
 
 type Variant =
   | "flip" | "dissolve" | "wipe" | "letters" | "tight" | "focus" | "iris" | "leak" | "panels"
-  | "reel" | "reel-wide" | "whip" | "whip-wide" | "pan" | "pan-step" | "film";
+  | "reel" | "reel-wide" | "whip" | "whip-wide" | "pan" | "pan-step" | "film" | "score";
 interface Cut {
   frames: Frame[];
   /** How long PASATIEMPO holds, in ms. */
@@ -356,9 +385,10 @@ const VARIANTS: Record<Variant, Cut> = {
     pan: { glide: true, tail: FILM_TAIL },
     music: MUSIC,
   },
+  score: { frames: SCORE, titleMs: 3000, leadMs: 300, cine: true, fast: true, music: MUSIC },
 };
 /** The intro visitors get. The others play with ?intro=<name>. */
-const DEFAULT_VARIANT: Variant = "film";
+const DEFAULT_VARIANT: Variant = "score";
 function readVariant(): Variant {
   try {
     const v = new URLSearchParams(location.search).get("intro");
