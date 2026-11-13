@@ -57,6 +57,11 @@ interface Frame {
   develop?: boolean;
   /** A tall photograph: shown whole, on a soft blurred copy of itself. */
   fit?: boolean;
+  /** On a tall (phone) screen only: show the photograph whole, as `fit` does,
+   *  where a full-screen crop would cut its subjects out. */
+  phoneFit?: boolean;
+  /** On a tall (phone) screen only: a different crop, and the point the zoom eases toward. */
+  phoneFocus?: string;
 }
 
 const FRAMES: Frame[] = [
@@ -323,10 +328,11 @@ const SCORE_EXIT_AT = 25200;
 const ZOOM: Frame["move"] = [1, 0, 0, 1.06, 0, 0];
 const SCORE: Frame[] = (
   [
-    { src: A("1929-tee-shot-bay.webp"), era: "archive", focus: "center 70%" },
-    { src: A("1929-opening-foursome.webp"), era: "archive", focus: "center 15%" },
+    // The tee shot and the foursome are wide groups: on a phone they show whole.
+    { src: A("1929-tee-shot-bay.webp"), era: "archive", focus: "center 70%", phoneFit: true },
+    { src: A("1929-opening-foursome.webp"), era: "archive", focus: "center 15%", phoneFit: true },
     { src: IMG + "mackenzie.webp", era: "archive", focus: "53% 18%" },
-    { src: IMG + "hollins.webp", era: "archive", focus: "50% 30%" },
+    { src: IMG + "hollins.webp", era: "archive", focus: "50% 30%", phoneFocus: "50% 0%" },
     { src: A("1929-gallery-oak.webp"), era: "archive", focus: "center 60%" },
     // Tall: shown whole, on a soft, darkened copy of itself.
     { src: IMG + "hollins-swing.webp", era: "archive", focus: "center", fit: true },
@@ -946,6 +952,7 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
         {
           "--hold": f.hold + "ms",
           "--focus": f.focus ?? "center",
+          "--focus-m": f.phoneFocus ?? f.focus ?? "center",
           "--fs": m[0],
           "--fx": m[1] + "%",
           "--fy": m[2] + "%",
@@ -955,7 +962,12 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
         } as CSSProperties
       }
     >
-      {f.fit && <div className="mci-page-fill" style={{ backgroundImage: `url(${f.src})` }} />}
+      {(f.fit || f.phoneFit) && (
+        <div
+          className={"mci-page-fill" + (f.fit ? "" : " is-phone")}
+          style={{ backgroundImage: `url(${f.src})` }}
+        />
+      )}
       {f.trio ? (
         f.trio.map((p) => (
           <div className="mci-panel" key={p.src} style={{ "--focus": p.focus ?? "center" } as CSSProperties}>
@@ -965,7 +977,7 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
         ))
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={f.src} alt="" className={f.fit ? "is-fit" : undefined} />
+        <img src={f.src} alt="" className={f.fit ? "is-fit" : f.phoneFit ? "is-phone-fit" : undefined} />
       )}
     </div>
   );
