@@ -713,6 +713,16 @@ body:has(.mci){margin:0;}
 .mci-pan.is-v .mci-pan-edge{display:none;}
 @media (max-width:760px){.mci-intro.is-pan .mci-reel-year,.mci-intro.is-pan .mci-reel-year.is-now{bottom:7vh;}}
 
+/* ---- The scored film (?intro=film, the default) ---- */
+/* The strip fades up out of black already moving. */
+.mci-intro.var-film .mci-pan{animation:mci-film-up 1.1s ease-out both;}
+@keyframes mci-film-up{from{opacity:0;}to{opacity:1;}}
+/* Sound: top left, opposite Skip. */
+.mci .mci-reel-skip.mci-reel-sound{right:auto;left:22px;display:inline-flex;align-items:center;gap:8px;}
+.mci .mci-reel-sound.is-blocked{border-color:var(--gold-bright);color:#f5f0e2;animation:mci-sub-in .4s .3s both,mci-sound-glow 2.2s 1s ease-in-out infinite;}
+@keyframes mci-sound-glow{0%,100%{box-shadow:0 0 0 0 rgba(210,171,94,0);}50%{box-shadow:0 0 0 6px rgba(210,171,94,.18);}}
+@media (max-width:760px){.mci .mci-reel-skip.mci-reel-sound{left:14px;top:14px;}}
+
 /* Replay, in the footer. */
 .mci .mci-replay{margin-top:18px;display:inline-flex;align-items:center;gap:8px;appearance:none;cursor:pointer;background:none;
   border:1px solid rgba(210,171,94,.45);color:var(--gold-pale);border-radius:99px;padding:7px 16px;

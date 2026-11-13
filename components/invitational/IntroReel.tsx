@@ -270,6 +270,39 @@ const PAN_TAIL: Frame[] = [
   { src: IMG + "hero.webp", hold: 0, era: "today" },
 ];
 
+// ---- The film, scored (the default) ------------------------------------------
+// The film pan, slower and never pausing, timed to the music: "A Perfect Day"
+// (Danny Cope), 0:39–0:54 then 1:11–1:22, crossfaded and faded out
+// (audio/intro-a-perfect-day.mp3, 25 s). The archive runs through the first
+// passage; the film turns to colour on the swell that opens the second
+// (about 15.5 s in), and the title rises on the next (about 20.5 s), drifting
+// to a stop as the music fades.
+const MUSIC = "/invitational/audio/intro-a-perfect-day.mp3";
+const FILM_STEP = 1550; // every frame takes the same time: one steady speed
+const film = (f: Omit<Frame, "hold">): Frame => ({ ...f, hold: FILM_STEP });
+const FILM: Frame[] = [
+  film({ src: A("1929-tee-shot-bay.webp"), era: "archive", focus: "center 70%" }),
+  film({ src: A("1929-opening-foursome.webp"), era: "archive", focus: "center 20%" }),
+  film({ src: IMG + "mackenzie.webp", era: "archive", focus: "53% 22%" }),
+  film({ src: A("1929-gallery-oak.webp"), era: "archive", focus: "center 60%" }),
+  film({ src: IMG + "hollins.webp", era: "archive", focus: "50% 30%" }),
+  film({ src: A("1929-golfer-oak.webp"), era: "archive", focus: "center 70%" }),
+  film({ src: A("mackenzie-house-1933.webp"), era: "archive", focus: "center 70%" }),
+  film({ src: IMG + "hollins-swing.webp", era: "archive", focus: "60% 20%" }),
+  film({ src: A("mackenzie-house-1933b.webp"), era: "archive", focus: "center 45%" }),
+  film({ src: A("1929-bunkered-green.webp"), era: "archive", focus: "center 60%" }),
+  film({ src: IMG + "course-green.webp", era: "today", focus: "center 60%" }),
+  film({ src: T("bridge.webp"), era: "today", focus: "center 60%" }),
+  film({ src: T("flag-green.webp"), era: "today", focus: "70% 60%" }),
+];
+/** The strip under the title: it comes to rest on the dawn aerial. */
+const FILM_TAIL: Frame[] = [
+  { src: T("aerial-dawn.webp"), hold: 0, era: "today", focus: "center 50%" },
+  { src: T("chairs-bay.webp"), hold: 0, era: "today", focus: "center 45%" },
+  { src: T("clock-1929.webp"), hold: 0, era: "today", focus: "18% center" },
+  { src: IMG + "hole-4-approach-poster.webp", hold: 0, era: "today" },
+];
+
 interface ReelLook {
   /** How far the camera pulls back between frames (1 = not at all). */
   out: number;
@@ -279,7 +312,7 @@ interface ReelLook {
 
 type Variant =
   | "flip" | "dissolve" | "wipe" | "letters" | "tight" | "focus" | "iris" | "leak" | "panels"
-  | "reel" | "reel-wide" | "whip" | "whip-wide" | "pan" | "pan-step";
+  | "reel" | "reel-wide" | "whip" | "whip-wide" | "pan" | "pan-step" | "film";
 interface Cut {
   frames: Frame[];
   /** How long PASATIEMPO holds, in ms. */
@@ -292,8 +325,11 @@ interface Cut {
   fast?: boolean;
   /** Play the photographs as frames on a film strip. */
   reel?: ReelLook;
-  /** The whole screen is the film, panned along (step: settle on each frame). */
-  pan?: { step?: boolean };
+  /** The whole screen is the film, panned along (step: settle on each frame;
+   *  glide: one steady speed, never pausing, easing to rest under the title). */
+  pan?: { step?: boolean; glide?: boolean; tail?: Frame[] };
+  /** A soundtrack, started with the first frame. */
+  music?: string;
 }
 const VARIANTS: Record<Variant, Cut> = {
   flip: { frames: FRAMES, titleMs: TITLE_MS },
@@ -311,9 +347,18 @@ const VARIANTS: Record<Variant, Cut> = {
   "whip-wide": { frames: WHIP, titleMs: 2600, cine: true, fast: true, reel: { out: 0.65, whip: true } },
   pan: { frames: PAN, titleMs: 2600, cine: true, fast: true, pan: {} },
   "pan-step": { frames: PAN, titleMs: 2600, cine: true, fast: true, pan: { step: true } },
+  film: {
+    frames: FILM,
+    titleMs: 3050,
+    leadMs: 300,
+    cine: true,
+    fast: true,
+    pan: { glide: true, tail: FILM_TAIL },
+    music: MUSIC,
+  },
 };
 /** The intro visitors get. The others play with ?intro=<name>. */
-const DEFAULT_VARIANT: Variant = "dissolve";
+const DEFAULT_VARIANT: Variant = "film";
 function readVariant(): Variant {
   try {
     const v = new URLSearchParams(location.search).get("intro");
@@ -435,6 +480,9 @@ export default function IntroReel({
   const [solid, setSolid] = useState(false);
   const [quick, setQuick] = useState(false);
   const [variant, setVariant] = useState<Variant>(DEFAULT_VARIANT);
+  const [sound, setSound] = useState<"idle" | "on" | "muted" | "blocked">("idle");
+  const music = useRef<HTMLAudioElement | null>(null);
+  const musicStart = useRef(0);
   const cut = VARIANTS[variant];
   const frames = cut.frames;
   const calm = variant !== "flip";
@@ -461,10 +509,25 @@ export default function IntroReel({
         : [
             ...VARIANTS[v].frames.flatMap((f) => (f.trio ? f.trio.map((p) => p.src) : [f.src])),
             ...(VARIANTS[v].reel?.whip ? WHIP_PAST.map((f) => f.src) : []),
-            ...(VARIANTS[v].pan ? PAN_TAIL.map((f) => f.src) : []),
+            ...(VARIANTS[v].pan ? (VARIANTS[v].pan.tail ?? PAN_TAIL).map((f) => f.src) : []),
             SETTLE_ON,
           ];
-    preload([LOGO, ...new Set(srcs)], 3000).then(() => {
+    // The soundtrack loads alongside the photographs (it never holds them up long).
+    const src = VARIANTS[v].music;
+    const audio = src ? new Audio(src) : null;
+    const audioReady = audio
+      ? new Promise<void>((resolve) => {
+          audio.preload = "auto";
+          audio.addEventListener("canplaythrough", () => resolve(), { once: true });
+          audio.addEventListener("error", () => resolve(), { once: true });
+          audio.load();
+        })
+      : Promise.resolve();
+    music.current = audio;
+    Promise.all([
+      preload([LOGO, ...new Set(srcs)], 3000),
+      Promise.race([audioReady, new Promise((r) => setTimeout(r, 3000))]),
+    ]).then(() => {
       if (!alive) return;
       setVariant(v);
       setPhase("lead");
@@ -472,8 +535,55 @@ export default function IntroReel({
     return () => {
       alive = false;
       html.style.overflow = prev;
+      audio?.pause();
     };
   }, []);
+
+  // The soundtrack starts with the first frame. A browser that won't play
+  // sound before the visitor has touched the page gets a button instead,
+  // which joins the music at the right moment.
+  useEffect(() => {
+    if (phase !== "lead") return;
+    const a = music.current;
+    if (!a) return;
+    musicStart.current = performance.now();
+    a.currentTime = 0;
+    a.play().then(
+      () => setSound("on"),
+      () => setSound("blocked"),
+    );
+  }, [phase]);
+
+  // A skip fades the music out quickly (it fades itself at the natural end).
+  useEffect(() => {
+    if (phase !== "exit" || !quick) return;
+    const a = music.current;
+    if (!a || a.paused) return;
+    const from = a.volume;
+    const t0 = performance.now();
+    const id = setInterval(() => {
+      const k = Math.min(1, (performance.now() - t0) / 450);
+      a.volume = from * (1 - k);
+      if (k >= 1) {
+        clearInterval(id);
+        a.pause();
+      }
+    }, 30);
+    return () => clearInterval(id);
+  }, [phase, quick]);
+
+  const toggleSound = () => {
+    const a = music.current;
+    if (!a) return;
+    if (sound === "blocked") {
+      a.currentTime = Math.max(0, (performance.now() - musicStart.current) / 1000);
+      a.muted = false;
+      a.play().then(() => setSound("on"), () => setSound("blocked"));
+    } else {
+      a.muted = sound === "on";
+      setSound(sound === "on" ? "muted" : "on");
+    }
+  };
 
   // The clock: a beat of black, each page's hold, the title, the exit.
   useEffect(() => {
@@ -597,7 +707,13 @@ export default function IntroReel({
       {/* The film pan runs on under the title, so it stays mounted through both. */}
       {(inReel || inTitle) && cut.pan && (
         <div className="mci-reel" aria-hidden>
-          <FilmPan frames={frames} step={!!cut.pan.step} tailMs={cut.titleMs + FAST_EXIT_MS} />
+          <FilmPan
+            frames={frames}
+            step={!!cut.pan.step}
+            glide={!!cut.pan.glide}
+            tail={cut.pan.tail ?? PAN_TAIL}
+            tailMs={cut.titleMs + FAST_EXIT_MS}
+          />
         </div>
       )}
       {inReel && cut.reel && (
@@ -691,6 +807,27 @@ export default function IntroReel({
       <div className="mci-reel-bar" aria-hidden>
         <span style={{ transform: `scaleX(${progress})` }} />
       </div>
+      {cut.music && sound !== "idle" && phase !== "exit" && (
+        <button
+          type="button"
+          className={"mci-reel-skip mci-reel-sound is-" + sound}
+          aria-pressed={sound === "on"}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleSound();
+          }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden width="14" height="14">
+            <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" />
+            {sound === "on" ? (
+              <path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            ) : (
+              <path d="M16.5 9.5l5 5M21.5 9.5l-5 5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            )}
+          </svg>
+          {sound === "blocked" ? "Play with sound" : sound === "on" ? "Sound on" : "Sound off"}
+        </button>
+      )}
       <button
         type="button"
         className="mci-reel-skip"
@@ -858,9 +995,21 @@ function FilmReel({ frames, i, look }: { frames: Frame[]; i: number; look: ReelL
  * vertical, as through a projector, on a tall one. One animation from first
  * frame to last, then a slow drift on under the title.
  */
-function FilmPan({ frames, step, tailMs }: { frames: Frame[]; step: boolean; tailMs: number }) {
+function FilmPan({
+  frames,
+  step,
+  glide,
+  tail,
+  tailMs,
+}: {
+  frames: Frame[];
+  step: boolean;
+  glide: boolean;
+  tail: Frame[];
+  tailMs: number;
+}) {
   const track = useRef<HTMLDivElement>(null);
-  const strip = [...frames, ...PAN_TAIL];
+  const strip = [...frames, ...tail];
   const [vertical] = useState(() => typeof window !== "undefined" && window.innerHeight > window.innerWidth * 1.1);
 
   useEffect(() => {
@@ -876,19 +1025,24 @@ function FilmPan({ frames, step, tailMs }: { frames: Frame[]; step: boolean; tai
     const pitch = at(0) - at(1);
     const run = frames.reduce((n, f) => n + f.hold, 0);
     const total = run + tailMs;
-    // Start half a frame early, so the first one slides into the centre.
-    const keys: Keyframe[] = [{ transform: move(at(0) + pitch * 0.55), offset: 0 }];
+    // Start half a frame early, so the first one slides into the centre. (The
+    // glide starts a whole frame early, already at its one steady speed.)
+    const keys: Keyframe[] = [{ transform: move(at(0) + pitch * (glide ? 1 : 0.55)), offset: 0 }];
     let clock = 0;
     frames.forEach((f, k) => {
       clock += f.hold;
       keys.push({ transform: move(at(k)), offset: clock / total });
     });
-    // Under the title: on along the strip, slowly.
-    keys.push({ transform: move(at(frames.length - 1) - pitch * 0.9), offset: 1 });
+    // Under the title: on along the strip, slowly. The glide carries its speed
+    // into this and eases to rest exactly one frame on.
+    keys.push({ transform: move(at(frames.length - 1) - pitch * (glide ? 1 : 0.9)), offset: 1 });
     const ease = step ? "cubic-bezier(.62,0,.38,1)" : "linear";
+    // For the glide, the curve's opening slope matches the speed it arrives at.
+    const lastHold = frames[frames.length - 1].hold;
+    const rest = `cubic-bezier(.3,${Math.min(1, (0.3 * tailMs) / lastHold).toFixed(3)},.5,1)`;
     keys.forEach((k, n) => {
-      if (n < keys.length - 2) k.easing = n === 0 ? "cubic-bezier(.3,0,.6,1)" : ease;
-      else if (n === keys.length - 2) k.easing = "cubic-bezier(.2,.4,.4,1)";
+      if (n < keys.length - 2) k.easing = n === 0 && !glide ? "cubic-bezier(.3,0,.6,1)" : ease;
+      else if (n === keys.length - 2) k.easing = glide ? rest : "cubic-bezier(.2,.4,.4,1)";
     });
     const anim = t.animate(keys, { duration: total, fill: "forwards" });
     return () => anim.cancel();
