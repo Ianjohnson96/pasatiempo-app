@@ -729,7 +729,10 @@ body:has(.mci){margin:0;}
    photograph, so nothing ever stops on screen. Long, soft dissolves. */
 .mci-intro.var-score .mci-bars{display:none;}
 .mci-intro.var-score .mci-page{animation:mci-xfade 1.35s cubic-bezier(.45,0,.35,1) both;}
-.mci-intro.var-score .mci-page img{transform-origin:var(--focus);animation-duration:4.4s;animation-timing-function:linear;}
+.mci-intro.var-score .mci-page img{transform-origin:var(--focus);animation-duration:var(--zoom,4.4s);animation-timing-function:linear;}
+/* The last photograph stays on under the title (dimmed by the title's scrim)
+   and fades away first as the intro lifts. */
+.mci-intro.var-score.is-exit .mci-reel{opacity:0;transition:opacity .7s ease;}
 .mci-intro.var-score .mci-reel.is-behind .mci-page img{animation:mci-score-title 8s linear both;}
 @keyframes mci-score-title{from{transform:scale(1.04);}to{transform:scale(1.12);}}
 .mci-intro.var-score .mci-reel-grain{opacity:.12;}
@@ -752,6 +755,18 @@ body:has(.mci){margin:0;}
   filter:blur(26px) brightness(.42) grayscale(1) sepia(.3);transform:scale(1.05);}
 .mci-page img.is-fit{object-fit:contain;transform-origin:50% 40%;
   filter:grayscale(1) sepia(.3) contrast(1.12) brightness(.95) drop-shadow(0 20px 50px rgba(0,0,0,.6));}
+
+/* On a tall (phone) screen: a wide group photograph shows whole on its soft
+   backdrop, and some photographs take a different crop. */
+.mci-page-fill.is-phone{display:none;}
+@media (max-aspect-ratio:4/5){
+  .mci-page-fill.is-phone{display:block;}
+  .mci-page img.is-phone-fit{object-fit:contain;transform-origin:50% 46%;
+    filter:grayscale(1) sepia(.3) contrast(1.12) brightness(.95) drop-shadow(0 18px 40px rgba(0,0,0,.6));}
+  .mci-page img{object-position:var(--focus-m,var(--focus));}
+  .mci-page img.is-phone-fit{object-position:50% 46%;}
+  .mci-intro.var-score .mci-page img:not(.is-phone-fit){transform-origin:var(--focus-m,var(--focus));}
+}
 
 /* The closing title of the scored dissolve: the club's 1929 logo, then
    PASATIEMPO in the logo's own script — each fading up in turn. */
