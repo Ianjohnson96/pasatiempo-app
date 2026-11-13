@@ -6,6 +6,8 @@ import {
   needsSingle,
   planDelete,
   planEntry,
+  planHappened,
+  planMove,
   readTitle,
 } from "./sync-plan";
 
@@ -199,5 +201,70 @@ describe("planDelete", () => {
     expect(
       planDelete({ calendarUid: "AAMk1", bill: { kind: "package", status: "paid" } }),
     ).toEqual({ ok: true, dismissUid: "AAMk1", dropSingle: false });
+  });
+});
+
+describe("planMove", () => {
+  const pkg = { clientId: "c1", kind: "package" };
+
+  it("moves a lesson on no bill onto the client's package", () => {
+    expect(planMove({ lessonClientId: "c1", bill: null, target: pkg })).toEqual({
+      ok: true,
+      dropSingle: false,
+    });
+  });
+
+  it("drops the unpaid single the lesson was billed on", () => {
+    for (const status of ["unpaid", "pending"]) {
+      expect(
+        planMove({ lessonClientId: "c1", bill: { kind: "single", status }, target: pkg }),
+      ).toEqual({ ok: true, dropSingle: true });
+    }
+  });
+
+  it("moves between packages without touching either package", () => {
+    expect(
+      planMove({ lessonClientId: "c1", bill: { kind: "package", status: "paid" }, target: pkg }),
+    ).toEqual({ ok: true, dropSingle: false });
+  });
+
+  it("refuses when its single is paid, so the money is not counted twice", () => {
+    expect(
+      planMove({ lessonClientId: "c1", bill: { kind: "single", status: "paid" }, target: pkg }).ok,
+    ).toBe(false);
+  });
+
+  it("refuses someone else's package, a single, or a lesson with no student", () => {
+    expect(
+      planMove({ lessonClientId: "c1", bill: null, target: { clientId: "c2", kind: "package" } }).ok,
+    ).toBe(false);
+    expect(
+      planMove({ lessonClientId: "c1", bill: null, target: { clientId: "c1", kind: "single" } }).ok,
+    ).toBe(false);
+    expect(planMove({ lessonClientId: null, bill: null, target: pkg }).ok).toBe(false);
+  });
+});
+
+describe("planHappened", () => {
+  it("lets go of an unpaid single when the lesson did not happen", () => {
+    expect(planHappened("cancelled", { kind: "single", status: "unpaid" })).toEqual({
+      dropSingle: true,
+    });
+  });
+
+  it("keeps the bill for a no-show - it may still be charged", () => {
+    expect(planHappened("no_show", { kind: "single", status: "unpaid" })).toEqual({
+      dropSingle: false,
+    });
+  });
+
+  it("never drops a paid single or a package", () => {
+    expect(planHappened("cancelled", { kind: "single", status: "paid" }).dropSingle).toBe(false);
+    expect(planHappened("cancelled", { kind: "package", status: "unpaid" }).dropSingle).toBe(false);
+    expect(planHappened("cancelled", null).dropSingle).toBe(false);
+  });
+
+  it("changes no bill when a lesson is put back as happened", () => {
+    expect(planHappened("completed", { kind: "single", status: "unpaid" }).dropSingle).toBe(false);
   });
 });

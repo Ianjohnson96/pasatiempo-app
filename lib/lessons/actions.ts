@@ -16,7 +16,7 @@ import {
   singleRate,
 } from "./calc";
 import { markPaidOn } from "./catchup";
-import { planDelete } from "./sync-plan";
+import { planDelete, planHappened, planMove } from "./sync-plan";
 import type { PayMethod, PaymentStatus, Result } from "./types";
 
 // Write-side for the lesson book.
@@ -1735,14 +1735,139 @@ export async function setLessonHappened(
       .from("lessons")
       .update({ status })
       .eq("id", lessonId)
-      .select("client_id");
+      .select("client_id, package_id");
     if (error) throw error;
     if (!data?.length) return { ok: false, error: "That lesson is no longer in the book." };
 
+    // A lesson that never happened owes nothing: let go of its own unpaid
+    // single, so it stops asking for payment (see planHappened). Deleting the
+    // single clears the lesson's package_id through the foreign key.
+    const packageId = data[0].package_id as string | null;
+    if (packageId) {
+      const bill = await billOf(supa, packageId);
+      if (planHappened(status, bill).dropSingle) {
+        const { error: dErr } = await supa
+          .from("lesson_packages")
+          .delete()
+          .eq("id", packageId)
+          .eq("kind", "single")
+          .neq("payment_status", "paid");
+        if (dErr) throw dErr;
+      }
+    }
+
     touched((data[0].client_id as string) ?? undefined);
+    revalidatePath("/lessons/billing");
     return { ok: true, value: undefined };
   } catch (e) {
     return fail(e, "Could not change that lesson.");
+  }
+}
+
+async function billOf(
+  supa: Awaited<ReturnType<typeof lessonBookClient>>,
+  packageId: string,
+): Promise<{ kind: string; status: string; clientId: string } | null> {
+  const { data, error } = await supa
+    .from("lesson_packages")
+    .select("kind, payment_status, client_id")
+    .eq("id", packageId)
+    .maybeSingle();
+  if (error) throw error;
+  return data
+    ? {
+        kind: data.kind as string,
+        status: data.payment_status as string,
+        clientId: data.client_id as string,
+      }
+    : null;
+}
+
+/**
+ * Put a lesson on one of its client's packages - or on a new 3/5/10-pack -
+ * from the lesson itself. Its own unpaid single goes, so it stops being
+ * billed as a lesson on its own; a paid single is refused (see planMove).
+ */
+export async function moveLessonToPackage(
+  lessonId: string,
+  target: { packageId: string } | { newSize: number },
+): Promise<Result<{ packageId: string; made: boolean }>> {
+  try {
+    await assertLessonBook();
+    const supa = await lessonBookClient();
+    const { data: lesson, error: lErr } = await supa
+      .from("lessons")
+      .select("id, client_id, package_id, starts_at")
+      .eq("id", lessonId)
+      .maybeSingle();
+    if (lErr) throw lErr;
+    if (!lesson) return { ok: false, error: "That lesson is no longer in the book." };
+    const clientId = (lesson.client_id as string | null) ?? null;
+    const oldId = (lesson.package_id as string | null) ?? null;
+    const bill = oldId ? await billOf(supa, oldId) : null;
+
+    let dest: { clientId: string; kind: string };
+    if ("packageId" in target) {
+      if (target.packageId === oldId) {
+        return { ok: true, value: { packageId: oldId, made: false } };
+      }
+      const t = await billOf(supa, target.packageId);
+      if (!t) return { ok: false, error: "That package is no longer in the book." };
+      dest = { clientId: t.clientId, kind: t.kind };
+    } else {
+      if (!Number.isInteger(target.newSize) || target.newSize < 2 || target.newSize > 50) {
+        return { ok: false, error: "A package holds between 2 and 50 lessons." };
+      }
+      dest = { clientId: clientId ?? "", kind: "package" };
+    }
+
+    const plan = planMove({ lessonClientId: clientId, bill, target: dest });
+    if (!plan.ok) return plan;
+
+    let packageId: string;
+    let made = false;
+    if ("packageId" in target) {
+      packageId = target.packageId;
+    } else {
+      const standard = await standardPrices();
+      const { data: created, error: cErr } = await supa
+        .from("lesson_packages")
+        .insert({
+          client_id: clientId,
+          size: target.newSize,
+          kind: "package",
+          sold_on: courseDay(lesson.starts_at as string),
+          price_cents: standard[target.newSize] ?? null,
+          payment_status: "unpaid",
+        })
+        .select("id")
+        .single();
+      if (cErr) throw cErr;
+      packageId = created.id as string;
+      made = true;
+    }
+
+    const { error: mErr } = await supa
+      .from("lessons")
+      .update({ package_id: packageId })
+      .eq("id", lessonId);
+    if (mErr) throw mErr;
+
+    if (plan.dropSingle && oldId) {
+      const { error: dErr } = await supa
+        .from("lesson_packages")
+        .delete()
+        .eq("id", oldId)
+        .eq("kind", "single")
+        .neq("payment_status", "paid");
+      if (dErr) throw dErr;
+    }
+
+    touched(clientId ?? undefined);
+    revalidatePath("/lessons/billing");
+    return { ok: true, value: { packageId, made } };
+  } catch (e) {
+    return fail(e, "Could not put that lesson on a package.");
   }
 }
 

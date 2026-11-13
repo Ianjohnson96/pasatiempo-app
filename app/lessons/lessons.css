@@ -1188,3 +1188,19 @@ a.lb-next:hover {
     min-height: 44px;
   }
 }
+
+/* Lessons tab "Adjust": whether it happened, which package, delete. The
+   package list reuses the Venmo-candidate buttons; a full pack is dimmed
+   but still pickable - Ian may be correcting a series' count. */
+.lb-adjust {
+  border-top: 1px dashed var(--line);
+}
+.lb-pkpick .lb-led-cand {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.lb-pkpick .lb-led-cand:disabled {
+  cursor: default;
+}

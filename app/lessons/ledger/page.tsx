@@ -3,7 +3,7 @@ import LessonsHeader from "@/components/lessons/LessonsHeader";
 import LessonLedger from "@/components/lessons/LessonLedger";
 import { requireLessonBook } from "@/lib/lessons/auth";
 import { gateFirst } from "@/lib/lessons/gate";
-import { lessonLedger, reviewCount } from "@/lib/lessons/data";
+import { lessonLedger, listPackageOptions, reviewCount } from "@/lib/lessons/data";
 
 // Every lesson in date order with the money against it - the other way round
 // from Billing, which works a client at a time. Walking the days is how a
@@ -11,10 +11,12 @@ import { lessonLedger, reviewCount } from "@/lib/lessons/data";
 export const dynamic = "force-dynamic";
 
 export default async function LedgerPage() {
-  const [viewer, [data, waiting]] = await gateFirst(
+  const [viewer, [data, waiting, options]] = await gateFirst(
     requireLessonBook(),
-    Promise.all([lessonLedger(), reviewCount()]),
+    Promise.all([lessonLedger(), reviewCount(), listPackageOptions()]),
   );
+  // Packages only: a lesson is moved onto a series, never onto someone's single.
+  const packages = options.filter((p) => p.kind === "package");
 
   return (
     <>
@@ -32,7 +34,7 @@ export default async function LedgerPage() {
           anything the calendar title already said &mdash; &ldquo;3 of
           5&rdquo;, &ldquo;[paid]&rdquo; &mdash; is offered, never assumed.
         </p>
-        <LessonLedger data={data} />
+        <LessonLedger data={data} packages={packages} />
       </main>
     </>
   );

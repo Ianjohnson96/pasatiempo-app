@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   deleteLesson,
+  moveLessonToPackage,
   packFromTitle,
   setLessonHappened,
   setLessonPayment,
@@ -13,9 +14,11 @@ import { METHOD_LABEL } from "@/lib/lessons/income";
 import {
   formatDay,
   money,
+  packageOptionLabel,
   type LedgerCandidate,
   type LedgerData,
   type LedgerRow,
+  type PackageOption,
   type PayMethod,
 } from "@/lib/lessons/types";
 
@@ -68,7 +71,31 @@ function clockTime(iso: string): string {
   }).format(new Date(iso));
 }
 
-export default function LessonLedger({ data }: { data: LedgerData }) {
+export default function LessonLedger({
+  data,
+  packages,
+}: {
+  data: LedgerData;
+  /** Every package (not single) in the book, for "put it on a package". */
+  packages: PackageOption[];
+}) {
+  // A client's packages, the ones with room first, then newest.
+  const pkgsOf = useMemo(() => {
+    const m = new Map<string, PackageOption[]>();
+    for (const p of packages) {
+      const list = m.get(p.clientId) ?? [];
+      list.push(p);
+      m.set(p.clientId, list);
+    }
+    for (const list of m.values()) {
+      list.sort(
+        (a, b) =>
+          Number(b.size - b.used > 0) - Number(a.size - a.used > 0) ||
+          (b.firstLessonAt ?? b.soldOn ?? "").localeCompare(a.firstLessonAt ?? a.soldOn ?? ""),
+      );
+    }
+    return m;
+  }, [packages]);
   const [filter, setFilter] = useState<Filter>("todo");
   const [open, setOpen] = useState<string | null>(null);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
@@ -133,6 +160,7 @@ export default function LessonLedger({ data }: { data: LedgerData }) {
                 <LessonRow
                   key={r.id}
                   row={r}
+                  pkgs={(r.clientId && pkgsOf.get(r.clientId)) || []}
                   loose={data.loose}
                   open={open === r.id}
                   onOpen={() => setOpen(open === r.id ? null : r.id)}
@@ -142,6 +170,7 @@ export default function LessonLedger({ data }: { data: LedgerData }) {
                     setNote({ ok: true, text });
                   }}
                   onError={(text) => setNote({ ok: false, text })}
+                  onNote={(text) => setNote({ ok: true, text })}
                 />
               ))}
             </div>
@@ -154,21 +183,45 @@ export default function LessonLedger({ data }: { data: LedgerData }) {
 
 function LessonRow({
   row,
+  pkgs,
   loose,
   open,
   onOpen,
   onDone,
   onError,
+  onNote,
 }: {
   row: LedgerRow;
+  /** This client's packages, ones with room first. */
+  pkgs: PackageOption[];
   loose: LedgerCandidate[];
   open: boolean;
   onOpen: () => void;
   onDone: (text: string) => void;
   onError: (text: string) => void;
+  /** A change that keeps the row on screen (it refreshes in place). */
+  onNote: (text: string) => void;
 }) {
   const [busy, start] = useTransition();
+  const [adjusting, setAdjusting] = useState(false);
   const settled = !!row.pack;
+  // On nothing, or billed as its own unpaid single, while the client has a
+  // package with room: most likely the next lesson of that series.
+  const room = pkgs.find((p) => p.size - p.used > 0) ?? null;
+  const loneBill =
+    !row.pack || (row.pack.kind === "single" && row.pack.paymentStatus !== "paid");
+  const offerPack =
+    room && loneBill && row.status !== "cancelled" && !(row.hintSize && row.hintSize > 1)
+      ? room
+      : null;
+
+  function move(target: { packageId: string } | { newSize: number }, label: string) {
+    start(async () => {
+      const r = await moveLessonToPackage(row.id, target);
+      if (!r.ok) onError(r.error);
+      else onDone(`${row.clientName}: ${clockTime(row.startsAt)} put on ${label}.`);
+    });
+  }
 
   return (
     <div className="card lb-led-row">
@@ -223,8 +276,47 @@ function LessonRow({
               {open ? "Close" : "Set payment"}
             </button>
           )}
+          <button
+            type="button"
+            className="btn ghost small"
+            style={{ marginTop: 6, display: "block", marginLeft: "auto" }}
+            onClick={() => setAdjusting((v) => !v)}
+            aria-expanded={adjusting}
+          >
+            {adjusting ? "Done" : "Adjust"}
+          </button>
         </div>
       </div>
+
+      {offerPack && (
+        <div className="lb-led-offer">
+          <span>
+            {row.pack ? "Billed on its own, but " : ""}
+            {row.clientName} has a {offerPack.size}-pack with{" "}
+            {offerPack.size - offerPack.used} left. Put it on that?
+          </span>
+          <button
+            type="button"
+            className="btn small"
+            disabled={busy}
+            onClick={() => move({ packageId: offerPack.id }, `their ${offerPack.size}-pack`)}
+          >
+            Yes
+          </button>
+        </div>
+      )}
+
+      {adjusting && (
+        <AdjustPanel
+          row={row}
+          pkgs={pkgs}
+          busy={busy}
+          onMove={move}
+          onDone={onDone}
+          onError={onError}
+          onNote={onNote}
+        />
+      )}
 
       {row.duplicateOf && (
         <p className="notice warn" style={{ margin: "10px 0 0" }}>
@@ -271,6 +363,115 @@ function LessonRow({
           onError={onError}
           onCancel={onOpen}
         />
+      )}
+    </div>
+  );
+}
+
+const HAPPENED: { status: "completed" | "cancelled" | "no_show"; label: string }[] = [
+  { status: "completed", label: "Happened" },
+  { status: "cancelled", label: "Didn’t happen" },
+  { status: "no_show", label: "No-show" },
+];
+
+/**
+ * Everything about a lesson that is not the money: whether it happened,
+ * which package it belongs to, or that it was never a lesson at all. Each
+ * saves on the tap - no trip to Outlook, no wait for the sync.
+ */
+function AdjustPanel({
+  row,
+  pkgs,
+  busy,
+  onMove,
+  onDone,
+  onError,
+  onNote,
+}: {
+  row: LedgerRow;
+  pkgs: PackageOption[];
+  busy: boolean;
+  onMove: (target: { packageId: string } | { newSize: number }, label: string) => void;
+  onDone: (text: string) => void;
+  onError: (text: string) => void;
+  onNote: (text: string) => void;
+}) {
+  const [saving, start] = useTransition();
+  const off = busy || saving;
+  const current = row.status === "scheduled" ? "completed" : row.status;
+
+  function happened(status: "completed" | "cancelled" | "no_show", label: string) {
+    start(async () => {
+      const r = await setLessonHappened(row.id, status);
+      if (!r.ok) onError(r.error);
+      // Didn't happen takes it off the to-do list; the others keep it there.
+      else if (status === "cancelled") onDone(`${row.clientName}: didn’t happen.`);
+      else onNote(`${row.clientName}: ${label.toLowerCase()}.`);
+    });
+  }
+
+  return (
+    <div className="lb-led-form lb-adjust">
+      <div className="lb-led-lbl">Did it happen?</div>
+      <div className="lb-chips">
+        {HAPPENED.map((h) => (
+          <button
+            key={h.status}
+            type="button"
+            className={h.status === current ? "btn small" : "btn secondary small"}
+            aria-pressed={h.status === current}
+            disabled={off || h.status === current}
+            onClick={() => happened(h.status, h.label)}
+          >
+            {h.label}
+          </button>
+        ))}
+      </div>
+      <p className="lb-fhint" style={{ margin: "4px 0 0" }}>
+        Saved now, and the calendar sync keeps it. Didn&rsquo;t happen also
+        drops an unpaid single, so it stops asking for payment.
+      </p>
+
+      {row.clientId && (
+        <>
+          <div className="lb-led-lbl" style={{ marginTop: 12 }}>
+            Part of a package?
+          </div>
+          <div className="lb-pkpick">
+            {pkgs.map((p) => {
+              const on = row.pack?.id === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`lb-led-cand${on ? " on" : ""}`}
+                  aria-pressed={on}
+                  disabled={off || on}
+                  onClick={() => onMove({ packageId: p.id }, `the ${p.size}-pack`)}
+                >
+                  <span className="lb-led-cand-who">{packageOptionLabel(p)}</span>
+                  {p.size - p.used <= 0 && <span className="lb-sub">full</span>}
+                </button>
+              );
+            })}
+          </div>
+          <div className="lb-chips" style={{ marginTop: 6 }}>
+            <span className="lb-sub" style={{ alignSelf: "center" }}>
+              New:
+            </span>
+            {[3, 5, 10].map((n) => (
+              <button
+                key={n}
+                type="button"
+                className="btn secondary small"
+                disabled={off}
+                onClick={() => onMove({ newSize: n }, `a new ${n}-pack`)}
+              >
+                {n}-pack
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       <DeleteRow row={row} onDone={onDone} onError={onError} />

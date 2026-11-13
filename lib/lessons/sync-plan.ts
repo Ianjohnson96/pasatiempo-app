@@ -208,6 +208,51 @@ export function planDelete(e: {
 }
 
 /**
+ * Putting a lesson on a package - the series it really belongs to, rather
+ * than the single the sync billed it as.
+ *
+ * Only the student's own packages, and never a paid single left behind: that
+ * money would then be counted on the single and again on the package.
+ */
+export function planMove(e: {
+  lessonClientId: string | null;
+  bill: { kind: string; status: string } | null;
+  target: { clientId: string; kind: string };
+}): { ok: true; dropSingle: boolean } | { ok: false; error: string } {
+  if (!e.lessonClientId) return { ok: false, error: "Give that lesson a student first." };
+  if (e.target.kind !== "package") {
+    return { ok: false, error: "Pick a package, not a single lesson's bill." };
+  }
+  if (e.target.clientId !== e.lessonClientId) {
+    return { ok: false, error: "That package belongs to someone else." };
+  }
+  const single = e.bill?.kind === "single";
+  if (single && e.bill?.status === "paid") {
+    return {
+      ok: false,
+      error:
+        "This lesson was already paid for on its own. Set that bill to unpaid first, then move it.",
+    };
+  }
+  return { ok: true, dropSingle: single };
+}
+
+/**
+ * Marking whether a lesson happened. One that did not happen owes nothing,
+ * so its own unpaid single goes; a no-show keeps its bill (it may still be
+ * charged), and a paid single or a package is never touched.
+ */
+export function planHappened(
+  status: "completed" | "cancelled" | "no_show",
+  bill: { kind: string; status: string } | null,
+): { dropSingle: boolean } {
+  return {
+    dropSingle:
+      status === "cancelled" && bill?.kind === "single" && bill.status !== "paid",
+  };
+}
+
+/**
  * Should a new calendar lesson be billed as a single?
  *
  * Yes when the client has no package with room left - nothing else it could
