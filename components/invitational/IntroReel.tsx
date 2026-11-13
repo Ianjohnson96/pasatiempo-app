@@ -51,6 +51,10 @@ interface Frame {
   focus?: string;
   /** A slow camera move (the dissolve cut): scale and offset in %, from → to. */
   move?: [fromScale: number, fromX: number, fromY: number, toScale: number, toX: number, toY: number];
+  /** Three photographs side by side in place of one (the panels cut). */
+  trio?: { src: string; focus?: string }[];
+  /** The colour develops out of a black-and-white print (the light-leak cut). */
+  develop?: boolean;
 }
 
 const FRAMES: Frame[] = [
@@ -129,14 +133,111 @@ const LETTERS: Frame[] = [
   { src: T("aerial-dawn.webp"), hold: 900, era: "today" },
 ];
 
-type Variant = "flip" | "dissolve" | "wipe" | "letters";
-const VARIANTS: Record<Variant, Frame[]> = {
-  flip: FRAMES,
-  dissolve: DISSOLVE,
-  wipe: WIPE,
-  letters: LETTERS,
+const TITLE_MS = 3200; // PASATIEMPO on screen
+
+// ---- Ten-second cuts -------------------------------------------------------
+// Quicker than the dissolve (about ten seconds, title and fade included), each
+// with one idea of its own. They share the dissolve's widescreen look and its
+// title over the course, timed a little tighter.
+
+/** 1 · The dissolve, quicker: each cut a little shorter than the last. */
+const TIGHT: Frame[] = [
+  { src: A("1929-tee-shot-bay.webp"), hold: 680, era: "archive", focus: "center 70%", move: [1.12, 0, 3, 1.04, 0, -1] },
+  { src: A("1929-opening-foursome.webp"), hold: 600, era: "archive", focus: "center 10%", move: [1.02, 0, 0, 1.12, 0, 1] },
+  { src: IMG + "mackenzie.webp", hold: 560, era: "archive", focus: "53% 16%", move: [1.14, 0, 0, 1.04, 0, 0] },
+  { src: A("1929-gallery-oak.webp"), hold: 520, era: "archive", focus: "center 60%", move: [1.1, 2.5, 0, 1.1, -2, 0] },
+  { src: IMG + "hollins.webp", hold: 500, era: "archive", focus: "50% 30%", move: [1.04, 0, 0, 1.14, 0, 0] },
+  { src: A("1929-bunkered-green.webp"), hold: 480, era: "archive", focus: "center 60%", move: [1.04, 0, 0, 1.12, 0, 0] },
+  { src: IMG + "course-green.webp", hold: 560, era: "today", focus: "center 60%", move: [1.12, 0, 0, 1.04, 0, 0] },
+  { src: T("bridge.webp"), hold: 460, era: "today", focus: "center 60%", move: [1.02, 0, 0, 1.14, 0, 1] },
+  { src: T("flag-green.webp"), hold: 440, era: "today", focus: "70% 60%", move: [1.1, -2, 0, 1.1, 2, 0] },
+  { src: T("aerial-dawn.webp"), hold: 640, era: "today", focus: "center 50%", move: [1.14, 0, 1, 1.05, 0, 0] },
+];
+/** 2 · Rack focus: each photograph pulls sharp out of a blur as the last one softens away. */
+const FOCUS: Frame[] = [
+  { src: A("1929-tee-shot-bay.webp"), hold: 780, era: "archive", focus: "center 70%", move: [1.08, 1.5, 0, 1.04, -1.5, 0] },
+  { src: IMG + "mackenzie.webp", hold: 700, era: "archive", focus: "53% 16%", move: [1.1, 0, 0, 1.03, 0, 0] },
+  { src: A("1929-opening-foursome.webp"), hold: 700, era: "archive", focus: "center 10%", move: [1.08, -1.5, 0, 1.04, 1.5, 0] },
+  { src: IMG + "hollins.webp", hold: 700, era: "archive", focus: "50% 30%", move: [1.03, 0, 0, 1.1, 0, 0] },
+  { src: IMG + "course-green.webp", hold: 760, era: "today", focus: "center 60%", move: [1.1, 0, 0, 1.03, 0, 0] },
+  { src: T("bridge.webp"), hold: 680, era: "today", focus: "center 60%", move: [1.03, 0, 0, 1.1, 0, 1] },
+  { src: T("aerial-dawn.webp"), hold: 760, era: "today", focus: "center 50%", move: [1.12, 0, 1, 1.04, 0, 0] },
+];
+/** 3 · Through the crest: a gold ring draws on black and 1929 is seen through it, then the ring opens out into 2027. */
+const IRIS: Frame[] = [
+  { src: A("1929-tee-shot-bay.webp"), hold: 760, era: "archive", focus: "center 70%", move: [1.16, 0, 0, 1.06, 0, 0] },
+  { src: A("1929-opening-foursome.webp"), hold: 660, era: "archive", focus: "center 10%", move: [1.04, 0, 0, 1.14, 0, 0] },
+  { src: IMG + "mackenzie.webp", hold: 660, era: "archive", focus: "53% 16%", move: [1.16, 0, 0, 1.06, 0, 0] },
+  { src: IMG + "hollins.webp", hold: 660, era: "archive", focus: "50% 30%", move: [1.04, 0, 0, 1.14, 0, 0] },
+  { src: A("1929-bunkered-green.webp"), hold: 620, era: "archive", focus: "center 60%", move: [1.06, 0, 0, 1.14, 0, 0] },
+  { src: IMG + "course-green.webp", hold: 900, era: "today", focus: "center 60%", move: [1.16, 0, 0, 1.04, 0, 0] },
+  { src: T("bridge.webp"), hold: 560, era: "today", focus: "center 60%", move: [1.02, 0, 0, 1.12, 0, 1] },
+  { src: T("aerial-dawn.webp"), hold: 700, era: "today", focus: "center 50%", move: [1.14, 0, 1, 1.05, 0, 0] },
+];
+/** 4 · Light leaks: warm film burns wash across each cut, and 2027 develops out of a black-and-white print. */
+const LEAK: Frame[] = [
+  { src: A("1929-tee-shot-bay.webp"), hold: 700, era: "archive", focus: "center 70%", move: [1.12, 0, 3, 1.04, 0, -1] },
+  { src: A("1929-opening-foursome.webp"), hold: 620, era: "archive", focus: "center 10%", move: [1.02, 0, 0, 1.12, 0, 1] },
+  { src: IMG + "mackenzie.webp", hold: 620, era: "archive", focus: "53% 16%", move: [1.14, 0, 0, 1.04, 0, 0] },
+  { src: A("1929-gallery-oak.webp"), hold: 580, era: "archive", focus: "center 60%", move: [1.1, 2.5, 0, 1.1, -2, 0] },
+  { src: IMG + "hollins.webp", hold: 580, era: "archive", focus: "50% 30%", move: [1.04, 0, 0, 1.14, 0, 0] },
+  { src: IMG + "course-green.webp", hold: 1100, era: "today", focus: "center 60%", move: [1.12, 0, 0, 1.03, 0, 0], develop: true },
+  { src: T("bridge.webp"), hold: 520, era: "today", focus: "center 60%", move: [1.02, 0, 0, 1.14, 0, 1] },
+  { src: T("aerial-dawn.webp"), hold: 680, era: "today", focus: "center 50%", move: [1.14, 0, 1, 1.05, 0, 0] },
+];
+/** 5 · Panels: three photographs at a time rise in like a gallery wall; the last opens out from the centre panel. */
+const PANELS: Frame[] = [
+  {
+    src: A("1929-tee-shot-bay.webp"), hold: 1500, era: "archive",
+    trio: [
+      { src: A("1929-tee-shot-bay.webp"), focus: "center 70%" },
+      { src: IMG + "mackenzie.webp", focus: "53% 16%" },
+      { src: IMG + "hollins.webp", focus: "50% 30%" },
+    ],
+  },
+  {
+    src: A("1929-opening-foursome.webp"), hold: 1400, era: "archive",
+    trio: [
+      { src: A("1929-opening-foursome.webp"), focus: "35% 10%" },
+      { src: A("1929-gallery-oak.webp"), focus: "center 60%" },
+      { src: A("1929-bunkered-green.webp"), focus: "center 60%" },
+    ],
+  },
+  {
+    src: T("bridge.webp"), hold: 1400, era: "today",
+    trio: [
+      { src: T("bridge.webp"), focus: "center 60%" },
+      { src: T("flag-green.webp"), focus: "70% 60%" },
+      { src: T("chairs-bay.webp"), focus: "center 45%" },
+    ],
+  },
+  { src: T("aerial-dawn.webp"), hold: 900, era: "today", focus: "center 50%", move: [1.14, 0, 1, 1.05, 0, 0] },
+];
+
+type Variant = "flip" | "dissolve" | "wipe" | "letters" | "tight" | "focus" | "iris" | "leak" | "panels";
+interface Cut {
+  frames: Frame[];
+  /** How long PASATIEMPO holds, in ms. */
+  titleMs: number;
+  /** The beat of black before the first photograph. */
+  leadMs?: number;
+  /** The widescreen look and the title over the course (the dissolve family). */
+  cine?: boolean;
+  /** The ten-second timing: a quicker title and a quicker lift. */
+  fast?: boolean;
+}
+const VARIANTS: Record<Variant, Cut> = {
+  flip: { frames: FRAMES, titleMs: TITLE_MS },
+  dissolve: { frames: DISSOLVE, titleMs: 4300, cine: true },
+  wipe: { frames: WIPE, titleMs: TITLE_MS },
+  letters: { frames: LETTERS, titleMs: TITLE_MS },
+  tight: { frames: TIGHT, titleMs: 2900, cine: true, fast: true },
+  focus: { frames: FOCUS, titleMs: 2900, cine: true, fast: true },
+  iris: { frames: IRIS, titleMs: 2800, leadMs: 1000, cine: true, fast: true },
+  leak: { frames: LEAK, titleMs: 2900, cine: true, fast: true },
+  panels: { frames: PANELS, titleMs: 2900, cine: true, fast: true },
 };
-/** The intro visitors get. The others play with ?intro=flip | wipe | letters. */
+/** The intro visitors get. The others play with ?intro=<name>. */
 const DEFAULT_VARIANT: Variant = "dissolve";
 function readVariant(): Variant {
   try {
@@ -165,7 +266,6 @@ const BEHIND = FRAMES.map((f) => f.src);
 const SETTLE_ON = T("chairs-bay.webp");
 
 const LEAD_MS = 250; // a beat of black before the first page
-const TITLE_MS = 3200; // PASATIEMPO on screen
 const SOLID_AT = 1100; // ...letters stop flickering and settle
 // The handoff into the page, in two stages: the title fades out first, then
 // the dark lifts slowly off the page (the CSS times both). The page's own
@@ -174,6 +274,9 @@ const EXIT_MS = 1900; // the whole lift
 const REVEAL_AT = 700; // ...when the page underneath starts its entrance
 // A skip shouldn't make anyone wait: it lifts in a blink.
 const QUICK_EXIT_MS = 500;
+// The ten-second cuts lift a little sooner.
+const FAST_EXIT_MS = 1500;
+const FAST_REVEAL_AT = 500;
 const FOUNDED = 1929;
 
 const FIRST_TODAY = FRAMES.findIndex((f) => f.era === "today");
@@ -257,7 +360,8 @@ export default function IntroReel({
   const [solid, setSolid] = useState(false);
   const [quick, setQuick] = useState(false);
   const [variant, setVariant] = useState<Variant>(DEFAULT_VARIANT);
-  const frames = VARIANTS[variant];
+  const cut = VARIANTS[variant];
+  const frames = cut.frames;
   const calm = variant !== "flip";
   const done = useRef({ onReveal, onDone });
   useEffect(() => {
@@ -276,7 +380,10 @@ export default function IntroReel({
     html.style.overflow = "hidden";
     let alive = true;
     const v = readVariant();
-    const srcs = v === "flip" ? [...BEHIND, ...FILL] : [...VARIANTS[v].map((f) => f.src), SETTLE_ON];
+    const srcs =
+      v === "flip"
+        ? [...BEHIND, ...FILL]
+        : [...VARIANTS[v].frames.flatMap((f) => (f.trio ? f.trio.map((p) => p.src) : [f.src])), SETTLE_ON];
     preload([LOGO, ...new Set(srcs)], 3000).then(() => {
       if (!alive) return;
       setVariant(v);
@@ -293,30 +400,29 @@ export default function IntroReel({
     let t: ReturnType<typeof setTimeout> | undefined;
     let r: ReturnType<typeof setTimeout> | undefined;
     if (phase === "lead") {
-      t = setTimeout(() => setPhase("reel"), LEAD_MS);
+      t = setTimeout(() => setPhase("reel"), cut.leadMs ?? LEAD_MS);
     } else if (phase === "reel") {
       t = setTimeout(() => {
         if (i < frames.length - 1) setI(i + 1);
         else setPhase("title");
       }, frames[i].hold);
     } else if (phase === "title") {
-      // The dissolve's title draws itself across, so it holds a little longer.
-      t = setTimeout(() => setPhase("exit"), variant === "dissolve" ? 4300 : TITLE_MS);
+      t = setTimeout(() => setPhase("exit"), cut.titleMs);
     } else if (phase === "exit") {
       markSeen();
       if (quick) {
         done.current.onReveal();
         t = setTimeout(() => done.current.onDone(), QUICK_EXIT_MS);
       } else {
-        r = setTimeout(() => done.current.onReveal(), REVEAL_AT);
-        t = setTimeout(() => done.current.onDone(), EXIT_MS);
+        r = setTimeout(() => done.current.onReveal(), cut.fast ? FAST_REVEAL_AT : REVEAL_AT);
+        t = setTimeout(() => done.current.onDone(), cut.fast ? FAST_EXIT_MS : EXIT_MS);
       }
     }
     return () => {
       clearTimeout(t);
       clearTimeout(r);
     };
-  }, [phase, i, quick, frames, variant]);
+  }, [phase, i, quick, frames, cut]);
 
   // Under the title, the pages keep turning — through the letters and behind
   // them — then stop and the letters settle solid.
@@ -355,6 +461,9 @@ export default function IntroReel({
   const inTitle = phase === "title" || phase === "exit";
   const frame = frames[i];
   const prevFrame = i > 0 ? frames[i - 1] : null;
+  const cine = !!cut.cine;
+  /** This cut is the turn from 1929 to colour. */
+  const turning = i > 0 && frame.era === "today" && prevFrame?.era === "archive";
   const last = frames[frames.length - 1];
   const era: Era | "none" = inReel ? frame.era : "none";
   // Behind the title: the pages keep turning, then rest on the bay.
@@ -380,7 +489,8 @@ export default function IntroReel({
     <div
       className={
         "mci-intro is-" + phase + " era-" + era + " var-" + variant +
-        (calm ? " is-calm" : "") + (solid ? " is-solid" : "") + (quick ? " is-quick" : "")
+        (calm ? " is-calm" : "") + (cut.cine ? " is-cine" : "") + (cut.fast ? " is-fast" : "") +
+        (solid ? " is-solid" : "") + (quick ? " is-quick" : "")
       }
       onClick={skip}
       role="presentation"
@@ -391,6 +501,16 @@ export default function IntroReel({
         </div>
       )}
 
+      {/* Through the crest: a gold ring draws on black, 1929 shows through it,
+          and it opens out past the edges of the screen for 2027. */}
+      {variant === "iris" && (phase === "lead" || inReel) && (
+        <div className="mci-iris" aria-hidden>
+          <svg viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="49.4" />
+          </svg>
+        </div>
+      )}
+
       {/* The flip-book. The page underneath keeps its key, so React keeps the
           element and nothing restarts under the turn. */}
       {inReel && (
@@ -398,9 +518,16 @@ export default function IntroReel({
           {prevFrame && <Page key={"p" + (i - 1)} f={prevFrame} under />}
           <Page key={"p" + i} f={frame} />
           {!calm && i === FIRST_TODAY && <div className="mci-reel-burst" />}
-          {/* The dissolve: a warm bloom of light as 1929 turns to colour. */}
-          {variant === "dissolve" && i > 0 && frame.era === "today" && prevFrame?.era === "archive" && (
-            <div className="mci-reel-bloom" />
+          {/* The dissolve family: a warm bloom of light as 1929 turns to colour
+              (an anamorphic flare in the rack-focus cut). */}
+          {cine && turning && variant !== "leak" && <div className="mci-reel-bloom" />}
+          {variant === "focus" && turning && <div className="mci-flare" />}
+          {/* Light leaks: a warm burn washes across every cut, biggest at the turn to colour. */}
+          {variant === "leak" && i > 0 && (
+            <div
+              className={"mci-leak" + (i % 2 ? " is-alt" : "") + (turning ? " is-big" : "")}
+              key={"l" + i}
+            />
           )}
           {/* Then-and-now: a gold line leads each wipe across. */}
           {variant === "wipe" && i > 0 && <div className="mci-wipe-line" key={"w" + i} />}
@@ -506,7 +633,10 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
   const m = f.move ?? [1.09, 0, 0, 1.01, 0, 0];
   return (
     <div
-      className={"mci-page era-" + f.era + (under ? " is-under" : "")}
+      className={
+        "mci-page era-" + f.era + (under ? " is-under" : "") + (f.trio ? " is-trio" : "") +
+        (f.develop ? " is-develop" : "")
+      }
       style={
         {
           "--hold": f.hold + "ms",
@@ -520,8 +650,17 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
         } as CSSProperties
       }
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={f.src} alt="" />
+      {f.trio ? (
+        f.trio.map((p) => (
+          <div className="mci-panel" key={p.src} style={{ "--focus": p.focus ?? "center" } as CSSProperties}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={p.src} alt="" />
+          </div>
+        ))
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={f.src} alt="" />
+      )}
     </div>
   );
 }
