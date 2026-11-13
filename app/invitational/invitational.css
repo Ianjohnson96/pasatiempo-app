@@ -766,6 +766,17 @@ body:has(.mci){margin:0;}
   .mci-page img{object-position:var(--focus-m,var(--focus));}
   .mci-page img.is-phone-fit{object-position:50% 46%;}
   .mci-intro.var-score .mci-page img:not(.is-phone-fit){transform-origin:var(--focus-m,var(--focus));}
+  /* Zoomed out and composed: the photograph at a set height, its point of
+     interest placed on the screen (to the thirds), on its soft backdrop. */
+  .mci-page:has(img.is-phone-wide){container-type:size;}
+  .mci-page img.is-phone-wide{inset:auto;width:auto;max-width:none;height:calc(var(--pw-h) * 100%);aspect-ratio:var(--pw-ar);
+    top:calc((var(--pw-ty) - var(--pw-fy) * var(--pw-h)) * 100%);
+    left:calc(var(--pw-tx) * 100cqw - var(--pw-fx) * var(--pw-h) * var(--pw-ar) * 100cqh);
+    box-shadow:0 20px 60px rgba(0,0,0,.35);}
+  .mci-intro.var-score .mci-page img.is-phone-wide{transform-origin:calc(var(--pw-fx) * 100%) calc(var(--pw-fy) * 100%);}
+  /* The title sits a little lower, below the clock. */
+  .mci-intro.var-score .mci-reel-title.mci-st{justify-content:flex-end;padding-bottom:15vh;}
+  .mci-intro.var-score .mci-st-mark{height:clamp(150px,26vh,240px);}
 }
 
 /* The closing title of the scored dissolve: the club's 1929 logo, then

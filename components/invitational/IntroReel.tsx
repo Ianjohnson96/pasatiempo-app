@@ -64,6 +64,11 @@ interface Frame {
   phoneFocus?: string;
   /** How long the slow zoom runs, if not the usual (the scored dissolve). */
   zoomMs?: number;
+  /** On a tall (phone) screen only: zoom the photograph out and place it — its
+   *  height as a share of the screen (h), its aspect ratio (ar), the point in it
+   *  (fx, fy, as fractions) and where on the screen that point sits (tx, ty) —
+   *  on a soft blurred copy of itself. For composing to the thirds. */
+  phoneWide?: { h: number; ar: number; fx: number; fy: number; tx: number; ty: number };
 }
 
 const FRAMES: Frame[] = [
@@ -337,18 +342,31 @@ const SCORE: Frame[] = (
     { src: IMG + "hollins.webp", era: "archive", focus: "50% 30%", phoneFocus: "50% 0%" },
     { src: A("1929-gallery-oak.webp"), era: "archive", focus: "center 60%" },
     { src: A("1929-bunkered-green.webp"), era: "archive", focus: "center 60%" },
-    // Colour, on the music's turn.
-    { src: IMG + "course-green.webp", era: "today", focus: "center 60%" },
-    { src: IMG + "clubhouse.webp", era: "today", focus: "center 55%" },
+    // Colour, on the music's turn: the green below the clubhouse (a panorama —
+    // zoomed out on a phone so the green and the house both show).
+    {
+      src: IMG + "clubhouse-green.webp", era: "today", focus: "55% 60%",
+      phoneWide: { h: 0.46, ar: 1280 / 440, fx: 0.55, fy: 0.6, tx: 0.5, ty: 0.5 },
+    },
+    // The clubhouse: the camera eases back rather than in.
+    {
+      src: IMG + "clubhouse.webp", era: "today", focus: "60% 40%", move: [1.1, 0, 0, 1.01, 0, 0],
+      phoneWide: { h: 0.62, ar: 1280 / 786, fx: 0.6, fy: 0.36, tx: 0.5, ty: 0.38 },
+    },
     { src: T("bridge.webp"), era: "today", focus: "center 62%" },
     // The last photograph, under the title: the club's clock, est. 1929, at dusk.
-    { src: T("clock-1929.webp"), era: "today", focus: "18% center", phoneFocus: "5% center" },
-  ] as Omit<Frame, "hold" | "move">[]
+    // On a phone it is zoomed out with the clock face on the upper-left third,
+    // clear of the title below it.
+    {
+      src: T("clock-1929.webp"), era: "today", focus: "18% center",
+      phoneWide: { h: 0.7, ar: 1.5, fx: 0.235, fy: 0.31, tx: 1 / 3, ty: 0.3 },
+    },
+  ] as Omit<Frame, "hold">[]
 ).map((f, k, all) => ({
   ...f,
   // The last photograph stays on through the title, so its zoom runs on
   // (a little further, at the same pace) rather than restarting.
-  move: k === all.length - 1 ? ([1, 0, 0, 1.1, 0, 0] as Frame["move"]) : ZOOM,
+  move: k === all.length - 1 ? ([1, 0, 0, 1.1, 0, 0] as Frame["move"]) : (f.move ?? ZOOM),
   zoomMs: k === all.length - 1 ? 7200 : undefined,
   hold: (k + 1 < SCORE_CUES.length ? SCORE_CUES[k + 1] : SCORE_TITLE_AT) - SCORE_CUES[k],
 }));
@@ -960,6 +978,16 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
           "--focus": f.focus ?? "center",
           "--focus-m": f.phoneFocus ?? f.focus ?? "center",
           ...(f.zoomMs ? { "--zoom": f.zoomMs + "ms" } : {}),
+          ...(f.phoneWide
+            ? {
+                "--pw-h": f.phoneWide.h,
+                "--pw-ar": f.phoneWide.ar,
+                "--pw-fx": f.phoneWide.fx,
+                "--pw-fy": f.phoneWide.fy,
+                "--pw-tx": f.phoneWide.tx,
+                "--pw-ty": f.phoneWide.ty,
+              }
+            : {}),
           "--fs": m[0],
           "--fx": m[1] + "%",
           "--fy": m[2] + "%",
@@ -969,7 +997,7 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
         } as CSSProperties
       }
     >
-      {(f.fit || f.phoneFit) && (
+      {(f.fit || f.phoneFit || f.phoneWide) && (
         <div
           className={"mci-page-fill" + (f.fit ? "" : " is-phone")}
           style={{ backgroundImage: `url(${f.src})` }}
@@ -984,7 +1012,11 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
         ))
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={f.src} alt="" className={f.fit ? "is-fit" : f.phoneFit ? "is-phone-fit" : undefined} />
+        <img
+          src={f.src}
+          alt=""
+          className={f.fit ? "is-fit" : f.phoneFit ? "is-phone-fit" : f.phoneWide ? "is-phone-wide" : undefined}
+        />
       )}
     </div>
   );
