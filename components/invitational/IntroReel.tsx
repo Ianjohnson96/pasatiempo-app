@@ -315,7 +315,7 @@ const FILM_TAIL: Frame[] = [
 // photographs change on each swell and halfway between, each dissolve starting
 // just ahead of its beat so the new photograph has arrived as the music lands.
 // 1929 runs through the first passage; colour arrives on the 17 s swell; the
-// club's mark, its founding year and the PASATIEMPO wordmark rise on the next.
+// club's 1929 logo and the PASATIEMPO wordmark rise on the next.
 const SCORE_CUES = [300, 1650, 4000, 6400, 8900, 11400, 13900, 16400, 18900];
 const SCORE_TITLE_AT = 21400;
 const SCORE_EXIT_AT = 25200;
@@ -332,15 +332,17 @@ const SCORE: Frame[] = (
     { src: IMG + "hollins-swing.webp", era: "archive", focus: "center", fit: true },
     { src: A("1929-bunkered-green.webp"), era: "archive", focus: "center 60%" },
     { src: IMG + "course-green.webp", era: "today", focus: "center 60%" },
-    { src: T("aerial-dawn.webp"), era: "today", focus: "center 50%" },
+    // The last photograph, under the title: the walk across the bridge.
+    { src: T("bridge.webp"), era: "today", focus: "center 62%" },
   ] as Omit<Frame, "hold" | "move">[]
 ).map((f, k) => ({
   ...f,
   move: ZOOM,
   hold: (k + 1 < SCORE_CUES.length ? SCORE_CUES[k + 1] : SCORE_TITLE_AT) - SCORE_CUES[k],
 }));
-/** The closing title: the club's mark, and its name in the logo's own script. */
-const MARK = "/invitational/img/logo-mark-large.png";
+/** The closing title: the club's 1929 logo (the version for dark backgrounds,
+ *  public/brand), and its name in the logo's own script. */
+const MARK = "/brand/pasatiempo-logo-1929-reverse.png";
 const WORDMARK = "/invitational/img/wordmark-pasatiempo.svg";
 
 interface ReelLook {
@@ -839,8 +841,7 @@ export default function IntroReel({
       {inTitle && variant === "score" && (
         <div className="mci-reel-title mci-st">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="mci-st-mark" src={MARK} alt="" />
-          <div className="mci-st-est">{`Est. ${FOUNDED}`}</div>
+          <img className="mci-st-mark" src={MARK} alt={`Pasatiempo Golf Club, ${FOUNDED}`} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="mci-st-word" src={WORDMARK} alt="Pasatiempo" />
           <div className="mci-st-rule" aria-hidden />
