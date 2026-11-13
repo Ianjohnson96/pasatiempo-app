@@ -13,6 +13,7 @@ import { seriesPaidOn } from "@/lib/lessons/catchup";
 import { METHOD_LABEL } from "@/lib/lessons/income";
 import {
   formatDay,
+  money,
   packageTitle,
   PAYMENT_LABEL,
   type CatchUpBill,
@@ -320,10 +321,11 @@ export default function CatchUpList({
                     )}
                   </div>
 
-                  {/* A single the sync made may really be the next lesson of
-                      a series - or a lesson that never happened. Paid singles
-                      stay put: that money is already counted. */}
-                  {b.kind === "single" && b.lessonId && b.paymentStatus !== "paid" && (
+                  {/* A single the sync made may really be a lesson of a
+                      series - often its first, which the calendar never
+                      numbered - or a lesson that never happened. A paid one
+                      asks whose payment is real before it moves. */}
+                  {b.kind === "single" && b.lessonId && (
                     <SingleFix
                       bill={b}
                       lessonId={b.lessonId}
@@ -376,10 +378,28 @@ function SingleFix({
       (b.firstLessonAt ?? "").localeCompare(a.firstLessonAt ?? ""),
   );
   const when = bill.soldOn ? formatDay(bill.soldOn) : "this lesson";
+  const paid = bill.paymentStatus === "paid";
+  const [asking, setAsking] = useState<{
+    target: { packageId: string };
+    label: string;
+  } | null>(null);
 
-  function move(target: { packageId: string } | { newSize: number }, label: string) {
+  function move(
+    target: { packageId: string } | { newSize: number },
+    label: string,
+    choice?: "carry" | "keep_package",
+  ) {
+    if (paid && !choice) {
+      // A new pack has no payment of its own: the single's carries over.
+      if ("newSize" in target) choice = "carry";
+      else {
+        setAsking({ target, label });
+        return;
+      }
+    }
+    setAsking(null);
     start(async () => {
-      const r = await moveLessonToPackage(lessonId, target);
+      const r = await moveLessonToPackage(lessonId, target, choice);
       onNote(
         r.ok
           ? { ok: true, text: `${bill.clientName}: ${when} put on ${label}.` }
@@ -435,6 +455,42 @@ function SingleFix({
           Didn&rsquo;t happen
         </button>
       </div>
+
+      {asking && (
+        <div className="notice warn lb-paidchoice" role="group" aria-label="Whose payment is real?">
+          <p style={{ margin: 0 }}>
+            This lesson was paid on its own
+            {bill.priceCents !== null && <> (<strong>{money(bill.priceCents)}</strong>)</>}.
+            Which payment is real for {asking.label}?
+          </p>
+          <div className="lb-chips" style={{ marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn small"
+              disabled={off}
+              onClick={() => move(asking.target, asking.label, "carry")}
+            >
+              Use this payment for the package
+            </button>
+            <button
+              type="button"
+              className="btn secondary small"
+              disabled={off}
+              onClick={() => move(asking.target, asking.label, "keep_package")}
+            >
+              Keep the package&rsquo;s payment
+            </button>
+            <button
+              type="button"
+              className="btn ghost small"
+              disabled={off}
+              onClick={() => setAsking(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

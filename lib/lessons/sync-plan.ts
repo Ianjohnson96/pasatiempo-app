@@ -211,14 +211,23 @@ export function planDelete(e: {
  * Putting a lesson on a package - the series it really belongs to, rather
  * than the single the sync billed it as.
  *
- * Only the student's own packages, and never a paid single left behind: that
- * money would then be counted on the single and again on the package.
+ * Only the student's own packages. A paid single is the usual shape of a
+ * series' first lesson - the calendar never said "1 of 5", so the sync
+ * billed it alone and the package money landed on it - so it can move, but
+ * Ian says which payment is real first, or the money is counted twice:
+ *   carry        - the single's payment becomes the package's (and its
+ *                  Venmo row follows);
+ *   keep_package - the package's payment stands; the single's is let go
+ *                  and its Venmo row untied, back to the loose payments.
  */
 export function planMove(e: {
   lessonClientId: string | null;
   bill: { kind: string; status: string } | null;
   target: { clientId: string; kind: string };
-}): { ok: true; dropSingle: boolean } | { ok: false; error: string } {
+  choice?: "carry" | "keep_package";
+}):
+  | { ok: true; dropSingle: boolean; carry: boolean; untie: boolean }
+  | { ok: false; error: string; needsChoice?: true } {
   if (!e.lessonClientId) return { ok: false, error: "Give that lesson a student first." };
   if (e.target.kind !== "package") {
     return { ok: false, error: "Pick a package, not a single lesson's bill." };
@@ -228,13 +237,22 @@ export function planMove(e: {
   }
   const single = e.bill?.kind === "single";
   if (single && e.bill?.status === "paid") {
+    if (!e.choice) {
+      return {
+        ok: false,
+        needsChoice: true,
+        error:
+          "This lesson was paid on its own. Use that payment for the package, or keep the package's?",
+      };
+    }
     return {
-      ok: false,
-      error:
-        "This lesson was already paid for on its own. Set that bill to unpaid first, then move it.",
+      ok: true,
+      dropSingle: true,
+      carry: e.choice === "carry",
+      untie: e.choice === "keep_package",
     };
   }
-  return { ok: true, dropSingle: single };
+  return { ok: true, dropSingle: single, carry: false, untie: false };
 }
 
 /**

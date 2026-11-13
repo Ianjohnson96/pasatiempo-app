@@ -211,6 +211,8 @@ describe("planMove", () => {
     expect(planMove({ lessonClientId: "c1", bill: null, target: pkg })).toEqual({
       ok: true,
       dropSingle: false,
+      carry: false,
+      untie: false,
     });
   });
 
@@ -218,20 +220,46 @@ describe("planMove", () => {
     for (const status of ["unpaid", "pending"]) {
       expect(
         planMove({ lessonClientId: "c1", bill: { kind: "single", status }, target: pkg }),
-      ).toEqual({ ok: true, dropSingle: true });
+      ).toEqual({ ok: true, dropSingle: true, carry: false, untie: false });
     }
   });
 
   it("moves between packages without touching either package", () => {
     expect(
       planMove({ lessonClientId: "c1", bill: { kind: "package", status: "paid" }, target: pkg }),
-    ).toEqual({ ok: true, dropSingle: false });
+    ).toEqual({ ok: true, dropSingle: false, carry: false, untie: false });
   });
 
-  it("refuses when its single is paid, so the money is not counted twice", () => {
+  it("asks first when its single is paid, so the money is never counted twice", () => {
+    const r = planMove({
+      lessonClientId: "c1",
+      bill: { kind: "single", status: "paid" },
+      target: pkg,
+    });
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.needsChoice).toBe(true);
+  });
+
+  it("carries a paid single's payment onto the package when told to", () => {
     expect(
-      planMove({ lessonClientId: "c1", bill: { kind: "single", status: "paid" }, target: pkg }).ok,
-    ).toBe(false);
+      planMove({
+        lessonClientId: "c1",
+        bill: { kind: "single", status: "paid" },
+        target: pkg,
+        choice: "carry",
+      }),
+    ).toEqual({ ok: true, dropSingle: true, carry: true, untie: false });
+  });
+
+  it("keeps the package's payment and lets the single's go when told to", () => {
+    expect(
+      planMove({
+        lessonClientId: "c1",
+        bill: { kind: "single", status: "paid" },
+        target: pkg,
+        choice: "keep_package",
+      }),
+    ).toEqual({ ok: true, dropSingle: true, carry: false, untie: true });
   });
 
   it("refuses someone else's package, a single, or a lesson with no student", () => {

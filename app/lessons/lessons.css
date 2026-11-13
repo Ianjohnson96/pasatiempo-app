@@ -1218,3 +1218,8 @@ a.lb-next:hover {
     padding-left: 0;
   }
 }
+
+/* "Whose payment is real?" when a paid single moves onto a package. */
+.lb-paidchoice {
+  margin-top: 10px;
+}

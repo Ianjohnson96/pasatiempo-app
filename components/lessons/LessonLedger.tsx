@@ -208,16 +208,47 @@ function LessonRow({
   // On nothing, or billed as its own unpaid single, while the client has a
   // package with room: most likely the next lesson of that series.
   const room = pkgs.find((p) => p.size - p.used > 0) ?? null;
+  const paidSingle = row.pack?.kind === "single" && row.pack.paymentStatus === "paid";
+  // A paid single just before a series starts is that series' first lesson
+  // more often than not: the calendar never said "1 of 5", so the sync billed
+  // it alone. Offer the package when its first lesson follows within weeks.
+  const startsSoonAfter = (p: PackageOption) =>
+    !!p.firstLessonAt &&
+    p.firstLessonAt > row.startsAt &&
+    new Date(p.firstLessonAt).getTime() - new Date(row.startsAt).getTime() <
+      60 * 86400000;
+  const lead = paidSingle ? (pkgs.find(startsSoonAfter) ?? null) : null;
   const loneBill =
     !row.pack || (row.pack.kind === "single" && row.pack.paymentStatus !== "paid");
   const offerPack =
-    room && loneBill && row.status !== "cancelled" && !(row.hintSize && row.hintSize > 1)
-      ? room
-      : null;
+    row.status === "cancelled" || (row.hintSize && row.hintSize > 1)
+      ? null
+      : loneBill
+        ? room
+        : lead;
 
-  function move(target: { packageId: string } | { newSize: number }, label: string) {
+  // A paid single waits here for "whose payment is real?" before it moves.
+  const [asking, setAsking] = useState<{
+    target: { packageId: string } | { newSize: number };
+    label: string;
+  } | null>(null);
+
+  function move(
+    target: { packageId: string } | { newSize: number },
+    label: string,
+    choice?: "carry" | "keep_package",
+  ) {
+    // A new pack has no payment of its own, so the single's simply carries.
+    if (paidSingle && !choice) {
+      if ("newSize" in target) choice = "carry";
+      else {
+        setAsking({ target, label });
+        return;
+      }
+    }
+    setAsking(null);
     start(async () => {
-      const r = await moveLessonToPackage(row.id, target);
+      const r = await moveLessonToPackage(row.id, target, choice);
       if (!r.ok) onError(r.error);
       else onDone(`${row.clientName}: ${clockTime(row.startsAt)} put on ${label}.`);
     });
@@ -291,9 +322,9 @@ function LessonRow({
       {offerPack && (
         <div className="lb-led-offer">
           <span>
-            {row.pack ? "Billed on its own, but " : ""}
-            {row.clientName} has a {offerPack.size}-pack with{" "}
-            {offerPack.size - offerPack.used} left. Put it on that?
+            {paidSingle
+              ? `Paid on its own, but ${row.clientName}'s ${offerPack.size}-pack starts ${formatDay(offerPack.firstLessonAt)}. Is this its first lesson?`
+              : `${row.pack ? "Billed on its own, but " : ""}${row.clientName} has a ${offerPack.size}-pack with ${offerPack.size - offerPack.used} left. Put it on that?`}
           </span>
           <button
             type="button"
@@ -316,6 +347,44 @@ function LessonRow({
           onError={onError}
           onNote={onNote}
         />
+      )}
+
+      {asking && row.pack && (
+        <div className="notice warn lb-paidchoice" role="group" aria-label="Whose payment is real?">
+          <p style={{ margin: 0 }}>
+            This lesson was paid on its own: <strong>{money(row.pack.priceCents)}</strong>
+            {row.pack.paymentMethod &&
+              ` · ${METHOD_LABEL[row.pack.paymentMethod as PayMethod] ?? row.pack.paymentMethod}`}
+            {row.pack.paidOn && ` · ${formatDay(row.pack.paidOn)}`}. Which payment is
+            real for {asking.label}?
+          </p>
+          <div className="lb-chips" style={{ marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn small"
+              disabled={busy}
+              onClick={() => move(asking.target, asking.label, "carry")}
+            >
+              Use this payment for the package
+            </button>
+            <button
+              type="button"
+              className="btn secondary small"
+              disabled={busy}
+              onClick={() => move(asking.target, asking.label, "keep_package")}
+            >
+              Keep the package&rsquo;s payment
+            </button>
+            <button
+              type="button"
+              className="btn ghost small"
+              disabled={busy}
+              onClick={() => setAsking(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       {row.duplicateOf && (

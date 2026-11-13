@@ -1785,12 +1785,14 @@ async function billOf(
 
 /**
  * Put a lesson on one of its client's packages - or on a new 3/5/10-pack -
- * from the lesson itself. Its own unpaid single goes, so it stops being
- * billed as a lesson on its own; a paid single is refused (see planMove).
+ * from the lesson itself. Its own single goes, so it stops being billed as a
+ * lesson on its own. A paid single needs `choice` - whose payment is real -
+ * so the money is never counted twice (see planMove).
  */
 export async function moveLessonToPackage(
   lessonId: string,
   target: { packageId: string } | { newSize: number },
+  choice?: "carry" | "keep_package",
 ): Promise<Result<{ packageId: string; made: boolean }>> {
   try {
     await assertLessonBook();
@@ -1821,8 +1823,8 @@ export async function moveLessonToPackage(
       dest = { clientId: clientId ?? "", kind: "package" };
     }
 
-    const plan = planMove({ lessonClientId: clientId, bill, target: dest });
-    if (!plan.ok) return plan;
+    const plan = planMove({ lessonClientId: clientId, bill, target: dest, choice });
+    if (!plan.ok) return { ok: false, error: plan.error };
 
     let packageId: string;
     let made = false;
@@ -1853,13 +1855,47 @@ export async function moveLessonToPackage(
       .eq("id", lessonId);
     if (mErr) throw mErr;
 
-    if (plan.dropSingle && oldId) {
-      const { error: dErr } = await supa
+    if (oldId && plan.carry) {
+      // The single's payment becomes the series' payment.
+      const { data: paid, error: sErr } = await supa
         .from("lesson_packages")
-        .delete()
+        .select("price_cents, payment_method, paid_on")
         .eq("id", oldId)
-        .eq("kind", "single")
-        .neq("payment_status", "paid");
+        .maybeSingle();
+      if (sErr) throw sErr;
+      if (paid) {
+        const { error } = await supa
+          .from("lesson_packages")
+          .update({
+            price_cents: paid.price_cents,
+            payment_status: "paid",
+            payment_method: paid.payment_method,
+            paid_on: paid.paid_on,
+          })
+          .eq("id", packageId);
+        if (error) throw error;
+      }
+    }
+    if (oldId && (plan.carry || plan.untie)) {
+      // The Venmo row follows the payment that stands - or, when the
+      // package's payment stands, goes back to the untied ones.
+      const { error } = await supa
+        .from("lesson_payments")
+        .update({
+          package_id: plan.carry ? packageId : null,
+          lesson_id: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("package_id", oldId);
+      if (error) throw error;
+    }
+
+    if (plan.dropSingle && oldId) {
+      // A paid single only gets this far once Ian has said whose payment is
+      // real; without that, planMove stopped above.
+      let del = supa.from("lesson_packages").delete().eq("id", oldId).eq("kind", "single");
+      if (!choice) del = del.neq("payment_status", "paid");
+      const { error: dErr } = await del;
       if (dErr) throw dErr;
     }
 
