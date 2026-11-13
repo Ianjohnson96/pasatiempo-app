@@ -7,7 +7,9 @@ export const metadata: Metadata = {
   title: "Men's Club Invitational 2027 · Pasatiempo",
   description:
     "The Pasatiempo Men's Club Invitational — schedule, flights, format, the field, wagering, prizes and player information.",
-  icons: { icon: "/logo-mark.png" },
+  // Its own icons, so an iPhone opening a shared link shows the club's 1929
+  // logo, not the staff app's red APP tile.
+  icons: { icon: "/logo-mark.png", apple: "/brand/apple-touch-icon-invitational.png" },
   // The card a shared link shows (texts, social posts): the dawn aerial,
   // the crest, PASATIEMPO. Next resolves the path against the deployment's
   // own address.

@@ -320,8 +320,9 @@ const FILM_TAIL: Frame[] = [
 // ---- The scored dissolve (the default) ---------------------------------------
 // Nine full-screen photographs, each easing slowly in (about 6%) and dissolving
 // into the next, cut to the music: "A Perfect Day" (Danny Cope), 0:39–0:54.2
-// then 1:10.3–1:22.6 — a join placed so the song's five-second phrase carries
-// straight through it (audio/intro-a-perfect-day.mp3, 27 s).
+// then 1:10.3–1:23.5 — a join placed so the song's five-second phrase carries
+// straight through it, and an ending that rings out into the song's own quiet
+// (audio/intro-a-perfect-day.mp3, 28 s).
 //
 // The song swells every 5 s (at about 2.2, 7.0, 12.0, 17.0 and 21.9 s). The
 // photographs change on each swell and halfway between, each dissolve starting
@@ -330,35 +331,39 @@ const FILM_TAIL: Frame[] = [
 // club's 1929 logo and the PASATIEMPO wordmark rise on the next.
 const SCORE_CUES = [300, 1650, 4000, 6400, 8900, 11400, 13900, 16400, 18900, 21400];
 const SCORE_TITLE_AT = 21900;
-const SCORE_EXIT_AT = 25300;
+const SCORE_EXIT_AT = 26600; // the title holds about 4.7 s
+/** The scored dissolve uses full-resolution copies (img/score, up to 1800px,
+ *  high quality): each photograph holds for seconds, full screen. */
+const SC = "/invitational/img/score/";
+const SA = (f: string) => SC + "archive-" + f;
 /** Every photograph eases in, about 6%, toward its subject (the focus point). */
 const ZOOM: Frame["move"] = [1, 0, 0, 1.06, 0, 0];
 const SCORE: Frame[] = (
   [
     // The tee shot and the foursome are wide groups: on a phone they show whole.
-    { src: A("1929-tee-shot-bay.webp"), era: "archive", focus: "center 70%", phoneFit: true },
-    { src: A("1929-opening-foursome.webp"), era: "archive", focus: "center 15%", phoneFit: true },
-    { src: IMG + "mackenzie.webp", era: "archive", focus: "53% 18%" },
-    { src: IMG + "hollins.webp", era: "archive", focus: "50% 30%", phoneFocus: "50% 0%" },
-    { src: A("1929-gallery-oak.webp"), era: "archive", focus: "center 60%" },
-    { src: A("1929-bunkered-green.webp"), era: "archive", focus: "center 60%" },
+    { src: SA("1929-tee-shot-bay.webp"), era: "archive", focus: "center 70%", phoneFit: true },
+    { src: SA("1929-opening-foursome.webp"), era: "archive", focus: "center 15%", phoneFit: true },
+    { src: SC + "mackenzie.webp", era: "archive", focus: "53% 18%" },
+    { src: SC + "hollins.webp", era: "archive", focus: "50% 30%", phoneFocus: "50% 0%" },
+    { src: SA("1929-gallery-oak.webp"), era: "archive", focus: "center 60%" },
+    { src: SA("1929-bunkered-green.webp"), era: "archive", focus: "center 60%" },
     // Colour, on the music's turn: the green below the clubhouse (a panorama —
     // zoomed out on a phone so the green and the house both show).
     {
-      src: IMG + "clubhouse-green.webp", era: "today", focus: "55% 60%",
+      src: SC + "clubhouse-green.webp", era: "today", focus: "55% 60%",
       phoneWide: { h: 0.46, ar: 1280 / 440, fx: 0.55, fy: 0.6, tx: 0.5, ty: 0.5 },
     },
     // The clubhouse: the camera eases back rather than in.
     {
-      src: IMG + "clubhouse.webp", era: "today", focus: "60% 40%", move: [1.1, 0, 0, 1.01, 0, 0],
+      src: SC + "clubhouse.webp", era: "today", focus: "60% 40%", move: [1.1, 0, 0, 1.01, 0, 0],
       phoneWide: { h: 0.62, ar: 1280 / 786, fx: 0.6, fy: 0.36, tx: 0.5, ty: 0.38 },
     },
-    { src: T("bridge.webp"), era: "today", focus: "center 62%" },
+    { src: SC + "today-bridge.webp", era: "today", focus: "center 62%" },
     // The last photograph, under the title: the club's clock, est. 1929, at dusk.
     // On a phone it is zoomed out with the clock face on the upper-left third,
     // clear of the title below it.
     {
-      src: T("clock-1929.webp"), era: "today", focus: "18% center",
+      src: SC + "today-clock-1929.webp", era: "today", focus: "18% center",
       phoneWide: { h: 0.7, ar: 1.5, fx: 0.235, fy: 0.31, tx: 1 / 3, ty: 0.3 },
     },
   ] as Omit<Frame, "hold">[]
@@ -487,6 +492,8 @@ const FIRST_TODAY = FRAMES.findIndex((f) => f.era === "today");
 
 const SEEN_KEY = "mci-intro-seen";
 const SKIP_STYLE = "mci-intro-skip";
+/** While the intro is about to play, the page is dark from its first paint (no cream flash). */
+const DARK_STYLE = "mci-intro-dark";
 
 declare global {
   interface Window {
@@ -501,12 +508,17 @@ declare global {
  * hides the reel with an injected style rather than touching <html>, which
  * React owns and would report as a hydration mismatch.
  */
-export const INTRO_GATE = `(function(){var skip=true;try{var h=location.hash.slice(1);skip=(h&&h!=="home")||!!sessionStorage.getItem("${SEEN_KEY}")||matchMedia("(prefers-reduced-motion: reduce)").matches;if(/[?&]intro=/.test(location.search))skip=false;}catch(e){}if(skip){window.__mciIntro="skip";var s=document.createElement("style");s.id="${SKIP_STYLE}";s.textContent=".mci-intro{display:none!important}";document.head.appendChild(s);}})();`;
+export const INTRO_GATE = `(function(){var skip=true;try{var h=location.hash.slice(1);skip=(h&&h!=="home")||!!sessionStorage.getItem("${SEEN_KEY}")||matchMedia("(prefers-reduced-motion: reduce)").matches;if(/[?&]intro=/.test(location.search))skip=false;}catch(e){}var s=document.createElement("style");if(skip){window.__mciIntro="skip";s.id="${SKIP_STYLE}";s.textContent=".mci-intro{display:none!important}";}else{s.id="${DARK_STYLE}";s.textContent="html,body{background:#050403!important}";}document.head.appendChild(s);})();`;
 
 /** Replay from the footer: lift the before-paint skip. */
 export function allowReplay() {
   window.__mciIntro = "play";
   document.getElementById(SKIP_STYLE)?.remove();
+}
+
+/** The intro is gone: the page takes back its own background. */
+function releaseDark() {
+  document.getElementById(DARK_STYLE)?.remove();
 }
 
 /** Should the reel be skipped on this load? (Client-side twin of INTRO_GATE.) */
@@ -547,6 +559,16 @@ function preload(srcs: string[], maxMs: number) {
   return Promise.race([Promise.all(imgs), new Promise((r) => setTimeout(r, maxMs))]);
 }
 
+/** Load and fully decode images, so the first paint of each is complete. */
+function preloadDecoded(srcs: string[], maxMs: number) {
+  const imgs = srcs.map((src) => {
+    const img = new Image();
+    img.src = src;
+    return img.decode().catch(() => undefined);
+  });
+  return Promise.race([Promise.all(imgs), new Promise((r) => setTimeout(r, maxMs))]);
+}
+
 type Phase = "load" | "lead" | "reel" | "title" | "exit";
 
 export default function IntroReel({
@@ -578,6 +600,7 @@ export default function IntroReel({
   // Decide, preload, and hold the page still while the reel runs.
   useEffect(() => {
     if (introSkipped()) {
+      releaseDark();
       done.current.onReveal();
       done.current.onDone();
       return;
@@ -609,9 +632,15 @@ export default function IntroReel({
         })
       : Promise.resolve();
     music.current = audio;
+    // Cut-to-music intros can't stop to wait for a photograph later, so they
+    // start only once the first few are fully loaded and decoded (on a slow
+    // connection, up to 12 s); the rest keep loading behind them.
+    const cued = !!VARIANTS[v].cues;
+    const first = cued ? [MARK, WORDMARK, ...VARIANTS[v].frames.slice(0, 3).map((f) => f.src)] : [];
+    if (cued) void preload([...new Set(srcs)], 60000);
     Promise.all([
-      preload([LOGO, ...new Set(srcs)], 3000),
-      Promise.race([audioReady, new Promise((r) => setTimeout(r, 3000))]),
+      cued ? preloadDecoded(first, 12000) : preload([LOGO, ...new Set(srcs)], 3000),
+      Promise.race([audioReady, new Promise((r) => setTimeout(r, cued ? 8000 : 3000))]),
     ]).then(() => {
       if (!alive) return;
       setVariant(v);
@@ -697,10 +726,16 @@ export default function IntroReel({
       markSeen();
       if (quick) {
         done.current.onReveal();
-        t = setTimeout(() => done.current.onDone(), QUICK_EXIT_MS);
+        t = setTimeout(() => {
+          releaseDark();
+          done.current.onDone();
+        }, QUICK_EXIT_MS);
       } else {
         r = setTimeout(() => done.current.onReveal(), cut.fast ? FAST_REVEAL_AT : REVEAL_AT);
-        t = setTimeout(() => done.current.onDone(), cut.fast ? FAST_EXIT_MS : EXIT_MS);
+        t = setTimeout(() => {
+          releaseDark();
+          done.current.onDone();
+        }, cut.fast ? FAST_EXIT_MS : EXIT_MS);
       }
     }
     return () => {
