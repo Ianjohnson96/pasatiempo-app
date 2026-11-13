@@ -214,7 +214,40 @@ const PANELS: Frame[] = [
   { src: T("aerial-dawn.webp"), hold: 900, era: "today", focus: "center 50%", move: [1.14, 0, 1, 1.05, 0, 0] },
 ];
 
-type Variant = "flip" | "dissolve" | "wipe" | "letters" | "tight" | "focus" | "iris" | "leak" | "panels";
+// ---- The film reel ----------------------------------------------------------
+// The photographs as frames on one strip of 35mm film. At each cut the camera
+// eases back off the frame (the gap, the sprocket holes and the next frame come
+// into view), the strip slides left to the next frame, and the camera eases
+// back in. 1929 runs into 2027 on the same strip; the last frame is pushed
+// into and the title rises over it.
+
+/** Film frames: the first holds after the opening push, the rest include their slide in. */
+const REEL: Frame[] = [
+  { src: A("1929-tee-shot-bay.webp"), hold: 1250, era: "archive", focus: "center 70%" },
+  { src: IMG + "mackenzie.webp", hold: 950, era: "archive", focus: "53% 16%" },
+  { src: IMG + "hollins.webp", hold: 950, era: "archive", focus: "50% 30%" },
+  { src: A("1929-bunkered-green.webp"), hold: 950, era: "archive", focus: "center 60%" },
+  { src: IMG + "course-green.webp", hold: 950, era: "today", focus: "center 60%" },
+  { src: T("aerial-dawn.webp"), hold: 1350, era: "today", focus: "center 50%" },
+];
+/** The whip: the same, but the strip races off to 2027, past frames blurred by speed. */
+const WHIP: Frame[] = REEL.map((f, k) => (k === 4 ? { ...f, hold: 1200 } : f));
+/** Frames the whip races past between 1929 and 2027 (never stopped on). */
+const WHIP_PAST: Frame[] = [
+  { src: A("1929-golfer-oak.webp"), hold: 0, era: "archive", focus: "center 70%" },
+  { src: T("chairs-bay.webp"), hold: 0, era: "today", focus: "center 45%" },
+];
+
+interface ReelLook {
+  /** How far the camera pulls back between frames (1 = not at all). */
+  out: number;
+  /** Race to 2027 past blurred frames, instead of one ordinary slide. */
+  whip?: boolean;
+}
+
+type Variant =
+  | "flip" | "dissolve" | "wipe" | "letters" | "tight" | "focus" | "iris" | "leak" | "panels"
+  | "reel" | "reel-wide" | "whip" | "whip-wide";
 interface Cut {
   frames: Frame[];
   /** How long PASATIEMPO holds, in ms. */
@@ -225,6 +258,8 @@ interface Cut {
   cine?: boolean;
   /** The ten-second timing: a quicker title and a quicker lift. */
   fast?: boolean;
+  /** Play the photographs as frames on a film strip. */
+  reel?: ReelLook;
 }
 const VARIANTS: Record<Variant, Cut> = {
   flip: { frames: FRAMES, titleMs: TITLE_MS },
@@ -236,6 +271,10 @@ const VARIANTS: Record<Variant, Cut> = {
   iris: { frames: IRIS, titleMs: 2800, leadMs: 1000, cine: true, fast: true },
   leak: { frames: LEAK, titleMs: 2900, cine: true, fast: true },
   panels: { frames: PANELS, titleMs: 2900, cine: true, fast: true },
+  reel: { frames: REEL, titleMs: 2600, cine: true, fast: true, reel: { out: 0.85 } },
+  "reel-wide": { frames: REEL, titleMs: 2600, cine: true, fast: true, reel: { out: 0.65 } },
+  whip: { frames: WHIP, titleMs: 2600, cine: true, fast: true, reel: { out: 0.85, whip: true } },
+  "whip-wide": { frames: WHIP, titleMs: 2600, cine: true, fast: true, reel: { out: 0.65, whip: true } },
 };
 /** The intro visitors get. The others play with ?intro=<name>. */
 const DEFAULT_VARIANT: Variant = "dissolve";
@@ -383,7 +422,11 @@ export default function IntroReel({
     const srcs =
       v === "flip"
         ? [...BEHIND, ...FILL]
-        : [...VARIANTS[v].frames.flatMap((f) => (f.trio ? f.trio.map((p) => p.src) : [f.src])), SETTLE_ON];
+        : [
+            ...VARIANTS[v].frames.flatMap((f) => (f.trio ? f.trio.map((p) => p.src) : [f.src])),
+            ...(VARIANTS[v].reel?.whip ? WHIP_PAST.map((f) => f.src) : []),
+            SETTLE_ON,
+          ];
     preload([LOGO, ...new Set(srcs)], 3000).then(() => {
       if (!alive) return;
       setVariant(v);
@@ -490,6 +533,7 @@ export default function IntroReel({
       className={
         "mci-intro is-" + phase + " era-" + era + " var-" + variant +
         (calm ? " is-calm" : "") + (cut.cine ? " is-cine" : "") + (cut.fast ? " is-fast" : "") +
+        (cut.reel ? " is-film" : "") +
         (solid ? " is-solid" : "") + (quick ? " is-quick" : "")
       }
       onClick={skip}
@@ -513,7 +557,13 @@ export default function IntroReel({
 
       {/* The flip-book. The page underneath keeps its key, so React keeps the
           element and nothing restarts under the turn. */}
-      {inReel && (
+      {inReel && cut.reel && (
+        <div className="mci-reel" aria-hidden>
+          <FilmReel frames={frames} i={i} look={cut.reel} />
+          {turning && <div className="mci-reel-bloom" />}
+        </div>
+      )}
+      {inReel && !cut.reel && (
         <div className="mci-reel" aria-hidden>
           {prevFrame && <Page key={"p" + (i - 1)} f={prevFrame} under />}
           <Page key={"p" + i} f={frame} />
@@ -661,6 +711,100 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={f.src} alt="" />
       )}
+    </div>
+  );
+}
+
+/**
+ * The photographs as frames on a strip of 35mm film. Moving to frame i: the
+ * camera eases back, the strip slides left, the camera eases back in. The
+ * first frame is pushed into from the strip; the last is pushed into for the
+ * title.
+ */
+function FilmReel({ frames, i, look }: { frames: Frame[]; i: number; look: ReelLook }) {
+  const cam = useRef<HTMLDivElement>(null);
+  const track = useRef<HTMLDivElement>(null);
+  const prev = useRef(-1);
+  // The strip: for the whip, the frames it races past sit between 1929 and 2027.
+  const turn = frames.findIndex((f) => f.era === "today");
+  const strip = look.whip ? [...frames.slice(0, turn), ...WHIP_PAST, ...frames.slice(turn)] : frames;
+  const slot = (k: number) => (look.whip && k >= turn ? k + WHIP_PAST.length : k);
+
+  useEffect(() => {
+    const c = cam.current;
+    const t = track.current;
+    if (!c || !t) return;
+    const from = prev.current;
+    prev.current = i;
+    const x = (k: number) => `translateX(calc(${-slot(k)} * var(--pitch)))`;
+    const out = look.out;
+    if (from < 0) {
+      // Open: fade up on the strip, pulled back, and push into the first frame.
+      t.style.transform = x(i);
+      c.animate(
+        [
+          { transform: `scale(${out * 0.96})`, opacity: 0, easing: "ease-out" },
+          { transform: `scale(${out * 0.97})`, opacity: 1, offset: 0.3, easing: "cubic-bezier(.5,0,.2,1)" },
+          { transform: "scale(1)", opacity: 1 },
+        ],
+        { duration: 1100, fill: "forwards" },
+      );
+      return;
+    }
+    const whip = look.whip && i === turn;
+    const dur = whip ? 1000 : 760;
+    // Out, across, in — the three overlap so it never stops moving.
+    c.animate(
+      [
+        { transform: "scale(1)", easing: "cubic-bezier(.45,0,.55,1)" },
+        { transform: `scale(${out})`, offset: whip ? 0.25 : 0.32, easing: "linear" },
+        { transform: `scale(${out})`, offset: whip ? 0.72 : 0.62, easing: "cubic-bezier(.45,0,.3,1)" },
+        { transform: "scale(1)" },
+      ],
+      { duration: dur, fill: "forwards" },
+    );
+    t.animate(
+      [
+        { transform: x(from) },
+        {
+          transform: x(from),
+          offset: whip ? 0.16 : 0.18,
+          easing: whip ? "cubic-bezier(.75,0,.25,1)" : "cubic-bezier(.6,0,.35,1)",
+        },
+        { transform: x(i), offset: whip ? 0.82 : 0.86 },
+        { transform: x(i) },
+      ],
+      { duration: dur, fill: "forwards" },
+    );
+    if (whip) {
+      t.animate(
+        [{ filter: "blur(0)" }, { filter: "blur(9px)", offset: 0.5 }, { filter: "blur(0)", offset: 0.8 }, { filter: "blur(0)" }],
+        { duration: dur },
+      );
+    }
+    // The last frame: push in, ready for the title.
+    if (i === frames.length - 1) {
+      c.animate([{ transform: "scale(1)" }, { transform: "scale(1.05)" }], {
+        duration: 500,
+        delay: dur,
+        easing: "cubic-bezier(.4,0,.2,1)",
+        fill: "forwards",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i]);
+
+  return (
+    <div className="mci-cam" ref={cam}>
+      <div className="mci-strip" ref={track}>
+        {strip.map((f, k) => (
+          <div className={"mci-strip-frame era-" + f.era} key={k}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={f.src} alt="" style={{ objectPosition: f.focus ?? "center" }} />
+            <span className="mci-strip-edge">{`PASATIEMPO  ${f.era === "today" ? EVENT.year : FOUNDED}  ▸ ${k + 1}A`}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
