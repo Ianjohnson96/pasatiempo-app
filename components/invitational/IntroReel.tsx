@@ -238,6 +238,38 @@ const WHIP_PAST: Frame[] = [
   { src: T("chairs-bay.webp"), hold: 0, era: "today", focus: "center 45%" },
 ];
 
+// ---- The film pan -----------------------------------------------------------
+// The whole screen is a strip of old film — sprocket holes top and bottom (down
+// the sides on a phone, where the film runs vertically, as it does through a
+// projector) — and the camera pans along it: the archive first, gathering
+// speed, then the course today in colour. The strip keeps drifting, dimmed,
+// under the title. No zoom.
+
+/** Each hold is how long the pan takes to bring that frame to centre. */
+const PAN: Frame[] = [
+  { src: A("1929-tee-shot-bay.webp"), hold: 900, era: "archive", focus: "center 70%" },
+  { src: A("1929-opening-foursome.webp"), hold: 640, era: "archive", focus: "center 20%" },
+  { src: IMG + "mackenzie.webp", hold: 600, era: "archive", focus: "53% 22%" },
+  { src: A("1929-gallery-oak.webp"), hold: 560, era: "archive", focus: "center 60%" },
+  { src: IMG + "hollins.webp", hold: 540, era: "archive", focus: "50% 30%" },
+  { src: A("1929-golfer-oak.webp"), hold: 500, era: "archive", focus: "center 70%" },
+  { src: A("mackenzie-house-1933.webp"), hold: 470, era: "archive", focus: "center 70%" },
+  { src: IMG + "hollins-swing.webp", hold: 450, era: "archive", focus: "60% 20%" },
+  { src: A("1929-bunkered-green.webp"), hold: 440, era: "archive", focus: "center 60%" },
+  { src: IMG + "course-green.webp", hold: 460, era: "today", focus: "center 60%" },
+  { src: T("bridge.webp"), hold: 430, era: "today", focus: "center 60%" },
+  { src: T("flag-green.webp"), hold: 420, era: "today", focus: "70% 60%" },
+  { src: T("clock-1929.webp"), hold: 420, era: "today", focus: "18% center" },
+  { src: T("chairs-bay.webp"), hold: 440, era: "today", focus: "center 45%" },
+  { src: T("aerial-dawn.webp"), hold: 560, era: "today", focus: "center 50%" },
+];
+/** After the last frame: more of the strip, for the drift under the title. */
+const PAN_TAIL: Frame[] = [
+  { src: IMG + "hole-4-approach-poster.webp", hold: 0, era: "today" },
+  { src: IMG + "clubhouse-green.webp", hold: 0, era: "today" },
+  { src: IMG + "hero.webp", hold: 0, era: "today" },
+];
+
 interface ReelLook {
   /** How far the camera pulls back between frames (1 = not at all). */
   out: number;
@@ -247,7 +279,7 @@ interface ReelLook {
 
 type Variant =
   | "flip" | "dissolve" | "wipe" | "letters" | "tight" | "focus" | "iris" | "leak" | "panels"
-  | "reel" | "reel-wide" | "whip" | "whip-wide";
+  | "reel" | "reel-wide" | "whip" | "whip-wide" | "pan" | "pan-step";
 interface Cut {
   frames: Frame[];
   /** How long PASATIEMPO holds, in ms. */
@@ -260,6 +292,8 @@ interface Cut {
   fast?: boolean;
   /** Play the photographs as frames on a film strip. */
   reel?: ReelLook;
+  /** The whole screen is the film, panned along (step: settle on each frame). */
+  pan?: { step?: boolean };
 }
 const VARIANTS: Record<Variant, Cut> = {
   flip: { frames: FRAMES, titleMs: TITLE_MS },
@@ -275,6 +309,8 @@ const VARIANTS: Record<Variant, Cut> = {
   "reel-wide": { frames: REEL, titleMs: 2600, cine: true, fast: true, reel: { out: 0.65 } },
   whip: { frames: WHIP, titleMs: 2600, cine: true, fast: true, reel: { out: 0.85, whip: true } },
   "whip-wide": { frames: WHIP, titleMs: 2600, cine: true, fast: true, reel: { out: 0.65, whip: true } },
+  pan: { frames: PAN, titleMs: 2600, cine: true, fast: true, pan: {} },
+  "pan-step": { frames: PAN, titleMs: 2600, cine: true, fast: true, pan: { step: true } },
 };
 /** The intro visitors get. The others play with ?intro=<name>. */
 const DEFAULT_VARIANT: Variant = "dissolve";
@@ -425,6 +461,7 @@ export default function IntroReel({
         : [
             ...VARIANTS[v].frames.flatMap((f) => (f.trio ? f.trio.map((p) => p.src) : [f.src])),
             ...(VARIANTS[v].reel?.whip ? WHIP_PAST.map((f) => f.src) : []),
+            ...(VARIANTS[v].pan ? PAN_TAIL.map((f) => f.src) : []),
             SETTLE_ON,
           ];
     preload([LOGO, ...new Set(srcs)], 3000).then(() => {
@@ -533,7 +570,7 @@ export default function IntroReel({
       className={
         "mci-intro is-" + phase + " era-" + era + " var-" + variant +
         (calm ? " is-calm" : "") + (cut.cine ? " is-cine" : "") + (cut.fast ? " is-fast" : "") +
-        (cut.reel ? " is-film" : "") +
+        (cut.reel ? " is-film" : "") + (cut.pan ? " is-pan" : "") +
         (solid ? " is-solid" : "") + (quick ? " is-quick" : "")
       }
       onClick={skip}
@@ -557,13 +594,19 @@ export default function IntroReel({
 
       {/* The flip-book. The page underneath keeps its key, so React keeps the
           element and nothing restarts under the turn. */}
+      {/* The film pan runs on under the title, so it stays mounted through both. */}
+      {(inReel || inTitle) && cut.pan && (
+        <div className="mci-reel" aria-hidden>
+          <FilmPan frames={frames} step={!!cut.pan.step} tailMs={cut.titleMs + FAST_EXIT_MS} />
+        </div>
+      )}
       {inReel && cut.reel && (
         <div className="mci-reel" aria-hidden>
           <FilmReel frames={frames} i={i} look={cut.reel} />
           {turning && <div className="mci-reel-bloom" />}
         </div>
       )}
-      {inReel && !cut.reel && (
+      {inReel && !cut.reel && !cut.pan && (
         <div className="mci-reel" aria-hidden>
           {prevFrame && <Page key={"p" + (i - 1)} f={prevFrame} under />}
           <Page key={"p" + i} f={frame} />
@@ -596,7 +639,7 @@ export default function IntroReel({
           <div className="mci-reel-sub">&nbsp;</div>
         </div>
       )}
-      {inTitle && (
+      {inTitle && !cut.pan && (
         <div className="mci-reel is-behind" aria-hidden>
           {behindPrev && <Page key={"b" + (fill - 1)} f={behindPrev} under />}
           <Page key={calm ? "b-calm" : solid ? "b-settle" : "b" + fill} f={behind} under={calm} />
@@ -802,6 +845,64 @@ function FilmReel({ frames, i, look }: { frames: Frame[]; i: number; look: ReelL
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={f.src} alt="" style={{ objectPosition: f.focus ?? "center" }} />
             <span className="mci-strip-edge">{`PASATIEMPO  ${f.era === "today" ? EVENT.year : FOUNDED}  ▸ ${k + 1}A`}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The whole screen as a strip of film, panned along: each frame reaches the
+ * centre of the screen as its hold runs out. Horizontal on a wide screen;
+ * vertical, as through a projector, on a tall one. One animation from first
+ * frame to last, then a slow drift on under the title.
+ */
+function FilmPan({ frames, step, tailMs }: { frames: Frame[]; step: boolean; tailMs: number }) {
+  const track = useRef<HTMLDivElement>(null);
+  const strip = [...frames, ...PAN_TAIL];
+  const [vertical] = useState(() => typeof window !== "undefined" && window.innerHeight > window.innerWidth * 1.1);
+
+  useEffect(() => {
+    const t = track.current;
+    if (!t) return;
+    // Where the track must sit to put frame k at the centre of the screen.
+    const cells = Array.from(t.children) as HTMLElement[];
+    const at = (k: number) => {
+      const r = cells[k].getBoundingClientRect();
+      return vertical ? innerHeight / 2 - (r.top + r.height / 2) : innerWidth / 2 - (r.left + r.width / 2);
+    };
+    const move = (px: number) => (vertical ? `translate3d(0,${px}px,0)` : `translate3d(${px}px,0,0)`);
+    const pitch = at(0) - at(1);
+    const run = frames.reduce((n, f) => n + f.hold, 0);
+    const total = run + tailMs;
+    // Start half a frame early, so the first one slides into the centre.
+    const keys: Keyframe[] = [{ transform: move(at(0) + pitch * 0.55), offset: 0 }];
+    let clock = 0;
+    frames.forEach((f, k) => {
+      clock += f.hold;
+      keys.push({ transform: move(at(k)), offset: clock / total });
+    });
+    // Under the title: on along the strip, slowly.
+    keys.push({ transform: move(at(frames.length - 1) - pitch * 0.9), offset: 1 });
+    const ease = step ? "cubic-bezier(.62,0,.38,1)" : "linear";
+    keys.forEach((k, n) => {
+      if (n < keys.length - 2) k.easing = n === 0 ? "cubic-bezier(.3,0,.6,1)" : ease;
+      else if (n === keys.length - 2) k.easing = "cubic-bezier(.2,.4,.4,1)";
+    });
+    const anim = t.animate(keys, { duration: total, fill: "forwards" });
+    return () => anim.cancel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className={"mci-pan" + (vertical ? " is-v" : "")}>
+      <div className="mci-pan-track" ref={track}>
+        {strip.map((f, k) => (
+          <div className={"mci-pan-frame era-" + f.era} key={k}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={f.src} alt="" style={{ objectPosition: f.focus ?? "center" }} />
+            <span className="mci-pan-edge">{`PASATIEMPO  ${f.era === "today" ? EVENT.year : FOUNDED}  ▸ ${k + 1}A`}</span>
           </div>
         ))}
       </div>

@@ -671,6 +671,48 @@ body:has(.mci){margin:0;}
 .mci-intro.is-film .mci-reel-year,.mci-intro.is-film .mci-reel-year.is-now{bottom:calc(6vh + 10px);}
 @media (max-width:760px){.mci-strip{--gap:4vw;--band:11vh;}}
 
+/* ---- The film pan (?intro=pan | pan-step): the whole screen is the film ---- */
+.mci-intro.is-pan .mci-bars{display:none;}
+.mci-intro.is-pan .mci-reel{perspective:none;}
+.mci-pan{--band:13vh;--gap:2.4vh;position:absolute;inset:0;background:#120f0b;overflow:hidden;}
+.mci-pan-track{position:absolute;left:0;top:var(--band);bottom:var(--band);display:flex;gap:var(--gap);
+  padding:0 0 0 0;will-change:transform;}
+/* The film base with its sprocket holes, travelling with the frames. */
+.mci-pan-track::before,.mci-pan-track::after{content:"";position:absolute;left:-50vw;right:-50vw;height:var(--band);
+  background-color:#17130e;background-repeat:repeat-x;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='30'><rect x='11' y='6' width='18' height='18' rx='3.5' fill='%23e0d6c0' fill-opacity='.7'/></svg>");
+  background-size:calc(var(--band) * .38) calc(var(--band) * .285);}
+.mci-pan-track::before{bottom:100%;background-position:0 38%;}
+.mci-pan-track::after{top:100%;background-position:0 62%;}
+.mci-pan-frame{position:relative;flex:none;height:100%;aspect-ratio:4/3;background:#050403;overflow:visible;
+  box-shadow:0 0 0 1px rgba(0,0,0,.6);}
+.mci-pan-frame img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.mci-pan-frame.era-archive img{filter:grayscale(1) sepia(.32) contrast(1.12) brightness(.95);}
+/* A faint warm glow through the old film. */
+.mci-intro.is-pan .mci-pan::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 50%,rgba(255,226,170,.06),transparent 70%);}
+.mci-pan-edge{position:absolute;left:4%;bottom:calc(100% + var(--band) * .06);white-space:pre;
+  font-family:ui-monospace,Menlo,monospace;font-size:max(9px,1.1vh);letter-spacing:.3em;color:rgba(232,190,110,.5);}
+/* The year sits on the frame, clear of the sprockets. */
+.mci-intro.is-pan .mci-reel-year,.mci-intro.is-pan .mci-reel-year.is-now{bottom:calc(13vh + 26px);}
+/* Under the title the film dims and keeps drifting. */
+.mci-intro.is-pan .mci-pan{transition:filter 1s ease;}
+.mci-intro.is-pan.is-title .mci-pan,.mci-intro.is-pan.is-exit .mci-pan{filter:brightness(.62) saturate(.95);}
+.mci-intro.is-pan.is-exit .mci-reel{opacity:0;transition:opacity .7s ease;}
+
+/* On a tall screen the film runs vertically, sprockets down the sides. */
+.mci-pan.is-v{--band:12vw;--gap:2.4vw;}
+.mci-pan.is-v .mci-pan-track{top:0;bottom:auto;left:var(--band);right:var(--band);flex-direction:column;}
+.mci-pan.is-v .mci-pan-frame{height:auto;width:100%;aspect-ratio:3/4;}
+.mci-pan.is-v .mci-pan-track::before,.mci-pan.is-v .mci-pan-track::after{left:auto;right:auto;top:-50vh;bottom:-50vh;height:auto;width:var(--band);
+  background-repeat:repeat-y;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='30' height='40'><rect x='6' y='11' width='18' height='18' rx='3.5' fill='%23e0d6c0' fill-opacity='.7'/></svg>");
+  background-size:calc(var(--band) * .285) calc(var(--band) * .38);}
+.mci-pan.is-v .mci-pan-track::before{right:100%;background-position:38% 0;}
+.mci-pan.is-v .mci-pan-track::after{left:100%;background-position:62% 0;}
+.mci-pan.is-v .mci-pan-edge{display:none;}
+@media (max-width:760px){.mci-intro.is-pan .mci-reel-year,.mci-intro.is-pan .mci-reel-year.is-now{bottom:7vh;}}
+
 /* Replay, in the footer. */
 .mci .mci-replay{margin-top:18px;display:inline-flex;align-items:center;gap:8px;appearance:none;cursor:pointer;background:none;
   border:1px solid rgba(210,171,94,.45);color:var(--gold-pale);border-radius:99px;padding:7px 16px;
