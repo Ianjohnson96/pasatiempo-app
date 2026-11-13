@@ -55,6 +55,8 @@ interface Frame {
   trio?: { src: string; focus?: string }[];
   /** The colour develops out of a black-and-white print (the light-leak cut). */
   develop?: boolean;
+  /** A tall photograph: shown whole, on a soft blurred copy of itself. */
+  fit?: boolean;
 }
 
 const FRAMES: Frame[] = [
@@ -304,13 +306,19 @@ const FILM_TAIL: Frame[] = [
 ];
 
 // ---- The scored dissolve (the default) ---------------------------------------
-// Full-screen photographs, each dissolving slowly into the next under its own
-// slow camera move, set to the same music as the film. Ten from the archive
-// through the first passage; the turn to colour lands on the swell that opens
-// the second (about 15.5 s in); the title rises on the next (about 20.5 s) over
-// the dawn aerial, which keeps drifting as the music fades.
-const SCORE_OLD = 1480; // each archive photograph
-const SCORE_NEW = 1400; // each photograph today
+// Nine full-screen photographs, each easing slowly in (about 6%) and dissolving
+// into the next, cut to the music: "A Perfect Day" (Danny Cope), 0:39–0:54.2
+// then 1:10.3–1:22.6 — a join placed so the song's five-second phrase carries
+// straight through it (audio/intro-a-perfect-day.mp3, 27 s).
+//
+// The song swells every 5 s (at about 2.2, 7.0, 12.0, 17.0 and 21.9 s). The
+// photographs change on each swell and halfway between, each dissolve starting
+// just ahead of its beat so the new photograph has arrived as the music lands.
+// 1929 runs through the first passage; colour arrives on the 17 s swell; the
+// club's mark, its founding year and the PASATIEMPO wordmark rise on the next.
+const SCORE_CUES = [300, 1650, 4000, 6400, 8900, 11400, 13900, 16400, 18900];
+const SCORE_TITLE_AT = 21400;
+const SCORE_EXIT_AT = 25200;
 /** Every photograph eases in, about 6%, toward its subject (the focus point). */
 const ZOOM: Frame["move"] = [1, 0, 0, 1.06, 0, 0];
 const SCORE: Frame[] = (
@@ -318,19 +326,22 @@ const SCORE: Frame[] = (
     { src: A("1929-tee-shot-bay.webp"), era: "archive", focus: "center 70%" },
     { src: A("1929-opening-foursome.webp"), era: "archive", focus: "center 15%" },
     { src: IMG + "mackenzie.webp", era: "archive", focus: "53% 18%" },
-    { src: A("1929-gallery-oak.webp"), era: "archive", focus: "center 60%" },
     { src: IMG + "hollins.webp", era: "archive", focus: "50% 30%" },
-    { src: A("1929-golfer-oak.webp"), era: "archive", focus: "center 70%" },
-    { src: A("mackenzie-house-1933.webp"), era: "archive", focus: "center 70%" },
-    { src: IMG + "hollins-swing.webp", era: "archive", focus: "60% 18%" },
-    { src: A("mackenzie-house-1933b.webp"), era: "archive", focus: "center 45%" },
+    { src: A("1929-gallery-oak.webp"), era: "archive", focus: "center 60%" },
+    // Tall: shown whole, on a soft, darkened copy of itself.
+    { src: IMG + "hollins-swing.webp", era: "archive", focus: "center", fit: true },
     { src: A("1929-bunkered-green.webp"), era: "archive", focus: "center 60%" },
     { src: IMG + "course-green.webp", era: "today", focus: "center 60%" },
-    { src: T("bridge.webp"), era: "today", focus: "center 60%" },
-    { src: T("flag-green.webp"), era: "today", focus: "70% 60%" },
     { src: T("aerial-dawn.webp"), era: "today", focus: "center 50%" },
   ] as Omit<Frame, "hold" | "move">[]
-).map((f) => ({ ...f, move: ZOOM, hold: f.era === "archive" ? SCORE_OLD : SCORE_NEW }));
+).map((f, k) => ({
+  ...f,
+  move: ZOOM,
+  hold: (k + 1 < SCORE_CUES.length ? SCORE_CUES[k + 1] : SCORE_TITLE_AT) - SCORE_CUES[k],
+}));
+/** The closing title: the club's mark, and its name in the logo's own script. */
+const MARK = "/invitational/img/logo-mark-large.png";
+const WORDMARK = "/invitational/img/wordmark-pasatiempo.svg";
 
 interface ReelLook {
   /** How far the camera pulls back between frames (1 = not at all). */
@@ -359,6 +370,9 @@ interface Cut {
   pan?: { step?: boolean; glide?: boolean; tail?: Frame[] };
   /** A soundtrack, started with the first frame. */
   music?: string;
+  /** Cut to the music: when each frame starts, the title rises and the reel
+   *  lifts, in ms from the first beat of black — kept to the music's own clock. */
+  cues?: { frames: number[]; title: number; exit: number };
 }
 const VARIANTS: Record<Variant, Cut> = {
   flip: { frames: FRAMES, titleMs: TITLE_MS },
@@ -385,7 +399,15 @@ const VARIANTS: Record<Variant, Cut> = {
     pan: { glide: true, tail: FILM_TAIL },
     music: MUSIC,
   },
-  score: { frames: SCORE, titleMs: 3000, leadMs: 300, cine: true, fast: true, music: MUSIC },
+  score: {
+    frames: SCORE,
+    titleMs: SCORE_EXIT_AT - SCORE_TITLE_AT,
+    leadMs: SCORE_CUES[0],
+    cine: true,
+    fast: true,
+    music: MUSIC,
+    cues: { frames: SCORE_CUES, title: SCORE_TITLE_AT, exit: SCORE_EXIT_AT },
+  },
 };
 /** The intro visitors get. The others play with ?intro=<name>. */
 const DEFAULT_VARIANT: Variant = "score";
@@ -541,6 +563,7 @@ export default function IntroReel({
             ...(VARIANTS[v].reel?.whip ? WHIP_PAST.map((f) => f.src) : []),
             ...(VARIANTS[v].pan ? (VARIANTS[v].pan.tail ?? PAN_TAIL).map((f) => f.src) : []),
             SETTLE_ON,
+            ...(v === "score" ? [MARK, WORDMARK] : []),
           ];
     // The soundtrack loads alongside the photographs (it never holds them up long).
     const src = VARIANTS[v].music;
@@ -574,9 +597,9 @@ export default function IntroReel({
   // which joins the music at the right moment.
   useEffect(() => {
     if (phase !== "lead") return;
+    musicStart.current = performance.now();
     const a = music.current;
     if (!a) return;
-    musicStart.current = performance.now();
     a.currentTime = 0;
     a.play().then(
       () => setSound("on"),
@@ -619,15 +642,25 @@ export default function IntroReel({
   useEffect(() => {
     let t: ReturnType<typeof setTimeout> | undefined;
     let r: ReturnType<typeof setTimeout> | undefined;
+    // Cut to music: wait for the cue on the music's own clock, so the pictures
+    // never drift off the beat. (Before the music starts, or without it, the
+    // page's clock stands in.)
+    const cues = cut.cues;
+    const until = (at: number) => {
+      const a = music.current;
+      const now = a && !a.paused ? a.currentTime * 1000 : performance.now() - musicStart.current;
+      return Math.max(0, at - now);
+    };
     if (phase === "lead") {
-      t = setTimeout(() => setPhase("reel"), cut.leadMs ?? LEAD_MS);
+      t = setTimeout(() => setPhase("reel"), cues ? until(cues.frames[0]) : (cut.leadMs ?? LEAD_MS));
     } else if (phase === "reel") {
+      const next = cues ? until(i < frames.length - 1 ? cues.frames[i + 1] : cues.title) : frames[i].hold;
       t = setTimeout(() => {
         if (i < frames.length - 1) setI(i + 1);
         else setPhase("title");
-      }, frames[i].hold);
+      }, next);
     } else if (phase === "title") {
-      t = setTimeout(() => setPhase("exit"), cut.titleMs);
+      t = setTimeout(() => setPhase("exit"), cues ? until(cues.exit) : cut.titleMs);
     } else if (phase === "exit") {
       markSeen();
       if (quick) {
@@ -803,7 +836,18 @@ export default function IntroReel({
         </div>
       )}
 
-      {inTitle && (
+      {inTitle && variant === "score" && (
+        <div className="mci-reel-title mci-st">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="mci-st-mark" src={MARK} alt="" />
+          <div className="mci-st-est">{`Est. ${FOUNDED}`}</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="mci-st-word" src={WORDMARK} alt="Pasatiempo" />
+          <div className="mci-st-rule" aria-hidden />
+          <div className="mci-st-sub">{`The ${EVENT.name} · ${EVENT.year}`}</div>
+        </div>
+      )}
+      {inTitle && variant !== "score" && (
         <div className="mci-reel-title">
           <div className="mci-reel-title-crest">
             <Medal size={110} />
@@ -910,6 +954,7 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
         } as CSSProperties
       }
     >
+      {f.fit && <div className="mci-page-fill" style={{ backgroundImage: `url(${f.src})` }} />}
       {f.trio ? (
         f.trio.map((p) => (
           <div className="mci-panel" key={p.src} style={{ "--focus": p.focus ?? "center" } as CSSProperties}>
@@ -919,7 +964,7 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
         ))
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={f.src} alt="" />
+        <img src={f.src} alt="" className={f.fit ? "is-fit" : undefined} />
       )}
     </div>
   );
