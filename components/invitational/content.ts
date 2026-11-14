@@ -128,6 +128,29 @@ export interface CommitteeMember {
 }
 export const COMMITTEE: CommitteeMember[] = [];
 
+// ---- Scenes from the Invitational (photo gallery) -------------------------
+// Photographs from past Invitationals, shown on the home page. Each one lives in
+// public/invitational/img/event/ twice: the full-size original (<name>.jpg,
+// opened in the viewer) and a light copy for the grid (<name>-1000.webp).
+// Add a photograph: drop both files in that folder and add a line here — the
+// order here is the order on the page.
+
+export interface GalleryPhoto {
+  /** File name in img/event, without extension. */
+  name: string;
+  alt: string;
+  /** Width and height of the original, so the grid lays out before it loads. */
+  w: number;
+  h: number;
+}
+export const GALLERY: GalleryPhoto[] = [
+  { name: "event-high-five-first-tee", alt: "Players trade high fives on the first tee as the field looks on", w: 2000, h: 1211 },
+  { name: "event-high-five-green", alt: "Two players high-five on the green, a putter in hand", w: 1333, h: 2000 },
+  { name: "event-registration-team", alt: "The golf staff at the registration table, Invitational programs laid out", w: 2000, h: 1727 },
+  { name: "event-champion-flags", alt: "Two Invitational Champion flags signed by the field", w: 1968, h: 2000 },
+  { name: "event-clock-blue-sky", alt: "The Pasatiempo clock, est. 1929, against a blue sky", w: 2000, h: 1333 },
+];
+
 // ---- Tabs -----------------------------------------------------------------
 // Page structure: the label in the nav, the photo and heading at the top of
 // each tab, the line on its home-page card, and what its "coming soon" state
