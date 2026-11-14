@@ -774,6 +774,8 @@ body:has(.mci){margin:0;}
     left:calc(var(--pw-tx) * 100cqw - var(--pw-fx) * var(--pw-h) * var(--pw-ar) * 100cqh);
     box-shadow:0 20px 60px rgba(0,0,0,.35);}
   .mci-intro.var-score .mci-page img.is-phone-wide{transform-origin:calc(var(--pw-fx) * 100%) calc(var(--pw-fy) * 100%);}
+  /* ...or a slow pan across it (the move's start and end, phone only). */
+  .mci-page img.is-phone-wide.has-pan{--fx:var(--pan-a);--tx:var(--pan-b);--fy:0%;--ty:0%;--fs:1.02;--ts:1.02;}
   /* The title sits a little lower, below the clock. */
   .mci-intro.var-score .mci-reel-title.mci-st{justify-content:flex-end;padding-bottom:15vh;}
   .mci-intro.var-score .mci-st-mark{height:clamp(150px,26vh,240px);}
