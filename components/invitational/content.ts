@@ -153,6 +153,10 @@ export const GALLERY: GalleryPhoto[] = [
   { name: "event-high-five-sweater", alt: "A high five in the sun as the field looks on", w: 2000, h: 1333 },
   { name: "event-scoreboard", alt: "The Pasatiempo Golf Club scoreboard under the oak, flights posted", w: 1500, h: 1000 },
   { name: "event-sunset-tee-shot", alt: "A tee shot at sunset, the field watching from the tee", w: 2000, h: 1333 },
+  { name: "event-iron-follow-through", alt: "A player holds his follow-through in the evening haze, the field watching", w: 2000, h: 1333 },
+  { name: "event-iron-impact", alt: "A player strikes an iron through the turf in the evening haze", w: 2000, h: 1333 },
+  { name: "event-laughing-group", alt: "Players share a laugh on the tee in the golden light", w: 2000, h: 1333 },
+  { name: "event-field-photo", alt: "The Invitational field together on the tee", w: 2000, h: 1333 },
   { name: "event-clock-blue-sky", alt: "The Pasatiempo clock, est. 1929, against a blue sky", w: 2000, h: 1333 },
 ];
 
