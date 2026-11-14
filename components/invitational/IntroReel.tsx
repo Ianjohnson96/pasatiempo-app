@@ -69,6 +69,8 @@ interface Frame {
    *  (fx, fy, as fractions) and where on the screen that point sits (tx, ty) —
    *  on a soft blurred copy of itself. For composing to the thirds. */
   phoneWide?: { h: number; ar: number; fx: number; fy: number; tx: number; ty: number };
+  /** On a tall (phone) screen only: a different photograph altogether. */
+  phoneSrc?: string;
   /** On a tall (phone) screen only: a slow pan across the photograph instead of
    *  the zoom — from and to, as a shift in % of its width. */
   phonePan?: [from: number, to: number];
@@ -337,6 +339,8 @@ const FILM_TAIL: Frame[] = [
 const SCORE_CUES = [300, 4200, 6630, 8640, 11560, 13570, 16580, 19000, 21400, 24630, 27540, 30000];
 const SCORE_TITLE_AT = 32800;
 const SCORE_EXIT_AT = 37400; // the title holds about 4.6 s
+/** A tall screen (a phone held upright): matches the CSS's phone framing. */
+const PHONE_MEDIA = "(max-aspect-ratio: 4/5)";
 /** The scored dissolve uses full-resolution copies (img/score, up to 1800px,
  *  high quality): each photograph holds for seconds, full screen. */
 const SC = "/invitational/img/score/";
@@ -354,27 +358,26 @@ const SCORE: Frame[] = (
     { src: SA("1929-gallery-oak.webp"), era: "archive", focus: "center 60%" },
     // Colour, on the 12 s swell: the course from the air at dawn (on a phone,
     // framed on the green and its bunkers).
-    { src: SC + "today-aerial-dawn.webp", era: "today", focus: "center 50%", phoneFocus: "60% 50%" },
-    // The Invitational scoreboard under the oak: on a phone, larger, with the
-    // camera panning slowly across it from PASATIEMPO to GOLF CLUB.
-    {
-      src: SC + "event-scoreboard.webp", era: "today", focus: "center 55%",
-      phoneWide: { h: 0.56, ar: 1.5, fx: 0.5, fy: 0.5, tx: 0.5, ty: 0.44 },
-      phonePan: [19, -19],
-    },
+    { src: SC + "today-aerial-dawn.webp", era: "today", focus: "center 50%", phoneFocus: "45% 50%" },
+    // Two chairs looking out over the course to the bay.
+    { src: SC + "today-chairs-bay.webp", era: "today", focus: "center 45%" },
     // The clubhouse: the camera eases back rather than in.
     {
       src: SC + "clubhouse.webp", era: "today", focus: "60% 40%", move: [1.1, 0, 0, 1.01, 0, 0],
       phoneWide: { h: 0.62, ar: 1280 / 786, fx: 0.6, fy: 0.36, tx: 0.5, ty: 0.38 },
     },
     // High fives on the first tee.
-    { src: SC + "event-high-five-first-tee.webp", era: "today", focus: "42% 40%", phoneFocus: "38% 40%" },
+    // (On a phone, zoomed out so both players show.)
+    {
+      src: SC + "event-high-five-first-tee.webp", era: "today", focus: "42% 40%",
+      phoneWide: { h: 0.75, ar: 1800 / 1090, fx: 0.42, fy: 0.42, tx: 0.5, ty: 0.44 },
+    },
     { src: SC + "today-bridge.webp", era: "today", focus: "center 62%" },
-    // A high five in the low sun: on a phone, zoomed out a little so the hands
-    // and the player's face both stay in frame.
+    // A high five in the low sun. A phone gets a tall photograph of a high five
+    // on the green instead, framed on the hands and faces.
     {
       src: SC + "event-high-five-sweater.webp", era: "today", focus: "55% 30%",
-      phoneWide: { h: 0.62, ar: 1.5, fx: 0.62, fy: 0.32, tx: 0.5, ty: 0.4 },
+      phoneSrc: SC + "event-high-five-green.webp", phoneFocus: "50% 20%",
     },
     // An iron struck through the evening haze.
     { src: SC + "event-iron-follow-through.webp", era: "today", focus: "50% 35%", phoneFocus: "52% 40%" },
@@ -633,7 +636,9 @@ export default function IntroReel({
       v === "flip"
         ? [...BEHIND, ...FILL]
         : [
-            ...VARIANTS[v].frames.flatMap((f) => (f.trio ? f.trio.map((p) => p.src) : [f.src])),
+            ...VARIANTS[v].frames.flatMap((f) =>
+              f.trio ? f.trio.map((p) => p.src) : f.phoneSrc && matchMedia(PHONE_MEDIA).matches ? [f.phoneSrc] : [f.src],
+            ),
             ...(VARIANTS[v].reel?.whip ? WHIP_PAST.map((f) => f.src) : []),
             ...(VARIANTS[v].pan ? (VARIANTS[v].pan.tail ?? PAN_TAIL).map((f) => f.src) : []),
             SETTLE_ON,
@@ -1066,20 +1071,22 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
           </div>
         ))
       ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={f.src}
-          alt=""
-          className={
-            f.fit
-              ? "is-fit"
-              : f.phoneFit
-                ? "is-phone-fit"
-                : f.phoneWide
-                  ? "is-phone-wide" + (f.phonePan ? " has-pan" : "")
-                  : undefined
-          }
-        />
+        <picture>
+          {f.phoneSrc && <source media={PHONE_MEDIA} srcSet={f.phoneSrc} />}
+          <img
+            src={f.src}
+            alt=""
+            className={
+              f.fit
+                ? "is-fit"
+                : f.phoneFit
+                  ? "is-phone-fit"
+                  : f.phoneWide
+                    ? "is-phone-wide" + (f.phonePan ? " has-pan" : "")
+                    : undefined
+            }
+          />
+        </picture>
       )}
     </div>
   );
