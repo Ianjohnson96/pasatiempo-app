@@ -69,6 +69,11 @@ interface Frame {
    *  (fx, fy, as fractions) and where on the screen that point sits (tx, ty) —
    *  on a soft blurred copy of itself. For composing to the thirds. */
   phoneWide?: { h: number; ar: number; fx: number; fy: number; tx: number; ty: number };
+  /** On a tall (phone) screen only: a different photograph altogether. */
+  phoneSrc?: string;
+  /** On a tall (phone) screen only: a slow pan across the photograph instead of
+   *  the zoom — from and to, as a shift in % of its width. */
+  phonePan?: [from: number, to: number];
 }
 
 const FRAMES: Frame[] = [
@@ -318,20 +323,24 @@ const FILM_TAIL: Frame[] = [
 ];
 
 // ---- The scored dissolve (the default) ---------------------------------------
-// Nine full-screen photographs, each easing slowly in (about 6%) and dissolving
-// into the next, cut to the music: "A Perfect Day" (Danny Cope), 0:39–0:54.2
-// then 1:10.3–1:23.5 — a join placed so the song's five-second phrase carries
-// straight through it, and an ending that rings out into the song's own quiet
-// (audio/intro-a-perfect-day.mp3, 28 s).
+// Twelve full-screen photographs, each easing slowly in (about 6%) and
+// dissolving into the next, cut to the music: "A Perfect Day" (Danny Cope),
+// 0:39–0:54.2 then 1:10.3–1:33.3 — a join placed so the song's five-second
+// phrase carries straight through it, ending as one phrase rings out, just
+// before the next begins (audio/intro-a-perfect-day.mp3, 37.75 s).
 //
-// The song swells every 5 s (at about 2.2, 7.0, 12.0, 17.0 and 21.9 s). The
-// photographs change on each swell and halfway between, each dissolve starting
-// just ahead of its beat so the new photograph has arrived as the music lands.
-// 1929 runs through the first passage; colour arrives on the 17 s swell; the
-// club's 1929 logo and the PASATIEMPO wordmark rise on the next.
-const SCORE_CUES = [300, 1650, 4000, 6400, 8900, 11400, 13900, 16400, 18900, 21400];
-const SCORE_TITLE_AT = 21900;
-const SCORE_EXIT_AT = 26600; // the title holds about 4.7 s
+// Cut to the song's swells (in the edit: 2.1, 7.0, 9.0, 12.0, 14.0, 17.0, 21.8,
+// 25.0, 27.9, 32.9 s) and its downbeats between. Each dissolve starts 0.4 s
+// ahead of its beat, so the new photograph has arrived as the music lands.
+// A long establishing shot opens; 1929 runs through the first passage; colour
+// arrives on the 12 s swell; the clock fades up ahead of the 32.9 s swell, on
+// which the club's 1929 logo and the PASATIEMPO wordmark rise.
+//   beat:  0.3 4.6 7.0 9.0 12.0 14.0 17.0 19.4 21.8 25.0 27.9 30.4 | title 32.9
+const SCORE_CUES = [300, 4200, 6630, 8640, 11560, 13570, 16580, 19000, 21400, 24630, 27540, 30000];
+const SCORE_TITLE_AT = 32800;
+const SCORE_EXIT_AT = 37400; // the title holds about 4.6 s
+/** A tall screen (a phone held upright): matches the CSS's phone framing. */
+const PHONE_MEDIA = "(max-aspect-ratio: 4/5)";
 /** The scored dissolve uses full-resolution copies (img/score, up to 1800px,
  *  high quality): each photograph holds for seconds, full screen. */
 const SC = "/invitational/img/score/";
@@ -340,25 +349,42 @@ const SA = (f: string) => SC + "archive-" + f;
 const ZOOM: Frame["move"] = [1, 0, 0, 1.06, 0, 0];
 const SCORE: Frame[] = (
   [
-    // The tee shot and the foursome are wide groups: on a phone they show whole.
-    { src: SA("1929-tee-shot-bay.webp"), era: "archive", focus: "center 70%", phoneFit: true },
-    { src: SA("1929-opening-foursome.webp"), era: "archive", focus: "center 15%", phoneFit: true },
+    // 1929. The opening establishing shot (on a phone, framed on the golfer on
+    // the tee and the crowd).
+    { src: SA("1929-tee-shot-bay.webp"), era: "archive", focus: "center 70%", phoneFocus: "62% 80%" },
     { src: SC + "mackenzie.webp", era: "archive", focus: "53% 18%" },
-    { src: SC + "hollins.webp", era: "archive", focus: "50% 30%", phoneFocus: "50% 0%" },
+    // A lone golfer below the oak (on a phone, framed on the golfer).
+    { src: SA("1929-golfer-oak.webp"), era: "archive", focus: "center 70%", phoneFocus: "52% 60%" },
     { src: SA("1929-gallery-oak.webp"), era: "archive", focus: "center 60%" },
-    { src: SA("1929-bunkered-green.webp"), era: "archive", focus: "center 60%" },
-    // Colour, on the music's turn: the green below the clubhouse (a panorama —
-    // zoomed out on a phone so the green and the house both show).
-    {
-      src: SC + "clubhouse-green.webp", era: "today", focus: "55% 60%",
-      phoneWide: { h: 0.46, ar: 1280 / 440, fx: 0.55, fy: 0.6, tx: 0.5, ty: 0.5 },
-    },
+    // Colour, on the 12 s swell: the course from the air at dawn (on a phone,
+    // framed on the green and its bunkers).
+    { src: SC + "today-aerial-dawn.webp", era: "today", focus: "center 50%", phoneFocus: "45% 50%" },
+    // Two chairs looking out over the course to the bay.
+    { src: SC + "today-chairs-bay.webp", era: "today", focus: "center 45%" },
     // The clubhouse: the camera eases back rather than in.
     {
       src: SC + "clubhouse.webp", era: "today", focus: "60% 40%", move: [1.1, 0, 0, 1.01, 0, 0],
       phoneWide: { h: 0.62, ar: 1280 / 786, fx: 0.6, fy: 0.36, tx: 0.5, ty: 0.38 },
     },
+    // High fives on the first tee.
+    // (On a phone, zoomed out so both players show.)
+    {
+      src: SC + "event-high-five-first-tee.webp", era: "today", focus: "42% 40%",
+      phoneWide: { h: 0.75, ar: 1800 / 1090, fx: 0.42, fy: 0.42, tx: 0.5, ty: 0.44 },
+    },
     { src: SC + "today-bridge.webp", era: "today", focus: "center 62%" },
+    // A high five in the low sun. A phone gets a tall photograph of a high five
+    // on the green instead, framed on the hands and faces.
+    {
+      src: SC + "event-high-five-sweater.webp", era: "today", focus: "55% 30%",
+      phoneSrc: SC + "event-high-five-green.webp", phoneFocus: "50% 20%",
+    },
+    // An iron struck through the evening haze.
+    // (On a phone, zoomed out to keep the watchers and the haze behind him.)
+    {
+      src: SC + "event-iron-follow-through.webp", era: "today", focus: "50% 35%",
+      phoneWide: { h: 0.7, ar: 1.5, fx: 0.45, fy: 0.5, tx: 0.5, ty: 0.5 },
+    },
     // The last photograph, under the title: the club's clock, est. 1929, at dusk.
     // On a phone it is zoomed out with the clock face on the upper-left third,
     // clear of the title below it.
@@ -371,8 +397,8 @@ const SCORE: Frame[] = (
   ...f,
   // The last photograph stays on through the title, so its zoom runs on
   // (a little further, at the same pace) rather than restarting.
-  move: k === all.length - 1 ? ([1, 0, 0, 1.1, 0, 0] as Frame["move"]) : (f.move ?? ZOOM),
-  zoomMs: k === all.length - 1 ? 7200 : undefined,
+  move: k === all.length - 1 ? ([1, 0, 0, 1.13, 0, 0] as Frame["move"]) : (f.move ?? ZOOM),
+  zoomMs: k === all.length - 1 ? 9600 : undefined,
   hold: (k + 1 < SCORE_CUES.length ? SCORE_CUES[k + 1] : SCORE_TITLE_AT) - SCORE_CUES[k],
 }));
 /** The closing title: the club's 1929 logo (the version for dark backgrounds,
@@ -614,7 +640,9 @@ export default function IntroReel({
       v === "flip"
         ? [...BEHIND, ...FILL]
         : [
-            ...VARIANTS[v].frames.flatMap((f) => (f.trio ? f.trio.map((p) => p.src) : [f.src])),
+            ...VARIANTS[v].frames.flatMap((f) =>
+              f.trio ? f.trio.map((p) => p.src) : f.phoneSrc && matchMedia(PHONE_MEDIA).matches ? [f.phoneSrc] : [f.src],
+            ),
             ...(VARIANTS[v].reel?.whip ? WHIP_PAST.map((f) => f.src) : []),
             ...(VARIANTS[v].pan ? (VARIANTS[v].pan.tail ?? PAN_TAIL).map((f) => f.src) : []),
             SETTLE_ON,
@@ -1013,6 +1041,7 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
           "--focus": f.focus ?? "center",
           "--focus-m": f.phoneFocus ?? f.focus ?? "center",
           ...(f.zoomMs ? { "--zoom": f.zoomMs + "ms" } : {}),
+          ...(f.phonePan ? { "--pan-a": f.phonePan[0] + "%", "--pan-b": f.phonePan[1] + "%" } : {}),
           ...(f.phoneWide
             ? {
                 "--pw-h": f.phoneWide.h,
@@ -1046,12 +1075,22 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
           </div>
         ))
       ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={f.src}
-          alt=""
-          className={f.fit ? "is-fit" : f.phoneFit ? "is-phone-fit" : f.phoneWide ? "is-phone-wide" : undefined}
-        />
+        <picture>
+          {f.phoneSrc && <source media={PHONE_MEDIA} srcSet={f.phoneSrc} />}
+          <img
+            src={f.src}
+            alt=""
+            className={
+              f.fit
+                ? "is-fit"
+                : f.phoneFit
+                  ? "is-phone-fit"
+                  : f.phoneWide
+                    ? "is-phone-wide" + (f.phonePan ? " has-pan" : "")
+                    : undefined
+            }
+          />
+        </picture>
       )}
     </div>
   );

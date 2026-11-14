@@ -774,6 +774,8 @@ body:has(.mci){margin:0;}
     left:calc(var(--pw-tx) * 100cqw - var(--pw-fx) * var(--pw-h) * var(--pw-ar) * 100cqh);
     box-shadow:0 20px 60px rgba(0,0,0,.35);}
   .mci-intro.var-score .mci-page img.is-phone-wide{transform-origin:calc(var(--pw-fx) * 100%) calc(var(--pw-fy) * 100%);}
+  /* ...or a slow pan across it (the move's start and end, phone only). */
+  .mci-page img.is-phone-wide.has-pan{--fx:var(--pan-a);--tx:var(--pan-b);--fy:0%;--ty:0%;--fs:1.02;--ts:1.02;}
   /* The title sits a little lower, below the clock. */
   .mci-intro.var-score .mci-reel-title.mci-st{justify-content:flex-end;padding-bottom:15vh;}
   .mci-intro.var-score .mci-st-mark{height:clamp(150px,26vh,240px);}
@@ -802,6 +804,33 @@ body:has(.mci){margin:0;}
 @keyframes mci-st-word{from{opacity:0;transform:scale(.97);}to{opacity:1;transform:none;}}
 .mci-intro.var-score.is-exit .mci-reel-title.mci-st{opacity:0;filter:none;}
 @media (max-width:760px){.mci-st-word{width:86vw;}}
+
+/* ---------- Scenes from the Invitational: a photo wall + full-screen viewer ---------- */
+.mci-scenes{padding-top:20px;}
+.mci-wall{columns:3 280px;column-gap:16px;margin-top:34px;}
+.mci .mci-wall-item{display:block;width:100%;margin:0 0 16px;padding:0;border:0;background:var(--panel-2);cursor:zoom-in;
+  break-inside:avoid;overflow:hidden;box-shadow:var(--shadow);appearance:none;}
+.mci-wall-item img{display:block;width:100%;height:100%;object-fit:cover;transition:transform 1.1s var(--ease),filter .6s;}
+.mci-wall-item:hover img{transform:scale(1.045);}
+.mci .mci-wall-item:focus-visible{outline:2px solid var(--gold);outline-offset:3px;}
+.mci-motion .mci-wall-item[data-reveal]{opacity:0;transform:translateY(26px);transition:opacity .9s var(--ease),transform .9s var(--ease);transition-delay:calc(var(--i,0) * 90ms);}
+.mci-motion .mci-wall-item[data-reveal].is-in{opacity:1;transform:none;}
+.mci-lightbox{position:fixed;inset:0;z-index:900;background:rgba(5,6,10,.94);display:grid;place-items:center;cursor:zoom-out;
+  animation:mci-xfade .3s ease both;}
+.mci-lightbox-img{max-width:min(94vw,1800px);max-height:88vh;width:auto;height:auto;object-fit:contain;cursor:default;
+  box-shadow:0 30px 80px rgba(0,0,0,.6);animation:mci-xfade .35s ease both;}
+.mci-lightbox-count{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);color:#d8d2c2;
+  font-family:var(--disp);letter-spacing:.24em;font-size:13px;}
+.mci .mci-lightbox-btn{position:absolute;appearance:none;cursor:pointer;width:48px;height:48px;border-radius:50%;
+  display:grid;place-items:center;font-size:30px;line-height:1;color:#f5f0e2;background:rgba(255,255,255,.08);
+  border:1px solid rgba(236,216,164,.4);transition:background .2s,border-color .2s;}
+.mci .mci-lightbox-btn:hover,.mci .mci-lightbox-btn:focus-visible{background:rgba(255,255,255,.18);border-color:var(--gold-bright);}
+.mci-lightbox-btn.is-close{top:16px;right:16px;}
+.mci-lightbox-btn.is-prev{left:16px;top:50%;transform:translateY(-50%);}
+.mci-lightbox-btn.is-next{right:16px;top:50%;transform:translateY(-50%);}
+@media (max-width:600px){.mci-wall{columns:2 140px;column-gap:10px;}.mci .mci-wall-item{margin-bottom:10px;}
+  .mci-lightbox-btn.is-prev,.mci-lightbox-btn.is-next{top:auto;bottom:10px;transform:none;}}
+@media (prefers-reduced-motion:reduce){.mci-lightbox,.mci-lightbox-img{animation:none;}.mci-wall-item img{transition:none;}}
 
 /* Replay, in the footer. */
 .mci .mci-replay{margin-top:18px;display:inline-flex;align-items:center;gap:8px;appearance:none;cursor:pointer;background:none;

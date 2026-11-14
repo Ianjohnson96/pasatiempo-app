@@ -18,6 +18,7 @@ import {
   FIELD,
   FLIGHTS,
   FORMAT,
+  GALLERY,
   INFO,
   PRIZES,
   SCHEDULE,
@@ -420,6 +421,8 @@ function Home({ go }: { go: (t: TabKey) => void }) {
         attribution="Dr. Alister MacKenzie · Golf Architecture, 1920"
       />
 
+      <Scenes />
+
       <section className="mci-block">
         <div className="mci-wrap mci-center">
           <div className="mci-eyebrow" data-reveal>
@@ -543,6 +546,134 @@ function ArchiveStrip() {
         </button>
       </div>
     </section>
+  );
+}
+
+/** Scenes from past Invitationals: a photo wall; any photograph opens full screen. */
+function Scenes() {
+  const [open, setOpen] = useState<number | null>(null);
+  if (GALLERY.length === 0) return null;
+  return (
+    <section className="mci-block mci-scenes">
+      <div className="mci-wrap">
+        <div className="mci-center">
+          <div className="mci-orn" data-reveal>
+            <span className="mci-eyebrow">The Invitational</span>
+          </div>
+          <h3 data-reveal style={stagger(1)}>
+            Scenes from the Invitational
+          </h3>
+          <p className="mci-lead mci-center" data-reveal style={stagger(2)}>
+            High fives on the first tee, a signed champion&rsquo;s flag, and the
+            clock that has kept Pasatiempo&rsquo;s time since 1929.
+          </p>
+        </div>
+        <div className="mci-wall">
+          {GALLERY.map((g, i) => (
+            <button
+              key={g.name}
+              type="button"
+              className="mci-wall-item"
+              data-reveal
+              style={{ ...stagger(i % 4), aspectRatio: `${g.w} / ${g.h}` }}
+              onClick={() => setOpen(i)}
+              aria-label={`View larger: ${g.alt}`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`${EVENT_IMG}${g.name}-1000.webp`} alt={g.alt} loading="lazy" width={g.w} height={g.h} />
+            </button>
+          ))}
+        </div>
+      </div>
+      {open !== null && <Lightbox index={open} onIndex={setOpen} onClose={() => setOpen(null)} />}
+    </section>
+  );
+}
+
+const EVENT_IMG = "/invitational/img/event/";
+
+/** One photograph full screen: arrows or swipe to move, Esc or a click outside to close. */
+function Lightbox({ index, onIndex, onClose }: { index: number; onIndex: (i: number) => void; onClose: () => void }) {
+  const n = GALLERY.length;
+  const g = GALLERY[index];
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const touchX = useRef<number | null>(null);
+  const go = useCallback((d: number) => onIndex((index + d + n) % n), [index, n, onIndex]);
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    const html = document.documentElement;
+    const overflow = html.style.overflow;
+    html.style.overflow = "hidden";
+    closeRef.current?.focus();
+    return () => {
+      html.style.overflow = overflow;
+      prev?.focus();
+    };
+  }, []);
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowRight") go(1);
+      else if (e.key === "ArrowLeft") go(-1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [go, onClose]);
+  return (
+    <div
+      className="mci-lightbox"
+      role="dialog"
+      aria-modal="true"
+      aria-label={g.alt}
+      onClick={onClose}
+      onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
+      onTouchEnd={(e) => {
+        const x0 = touchX.current;
+        touchX.current = null;
+        if (x0 === null) return;
+        const dx = e.changedTouches[0].clientX - x0;
+        if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        key={g.name}
+        className="mci-lightbox-img"
+        src={`${EVENT_IMG}${g.name}.jpg`}
+        alt={g.alt}
+        onClick={(e) => e.stopPropagation()}
+      />
+      <div className="mci-lightbox-count">{`${index + 1} / ${n}`}</div>
+      <button ref={closeRef} type="button" className="mci-lightbox-btn is-close" onClick={onClose} aria-label="Close">
+        ×
+      </button>
+      {n > 1 && (
+        <>
+          <button
+            type="button"
+            className="mci-lightbox-btn is-prev"
+            onClick={(e) => {
+              e.stopPropagation();
+              go(-1);
+            }}
+            aria-label="Previous photograph"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            className="mci-lightbox-btn is-next"
+            onClick={(e) => {
+              e.stopPropagation();
+              go(1);
+            }}
+            aria-label="Next photograph"
+          >
+            ›
+          </button>
+        </>
+      )}
+    </div>
   );
 }
 

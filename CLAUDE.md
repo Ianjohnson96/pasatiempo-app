@@ -26,3 +26,12 @@ red Events tile).
 
 The club's full brand guide has not been added to the repository yet; if it
 turns up, put it in `public/brand/` and summarise its rules here.
+
+## Event photographs (Men's Club Invitational)
+
+Photographs from past Invitationals, supplied by the club, live in
+`public/invitational/img/event/`: each as the full-size original
+(`<name>.jpg`) and a light 1000px copy for grids (`<name>-1000.webp`). The
+list the home page's "Scenes from the Invitational" gallery shows is
+`GALLERY` in `components/invitational/content.ts` — add a photograph by adding
+both files and a line there. Use these for any later page, card or intro.
