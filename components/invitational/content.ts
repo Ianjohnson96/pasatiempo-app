@@ -146,6 +146,7 @@ export interface GalleryPhoto {
 export const GALLERY: GalleryPhoto[] = [
   { name: "event-high-five-first-tee", alt: "Players trade high fives on the first tee as the field looks on", w: 2000, h: 1211 },
   { name: "event-high-five-green", alt: "Two players high-five on the green, a putter in hand", w: 1333, h: 2000 },
+  { name: "event-handshake-green", alt: "Two players shake hands on the green, putters in hand", w: 2000, h: 1481 },
   { name: "event-registration-team", alt: "The golf staff at the registration table, Invitational programs laid out", w: 2000, h: 1727 },
   { name: "event-champion-flags", alt: "Two Invitational Champion flags signed by the field", w: 1968, h: 2000 },
   { name: "event-clock-blue-sky", alt: "The Pasatiempo clock, est. 1929, against a blue sky", w: 2000, h: 1333 },
