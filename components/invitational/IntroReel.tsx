@@ -661,14 +661,19 @@ export default function IntroReel({
       : Promise.resolve();
     music.current = audio;
     // Cut-to-music intros can't stop to wait for a photograph later, so they
-    // start only once the first few are fully loaded and decoded (on a slow
-    // connection, up to 12 s); the rest keep loading behind them.
+    // start only once the first two are fully loaded and decoded (on a slow
+    // connection, up to 6 s); the rest keep loading behind them.
     const cued = !!VARIANTS[v].cues;
-    const first = cued ? [MARK, WORDMARK, ...VARIANTS[v].frames.slice(0, 3).map((f) => f.src)] : [];
+    // Only the first two photographs: the rest (and the title art, half a
+    // minute away) load behind them.
+    const first = cued ? VARIANTS[v].frames.slice(0, 2).map((f) => f.src) : [];
     if (cued) void preload([...new Set(srcs)], 60000);
     Promise.all([
-      cued ? preloadDecoded(first, 12000) : preload([LOGO, ...new Set(srcs)], 3000),
-      Promise.race([audioReady, new Promise((r) => setTimeout(r, cued ? 8000 : 3000))]),
+      cued ? preloadDecoded(first, 6000) : preload([LOGO, ...new Set(srcs)], 3000),
+      // An iPhone won't load audio before the visitor touches the page, so the
+      // music is never waited on for long: the pictures keep to the page's
+      // clock until it plays, then to the music's.
+      Promise.race([audioReady, new Promise((r) => setTimeout(r, cued ? 600 : 3000))]),
     ]).then(() => {
       if (!alive) return;
       setVariant(v);
