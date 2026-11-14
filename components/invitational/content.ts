@@ -149,6 +149,10 @@ export const GALLERY: GalleryPhoto[] = [
   { name: "event-handshake-green", alt: "Two players shake hands on the green, putters in hand", w: 2000, h: 1481 },
   { name: "event-registration-team", alt: "The golf staff at the registration table, Invitational programs laid out", w: 2000, h: 1727 },
   { name: "event-champion-flags", alt: "Two Invitational Champion flags signed by the field", w: 1968, h: 2000 },
+  { name: "event-fist-bump-green", alt: "A fist bump on the green, a putter in hand", w: 1333, h: 2000 },
+  { name: "event-high-five-sweater", alt: "A high five in the sun as the field looks on", w: 2000, h: 1333 },
+  { name: "event-scoreboard", alt: "The Pasatiempo Golf Club scoreboard under the oak, flights posted", w: 1500, h: 1000 },
+  { name: "event-sunset-tee-shot", alt: "A tee shot at sunset, the field watching from the tee", w: 2000, h: 1333 },
   { name: "event-clock-blue-sky", alt: "The Pasatiempo clock, est. 1929, against a blue sky", w: 2000, h: 1333 },
 ];
 
