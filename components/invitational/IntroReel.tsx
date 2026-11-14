@@ -380,7 +380,11 @@ const SCORE: Frame[] = (
       phoneSrc: SC + "event-high-five-green.webp", phoneFocus: "50% 20%",
     },
     // An iron struck through the evening haze.
-    { src: SC + "event-iron-follow-through.webp", era: "today", focus: "50% 35%", phoneFocus: "52% 40%" },
+    // (On a phone, zoomed out to keep the watchers and the haze behind him.)
+    {
+      src: SC + "event-iron-follow-through.webp", era: "today", focus: "50% 35%",
+      phoneWide: { h: 0.7, ar: 1.5, fx: 0.45, fy: 0.5, tx: 0.5, ty: 0.5 },
+    },
     // The last photograph, under the title: the club's clock, est. 1929, at dusk.
     // On a phone it is zoomed out with the clock face on the upper-left third,
     // clear of the title below it.
