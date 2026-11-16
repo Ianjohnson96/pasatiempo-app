@@ -15,6 +15,9 @@ const BENCH = {
   gm: {apparel: 0.45, accessories: 0.40, equipment: 0.25, near: 0.05, text: 'Margin: apparel 45%+, accessories 40%+, equipment 25%+'}
 };
 const FAST_TURN = new Set(['160', '320']);   // balls and gloves
+/** 'neg' (red) when a figure is off the rules of thumb, for the Subcategories and Brands tables: the same cut-offs the
+    Scorecard shades by. seg: apparel | accessories | equipment. */
+const offBench = (metric, v, seg, cat) => grade(metric, v, seg, cat) === 'bad' ? 'neg' : '';
 const SEGOF = code => ['160', '200', '220', '300', '320', '350'].includes(code) ? 'equipment'
   : ['440', '620', '660'].includes(code) ? 'accessories' : 'apparel';
 

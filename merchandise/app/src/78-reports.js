@@ -34,7 +34,7 @@ function renderDueBar(){
   if (bar.hidden) return;
   const late = a.some(x => x.status === 'overdue');
   bar.classList.toggle('late', late);
-  bar.innerHTML = `<span>${a.map(x => `<b>${esc(x.p.label)}</b> ${x.status === 'overdue' ? 'is overdue' : x.p.due === RPT.today ? 'is due today' : 'is due'} (${x.left} left)`).join(' · ')}${a.some(x => x.p.cadence === 'monthly' && x.p.due === RPT.today && !((CHECKS[x.p.key] || {}).items || {}).sku) ? '. Run the SKU Analysis today: on-hand can\'t be recreated later.' : ''}</span>${upNeeded(a) ? '<button class="btn sm primary" type="button" data-tab="monthend">Upload reports</button>' : ''}<button class="btn sm" type="button" data-tab="reports">Open Reports</button>`;
+  bar.innerHTML = `<span>${a.map(x => `<b>${esc(x.p.label)}</b> ${x.status === 'overdue' ? 'is overdue' : x.p.due === RPT.today ? 'is due today' : 'is due'} (${x.left} left)`).join(' · ')}${a.some(x => x.p.cadence === 'monthly' && x.p.due === RPT.today && !((CHECKS[x.p.key] || {}).items || {}).sku) ? '. Run the SKU Analysis today: on-hand can\'t be recreated later.' : ''}</span>${upNeeded(a) ? '<button class="btn sm primary" type="button" data-tab="monthend">Upload reports</button>' : ''}<button class="btn sm" type="button" data-tab="reports">Open Checklists</button>`;
 }
 function renderReports(){
   if (!RPT){ $('#pane').innerHTML = `<section class="panel"><div class="note">The reports calendar is part of the club app.</div></section>`; return; }

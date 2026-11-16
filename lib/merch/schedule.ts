@@ -1,6 +1,6 @@
 // The Pro Shop reporting calendar: every report and task that keeps the
 // open-to-buy accurate, when it's due, and when to remind people. One source
-// for the program's Reports tab, the hub dashboard and the reminder emails
+// for the program's Checklists page, the hub dashboard and the reminder emails
 // (app/api/cron/merch). Ticks are stored as merch documents checklist/{key}.
 //
 // Dates are Pacific calendar days as "YYYY-MM-DD".

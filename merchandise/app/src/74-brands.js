@@ -1,6 +1,8 @@
 
 /* ---------- brand scorecard ---------- */
 let BRANDS = FALLBACK.brands || null, BCALLS = {};
+// the rules-of-thumb segment (17-metrics.js BENCH) of each brand segment
+const BSEG_BENCH = {mens: 'apparel', ladies: 'apparel', hats: 'accessories', accessories: 'accessories', equipment: 'equipment'};
 let bfilt = {seg: 'all', call: 'all', q: '', small: false}, bsort = {key: 't12', dir: -1};
 const normName = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const bCall = r => (BCALLS[r.id] && BCALLS[r.id].call) || r.call;
@@ -91,9 +93,9 @@ function renderBrands(){
       <td><b>${esc(r.brand)}</b><div style="font-size:11.5px;color:var(--faint)">${SEGS[r.seg]}${r.was !== r.brand ? ` · was ${esc(r.was)}, combined at the next Update brands` : ''}</div></td>
       <td><span class="chip b-${r.ecall}">${BCALL[r.ecall]}</span>${BCALLS[r.id] ? ' <span title="Set by the owner" style="color:var(--faint)">✎</span>' : ''}</td>
       <td class="r num">${money(r.t12)}${soLine(r)}</td><td class="r num ${r.ly >= 10 && r.ty < r.ly * .75 ? 'neg' : ''}">${trendTxt(r)}</td><td>${spark(r.series)}</td>
-      <td class="r num">${money(r.oh)}</td><td class="r num ${r.wks > 40 ? 'neg' : ''}">${r.wks == null ? '—' : r.wks >= 999 ? 'no sales' : Math.round(r.wks)}</td>
-      <td class="r num">${r.gm == null ? '—' : Math.round(r.gm * 100) + '%'}</td><td class="r num ${r.gmroi != null && r.gmroi < (r.seg === 'equipment' ? .5 : 1) ? 'neg' : ''}">${r.gmroi == null ? '—' : r.gmroi.toFixed(2)}</td>
-      <td class="r num ${r.agedPct > .3 ? 'neg' : ''}">${r.oh ? Math.round(r.agedPct * 100) + '%' : '—'}</td>
+      <td class="r num">${money(r.oh)}</td><td class="r num ${r.wks == null ? '' : r.wks >= 999 ? (r.oh ? 'neg' : '') : offBench('wks', r.wks)}">${r.wks == null ? '—' : r.wks >= 999 ? 'no sales' : Math.round(r.wks)}</td>
+      <td class="r num">${r.gm == null ? '—' : Math.round(r.gm * 100) + '%'}</td><td class="r num ${offBench('gmroi', r.gmroi, BSEG_BENCH[r.seg] || 'apparel')}">${r.gmroi == null ? '—' : r.gmroi.toFixed(2)}</td>
+      <td class="r num ${r.oh ? offBench('agedPct', r.agedPct) : ''}">${r.oh ? Math.round(r.agedPct * 100) + '%' : '—'}</td>
       <td class="r num">${r.ord.cur ? money(r.ord.cur) : '<span style="color:var(--faint)">–</span>'}</td><td class="r num">${r.ord.next ? money(r.ord.next) : '<span style="color:var(--faint)">–</span>'}</td></tr>`).join('') || '<tr><td colspan="12" style="color:var(--muted);padding:12px">No brands match.</td></tr>'}</tbody></table></div>
     <div class="note"><b>GMROI</b> = gross margin earned in 12 months for every $1 of stock at cost; under 1.0 means the stock isn't paying its way (equipment runs lower because margins are thin). <b>Weeks</b> = weeks of supply at the last 12 months' pace. <b>Aged</b> = share of the stock with no sale in 12 months. <b>Special orders</b> count in sales (the share under the figure) but not in weeks, GMROI or the call, which are about shelf stock. Brands come from item descriptions, <b>Assign brands</b> and <b>Edit brands</b>; ${money(sum(Object.values(BRANDS.unassigned || {})))} of sales had no brand when the scorecard was built${BRANDS.at ? ` (${dateLabel(BRANDS.at.slice(0, 10))})` : ''}. ${isAdmin ? '<b>Update brands</b> rebuilds it with the latest changes; so does every month-end upload.' : 'The owner\'s <b>Update brands</b> puts brand changes into it, and so does every month-end upload.'}</div></section>`;
 }
