@@ -29,7 +29,7 @@ function openOrder(id, preset){
       <div id="dVendorBox"></div>
       <div class="row3">
         <div class="f" id="wCat"><label for="dCat">Main category</label><select id="dCat" data-d="cat" ${ro ? 'disabled' : ''}><option value="">Choose…</option>${catList().map(c => `<option value="${c.code}" ${D.cat === c.code ? 'selected' : ''}>${c.code} · ${esc(c.name)}</option>`).join('')}</select><div class="hint">New lines start in this category</div></div>
-        <div class="f" id="wDel"><label for="dDel">Expected delivery</label><select id="dDel" data-d="deliveryMonth" ${ro ? 'disabled' : ''}>${MONTH_OPTS.map(m => `<option value="${m}" ${D.deliveryMonth === m ? 'selected' : ''}>${monthLabel(m)}</option>`).join('')}</select></div>
+        <div class="f" id="wDel"><label for="dDel">Expected delivery</label><select id="dDel" data-d="deliveryMonth" ${ro ? 'disabled' : ''}>${(D.deliveryMonth && !MONTH_OPTS.includes(D.deliveryMonth) ? [D.deliveryMonth, ...MONTH_OPTS].sort() : MONTH_OPTS).map(m => `<option value="${m}" ${D.deliveryMonth === m ? 'selected' : ''}>${monthLabel(m)}</option>`).join('')}</select></div>
         <div class="f"><label for="dCancel">Cancel by</label><input id="dCancel" type="date" data-d="cancelDate" value="${esc(D.cancelDate)}" ${ro ? 'disabled' : ''}><div class="hint">From the vendor's confirmation</div></div>
       </div>
       <div class="sec">2 · What you're buying</div>

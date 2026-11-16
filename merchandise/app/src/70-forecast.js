@@ -3,10 +3,10 @@
 const pct = (v, d = 0) => (v >= 0 ? '+' : '−') + Math.abs(v * 100).toFixed(d) + '%';
 const catsAll = () => BASE.order;
 const fySales = (fy, cats = catsAll()) => sum(cats, c => sum(fyMonths(fy), k => ENG.S[c][k]));
-const lySales = (fy, cats = catsAll()) => sum(cats, c => sum(fyMonths(fy - 1), k => num(BASE.cats[c].hist[k])));
+const lySales = (fy, cats = catsAll()) => sum(cats, c => sum(fyMonths(fy), k => lastYear(BASE.cats[c], k)));
 const monthStatus = k => k <= BASE.actualThrough ? 'actual' : (BASE.partial && k === BASE.partial.m ? 'partial' : 'forecast');
 function monthTotal(k){ return sum(catsAll(), c => ENG.S[c][k]); }
-function monthLY(k){ const l = addMonths(k, -12); return sum(catsAll(), c => l in ENG.S[c] ? ENG.S[c][l] : num(BASE.cats[c].hist[l])); }
+function monthLY(k){ const l = addMonths(k, -12); return sum(catsAll(), c => l in ENG.S[c] ? ENG.S[c][l] : lastYear(BASE.cats[c], k)); }
 const canPlan = () => isAdmin && canAct();
 
 function setWhatIf(group, key, val){
@@ -15,8 +15,11 @@ function setWhatIf(group, key, val){
   schedule();
 }
 async function saveAssumptions(){
-  const a = assumptions();
-  const body = {g27: a.g27, g27cat: a.g27cat, g28: a.g28, wos: a.wos, by: myId, at: new Date().toISOString(), basedOn: BASE.asOf};
+  // Saved by fiscal year, so the plan still means the same years after the year turns (byYear in 20-engine.js).
+  const a = assumptions(), fy = curFY(), growth = byYear(SAVED);
+  growth[fy] = {months: a.g27, cats: a.g27cat};
+  growth[fy + 1] = {months: (growth[fy + 1] || {}).months || {}, cats: a.g28};
+  const body = {growth, wos: a.wos, fy: fyLabel(fy), by: myId, at: new Date().toISOString(), basedOn: BASE.asOf};
   if (await write('plan/assumptions', body)){ WHATIF = null; toast('Saved. Every budget now uses this forecast.'); }
 }
 function whatIfBar(){
@@ -52,7 +55,7 @@ function renderForecast(){
     return `<tr><td>${monthLabel(k)}</td><td class="r num">${money(ly)}</td><td class="r">${g}</td><td class="r num"><b>${money(tot)}</b></td><td>${tag}</td><td class="r num">${money(nx)}</td><td class="r num">${pct(nx / tot - 1)}</td></tr>`;
   }).join('');
   const catRows = BASE.order.map(c => {
-    const v = BASE.cats[c], s1 = sum(m1, k => ENG.S[c][k]), s0 = sum(fyMonths(fy - 1), k => num(v.hist[k])), s2 = sum(fyMonths(fy + 1), k => ENG.S[c][k]);
+    const v = BASE.cats[c], s1 = sum(m1, k => ENG.S[c][k]), s0 = sum(fyMonths(fy), k => lastYear(v, k)), s2 = sum(fyMonths(fy + 1), k => ENG.S[c][k]);
     const y = sum(closed, k => ENG.S[c][k]), so = inOTB(c) ? sum(m1, k => ENG.S[c][k] * soShare(v, k)) : 0;
     return `<tr><td><span class="code">${c}</span> ${esc(v.name)}</td><td class="r num">${money(s0)}</td><td class="r num">${money(y)}</td><td class="r num"><b>${money(s1)}</b></td><td class="r num">${s0 ? pct(s1 / s0 - 1) : '—'}</td>
       <td class="r num">${so >= 1 ? `${money(so)}<div style="font-size:11px;color:var(--muted)">${Math.round(so / s1 * 100)}% of sales</div>` : '<span style="color:var(--faint)">–</span>'}</td>

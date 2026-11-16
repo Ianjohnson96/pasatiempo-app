@@ -11,20 +11,39 @@ let BASE = FALLBACK.base || null, SAVED = null, WHATIF = null, ENG = null, PLANS
 let FYSEL = (() => { try { return localStorage.getItem('mp.fy') || 'cur'; } catch (_) { return 'cur'; } })();
 const LEGACY_PLAN = FALLBACK.plan;
 
-/* saved assumptions (plan/assumptions) over the pipeline defaults, then this viewer's unsaved what-if */
-function assumptions(){
-  const d = BASE.defaults, s = SAVED || {}, w = WHATIF || {};
-  const m = k => ({...(d[k] || {}), ...(s[k] || {}), ...(w[k] || {})});
-  return {g27: m('g27'), g27cat: m('g27cat'), g28: m('g28'), wos: m('wos')};
+/* Growth by fiscal year ({'YYYY': {months, cats}}) from plan/assumptions or BASE.defaults, in either shape: by year
+   ({growth}) or the older one with no year (g27 months, g27cat, g28), which belongs to the year of its g27 months.
+   Mirrors by_year() in pipeline/engine.py. */
+function byYear(store){
+  store = store || {};
+  const out = {};
+  for (const [y, g] of Object.entries(store.growth || {})) out[y] = {months: {...((g || {}).months || {})}, cats: {...((g || {}).cats || {})}};
+  if (store.g27 || store.g27cat || store.g28){
+    const ms = Object.keys(store.g27 || {}).sort(), fy = ms.length ? fyOf(ms[0]) : /^FY\d{4}$/.test(store.fy || '') ? +store.fy.slice(2) : 2027;
+    const cur = out[fy] = out[fy] || {months: {}, cats: {}}, nxt = out[fy + 1] = out[fy + 1] || {months: {}, cats: {}};
+    Object.assign(cur.months, store.g27 || {}); Object.assign(cur.cats, store.g27cat || {}); Object.assign(nxt.cats, store.g28 || {});
+  }
+  return out;
 }
-const curFY = () => BASE ? fyOf(BASE.partial ? BASE.partial.m : addMonths(BASE.actualThrough, 1)) : 2027;
+/* The engine's assumptions for the plan year: the defaults, the saved plan over them, then this viewer's unsaved what-if.
+   g27 = this year's growth by month, g27cat = this year's extra by category, g28 = next year's by category (resolve() in engine.py). */
+function assumptions(){
+  const fy = curFY(), d = byYear(BASE.defaults), s = byYear(SAVED), w = WHATIF || {};
+  const pick = (y, part, wk) => ({...((d[y] || {})[part] || {}), ...((s[y] || {})[part] || {}), ...(w[wk] || {})});
+  return {g27: pick(fy, 'months', 'g27'), g27cat: pick(fy, 'cats', 'g27cat'), g28: pick(fy + 1, 'cats', 'g28'),
+    wos: {...((BASE.defaults || {}).wos || {}), ...((SAVED || {}).wos || {}), ...(w.wos || {})}};
+}
+/* the fiscal year being planned: the year of the first month not yet closed (plan_fy in engine.py) */
+const curFY = () => BASE ? fyOf(BASE.partial ? BASE.partial.m : addMonths(BASE.actualThrough, 1)) : fyOf(THIS_MONTH);
+/* a category's sales a year before month k: this data's actual where it has one, else its history */
+const lastYear = (v, k) => { const kk = addMonths(k, -12); return kk in v.act ? v.act[kk] : num(v.hist[kk]); };
 
 function salesPlan(base, a){
-  const fy = +base.fy.slice(2), m27 = fyMonths(fy), m28 = fyMonths(fy + 1);
+  const fy = curFY(), m27 = fyMonths(fy), m28 = fyMonths(fy + 1);
   const beyond = [1, 2, 3, 4].map(i => addMonths(m28[11], i)), S = {};
   for (const [c, v] of Object.entries(base.cats)){
     const s = {};
-    for (const k of m27) s[k] = (k in v.act) ? v.act[k] : num(v.hist[addMonths(k, -12)]) * (1 + num(a.g27[k]) + num(a.g27cat[c]));
+    for (const k of m27) s[k] = (k in v.act) ? v.act[k] : lastYear(v, k) * (1 + num(a.g27[k]) + num(a.g27cat[c]));
     for (const k of m28) s[k] = s[addMonths(k, -12)] * (1 + num(a.g28[c]));
     for (const k of beyond) s[k] = s[addMonths(k, -12)];
     S[c] = s;

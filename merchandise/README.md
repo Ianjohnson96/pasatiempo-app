@@ -58,7 +58,10 @@ The rules of thumb (`BENCH` in `17-metrics.js`) are general guidelines for a pri
 
 Fiscal year: May 1 – Apr 30. Sales are at retail. Stock and budgets are at cost.
 
-- **Sales, this year:** closed months are actual. Each open month = the same month last year × (1 + month growth + category extra growth).
+- **Plan year:** the fiscal year of the first month not yet closed (`engine.plan_fy`, `curFY()` in `20-engine.js`). After the April close that is the next year even though the data still belongs to the closing one; "last year" for a month is then this data's actual for it (`last_year` / `lastYear`), not the older history.
+- **Growth by fiscal year:** `config.GROWTH_DEFAULT` and the saved plan (`plan/assumptions`) hold `growth: {"YYYY": {months: {YYYY-MM: g}, cats: {cat: g}}}`, each year against the one before. `engine.resolve` / `assumptions()` read the plan year's months and categories (`g27`, `g27cat`) and the next year's categories (`g28`), defaults first, the saved plan over them key by key, then the viewer's what-if. Nothing is re-keyed when the year turns: the FY2028 category growth set in FY2027 becomes the current year's category growth after May. A year with no growth set repeats the year before, and the upload says so. Older saved plans (`g27`, `g27cat`, `g28` with no year) are read as belonging to the year of their `g27` months. Add the coming year's defaults to `GROWTH_DEFAULT` at each year-end.
+
+- **Sales, this (plan) year:** closed months are actual. Each open month = the same month last year × (1 + month growth + category extra growth).
 - **Sales, next year:** this year × (1 + next-year growth for the category). Beyond that, next year repeats.
 - **Shelf sales** = sales less special orders. Budgets count shelf sales and shelf stock only (see Special orders below).
 - **Cost of sales** = shelf sales × (1 − realized margin from the cost & margin report).

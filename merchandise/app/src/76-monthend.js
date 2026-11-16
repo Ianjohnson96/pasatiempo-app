@@ -79,7 +79,7 @@ function renderUpload(){
   const r = UP.result;
   if (r){
     const s = r.summary, last = REFRESHES.slice().sort((a, b) => String(b.asOf).localeCompare(String(a.asOf)))[0] || {};
-    const fy = +String(s.fy).slice(2), row = (label, before, after) => `<tr><td>${label}</td><td class="r num">${before}</td><td class="r num"><b>${after}</b></td></tr>`;
+    const fy = +String(s.planFy || s.fy).slice(2), row = (label, before, after) => `<tr><td>${label}</td><td class="r num">${before}</td><td class="r num"><b>${after}</b></td></tr>`;
     return `<section class="panel">${head}
       ${upFilesTable(r.files)}
       ${(r.warnings || []).length ? `<ul class="note" style="margin:6px 0 0;padding-left:34px">${r.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}

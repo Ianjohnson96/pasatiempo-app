@@ -19,7 +19,9 @@ const monthShort = m => MN[+m.slice(5,7)-1];
 const dateLabel = d => d ? MN[+d.slice(5,7)-1] + ' ' + (+d.slice(8,10)) + ', ' + d.slice(0,4) : '—';
 const daysBetween = (a,b) => Math.round((Date.parse(b+'T00:00:00') - Date.parse(a+'T00:00:00')) / 864e5);
 const addMonths = (m, k) => { let y = +m.slice(0,4), mo = +m.slice(5,7) - 1 + k; y += Math.floor(mo/12); mo = ((mo%12)+12)%12; return y + '-' + pad(mo+1); };
-const MONTH_OPTS = (() => { const o = []; for (let m = '2026-06'; m <= '2028-06'; m = addMonths(m,1)) o.push(m); return o; })();
+// Delivery months an order can pick: from a year back to the end of next fiscal year and two months on.
+const MONTH_OPTS = (() => { const fy = +THIS_MONTH.slice(0, 4) + (+THIS_MONTH.slice(5, 7) >= 5 ? 1 : 0), o = [];
+  for (let m = addMonths(THIS_MONTH, -12); m <= fy + 1 + '-06'; m = addMonths(m, 1)) o.push(m); return o; })();
 const uid = () => Math.random().toString(36).slice(2,10);
 const STATUS = {open:'Open', hold:'On hold', partial:'Partly received', received:'Received', cancelled:'Cancelled'};
 // On hold = placed but something on it needs fixing (p.fix says what). It still counts against the budget like an open order.
