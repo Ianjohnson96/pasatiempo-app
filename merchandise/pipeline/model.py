@@ -186,6 +186,17 @@ def fytd_by_category(cat_reports, fy, cur):
     return None
 
 
+def sku_day(rep):
+    """The day a SKU Analysis runs through. A printed one gives only its month (the month-end it was run for);
+    an export without dates gives its latest sale (exports.parse_sku_analysis), which closes the month only
+    when it falls on the last day or the day before (a month-end run before the day's first sale)."""
+    end = month_end(rep['as_of'])
+    if not rep.get('day'):
+        return end
+    d = date.fromisoformat(rep['day'])
+    return end if (end - d).days <= 1 else d
+
+
 # ---------- main build ----------
 def build(reports, prior=None):
     """reports: dict kind -> parsed report (lists for sku_analysis, rounds, sales_by_item, sales_by_category, best100).
@@ -195,7 +206,7 @@ def build(reports, prior=None):
     snap_rep = skus[-1]
     snap = {r['sku']: r for r in snap_rep['rows'] if r['cat_no'] in MERCH}
     daily = reports.get('daily_sales')
-    as_of = date.fromisoformat(daily['date']) if daily else month_end(snap_rep['as_of'])
+    as_of = date.fromisoformat(daily['date']) if daily else sku_day(snap_rep)
     cur = ym(as_of.year, as_of.month)
     is_month_end = as_of == month_end(cur)
     actual_through = cur if is_month_end else add_months(cur, -1)

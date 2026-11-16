@@ -224,6 +224,11 @@ def rebuild_brands(docs):
 def warnings(reports, prior, summary):
     """Plain-English notes on what this refresh can't update, for the owner to see before loading it."""
     out = []
+    if summary.get('asOf') and summary.get('actualThrough') and summary['asOf'][:7] > summary['actualThrough']:
+        d = datetime.fromisoformat(summary['asOf'])
+        out.append(f"These reports run to {d:%b} {d.day}, so {d:%B} stays open: its sales are forecast until the month-end reports "
+                   f"come in, and this year's actual sales run through {datetime.fromisoformat(summary['actualThrough'] + '-01'):%B}."
+                   + ('' if reports.get('daily_sales') else ' Add the Daily Sales Report to count the month so far.'))
     if not reports.get('best100'):
         out.append('No cost & margin report (BEST 100): margins stay as they were.')
     if not reports.get('sales_by_item') and not (reports.get('daily_sales') or {}).get('items'):
