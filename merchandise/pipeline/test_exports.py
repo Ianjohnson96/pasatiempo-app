@@ -144,3 +144,8 @@ def test_an_export_from_mid_month_leaves_the_month_open():
     assert model.sku_day(rep).isoformat() == '2026-11-16'
     assert model.sku_day(dict(as_of='2026-11', day='2026-11-29')).isoformat() == '2026-11-30'  # run on the last morning
     assert model.sku_day(dict(as_of='2026-11')).isoformat() == '2026-11-30'  # a printed one: its month-end
+
+
+def test_a_mid_month_period_ends_at_the_latest_sale():
+    assert exports.period_label('2026-05', '2026-11', '2026-11-15') == 'May 1 – Nov 15, 2026'
+    assert exports.period_label('2026-05', '2026-11') == 'May 1 – Nov 30, 2026'

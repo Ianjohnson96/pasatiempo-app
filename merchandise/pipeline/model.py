@@ -319,8 +319,16 @@ def build(reports, prior=None):
         # sales so far, so the monthly estimates are scaled to it (spread like last year where there's no estimate).
         fytd = fytd_by_category(reports.get('sales_by_category', []), fy, cur)
         if fytd:
+            so_far = 0.0
             for c in MERCH:
                 target, tot = fytd.get(c, 0.0), sum(act[c].values())
+                if not is_month_end:
+                    # run mid-month, the report includes this month so far: its share by the SKU Analysis's units
+                    # stays with this month (partial) rather than landing on the months already closed
+                    now = est[c].get(cur, 0)
+                    part = target * now / (tot + now) if tot + now > 0 else 0.0
+                    target -= part
+                    so_far += part
                 if tot > 0:
                     act[c] = {k: v * target / tot for k, v in act[c].items()}
                 else:
@@ -328,7 +336,9 @@ def build(reports, prior=None):
                     st = sum(shape.values())
                     act[c] = {k: (target * v / st if st else target / len(closed)) for k, v in shape.items()}
                 ytd_cat[c] = target
-            rep_closed = sum(fytd.get(c, 0.0) for c in MERCH)
+            rep_closed = sum(ytd_cat.get(c, 0.0) for c in MERCH)
+            if not is_month_end:
+                partial = dict(m=cur, actual=round(so_far, 2), day=as_of.day, days=monthrange(as_of.year, as_of.month)[1])
     units_closed = sum(u for sk, mo in hist.items() if cat_of.get(sk) in MERCH for k, u in mo.items() if k in closed)
     if closed and units_closed > 0 and sum(v for c in MERCH for v in act[c].values()) <= 0:
         raise ValueError("This year's sales come out at $0: there are no selling prices to turn unit sales into dollars. "
