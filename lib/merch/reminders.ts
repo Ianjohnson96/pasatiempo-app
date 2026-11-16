@@ -65,14 +65,14 @@ export function reminderEmail(
   const text = [
     note,
     ...due.map((d) => [`${d.period.label} (${when(d.period, d.status, today)}), ${d.left.length} left:`, ...d.left.map((i) => `  [ ] ${i.t} — ${i.d}`)].join("\n")),
-    `Tick them off on the Reports tab: ${link}`,
+    `Tick them off on the Checklists page: ${link}`,
     "You get this because you have access to the Merchandise Program.",
   ].filter(Boolean).join("\n\n");
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.45;color:#1d2a24;max-width:620px">
 ${note ? `<p style="background:#fbecea;border-left:4px solid #A4402C;padding:8px 12px;margin:0 0 14px"><b>${esc(note)}</b></p>` : ""}
 ${due.map((d) => `<h3 style="margin:16px 0 4px;font-size:15px">${esc(d.period.label)} <span style="font-weight:normal;color:${d.status === "overdue" ? "#A4402C" : "#5c6b63"}">· ${esc(when(d.period, d.status, today))}, ${d.left.length} left</span></h3>
 <ul style="margin:4px 0 0;padding-left:20px">${d.left.map((i) => `<li style="margin:3px 0"><b>${esc(i.t)}</b><br><span style="color:#5c6b63">${esc(i.d)}</span></li>`).join("")}</ul>`).join("\n")}
-<p style="margin:20px 0"><a href="${esc(link)}" style="background:#2E6B4F;color:#fff;padding:9px 16px;border-radius:4px;text-decoration:none;font-weight:bold">Open the Reports tab</a></p>
+<p style="margin:20px 0"><a href="${esc(link)}" style="background:#2E6B4F;color:#fff;padding:9px 16px;border-radius:4px;text-decoration:none;font-weight:bold">Open the Checklists</a></p>
 <p style="color:#8a958f;font-size:12px">You get this because you have access to the Merchandise Program.</p></div>`;
   return { subject, text, html };
 }

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getMerchViewer } from "@/lib/merch/auth";
 import { reportTicket } from "@/lib/merch/ticket";
@@ -12,10 +12,13 @@ export const dynamic = "force-dynamic";
 // assignments and any saved forecast assumptions. Brands -> Update brands uses the same pass and documents
 // (with brandin/current) to rebuild only the brand scorecard and the subcategory report (subcats/* and submap/current). The reader returns a data file, and the
 // page loads it through /merch/api/import once the owner confirms.
-export async function POST() {
+export async function POST(request: NextRequest) {
   const me = await getMerchViewer();
   if (!me || me.role !== "owner")
     return NextResponse.json({ error: "Only the owner can update the program from reports." }, { status: 403 });
+  // ?prior=0: just the pass. The reader then reads last month's documents from the database itself,
+  // so the upload doesn't carry them (they grow every month against the reader's 4.4 MB limit).
+  if (request.nextUrl.searchParams.get("prior") === "0") return NextResponse.json({ ticket: reportTicket(me.email) });
   const supa = createAdminClient("merch");
   const [named, hist] = await Promise.all([
     supa.from("docs").select("path, data").eq("deleted", false).in("path", ["base/current", "plan/assumptions", "skusnap/current", "brandmap/current", "brandin/current", "submap/current"]),

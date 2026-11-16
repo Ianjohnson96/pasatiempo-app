@@ -82,8 +82,8 @@ function renderAttention(S){
 const KIND_NOTE = {
   all:'Order problems come first, then item suggestions ranked by dollars at stake. Mark each one Done when you have acted on it, or Dismiss it if it doesn\'t apply. I see what you mark when I roll the plan.',
   order:'Problems with orders you have written: cancel dates, late deliveries, and categories going over budget. These update the moment an order changes.',
-  reorder:'Fast sellers that will run out in under 6 weeks at the pace expected this fall. "Start an order" fills in a new order for you.',
-  stockout:'Items that sold well in June to August but have none on hand. Reorder the ones you are keeping in the line.',
+  reorder:'Fast sellers that will run out in under 6 weeks at the pace forecast for the coming weeks. "Start an order" fills in a new order for you.',
+  stockout:'Items that sold well in the last three months but have none on hand. Reorder the ones you are keeping in the line.',
   overstock:'Items with more than a year of stock at the current pace. Don\'t reorder them; move them with a feature or a markdown.',
   aged:'Items that have not sold in over a year. "Restocked" means more arrived after it stopped selling — check whether that receipt was a mistake.',
   margin:'The latest cost is well above what you paid last year, but the selling price hasn\'t changed. Check the invoice, then re-price or renegotiate.',
@@ -99,7 +99,7 @@ function renderInventory(S){
   const counts = [...COUNTS].sort((a,b) => String(b.date).localeCompare(String(a.date)));
   $('#pane').innerHTML = `<div class="stack">
   <section class="panel"><header><h2>Inventory on hand</h2><span class="lab">${esc(INV.source)} · as of ${dateLabel(INV.asOf)}</span></header>
-    <div class="note" style="border-bottom:1px solid var(--rule)">This is the starting point for every budget. It updates each month-end when the new SKU Analysis comes in. <b>Weeks of supply</b> is how long the stock lasts at the sales pace forecast for this fall and winter. <b>Target by Apr 30</b> is the stock level the plan is steering towards.</div>
+    <div class="note" style="border-bottom:1px solid var(--rule)">This is the starting point for every budget. It updates each month-end when the new SKU Analysis comes in. <b>Weeks of supply</b> is how long the stock lasts at the sales pace forecast for the coming months. <b>Target by Apr 30</b> is the stock level the plan is steering towards.</div>
     <div class="tbl"><table style="min-width:900px"><thead><tr><th><span class="h">Category</span></th><th class="r"><span class="h">SKUs</span></th><th class="r"><span class="h">Units</span></th><th class="r"><span class="h">At cost</span></th><th class="r"><span class="h">Not sold 12+ mo</span></th><th class="r"><span class="h">Weeks of supply</span></th><th class="r"><span class="h">Target by Apr 30</span></th><th><span class="h">Read</span></th></tr></thead>
     <tbody class="click">${rows.map(r => `<tr data-cat="${r.c.code}"><td><b>${esc(r.c.name)}</b><span class="sm">${r.c.code}</span></td><td class="r num">${int(r.i.skus)}</td><td class="r num">${int(r.i.units)}</td><td class="r num">${money(r.i.cost)}</td>
       <td class="r num">${r.i.aged ? money(r.i.aged) + `<span class="sm">${Math.round(r.i.aged / r.i.cost * 100)}%</span>` : '—'}</td><td class="r num" ${r.wks > 30 ? 'style="color:var(--brick)"' : ''}>${r.wks ? Math.round(r.wks) : '—'}</td>
@@ -131,17 +131,8 @@ function renderHelp(){
   const P = PLANS.cur || PLAN, ga = P.cats['620'] || {};
   $('#pane').innerHTML = `<div class="help">
   <section class="panel"><div class="in"><h3>The pages</h3>
-    <p>The tabs at the top are grouped the way a buying month runs: <b>Plan</b> the money, <b>Buy</b> against it, check the <b>Assortment</b>, then <b>Close the month</b>. They stay at the top of the screen as you scroll.</p><dl class="gl">
-    <dt>Overview</dt><dd>Budget left by category for the year and month you pick, and the top things to do.</dd>
-    <dt>Forecast</dt><dd>Sales by month for this year and next. Growth and target weeks can be changed; every budget follows.</dd>
-    <dt>Open-to-buy</dt><dd>The budget as a category × month grid for this year, next year or calendar ${P.fyNum || 2027}, plus the month-by-month worksheet.</dd>
-    <dt>Orders</dt><dd>Every purchase order. Each one counts against the fiscal year it arrives in.</dd>
-    <dt>Brands</dt><dd>A scorecard for every brand, by men's, ladies', hats, accessories and equipment, with a call: Grow, Keep, Watch, Reduce or Drop.</dd>
-    <dt>Vendors</dt><dd>Vendor contacts, account numbers, terms and lead times.</dd>
-    <dt>Subcategories</dt><dd>Inside each category, where the sales and the stock are: headcovers against towels, polos against quarter-zips. Sales, trend, weeks of supply, margin, GMROI, aged stock and what's on order, with a call for each. Special orders show in the category they sell as, with their share of sales; weeks of supply, GMROI and the call count shelf sales and shelf stock only. SKUs are sorted from their descriptions; <b>Sort SKUs</b> fixes any that land in the wrong place, marks what is a special order, and places Special Orders items in a category. Budgets stay by category.</dd>
-    <dt>Inventory &amp; counts</dt><dd>Stock by category, aging, and the quarterly count.</dd>
-    <dt>To do</dt><dd>Order problems and item-level suggestions: reorders, stock-outs, aged stock, combined SKUs, data errors.</dd>
-    <dt>Month-end</dt><dd>The checklist, the refresh history, and how each month came in against the forecast.</dd></dl>
+    <p>The sections across the top hold the pages, shown as a row underneath the section you pick. They stay at the top of the screen as you scroll.</p>
+    ${SECTIONS.map(([id, name, pages]) => `<h4 style="margin:12px 0 4px">${esc(name)}</h4><dl class="gl">${pages.filter(t => PAGES[t] || t === 'vendors').map(t => `<dt>${esc(PAGENAME[t] || (t === 'vendors' ? 'Vendors' : t))}</dt><dd>${esc((TABHEAD[t] || [, t === 'vendors' ? 'Vendor contacts, account numbers, terms and lead times. Every order picks its vendor from this list.' : ''])[1])}</dd>`).join('')}</dl>`).join('')}
     <h3 style="margin-top:14px">What the open-to-buy is</h3>
     <p>A spending limit for merchandise, set by category and month, at cost. It tells you how much you can bring in without ending the year with more stock than you need.</p>
     <div class="formula"><div class="ln"><span class="op"></span><span>Stock you want at the end of the year</span><span>target</span></div>
@@ -156,7 +147,7 @@ function renderHelp(){
       <div class="ln tot"><span class="op">=</span><span>${P.fy} budget</span><span>${money(ga.plan || 0)}</span></div></div>
   </div></section>
   <section class="panel"><div class="in"><h3>Buying for next year</h3>
-    <p>Pick <b>${PLANS.next ? PLANS.next.fy : 'next year'}</b> at the top of the Budget page (Buying), or enter any order with a delivery month from May on. It's checked against next year's budget automatically.</p>
+    <p>Pick <b>${PLANS.next ? PLANS.next.fy : 'next year'}</b> at the top of the Budget page (Plan), or enter any order with a delivery month from May on. It's checked against next year's budget automatically.</p>
     <p>Next year's budget starts from the stock this year is expected to end with. If a category is overbought now, or you order more than this year's budget, the extra comes out of next year's budget. The Open-to-buy page lists what next year inherits.</p>
     <p>The brand scorecard warns you when you order from a brand marked Drop or Reduce.</p>
     <h3 style="margin-top:14px">Months</h3>

@@ -25,6 +25,8 @@ import receipts
 from config import CATS, OTB_EXCLUDE, REPLENISH
 from extract import SHEETS, detect_kind, is_sheet, pdf_text, rows_text, sheet_rows
 
+# plan/assumptions keys the refresh reads: growth by fiscal year (or the older g27/g27cat/g28) and target weeks
+ASSUME_KEYS = ('growth', 'g27', 'g27cat', 'g28', 'wos', 'fy')
 LISTS = ('sku_analysis', 'rounds', 'sales_by_item', 'sales_by_category', 'best100')
 
 
@@ -174,7 +176,7 @@ def load_prior(folder):
         elif n == 'brandmap':
             pr['brandmap'] = d
         elif n == 'assumptions':
-            pr['assumptions'] = {k: d[k] for k in ('g27', 'g27cat', 'g28', 'wos') if k in d}
+            pr['assumptions'] = {k: d[k] for k in ASSUME_KEYS if k in d}
     return pr
 
 
@@ -189,7 +191,7 @@ def prior_from_docs(docs):
         elif path.startswith('skuhist/'):
             pr['skuhist'][path[8:]] = d
         elif path == 'plan/assumptions':
-            pr['assumptions'] = {k: d[k] for k in ('g27', 'g27cat', 'g28', 'wos') if k in d}
+            pr['assumptions'] = {k: d[k] for k in ASSUME_KEYS if k in d}
         elif path == 'skusnap/current':
             pr['skusnap'] = d
         elif path == 'brandmap/current':
@@ -210,7 +212,7 @@ def rebuild_brands(docs):
     ctx = model.rebuild_ctx(docs)
     model.special_budget(ctx)
     base = ctx['base']
-    calls, _ = category_calls(base, {k: v for k, v in (docs.get('plan/assumptions') or {}).items() if k in ('g27', 'g27cat', 'g28', 'wos')})
+    calls, _ = category_calls(base, {k: v for k, v in (docs.get('plan/assumptions') or {}).items() if k in ASSUME_KEYS})
     for c, k in calls.items():
         base['cats'][c]['call'] = k
     brands, bskus, assort = model.build_brands(ctx), model.brand_skus(ctx), model.build_subcats(ctx)
@@ -243,8 +245,10 @@ def warnings(reports, prior, summary):
     if not reports.get('daily_sales') and not any(model.fytd_by_category([c], int(summary['fy'][2:]), summary['asOf'][:7]) for c in reports.get('sales_by_category', [])):
         out.append('No Daily Sales Report or Sales by Category (May 1 to date), so this year\'s sales are estimated from the SKU Analysis and prices.')
     if pb.get('fy') and summary.get('fy') and pb['fy'] < summary['fy']:
-        out.append(f"{pb['fy']} has closed: its months become last year's sales from the last upload. "
-                   f"Set {summary['fy']}'s monthly growth on the Forecast tab; until then the forecast repeats last year's months.")
+        out.append(f"{pb['fy']} has closed: its months become last year's sales from the last upload.")
+    if summary.get('planFy') and summary.get('growthSet') is False:
+        out.append(f"No growth is set for {summary['planFy']} yet, so its open months repeat last year's. "
+                   f"Set it on the Forecast page (this year's growth by month), then save it as the plan.")
     if summary.get('descChanged'):
         n = summary['descChanged']
         out.append(f"{n} SKU{'s have' if n != 1 else ' has'} a new description since the last upload. If a number was reused for a new product, "
@@ -311,7 +315,9 @@ def build_bundle(reports, prior=None, notes=None):
                   note=f"Month-end data as of {base['asOf']}" + (': ' + '; '.join(notes) if notes else ''),
                   docs={paths[n]: d for n, d in docs.items()})
     rf = docs['refresh']
-    summary = dict(asOf=base['asOf'], fy=base['fy'], actualThrough=base['actualThrough'], partial=base['partial'],
+    pfy = engine.plan_fy(base)
+    summary = dict(asOf=base['asOf'], fy=base['fy'], planFy=f'FY{pfy}', actualThrough=base['actualThrough'], partial=base['partial'],
+                   growthSet=bool(engine.resolve(base, (prior or {}).get('assumptions'))['g27']),
                    ytd=rf['ytd'], onHand=rf['onHand'], otbCur=rf['otbCur'], otbNext=rf['otbNext'],
                    arrivals=dict(total=arrived['total'], **{'from': arrived['from']}) if arrived else None,
                    descChanged=len(docs['brandskus'].get('changed') or {}))
@@ -336,7 +342,7 @@ def main():
     bpath = os.path.join(a.out, f"Merchandise_Program_Data_{summary['asOf']}.json")
     json.dump(bundle, open(bpath, 'w'), separators=(',', ':'))
     print(f'  data file        {bpath}')
-    fy = int(summary['fy'][2:])
+    fy = int(summary['planFy'][2:])
     print(f"\nAs of {summary['asOf']}  actuals through {summary['actualThrough']}  partial {summary['partial']}")
     print(f"FY{fy} open-to-buy remaining (ex Special Orders): ${summary['otbCur']:,.0f}")
     print(f"FY{fy + 1} open-to-buy (ex Special Orders):          ${summary['otbNext']:,.0f}")

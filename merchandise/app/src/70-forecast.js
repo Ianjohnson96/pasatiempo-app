@@ -3,10 +3,10 @@
 const pct = (v, d = 0) => (v >= 0 ? '+' : '−') + Math.abs(v * 100).toFixed(d) + '%';
 const catsAll = () => BASE.order;
 const fySales = (fy, cats = catsAll()) => sum(cats, c => sum(fyMonths(fy), k => ENG.S[c][k]));
-const lySales = (fy, cats = catsAll()) => sum(cats, c => sum(fyMonths(fy - 1), k => num(BASE.cats[c].hist[k])));
+const lySales = (fy, cats = catsAll()) => sum(cats, c => sum(fyMonths(fy), k => lastYear(BASE.cats[c], k)));
 const monthStatus = k => k <= BASE.actualThrough ? 'actual' : (BASE.partial && k === BASE.partial.m ? 'partial' : 'forecast');
 function monthTotal(k){ return sum(catsAll(), c => ENG.S[c][k]); }
-function monthLY(k){ const l = addMonths(k, -12); return sum(catsAll(), c => l in ENG.S[c] ? ENG.S[c][l] : num(BASE.cats[c].hist[l])); }
+function monthLY(k){ const l = addMonths(k, -12); return sum(catsAll(), c => l in ENG.S[c] ? ENG.S[c][l] : lastYear(BASE.cats[c], k)); }
 const canPlan = () => isAdmin && canAct();
 
 function setWhatIf(group, key, val){
@@ -15,8 +15,11 @@ function setWhatIf(group, key, val){
   schedule();
 }
 async function saveAssumptions(){
-  const a = assumptions();
-  const body = {g27: a.g27, g27cat: a.g27cat, g28: a.g28, wos: a.wos, by: myId, at: new Date().toISOString(), basedOn: BASE.asOf};
+  // Saved by fiscal year, so the plan still means the same years after the year turns (byYear in 20-engine.js).
+  const a = assumptions(), fy = curFY(), growth = byYear(SAVED);
+  growth[fy] = {months: a.g27, cats: a.g27cat};
+  growth[fy + 1] = {months: (growth[fy + 1] || {}).months || {}, cats: a.g28};
+  const body = {growth, wos: a.wos, fy: fyLabel(fy), by: myId, at: new Date().toISOString(), basedOn: BASE.asOf};
   if (await write('plan/assumptions', body)){ WHATIF = null; toast('Saved. Every budget now uses this forecast.'); }
 }
 function whatIfBar(){
@@ -39,7 +42,7 @@ function renderForecast(){
   const k = (lab, v, sub, expl) => `<div class="kpi"><div class="lab">${lab}</div><div class="v num">${v}</div><div class="s">${sub}</div><div class="x">${expl}</div></div>`;
   const kpis = k(`${fyLabel(fy)} sales forecast`, moneyK(f1), `${pct(f1 / l1 - 1)} vs ${fyLabel(fy - 1)}`, `Actual through ${monthLabel(BASE.actualThrough)}, forecast after. Retail, all categories.`) +
     k('Year to date', moneyK(ytd), `${pct(ytd / ytdLY - 1, 1)} vs last year`, `${monthShort(closed[0] || fyMonths(fy)[0])}–${monthShort(BASE.actualThrough)}, closed months.`) +
-    k('Rest of the year', moneyK(rest), `${pct(rest / restLY - 1)} vs last year`, `Growth assumed ${Math.round(Math.min(...gOpen) * 100)}–${Math.round(Math.max(...gOpen) * 100)}% a month — below the year-to-date pace.`) +
+    k('Rest of the year', moneyK(rest), open.length ? `${pct(rest / restLY - 1)} vs last year` : 'every month closed', open.length ? `Growth assumed ${Math.round(Math.min(...gOpen) * 100)}–${Math.round(Math.max(...gOpen) * 100)}% a month${ytdLY && Math.max(...gOpen) < ytd / ytdLY - 1 ? ' — below the year-to-date pace' : ''}.` : 'The year is closed: every month is actual.') +
     k(`${fyLabel(fy)} gross margin`, moneyK(gm1), `${Math.round(gm1 / f1 * 100)}% of sales`, 'Forecast sales × each category\'s realized margin.') +
     k(`${fyLabel(fy + 1)} sales forecast`, moneyK(f2), `${pct(f2 / f1 - 1)} vs ${fyLabel(fy)}`, 'This year × next year\'s growth by category.') +
     k(`${fyLabel(fy + 1)} gross margin`, moneyK(gm2), `${Math.round(gm2 / f2 * 100)}% of sales`, 'Mix shifts toward the higher-margin categories.');
@@ -52,7 +55,7 @@ function renderForecast(){
     return `<tr><td>${monthLabel(k)}</td><td class="r num">${money(ly)}</td><td class="r">${g}</td><td class="r num"><b>${money(tot)}</b></td><td>${tag}</td><td class="r num">${money(nx)}</td><td class="r num">${pct(nx / tot - 1)}</td></tr>`;
   }).join('');
   const catRows = BASE.order.map(c => {
-    const v = BASE.cats[c], s1 = sum(m1, k => ENG.S[c][k]), s0 = sum(fyMonths(fy - 1), k => num(v.hist[k])), s2 = sum(fyMonths(fy + 1), k => ENG.S[c][k]);
+    const v = BASE.cats[c], s1 = sum(m1, k => ENG.S[c][k]), s0 = sum(fyMonths(fy), k => lastYear(v, k)), s2 = sum(fyMonths(fy + 1), k => ENG.S[c][k]);
     const y = sum(closed, k => ENG.S[c][k]), so = inOTB(c) ? sum(m1, k => ENG.S[c][k] * soShare(v, k)) : 0;
     return `<tr><td><span class="code">${c}</span> ${esc(v.name)}</td><td class="r num">${money(s0)}</td><td class="r num">${money(y)}</td><td class="r num"><b>${money(s1)}</b></td><td class="r num">${s0 ? pct(s1 / s0 - 1) : '—'}</td>
       <td class="r num">${so >= 1 ? `${money(so)}<div style="font-size:11px;color:var(--muted)">${Math.round(so / s1 * 100)}% of sales</div>` : '<span style="color:var(--faint)">–</span>'}</td>

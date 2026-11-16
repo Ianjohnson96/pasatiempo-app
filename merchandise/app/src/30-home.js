@@ -49,7 +49,7 @@ function renderSummary(S){
   if (noRoom.length && s !== 'season'){
     const waits = noRoom.filter(c => seasonBudget(c.code) > 0).map(c => { const f = firstRoomMonth(c.code, k => S.cm(c.code, k)); return `${esc(c.name)}${f ? ' (opens ' + monthShort(f) + ')' : ''}`; });
     const stops = noRoom.filter(c => seasonBudget(c.code) <= 0).map(c => esc(c.name));
-    if (waits.length) lines.push(`<b>Wait before buying:</b> ${waits.join(', ')}. September's stock is still above plan in these, so goods that arrive earlier just sit.`);
+    if (waits.length) lines.push(`<b>Wait before buying:</b> ${waits.join(', ')}. Stock is still above plan in these, so goods that arrive earlier just sit.`);
     if (stops.length) lines.push(`<b>Don't buy in ${PLAN.fy}:</b> ${stops.join(', ')} — already overbought for the whole year.`);
   }
   if (S.arriving && s !== 'season') lines.push(`<b>${money(S.arriving)}</b> of orders are due to arrive in ${monthFull(s)}.`);
@@ -64,7 +64,7 @@ function renderKpis(S){
   $('#kpis').innerHTML =
     k(s === 'season' ? PLAN.fy + ' budget' : `Room through ${monthShort(s)}`, money(S.room), 'at cost', s === 'season' ? `What the plan lets you receive from ${periodTxt(PLAN)}.` : `What the plan lets you receive from ${dateLabel(PLAN.start)} to the end of this month.`) +
     k('Committed', money(S.commit), `${POS.filter(isOpen).length} open orders`, 'Orders arriving in this period, plus anything already received.', `<div class="meter"><i style="width:${S.room > 0 ? Math.min(100, S.commit / S.room * 100) : (S.commit ? 100 : 0)}%;background:${S.commit > S.room ? 'var(--brick)' : 'var(--cypress)'}"></i></div>`) +
-    k('Left to buy', `<span class="${S.left < 0 ? 'neg' : ''}">${money(S.left)}</span>`, `${catsWithRoom} of 15 categories have room`, S.left < 0 ? 'Negative means more is due in than the plan allows by then.' : 'Room minus committed. Spend it where the category list shows room.') +
+    k('Left to buy', `<span class="${S.left < 0 ? 'neg' : ''}">${money(S.left)}</span>`, `${catsWithRoom} of ${catList().filter(c => inOTB(c.code)).length} categories have room`, S.left < 0 ? 'Negative means more is due in than the plan allows by then.' : 'Room minus committed. Spend it where the category list shows room.') +
     k('On hand', money(invTot), `${int(invU)} units · ${dateLabel(INV.asOf)}`, `Stock on the shelf at cost, from the SKU Analysis. ${S.receivedSince ? money(S.receivedSince) + ' received since.' : 'Updated every month-end.'}`) +
     k('On order', money(S.open), S.later ? `+ ${money(S.later)} after ${monthShort(LAST())} ${LAST().slice(0,4)}` : 'not yet received', 'Still to arrive from vendors on open orders.') +
     k('To do', `<span style="color:${crit ? 'var(--brick)' : att.length ? 'var(--ochre)' : 'inherit'}">${att.length}</span>`, `${crit} urgent`, 'Order problems and item suggestions to work through.');
@@ -72,7 +72,7 @@ function renderKpis(S){
 function renderTabs(S){
   const att = openAttention(S), crit = att.filter(i => i.sev === 'crit').length;
   const due = BASE ? nextRefreshMonth() : null, overdue = due && todayISO > due + '-' + pad(new Date(+due.slice(0,4), +due.slice(5,7), 0).getDate());
-  // Four sections in one row; the section's pages as a wrapping row of pills under it. Nothing scrolls sideways.
+  // Five sections in one row; the section's pages as a wrapping row of pills under it. Nothing scrolls sideways.
   const badge = {orders: [POS.length], attention: [att.length, crit], subcats: [(ssUnsorted().length + ssPlace().length) || null], monthend: [overdue ? '!' : null, overdue]};
   if (RPT){ const a = rptAlerts(); badge.reports = [a.length ? a.reduce((n, x) => n + x.left, 0) : null, a.some(x => x.status === 'overdue')]; }
   const cnt = id => { const [c, hot] = badge[id] || []; return c != null ? `<span class="cnt ${hot ? 'hot' : ''}">${c}</span>` : ''; };
@@ -87,17 +87,18 @@ function renderTabs(S){
 }
 // [section id, name, its pages (the first opens when the section is picked)]
 const SECTIONS = [
-  ['summary', 'Summary', ['summary']],
-  ['analysis', 'Analysis', ['scorecard', 'rounds', 'trends', 'stuck', 'brands']],
-  ['buying', 'Buying', ['overview', 'otb', 'forecast', 'orders', 'vendors', 'attention']],
-  ['ops', 'Operations', ['monthend', 'reports', 'inventory', 'subcats', 'help']]
+  ['home', 'Home', ['summary']],
+  ['plan', 'Plan', ['overview', 'otb', 'forecast']],
+  ['buy', 'Orders', ['orders', 'attention', 'vendors']],
+  ['assort', 'Assortment', ['scorecard', 'subcats', 'brands', 'stuck', 'trends', 'rounds']],
+  ['close', 'Month-end', ['monthend', 'reports', 'inventory', 'help']]
 ];
 const ANALYSIS_TABS = new Set(['summary', 'scorecard', 'rounds', 'trends', 'stuck']);
-const PAGENAME = {summary: 'Summary', scorecard: 'Scorecard', rounds: 'Spend per round', trends: 'Trends', stuck: 'Stuck money', brands: 'Brands',
+const PAGENAME = {summary: 'Home', scorecard: 'Scorecard', rounds: 'Spend per round', trends: 'Trends', stuck: 'Stuck money', brands: 'Brands',
   overview: 'Budget', otb: 'Open-to-buy', forecast: 'Forecast', orders: 'Orders', attention: 'To do',
-  monthend: 'Month-end', reports: 'Reports', inventory: 'Inventory & counts', subcats: 'Subcategories', help: 'How it works'};
+  monthend: 'Month-end', reports: 'Checklists', inventory: 'Inventory & counts', subcats: 'Subcategories', help: 'How it works'};
 const TABHEAD = {
-  summary: ['Summary', 'The shop at a glance: the last 12 months against the year before, and what to do next.'],
+  summary: ['Home', 'The shop at a glance: the last 12 months against the year before, and what to do next.'],
   scorecard: ['Scorecard', 'Every category and subcategory side by side, graded against the rules of thumb.'],
   rounds: ['Spend per round', 'Shop sales for every round played, member, guest and public.'],
   trends: ['Trends', 'Two years of sales by month, and when the shop sells.'],
@@ -111,7 +112,7 @@ const TABHEAD = {
   subcats: ['Subcategories', 'Sort SKUs into subcategories, and see how each one sells.'],
   inventory: ['Inventory & counts', 'Stock on hand by category, and the quarterly counts.'],
   monthend: ['Month-end', 'Upload the reports, work the checklist, and see forecast against actual.'],
-  reports: ['Reports', 'What is due, and who has done it.'],
+  reports: ['Checklists', 'Every report and task on the calendar: what is due, and who has done it.'],
   help: ['How it works', 'The monthly routine, and the words used on this page.']
 };
 

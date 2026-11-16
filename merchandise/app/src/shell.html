@@ -110,7 +110,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* Five main tabs plus More. Pinned while you scroll; on a phone a 3-across grid, never a sideways scroll. */
 /* Four sections in one row (a 4-column grid at every width), the section's pages as wrapping pills. Pinned while you scroll. */
 .tabs{position:sticky;top:0;z-index:25;margin:4px -20px 16px;padding:8px 20px 10px;background:color-mix(in srgb,var(--paper) 94%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--rule2)}
-.tabs .secs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;max-width:720px}
+.tabs .secs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;max-width:880px}
 .tabs .secs button{border:1px solid var(--rule2);background:var(--card);min-height:44px;padding:0 10px;font-weight:700;font-size:14px;color:var(--muted);cursor:pointer;border-radius:8px;display:inline-flex;gap:7px;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .tabs .secs button:hover{color:var(--ink);border-color:var(--muted)}
 .tabs .secs button[aria-selected="true"]{background:var(--band);border-color:var(--band);color:#fff}
@@ -484,9 +484,10 @@ td.h-bad{background:color-mix(in srgb,var(--tint-stop) 90%,transparent);color:va
   table.fc.rt tr.tot{background:var(--sunk)}
 }
 @media (max-width:440px){table.rt tr{grid-template-columns:minmax(0,1fr)}}
-@media print{body{padding:0;background:#fff}.band,.tabs,.subnav,.top .actions,#banner,#wibar,.noprint{display:none!important}.ccard,.tiles,.panel{break-inside:avoid}}
+@media print{body{padding:0;background:#fff}.band,.tabs,.subnav,.top .actions,#banner,#wibar,#duebar,.noprint{display:none!important}.ccard,.tiles,.panel{break-inside:avoid}}
 @media (max-width:760px){.band-in{min-height:58px;gap:10px}.back{padding:0 12px 0 8px}.brandmark .k{display:none}.brandmark .t{font-size:16px}.acctbtn .nm{display:none}.acctbtn{padding:0 8px 0 4px}}
 @media (max-width:640px){.atbl td:first-child,.atbl th:first-child{min-width:0;max-width:46vw;white-space:normal}.atbl tr.asub td:first-child{padding-left:18px}
+  .tabs .secs{grid-template-columns:repeat(6,minmax(0,1fr))}.tabs .secs button{grid-column:span 2}.tabs .secs button:nth-child(n+4){grid-column:span 3}
   .tabs .secs button{font-size:13px;padding:0 4px}.snav{min-height:34px;padding:0 11px;font-size:12.5px}
   .top .actions{width:100%}.top .actions>.btn,.top .actions>.menu{flex:1}.top .actions .menu>.btn{width:100%}.top .actions .btn{justify-content:center;min-height:42px}
   .monthbar{align-items:stretch}.months,.months.years{width:100%}.months button{flex:1 0 auto}}

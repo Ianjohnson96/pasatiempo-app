@@ -28,6 +28,15 @@ G27_DEFAULT = {'2026-09': .37, '2026-10': .30, '2026-11': .30, '2026-12': .25, '
 G28_DEFAULT = {'620': .08, '440': .08, '480': .06, '400': .06, '490': .03, '470': 0, '320': .03, '660': 0, '200': 0,
                '160': .03, '350': -.10, '500': -.15, '300': -.25, '220': -.25, '430': -.15, '640': 0}
 
+# Forecast growth by fiscal year, each year against the one before: "months" by calendar month (YYYY-MM), "cats" an
+# extra by category on top. The plan's current year and the year after read their own entry (engine.resolve), so
+# nothing has to be re-keyed when the year turns; a year with no entry repeats the year before until growth is set
+# on the Forecast page (plan/assumptions, the same shape). Add the next year's defaults here at each year-end.
+GROWTH_DEFAULT = {
+    '2027': {'months': G27_DEFAULT, 'cats': {}},
+    '2028': {'months': {}, 'cats': G28_DEFAULT},
+}
+
 # Daily Sales Report category headings -> category number.
 DAILY_NAMES = {'Golf Balls': '160', 'Golf Clubs': '200', 'Demo Golf Clubs': '220', 'Shoes': '300', 'Gloves': '320',
                'Golf Bags': '350', 'Solid Shirts': '400', 'Pants/Shorts': '430', 'Clothing Accessories': '440',

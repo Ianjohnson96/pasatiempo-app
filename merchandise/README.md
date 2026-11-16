@@ -24,17 +24,17 @@ Roles are granted per app on the hub's **People & access** page (`/admin/people`
 
 ## Setup (once)
 
-1. Run `supabase/migration-merch-schema.sql` in the hub project. Then add `merch` under Settings → API → Exposed schemas.
+1. Run `supabase/migration-merch-schema.sql`, then `supabase/migration-merch-imports.sql`, in the hub project. Then add `merch` under Settings → API → Exposed schemas.
 2. For now the program is served by path at `pasatiempo-app.vercel.app/merch`. To give it its own domain later, add the domain to the Vercel project and list it under the `merch` entry in `lib/sections.ts`.
 3. Sign in at that address. Open your name (top right) → **Load month-end data** and load the latest data file. Add staff on `/admin/people`. After that, each month's reports are uploaded on the Month-end page.
 
 ## Pages
 
-Four sections, each with its pages as a row of pills: **Summary**, **Analysis** (Scorecard, Spend per round, Trends, Stuck money, Brands), **Buying** (Budget, Open-to-buy, Forecast, Orders, Vendors, To do) and **Operations** (Month-end, Reports, Inventory & counts, Subcategories, How it works).
+Five sections, each with its pages as a row of pills: **Home**, **Plan** (Budget, Open-to-buy, Forecast), **Orders** (Orders, To do, Vendors), **Assortment** (Scorecard, Subcategories, Brands, Stuck money, Trends, Spend per round) and **Month-end** (Month-end, Checklists, Inventory & counts, How it works). Staff open on Orders the first time; the owner and view-only members (the GM and board) open on Home.
 
 | Page | What it shows |
 |---|---|
-| Summary | Six headline figures against a year earlier and the rules of thumb, sales by month, category health, and the top suggestions ranked by dollars. Prints on one page |
+| Home | Six headline figures against a year earlier and the rules of thumb, sales by month, category health, and the top suggestions ranked by dollars. Prints on one page |
 | Scorecard | Every category, opening to its subcategories: sales, growth, share of sales against share of stock, margin, markdowns, turns, GMROI, weeks and aged stock, shaded against the rules of thumb; a growth-against-GMROI bubble chart |
 | Spend per round | Retail sales per round by month against a year earlier; rounds by member, guest, public and other |
 | Trends | Shop sales by month, seasonality (each month's share of the year), and each category's two years |
@@ -46,19 +46,23 @@ Four sections, each with its pages as a row of pills: **Summary**, **Analysis** 
 | Brands | Scorecard by segment with a suggested call (Grow / Keep / Watch / Reduce / Drop). The owner can override a call in `brandCalls/{id}`. Orders link to brands by vendor name |
 | To do | Order alerts plus item suggestions (`insights/current`) |
 | Inventory & counts | On hand by category; quarterly counts |
-| Month-end | Checklist (`checklist/{YYYY-MM}`), refresh history (`refreshes/{asOf}`), forecast vs actual |
+| Month-end | The upload, checklist (`checklist/{YYYY-MM}`), refresh history (`refreshes/{asOf}`) with Undo last update, forecast vs actual |
+| Checklists | Every report and task on the reporting calendar, with shared ticks (see Reports calendar below) |
 
 ## Analysis
 
 The Summary and Analysis pages are worked out in the browser from `assort/current` (`app/src/17-metrics.js`, tested in `lib/merch/analysis.test.ts`); charts are `app/src/16-charts.js`. Special orders are left out. Growth compares only months that have a year-earlier month in the data, so until there are 24 months it covers fewer than 12 (the page says which). Suggestions are rules, one per line, ranked by the dollars involved: stock heavier than sales, aged stock over 10%, markdowns over 15%, more than 30 weeks of supply, fast growth with under 8 weeks, GMROI under the guideline, and sales falling 25% with stock behind them.
 
-The rules of thumb (`BENCH` in `17-metrics.js`) are general guidelines for a private-club pro shop, not the club's own targets: aged stock under 10%, markdowns under 15%, 12–16 weeks of supply, GMROI above 2 for apparel and accessories and above 1 for equipment, 2–3 turns (3–4 for balls and gloves), and margins of 45% for apparel, 40% for accessories and 25% for equipment.
+The rules of thumb (`BENCH` in `17-metrics.js`) are general guidelines for a private-club pro shop, not the club's own targets: aged stock under 10%, markdowns under 15%, 12–16 weeks of supply, GMROI above 2 for apparel and accessories and above 1 for equipment, 2–3 turns (3–4 for balls and gloves), and margins of 45% for apparel, 40% for accessories and 25% for equipment. The Scorecard shades by them, and the Subcategories and Brands tables mark a figure red on the same cut-offs (`offBench`): weeks of supply outside 8–24, GMROI under three-quarters of its guideline, aged stock over 15%.
 
 ## The model
 
 Fiscal year: May 1 – Apr 30. Sales are at retail. Stock and budgets are at cost.
 
-- **Sales, this year:** closed months are actual. Each open month = the same month last year × (1 + month growth + category extra growth).
+- **Plan year:** the fiscal year of the first month not yet closed (`engine.plan_fy`, `curFY()` in `20-engine.js`). After the April close that is the next year even though the data still belongs to the closing one; "last year" for a month is then this data's actual for it (`last_year` / `lastYear`), not the older history.
+- **Growth by fiscal year:** `config.GROWTH_DEFAULT` and the saved plan (`plan/assumptions`) hold `growth: {"YYYY": {months: {YYYY-MM: g}, cats: {cat: g}}}`, each year against the one before. `engine.resolve` / `assumptions()` read the plan year's months and categories (`g27`, `g27cat`) and the next year's categories (`g28`), defaults first, the saved plan over them key by key, then the viewer's what-if. Nothing is re-keyed when the year turns: the FY2028 category growth set in FY2027 becomes the current year's category growth after May. A year with no growth set repeats the year before, and the upload says so. Older saved plans (`g27`, `g27cat`, `g28` with no year) are read as belonging to the year of their `g27` months. Add the coming year's defaults to `GROWTH_DEFAULT` at each year-end.
+
+- **Sales, this (plan) year:** closed months are actual. Each open month = the same month last year × (1 + month growth + category extra growth).
 - **Sales, next year:** this year × (1 + next-year growth for the category). Beyond that, next year repeats.
 - **Shelf sales** = sales less special orders. Budgets count shelf sales and shelf stock only (see Special orders below).
 - **Cost of sales** = shelf sales × (1 − realized margin from the cost & margin report).
@@ -112,7 +116,7 @@ Items bought for one member (custom clubs, a named order, imprinted balls) or on
 
 ## Navigation
 
-Four sections sit in one row at the top, **Summary**, **Analysis**, **Buying** and **Operations**, with the chosen section's pages as a wrapping row of pills underneath (`SECTIONS` in `app/src/30-home.js`). The bar stays pinned as the page scrolls and never scrolls sideways. Vendors opens as a drawer. The open page is remembered in the browser (`ob.tab2`).
+Five sections sit at the top, **Home**, **Plan**, **Orders**, **Assortment** and **Month-end** (in two rows on a phone), with the chosen section's pages as a wrapping row of pills underneath (`SECTIONS` in `app/src/30-home.js`; How it works lists the pages from it). The bar stays pinned as the page scrolls and never scrolls sideways. Vendors opens as a drawer. The open page is remembered in the browser (`ob.tab2`).
 
 ## Deliveries
 
@@ -127,7 +131,7 @@ In the budget (`ledger()` in `app/src/10-core.js`), each delivery counts in the 
 
 ## Reports calendar and reminders
 
-The **Reports** tab lists every report and task on the Pro Shop reporting calendar, with tick boxes everyone shares (`checklist/{key}`):
+The **Checklists** page lists every report and task on the Pro Shop reporting calendar, with tick boxes everyone shares (`checklist/{key}`):
 
 | Checklist | Shows | Due | Overdue from | Reminder emails |
 |---|---|---|---|---|
@@ -147,7 +151,9 @@ On reminder days, `/api/cron/merch` (Vercel Cron, 15:00 UTC, about 8 am Pacific)
 2. As the owner, open **Month-end → Update from this month's reports** and choose all the files at once. The report type is detected from each file's contents, so file names don't matter.
 3. The page shows how each file was read, any warnings (a missing report, or data older than what's loaded), and the new numbers next to the current ones. Nothing changes until **Update the program**, which loads the new data file through `/merch/api/import`.
 
-How it runs: the page gets a 15-minute pass and last month's documents (`base/current`, `skuhist/…`, `plan/assumptions`) from `/merch/api/refresh`. It posts them with the files to `/api/merch/reports`, a Python function that runs `pipeline/refresh.py`. The pass is signed with a key derived from `SUPABASE_SERVICE_ROLE_KEY` (`lib/merch/ticket.ts`), so no other secret is needed. Uploads are limited to 3.2 MB per batch. `next dev` doesn't serve the Python function; use `vercel dev` to try the upload locally.
+How it runs: the page gets a 15-minute pass from `/merch/api/refresh?prior=0` and posts it with the files to `/api/merch/reports`, a Python function that reads last month's documents (`base/current`, `skuhist/…`, `plan/assumptions`, …) from the database itself and runs `pipeline/refresh.py`. The pass is signed with a key derived from `SUPABASE_SERVICE_ROLE_KEY` (`lib/merch/ticket.ts`), so no other secret is needed. Uploads are limited to 3.2 MB of files per batch; last month's documents don't count against it.
+
+**Update the program** sends the data file to `/merch/api/import`, which writes every document in one transaction (`merch.put_docs`, `supabase/migration-merch-imports.sql`): all of it is saved or none of it. What each document held before is kept (`merch.imports`, the last 12 loads), so **Refresh history → Undo last update** (`/merch/api/import/undo`, `merch.undo_import`) puts the program back to before the latest load. Deliveries the load recorded on orders stay; they're changed on the order. A month-end upload (one that closes its month) ticks its reports and *Upload the reports* off that month's checklist. While a month-end checklist is due and not uploaded, the banner and the Reports page show the owner an **Upload reports** button. `next dev` doesn't serve the Python function; use `vercel dev` to try the upload locally.
 
 The spreadsheet reader turns each row into a tab-separated line with numbers and dates written as the printout shows them, so one set of parsers reads PDF, Excel and CSV. It was checked against Excel, `.xls` and CSV copies of the September 2026 PDFs. If the POS's own exports are laid out differently, a file is reported as "no rows could be read" and the PDF still works. The POS's "data only" exports, with no title or headings, are read by their columns (`pipeline/exports.py`): the SKU Analysis's months run newest first, ending in the month of the latest sale, and a sales report's period is the run of months whose SKU Analysis units add up to its own. A file with the same rows as another is left out (a "Top 100" export that is really Sales by Item, for one); the cost & margin report has to be the BEST 100 ("Top 100 Hottest items"), with its cost and margin columns. Its export stops at 100 SKUs per category; the upload says which categories were cut off while still selling. The Daily Sales Report by Item export (today, month to date and fiscal year to date per SKU, green fees and gift cards included) has no date or categories: each SKU's category comes from the SKU Analysis, only merchandise counts, and its date is the SKU Analysis's, so the two have to be run the same day (its month-to-date units must match the SKU Analysis's newest month, or it's left out). The Rounds of golf export keeps its headings but has no year or total rows: the program adds up all classifications (Report Totals) and the Member, Guest and Public Rounds groups, and takes the year from a 20xx in the file name or else from the SKU Analysis.
 
@@ -162,7 +168,7 @@ To run the refresh by hand instead:
    On a first build with no prior folder, include the full-year Sales by Category, Sales by Item and April SKU Analysis for last fiscal year.
 3. Load `data/out/Merchandise_Program_Data_<asOf>.json` on your name (top right) → **Load month-end data** (`/merch/admin`).
 
-Either way, a data file can only replace `base`, `inventory`, `insights`, `brands`, `refreshes` and `skuhist`. Orders, vendors, counts, budget changes and brand calls are never touched. Items marked done or dismissed stay that way, because `istate` is keyed by item id.
+Either way, a data file can only replace the month-end documents (`IMPORTABLE` in `lib/merch/rules.ts`: `base`, `inventory`, `insights`, `brands`, `refreshes`, `skuhist`, `skusnap`, `arrivals`, `brandskus`, `brandin`, `assort`). Orders, vendors, counts, budget changes and brand calls are never touched. Items marked done or dismissed stay that way, because `istate` is keyed by item id.
 
 ## Planning constants
 

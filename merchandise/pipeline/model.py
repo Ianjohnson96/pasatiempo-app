@@ -16,7 +16,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 
 from brands import _SEG, brand_of, brand_split, segment_of, is_hat
-from config import (CATS, OTB_EXCLUDE, TARGET_WOS, MARKDOWN, G27_DEFAULT, G28_DEFAULT, COMBINED, DAILY_NAMES, SUB_RULES,
+from config import (CATS, OTB_EXCLUDE, TARGET_WOS, MARKDOWN, GROWTH_DEFAULT, COMBINED, DAILY_NAMES, SUB_RULES,
                     SO_KINDS, SO_NOT_RETAIL, SO_GROUP, SO_SHELF, SO_MEMBER, SO_MEMBER_SUBS, SELLS_AS)
 
 MERCH = set(CATS)
@@ -395,7 +395,7 @@ def build(reports, prior=None):
 
     base = dict(asOf=as_of.isoformat(), fy=f'FY{fy}', actualThrough=actual_through, partial=partial, cats=cats, order=order,
                 ytdActual=round(rep_closed or sum(v for c in MERCH for v in act[c].values()), 2), ytdReport=round(daily['report']['fytd'], 2) if daily else None,
-                defaults=dict(g27={k: v for k, v in G27_DEFAULT.items()}, g28=G28_DEFAULT, wos=TARGET_WOS),
+                defaults=dict(growth=GROWTH_DEFAULT, wos=TARGET_WOS),
                 rounds=rounds, exclude=sorted(OTB_EXCLUDE))
 
     inventory = dict(asOf=as_of.isoformat(), source=f"SKU Analysis as of {snap_rep['as_of']} (on-hand x current cost price)",
@@ -409,7 +409,7 @@ def build(reports, prior=None):
 
     changed = desc_changes(prior.get('brandin'), snap, phist.get('meta', {}), prior.get('brandmap'),
                            datetime.now(timezone.utc).isoformat(timespec='seconds'))
-    ctx = dict(as_of=as_of, cur=cur, actual_through=actual_through, fy=fy, snap=snap, sku_month=snap_rep['as_of'], hist=hist, px=px, sku_gm=sku_gm,
+    ctx = dict(assumptions=prior.get('assumptions'), as_of=as_of, cur=cur, actual_through=actual_through, fy=fy, snap=snap, sku_month=snap_rep['as_of'], hist=hist, px=px, sku_gm=sku_gm,
                bmap=brand_assignments(prior.get('brandmap')), blist=prior.get('brandmap') or {},
                desc_of=desc_of, cat_of=cat_of, items=reports.get('sales_by_item', []), base=base, changed=changed,
                subids=prior.get('subids'), **sort_sets(prior.get('submap')))
@@ -439,7 +439,8 @@ def build_insights(ctx, calls):
     start = as_of + timedelta(days=1)
     ly_start = date(start.year - 1, start.month, min(start.day, 28))
     # blended forecast growth over the next 13 weeks (day-weighted)
-    g27 = base['defaults']['g27']
+    import engine  # engine imports this module
+    g27 = engine.resolve(base, ctx.get('assumptions'))['g27']
     gw, dsum, d = 0.0, 0, start
     while d < start + timedelta(days=91):
         gw += 1 + g27.get(ym(d.year, d.month), 0)
