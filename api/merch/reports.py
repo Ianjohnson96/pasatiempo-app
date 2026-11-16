@@ -129,9 +129,17 @@ def run(req):
     prior = refresh.prior_from_docs(docs)
     note = req.get('note')
     notes = [note.strip()[:200]] if isinstance(note, str) and note.strip() else []
-    reports, found = refresh.read_reports(decoded)
+    meta = docs.get('skuhist/meta') if isinstance(docs.get('skuhist/meta'), dict) else {}
+    cat_of = {s: v[0] for s, v in meta.items() if isinstance(v, list) and v}
+    week = req.get('week') if isinstance(req.get('week'), str) and len(req.get('week')) == 10 else None
+    reports, found = refresh.read_reports(decoded, cat_of=cat_of, week=week)
+    if not reports.get('sku_analysis') and reports.get('daily_sales'):
+        # a Daily Sales Report on its own: the weekly numbers (pulse/{date}); budgets and stock wait for month-end
+        bundle, summary, warns = refresh.build_pulse(reports, prior)
+        return 200, {'bundle': bundle, 'summary': summary, 'files': found, 'warnings': warns}
     if not reports.get('sku_analysis'):
-        return 422, {'error': 'No SKU Analysis among these files. It is needed for on-hand stock and unit sales.', 'files': found}
+        return 422, {'error': 'No SKU Analysis among these files. It is needed for on-hand stock and unit sales. '
+                              'For the weekly numbers, upload the Daily Sales Report on its own.', 'files': found}
     try:
         _docs, bundle, summary = refresh.build_bundle(reports, prior, notes)
     except ValueError as e:

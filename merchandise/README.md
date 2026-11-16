@@ -30,7 +30,7 @@ Roles are granted per app on the hub's **People & access** page (`/admin/people`
 
 ## Pages
 
-Five sections, each with its pages as a row of pills: **Home**, **Plan** (Budget, Open-to-buy, Forecast), **Orders** (Orders, To do, Vendors), **Assortment** (Scorecard, Subcategories, Brands, Stuck money, Trends, Spend per round) and **Month-end** (Month-end, Checklists, Inventory & counts, How it works). Staff open on Orders the first time; the owner and view-only members (the GM and board) open on Home.
+Five sections, each with its pages as a row of pills: **Home** (Home, Management report), **Plan** (Budget, Open-to-buy, Forecast), **Orders** (Orders, To do, Vendors), **Assortment** (Scorecard, Subcategories, Brands, Stuck money, Trends, Spend per round) and **Month-end** (Month-end, Checklists, Inventory & counts, How it works). Staff open on Orders the first time, view-only members (the General Manager, the Director of Golf) on the Management report, the owner on Home.
 
 | Page | What it shows |
 |---|---|
@@ -48,6 +48,16 @@ Five sections, each with its pages as a row of pills: **Home**, **Plan** (Budget
 | Inventory & counts | On hand by category; quarterly counts |
 | Month-end | The upload, checklist (`checklist/{YYYY-MM}`), refresh history (`refreshes/{asOf}`) with Undo last update, forecast vs actual |
 | Checklists | Every report and task on the reporting calendar, with shared ticks (see Reports calendar below) |
+
+## Weekly numbers
+
+Between month-ends, upload the **Daily Sales Report on its own** (Month-end → Update from this month's reports). It is read as the weekly numbers (`refresh.build_pulse`): month and fiscal year to date by category, through the day it was run for, saved as `pulse/{date}`. Nothing else changes: budgets, stock and suggestions wait for the month-end reports. A PDF gives its own date and categories; an Excel export takes its categories from the stored SKU history (`skuhist/meta`) and its date from the file name (`DSR 11-23.xlsx`), else from the date picked on the upload panel (last Sunday by default). Saving it ticks the week's *Daily Sales Report for Sunday*.
+
+Home shows the latest weekly numbers while they are newer than the month-end data (`36-weekly.js`): the month and year to date against the plan and last year, both pro-rated by the days gone in the month, by category, and the sales since the previous week's numbers.
+
+## Management report
+
+**Home → Management report** (`37-mgmt.js`) is one page for the General Manager and the Director of Golf, made to print on one Letter sheet: sales this fiscal year against last year, the month so far from the weekly numbers (or the year's forecast), gross margin, inventory with weeks of supply, aged stock, the buying budget left and on order, sales by month (actual, forecast, last year), sales per round, the four largest suggestions, and every category's sales, change, margin, stock, weeks and buying call. View-only members open on it.
 
 ## Analysis
 

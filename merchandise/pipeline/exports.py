@@ -234,6 +234,51 @@ def daily_from_sku(d, sku, merch):
     return True
 
 
+def daily_from_cats(d, cat_of, merch, day):
+    """A Daily Sales export uploaded on its own (the weekly numbers): categories from the stored SKU history
+    (cat_of {sku: category no}) and the date it was run for (day, YYYY-MM-DD). Same result as daily_from_sku.
+    Returns False when too few of its SKUs are known to place the sales."""
+    known = [v['mtd'] for s, v in d['items'].items() if s in cat_of]
+    if not day or not d['items'] or len(known) < len(d['items']) * 0.5:
+        return False
+    zero = lambda: {k: 0.0 for k in DAILY_KEYS}
+    cats, report = {}, zero()
+    for s, v in d['items'].items():
+        c = cat_of.get(s)
+        if c not in merch:
+            continue
+        cat = cats.setdefault(c, dict(items=[], tot=zero()))
+        for k in DAILY_KEYS:
+            cat['tot'][k] += v[k]
+            report[k] += v[k]
+    rnd = lambda t: {k: round(x, 2) for k, x in t.items()}
+    for cat in cats.values():
+        cat['tot'] = rnd(cat['tot'])
+    d.update(date=day, cats=cats, report=rnd(report))
+    return True
+
+
+def date_from_name(name, today):
+    """The date a file name gives (DSR 11-23.xlsx, Daily sales 11-23-26.xlsx, 2026-11-23.xlsx), or None.
+    Without a year, the latest such date on or before today (a date)."""
+    m = re.search(r'(?<!\d)(20\d\d)[-_.](\d{1,2})[-_.](\d{1,2})(?!\d)', name)
+    if m:
+        y, mo, dd, year_given = int(m.group(1)), int(m.group(2)), int(m.group(3)), True
+    else:
+        m = re.search(r'(?<!\d)(\d{1,2})[-_.](\d{1,2})(?:[-_.](\d{4}|\d{2}))?(?!\d)', name)
+        if not m:
+            return None
+        mo, dd, yy = int(m.group(1)), int(m.group(2)), m.group(3)
+        y, year_given = (int(yy) + (2000 if len(yy) == 2 else 0), True) if yy else (today.year, False)
+    try:
+        d = date(y, mo, dd)
+        if not year_given and d > today:
+            d = date(y - 1, mo, dd)
+    except ValueError:
+        return None
+    return d.isoformat()
+
+
 def parse_best100(rows):
     """Same shape as parse.parse_best100; the period is worked out later (infer_period). 'cut' lists the
     categories that stop at 100 SKUs while still selling, so some of their sales are missing."""

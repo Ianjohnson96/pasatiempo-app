@@ -63,7 +63,9 @@ async function toggleCheck(m, k, on){
    2. POST /api/merch/reports      the reader (Python) reads last month's documents and the files, and returns
                                    a data file and its headline numbers
    3. POST {base}/api/import       once the owner confirms, the data file replaces the month-end documents */
-const UP = {files: [], note: '', busy: false, applying: false, result: null, error: null, found: null, rcv: null};
+// week: the date a Daily Sales Report uploaded on its own (the weekly numbers) was run for, when its file name doesn't say; last Sunday by default
+const lastSunday = () => { const d = new Date(todayISO + 'T00:00:00'); d.setDate(d.getDate() - (d.getDay() || 7)); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+const UP = {week: lastSunday(), files: [], note: '', busy: false, applying: false, result: null, error: null, found: null, rcv: null};
 const UP_MAX = 3.2e6;  // raw bytes; base64 adds a third and the reader takes 4.4 MB
 const UP_KINDS = {sku_analysis: 'SKU Analysis', daily_sales: 'Daily Sales Report', best100: 'Cost & margin (BEST 100)', sales_by_category: 'Sales by Category', sales_by_item: 'Sales by Item', rounds: 'Rounds Summary'};
 const ownerHere = () => !!(window.MERCH_HOST && MERCH_HOST.me && MERCH_HOST.me.role === 'owner') && canAct();
@@ -77,6 +79,7 @@ function renderUpload(){
   const head = `<header><h2>Update from this month's reports</h2><span class="lab">Owner</span></header>`;
   if (UP.busy) return `<section class="panel">${head}<div class="note" style="font-size:13.5px;color:var(--ink)">Reading ${UP.files.length} file${UP.files.length === 1 ? '' : 's'}… PDFs can take up to a minute; Excel takes seconds.</div></section>`;
   const r = UP.result;
+  if (r && r.summary && r.summary.kind === 'pulse') return `<section class="panel">${head}${upFilesTable(r.files)}${pulsePreview(r)}</section>`;
   if (r){
     const s = r.summary, last = REFRESHES.slice().sort((a, b) => String(b.asOf).localeCompare(String(a.asOf)))[0] || {};
     const fy = +String(s.planFy || s.fy).slice(2), row = (label, before, after) => `<tr><td>${label}</td><td class="r num">${before}</td><td class="r num"><b>${after}</b></td></tr>`;
@@ -97,13 +100,14 @@ function renderUpload(){
   }
   const size = UP.files.reduce((a, f) => a + f.size, 0);
   return `<section class="panel">${head}
-    <div class="note" style="font-size:13.5px;color:var(--ink)">Choose this month's reports all at once, PDF or Excel, any file names. The program reads them and shows what changes before anything is updated.</div>
+    <div class="note" style="font-size:13.5px;color:var(--ink)">Choose this month's reports all at once, PDF or Excel, any file names. The program reads them and shows what changes before anything is updated. <b>Weekly numbers:</b> upload the Daily Sales Report on its own; budgets and stock wait for month-end.</div>
     ${UP.error ? `<div class="note neg" style="font-size:13.5px">${esc(UP.error)}</div>` : ''}
     ${upFilesTable(UP.found)}
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:6px 16px 4px">
       <label class="btn" style="cursor:pointer">Choose files<input type="file" id="upFiles" multiple accept=".pdf,.xlsx,.xls,.xlsm,.csv,application/pdf" style="display:none"></label>
       <span class="lab">${UP.files.length ? `${UP.files.length} file${UP.files.length === 1 ? '' : 's'}, ${(size / 1e6).toFixed(1)} MB` : 'No files chosen'}</span></div>
     ${UP.files.length ? `<ul class="note" style="margin:0;padding-left:34px">${UP.files.map(f => `<li style="word-break:break-all">${esc(f.name)}</li>`).join('')}</ul>` : ''}
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:4px 16px 0;font-size:12.5px;color:var(--muted)"><label for="upWeek">Daily Sales Report run for</label><input id="upWeek" type="date" value="${esc(UP.week)}" max="${todayISO}" style="padding:5px 8px;border:1px solid var(--rule2);border-radius:4px;background:var(--card)"><span>weekly numbers only, when the file name has no date (e.g. DSR 11-23.xlsx)</span></div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;padding:8px 16px 14px"><input id="upNote" type="text" maxlength="200" placeholder="Note for the history (optional), e.g. October close" value="${esc(UP.note)}" style="flex:1;min-width:200px;padding:7px 10px;border:1px solid var(--rule2);border-radius:4px;background:var(--card)">
       <button type="button" class="btn primary" id="upRead" ${UP.files.length ? '' : 'disabled'}>Read the reports</button></div></section>`;
 }
@@ -125,7 +129,7 @@ async function readReports(){
     const H = window.MERCH_HOST;
     const start = await upJSON(H.base + '/api/refresh?prior=0');  // the reader reads last month's documents itself
     const files = await Promise.all(UP.files.map(async f => ({name: f.name, data: await fileB64(f)})));
-    UP.result = await upJSON('/api/merch/reports', {ticket: start.ticket, note: UP.note, files});
+    UP.result = await upJSON('/api/merch/reports', {ticket: start.ticket, note: UP.note, week: UP.week, files});
     const arr = UP.result.bundle && UP.result.bundle.docs && UP.result.bundle.docs['arrivals/' + UP.result.summary.asOf];
     UP.rcv = arr ? matchArrivals(arr) : null;
   } catch (e){ UP.error = e.message; UP.found = e.found || null; }
@@ -135,7 +139,14 @@ async function readReports(){
    upload ticks nothing: the month-end reports are still to come. */
 const UP_TICKS = {sku_analysis: 'sku', daily_sales: 'daily', best100: 'best', rounds: 'rounds'};
 async function tickAfterUpload(r){
-  const s = r.summary || {}, m = String(s.asOf || '').slice(0, 7);
+  const s = r.summary || {};
+  if (s.kind === 'pulse'){  // the weekly Daily Sales Report ticks the open weekly checklist's
+    const wk = RPT && RPT.periods.find(p => p.cadence === 'weekly'); if (!wk) return;
+    const cur = CHECKS[wk.key] || {items: {}, by: {}};
+    if (!(cur.items || {}).daily) await write('checklist/' + wk.key, {items: {...(cur.items || {}), daily: true}, by: {...(cur.by || {}), daily: myId}, month: wk.key});
+    return;
+  }
+  const m = String(s.asOf || '').slice(0, 7);
   if (!m || s.partial || s.actualThrough !== m) return;
   const mp = typeof rptMonthly === 'function' ? rptMonthly() : null, key = mp && mp.key.slice(0, 7) === m ? mp.key : m;
   const keys = new Set(['send', ...(r.files || []).filter(f => f.ok && UP_TICKS[f.kind]).map(f => UP_TICKS[f.kind])]);
@@ -159,6 +170,16 @@ async function undoLastImport(){
     toast('Update undone. Reloading…'); setTimeout(() => location.reload(), 1000);
   } catch (e){ UP.undoing = false; toast(e.message); render(); }
 }
+/* The weekly numbers before they're saved: the month and year so far against plan and last year. */
+function pulsePreview(r){
+  const p = (r.bundle.docs || {})['pulse/' + r.summary.date], w = pulseView(p);
+  return `${(r.warnings || []).length ? `<ul class="note" style="margin:6px 0 0;padding-left:34px">${r.warnings.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+    <table class="mini" style="margin:10px 16px 4px;width:calc(100% - 32px)"><thead><tr><th>Through ${dateLabel(r.summary.date)}</th><th class="r">Sales</th><th class="r">vs plan</th><th class="r">vs last year</th></tr></thead><tbody>
+      <tr><td>${w ? monthFull(w.m) : 'Month'} to date</td><td class="r num"><b>${money(r.summary.mtd)}</b></td><td class="r num">${w ? vsTxt(w.mtd, w.planMtd) : '—'}</td><td class="r num">${w ? vsTxt(w.mtd, w.lyMtd) : '—'}</td></tr>
+      <tr><td>Year to date</td><td class="r num"><b>${money(r.summary.fytd)}</b></td><td class="r num">${w ? vsTxt(w.fytd, w.planFytd) : '—'}</td><td class="r num">${w ? vsTxt(w.fytd, w.lyFytd) : '—'}</td></tr></tbody></table>
+    <div class="note">Weekly numbers: they show on Home and in the management report until the month-end reports come in. Budgets, stock and suggestions don't change.</div>
+    <div style="display:flex;gap:8px;padding:4px 16px 14px"><button type="button" class="btn primary" id="upApply" ${UP.applying ? 'disabled' : ''}>${UP.applying ? 'Saving…' : 'Save the weekly numbers'}</button><button type="button" class="btn" id="upReset" ${UP.applying ? 'disabled' : ''}>Cancel</button></div>`;
+}
 async function applyReports(){
   const r = UP.result; if (!r || UP.applying) return;
   UP.applying = true; render();
@@ -166,6 +187,7 @@ async function applyReports(){
     await upJSON(window.MERCH_HOST.base + '/api/import', r.bundle);
     const delivered = UP.rcv ? await applyArrivals(UP.rcv) : true;
     await tickAfterUpload(r).catch(() => {});
+    if (r.summary.kind === 'pulse'){ upReset(); render(); toast(`Weekly numbers through ${dateLabel(r.summary.date)} saved. Reloading…`); setTimeout(() => location.reload(), 1000); return; }
     const asOf = r.summary.asOf; upReset(); render();
     toast(delivered ? `Updated to reports as of ${dateLabel(asOf)}. Reloading…` : `Updated to reports as of ${dateLabel(asOf)}, but some deliveries didn't save; record them on the order. Reloading…`);
     setTimeout(() => location.reload(), 1200);

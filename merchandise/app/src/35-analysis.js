@@ -60,6 +60,7 @@ function renderSummaryPage(){
   const labs = a.months.slice(n - 12).map(mLab);
   const ty = s.series.slice(n - 12), ly = s.series.slice(n - 24, n - 12).map((v, i) => n - 24 + i >= a.first ? v : null);
   $('#pane').innerHTML = `<div class="astack">
+    ${weeklyPanel()}
     <div class="noprint" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:12.5px;color:var(--muted)">Data through ${monthLabel(a.through)}. Growth compares ${anaCmpText(a)}.</span><button class="btn sm" type="button" data-print="1">Print this page</button></div>
     <section class="tiles" aria-label="Headline figures">
       ${anaTile('Sales, last 12 months', moneyK(s.t12), s.growth == null ? '' : aDelta(s.growth) + ' growth', '', 'Retail sales, with special orders filed in a category.')}
