@@ -119,7 +119,7 @@ function render(){
     return;
   }
   derive();
-  if (!PAGES[TAB]) TAB = 'summary';
+  if (!PAGES[TAB]) TAB = FIRST_TAB;
   const S = stats(), bar = TAB === 'overview' || TAB === 'orders';
   $('.monthbar').hidden = !bar; $('#summary').hidden = TAB !== 'overview'; $('#kpis').hidden = TAB !== 'overview';
   if (bar) renderMonths();
@@ -230,6 +230,7 @@ document.addEventListener('click', async e => {
   if (t.id === 'upRead') return readReports();
   if (t.id === 'upApply') return applyReports();
   if (t.id === 'upReset'){ upReset(); return render(); }
+  if (t.id === 'upUndo') return undoLastImport();
   if (t.id === 'iPrev') return previewImport();
   if (t.id === 'iGo') return runImport();
   if (D){

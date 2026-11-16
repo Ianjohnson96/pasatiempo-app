@@ -24,6 +24,8 @@ function checklistHTML(key, items){
   const chk = CHECKS[key] || {items: {}};
   return `<ul class="checks">${items.map(x => { const on = !!(chk.items && chk.items[x.k]); return `<li><label><input type="checkbox" data-chk="${esc(x.k)}" data-chkm="${esc(key)}" ${on ? 'checked' : ''} ${canAct() ? '' : 'disabled'}><span><b>${esc(x.t)}</b><span class="d">${esc(x.d)}</span>${on && chk.by && chk.by[x.k] ? `<span class="who">✓ <span class="person" data-uid="${esc(chk.by[x.k])}"></span></span>` : ''}</span></label></li>`; }).join('')}</ul>`;
 }
+/* The owner's way in to the month-end upload: shown while a monthly checklist is due and its reports aren't uploaded. */
+const upNeeded = a => typeof ownerHere === 'function' && ownerHere() && a.some(x => x.p.cadence === 'monthly' && !((CHECKS[x.p.key] || {}).items || {}).send);
 function renderDueBar(){
   let bar = $('#duebar');
   if (!bar){ bar = document.createElement('div'); bar.id = 'duebar'; bar.className = 'banner duebar'; bar.hidden = true; $('#wibar').before(bar); }
@@ -32,7 +34,7 @@ function renderDueBar(){
   if (bar.hidden) return;
   const late = a.some(x => x.status === 'overdue');
   bar.classList.toggle('late', late);
-  bar.innerHTML = `<span>${a.map(x => `<b>${esc(x.p.label)}</b> ${x.status === 'overdue' ? 'is overdue' : x.p.due === RPT.today ? 'is due today' : 'is due'} (${x.left} left)`).join(' · ')}${a.some(x => x.p.cadence === 'monthly' && x.p.due === RPT.today && !((CHECKS[x.p.key] || {}).items || {}).sku) ? '. Run the SKU Analysis today: on-hand can\'t be recreated later.' : ''}</span><button class="btn sm" type="button" data-tab="reports">Open Reports</button>`;
+  bar.innerHTML = `<span>${a.map(x => `<b>${esc(x.p.label)}</b> ${x.status === 'overdue' ? 'is overdue' : x.p.due === RPT.today ? 'is due today' : 'is due'} (${x.left} left)`).join(' · ')}${a.some(x => x.p.cadence === 'monthly' && x.p.due === RPT.today && !((CHECKS[x.p.key] || {}).items || {}).sku) ? '. Run the SKU Analysis today: on-hand can\'t be recreated later.' : ''}</span>${upNeeded(a) ? '<button class="btn sm primary" type="button" data-tab="monthend">Upload reports</button>' : ''}<button class="btn sm" type="button" data-tab="reports">Open Reports</button>`;
 }
 function renderReports(){
   if (!RPT){ $('#pane').innerHTML = `<section class="panel"><div class="note">The reports calendar is part of the club app.</div></section>`; return; }
@@ -40,7 +42,8 @@ function renderReports(){
   open.sort((a, b) => order[a.status] - order[b.status] || a.p.due.localeCompare(b.p.due));
   const panel = x => `<section class="panel"><header><h2>${esc(x.p.label)}</h2><span class="rstat ${x.status}">${esc(rptWhen(x))}</span></header>
     <div class="note" style="padding-bottom:0">${esc(RPT.cadences[x.p.cadence] || '')} · ${x.p.items.length - x.left} of ${x.p.items.length} done</div>
-    ${checklistHTML(x.p.key, x.p.items)}</section>`;
+    ${checklistHTML(x.p.key, x.p.items)}
+    ${x.p.cadence === 'monthly' && upNeeded([x]) ? '<div style="padding:0 16px 14px"><button class="btn primary" type="button" data-tab="monthend">Upload this month\'s reports</button></div>' : ''}</section>`;
   $('#pane').innerHTML = `<div class="grid">
     <div class="stack">${open.length ? open.map(panel).join('') : '<section class="panel"><div class="note">Nothing is due right now.</div></section>'}</div>
     <div class="stack">

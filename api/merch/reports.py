@@ -4,7 +4,10 @@ Runs on Vercel's Python runtime (the report readers are Python: merchandise/pipe
 owner's page first asks the Next.js app for a pass and last month's documents
 (POST /merch/api/refresh), then posts them here with the report files:
 
-  {"ticket": "...", "prior": {path: data}, "note": "...", "files": [{"name": "...", "data": "<base64>"}]}
+  {"ticket": "...", "note": "...", "files": [{"name": "...", "data": "<base64>"}]}
+
+Last month's documents (the forecast base, SKU history, stock snapshot, brand and subcategory
+assignments) are read here from the database (fetch_prior); an older page may still send them as "prior".
 
 and gets back {"bundle": ..., "summary": ..., "files": [...]}. With "rebuild": "brands" and no files, it
 rebuilds only the brand scorecard from the stored documents (Brands -> Update brands). Nothing is saved here: the page
@@ -28,6 +31,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, os.path.join(ROOT, 'merchandise', 'pipeline'))
 
 import refresh  # noqa: E402
+
+# Last month's documents the reader builds on (the same set /merch/api/refresh hands the page).
+PRIOR_PATHS = ('base/current', 'plan/assumptions', 'skusnap/current', 'brandmap/current', 'brandin/current', 'submap/current')
 
 MAX_BODY = 4_400_000  # Vercel accepts request bodies up to 4.5 MB
 MAX_FILES = 20
@@ -59,6 +65,39 @@ def check_ticket(ticket, key=None, now=None):
     return claims
 
 
+def fetch_prior():
+    """Last month's documents straight from the database ({path: data}), so the page doesn't carry them
+    in the upload (they grow every month, and the upload is limited to 4.4 MB). None when the
+    database isn't configured here."""
+    import urllib.parse
+    import urllib.request
+    url, key = os.environ.get('NEXT_PUBLIC_SUPABASE_URL'), os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
+    if not url or not key:
+        return None
+    named = ','.join(f'"{p}"' for p in PRIOR_PATHS)
+    q = urllib.parse.urlencode({'select': 'path,data', 'deleted': 'eq.false',
+                                'or': f'(path.in.({named}),path.like.skuhist/*,path.like.subcats/*)'})
+    r = urllib.request.Request(f"{url.rstrip('/')}/rest/v1/docs?{q}",
+                               headers={'apikey': key, 'Authorization': f'Bearer {key}', 'Accept-Profile': 'merch'})
+    with urllib.request.urlopen(r, timeout=20) as res:
+        return {d['path']: d['data'] for d in json.loads(res.read())}
+
+
+def prior_docs(req):
+    """The documents a request builds on: the page's copy if it sent one (older pages), else the database's."""
+    if isinstance(req.get('prior'), dict):
+        return req['prior']
+    try:
+        return fetch_prior() or {}
+    except Exception:
+        traceback.print_exc()
+        raise PriorUnavailable()
+
+
+class PriorUnavailable(Exception):
+    pass
+
+
 def run(req):
     """(status, response body) for one request body (already parsed JSON)."""
     if not isinstance(req, dict):
@@ -67,7 +106,7 @@ def run(req):
     if not claims:
         return 401, {'error': 'Your upload pass has expired. Reload the page and try again.'}
     if req.get('rebuild') == 'brands':  # Brands -> Update brands: no reports, just the stored documents
-        docs = req.get('prior') if isinstance(req.get('prior'), dict) else {}
+        docs = prior_docs(req)
         try:
             bundle, summary = refresh.rebuild_brands(docs)
         except ValueError as e:
@@ -86,7 +125,7 @@ def run(req):
             decoded.append((f['name'][:200], base64.b64decode(f['data'], validate=True)))
         except ValueError:
             return 400, {'error': f"{f['name'][:200]} didn't upload cleanly. Try again."}
-    docs = req.get('prior') if isinstance(req.get('prior'), dict) else {}
+    docs = prior_docs(req)
     prior = refresh.prior_from_docs(docs)
     note = req.get('note')
     notes = [note.strip()[:200]] if isinstance(note, str) and note.strip() else []
@@ -127,6 +166,8 @@ class handler(BaseHTTPRequestHandler):
             return self._send(400, {'error': "That upload wasn't understood."})
         try:
             status, body = run(req)
+        except PriorUnavailable:
+            status, body = 503, {'error': "Last month's data couldn't be loaded. Try again in a minute."}
         except Exception:
             traceback.print_exc()
             status, body = 500, {'error': "The reports couldn't be read. Check they are this month's POS reports and try again."}

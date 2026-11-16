@@ -39,7 +39,7 @@ function renderForecast(){
   const k = (lab, v, sub, expl) => `<div class="kpi"><div class="lab">${lab}</div><div class="v num">${v}</div><div class="s">${sub}</div><div class="x">${expl}</div></div>`;
   const kpis = k(`${fyLabel(fy)} sales forecast`, moneyK(f1), `${pct(f1 / l1 - 1)} vs ${fyLabel(fy - 1)}`, `Actual through ${monthLabel(BASE.actualThrough)}, forecast after. Retail, all categories.`) +
     k('Year to date', moneyK(ytd), `${pct(ytd / ytdLY - 1, 1)} vs last year`, `${monthShort(closed[0] || fyMonths(fy)[0])}–${monthShort(BASE.actualThrough)}, closed months.`) +
-    k('Rest of the year', moneyK(rest), `${pct(rest / restLY - 1)} vs last year`, `Growth assumed ${Math.round(Math.min(...gOpen) * 100)}–${Math.round(Math.max(...gOpen) * 100)}% a month — below the year-to-date pace.`) +
+    k('Rest of the year', moneyK(rest), open.length ? `${pct(rest / restLY - 1)} vs last year` : 'every month closed', open.length ? `Growth assumed ${Math.round(Math.min(...gOpen) * 100)}–${Math.round(Math.max(...gOpen) * 100)}% a month${ytdLY && Math.max(...gOpen) < ytd / ytdLY - 1 ? ' — below the year-to-date pace' : ''}.` : 'The year is closed: every month is actual.') +
     k(`${fyLabel(fy)} gross margin`, moneyK(gm1), `${Math.round(gm1 / f1 * 100)}% of sales`, 'Forecast sales × each category\'s realized margin.') +
     k(`${fyLabel(fy + 1)} sales forecast`, moneyK(f2), `${pct(f2 / f1 - 1)} vs ${fyLabel(fy)}`, 'This year × next year\'s growth by category.') +
     k(`${fyLabel(fy + 1)} gross margin`, moneyK(gm2), `${Math.round(gm2 / f2 * 100)}% of sales`, 'Mix shifts toward the higher-margin categories.');

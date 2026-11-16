@@ -49,7 +49,7 @@ function renderSummary(S){
   if (noRoom.length && s !== 'season'){
     const waits = noRoom.filter(c => seasonBudget(c.code) > 0).map(c => { const f = firstRoomMonth(c.code, k => S.cm(c.code, k)); return `${esc(c.name)}${f ? ' (opens ' + monthShort(f) + ')' : ''}`; });
     const stops = noRoom.filter(c => seasonBudget(c.code) <= 0).map(c => esc(c.name));
-    if (waits.length) lines.push(`<b>Wait before buying:</b> ${waits.join(', ')}. September's stock is still above plan in these, so goods that arrive earlier just sit.`);
+    if (waits.length) lines.push(`<b>Wait before buying:</b> ${waits.join(', ')}. Stock is still above plan in these, so goods that arrive earlier just sit.`);
     if (stops.length) lines.push(`<b>Don't buy in ${PLAN.fy}:</b> ${stops.join(', ')} — already overbought for the whole year.`);
   }
   if (S.arriving && s !== 'season') lines.push(`<b>${money(S.arriving)}</b> of orders are due to arrive in ${monthFull(s)}.`);
@@ -64,7 +64,7 @@ function renderKpis(S){
   $('#kpis').innerHTML =
     k(s === 'season' ? PLAN.fy + ' budget' : `Room through ${monthShort(s)}`, money(S.room), 'at cost', s === 'season' ? `What the plan lets you receive from ${periodTxt(PLAN)}.` : `What the plan lets you receive from ${dateLabel(PLAN.start)} to the end of this month.`) +
     k('Committed', money(S.commit), `${POS.filter(isOpen).length} open orders`, 'Orders arriving in this period, plus anything already received.', `<div class="meter"><i style="width:${S.room > 0 ? Math.min(100, S.commit / S.room * 100) : (S.commit ? 100 : 0)}%;background:${S.commit > S.room ? 'var(--brick)' : 'var(--cypress)'}"></i></div>`) +
-    k('Left to buy', `<span class="${S.left < 0 ? 'neg' : ''}">${money(S.left)}</span>`, `${catsWithRoom} of 15 categories have room`, S.left < 0 ? 'Negative means more is due in than the plan allows by then.' : 'Room minus committed. Spend it where the category list shows room.') +
+    k('Left to buy', `<span class="${S.left < 0 ? 'neg' : ''}">${money(S.left)}</span>`, `${catsWithRoom} of ${catList().filter(c => inOTB(c.code)).length} categories have room`, S.left < 0 ? 'Negative means more is due in than the plan allows by then.' : 'Room minus committed. Spend it where the category list shows room.') +
     k('On hand', money(invTot), `${int(invU)} units · ${dateLabel(INV.asOf)}`, `Stock on the shelf at cost, from the SKU Analysis. ${S.receivedSince ? money(S.receivedSince) + ' received since.' : 'Updated every month-end.'}`) +
     k('On order', money(S.open), S.later ? `+ ${money(S.later)} after ${monthShort(LAST())} ${LAST().slice(0,4)}` : 'not yet received', 'Still to arrive from vendors on open orders.') +
     k('To do', `<span style="color:${crit ? 'var(--brick)' : att.length ? 'var(--ochre)' : 'inherit'}">${att.length}</span>`, `${crit} urgent`, 'Order problems and item suggestions to work through.');

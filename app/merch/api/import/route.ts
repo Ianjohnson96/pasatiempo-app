@@ -8,8 +8,9 @@ export const dynamic = "force-dynamic";
 
 // POST a data file: {kind: "pasatiempo-merch-bundle", docs: {path: data}}.
 // The owner loads month-end documents this way (forecast base, brand
-// scorecard, suggestions, SKU history). Each document replaces the stored one;
-// only the collections in IMPORTABLE are accepted.
+// scorecard, suggestions, SKU history). Each document replaces the stored one,
+// all in one transaction (merch.put_docs), which keeps the replaced documents
+// for Undo last update (./undo); only the collections in IMPORTABLE are accepted.
 export async function POST(request: NextRequest) {
   const me = await getMerchViewer();
   if (!me || me.role !== "owner") return NextResponse.json({ error: "Only the owner can load data." }, { status: 403 });
@@ -31,13 +32,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `${path} is too large.` }, { status: 413 });
   }
   const supa = createAdminClient("merch");
-  let done = 0;
-  for (const [path, data] of entries) {
-    const { error } = await supa.rpc("put_doc", { p_path: path, p_data: data, p_by: me.email, p_if_version: null });
-    if (error) return NextResponse.json({ error: `Stopped at ${path} after ${done} documents. Try again.` }, { status: 503 });
-    done++;
-  }
   const note = typeof (b as { note?: unknown }).note === "string" ? (b as { note: string }).note.slice(0, 200) : null;
-  await logActivity({ actor: me.email, app: "merch", action: "merch.data_loaded", detail: { documents: done, note } });
-  return NextResponse.json({ loaded: done });
+  // One transaction: every document or none, and what each held before is kept for Undo last update.
+  const { data: importId, error } = await supa.rpc("put_docs", { p_docs: Object.fromEntries(entries), p_by: me.email, p_note: note });
+  if (error) return NextResponse.json({ error: "The data couldn't be saved, and nothing was changed. Try again." }, { status: 503 });
+  await logActivity({ actor: me.email, app: "merch", action: "merch.data_loaded", detail: { documents: entries.length, note, importId } });
+  return NextResponse.json({ loaded: entries.length, importId });
 }

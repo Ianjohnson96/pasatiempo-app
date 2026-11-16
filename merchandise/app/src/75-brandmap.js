@@ -255,8 +255,8 @@ async function updateBrands(){
   if (BUP.busy || !window.MERCH_HOST) return;
   BUP.busy = true; render();
   try {
-    const H = window.MERCH_HOST, start = await upJSON(H.base + '/api/refresh');
-    const r = await upJSON('/api/merch/reports', {ticket: start.ticket, prior: start.prior, rebuild: 'brands'});
+    const H = window.MERCH_HOST, start = await upJSON(H.base + '/api/refresh?prior=0');
+    const r = await upJSON('/api/merch/reports', {ticket: start.ticket, rebuild: 'brands'});
     await upJSON(H.base + '/api/import', r.bundle);
     BRANDS = r.bundle.docs['brands/current']; BRANDSKUS = r.bundle.docs['brandskus/current'];
     if (r.bundle.docs['assort/current']) ASSORT = r.bundle.docs['assort/current'];

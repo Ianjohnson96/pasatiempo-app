@@ -24,6 +24,7 @@ function renderMonthEnd(){
   const res = closed.map(k => ({k, act: monthTotal(k), ly: monthLY(k), fc: fcFor(k)}));
   $('#pane').innerHTML = `<div class="grid">
     <div class="stack">
+      ${renderUpload()}
       <section class="panel"><header><h2>Where the data stands</h2><span class="lab">Updated ${dateLabel(BASE.asOf)}</span></header>
         <div class="note" style="font-size:13.5px;color:var(--ink)">
           <p style="margin-top:0">Sales, stock and suggestions are as of <b>${dateLabel(BASE.asOf)}</b>. Closed months run through <b>${monthFull(BASE.actualThrough)} ${BASE.actualThrough.slice(0,4)}</b>${BASE.partial ? `; ${monthFull(BASE.partial.m)} had ${money(BASE.partial.actual)} of sales by day ${BASE.partial.day}` : ''}.</p>
@@ -34,7 +35,6 @@ function renderMonthEnd(){
         <div class="note">Anyone who can log orders can tick these off; everyone sees the same list${RPT ? ', here and on the Reports tab' : ''}. Save each report as Excel if you can (it reads in seconds), PDF otherwise.</div></section>
     </div>
     <div class="stack">
-      ${renderUpload()}
       <section class="panel"><header><h2>What happens at a refresh</h2></header><div class="note" style="font-size:13.5px;color:var(--ink)">
         <ol style="margin:0;padding-left:18px">
           <li>The owner uploads the reports on this page (PDF or Excel) and checks the new numbers before updating.</li>
@@ -46,10 +46,11 @@ function renderMonthEnd(){
         <div style="overflow-x:auto"><table class="mini" style="margin:8px 16px 4px;width:calc(100% - 32px)"><thead><tr><th>Month</th><th class="r">Actual</th><th class="r">Last year</th><th class="r">vs LY</th><th class="r">Forecast</th><th class="r">vs forecast</th></tr></thead>
         <tbody>${res.map(r => `<tr><td>${monthLabel(r.k)}</td><td class="r num">${money(r.act)}</td><td class="r num">${money(r.ly)}</td><td class="r num">${pct(r.act / r.ly - 1)}</td><td class="r num">${r.fc == null ? '—' : money(r.fc)}</td><td class="r num ${r.fc != null && r.act < r.fc ? 'neg' : ''}">${r.fc == null ? '—' : pct(r.act / r.fc - 1)}</td></tr>`).join('')}</tbody></table></div>
         <div class="note">"Forecast" is what the plan expected for the month at the refresh before it. It fills in from the next refresh on.</div></section>
-      <section class="panel"><header><h2>Refresh history</h2></header>
+      <section class="panel"><header><h2>Refresh history</h2>${ownerHere() && UP.last ? `<button type="button" class="btn sm" id="upUndo" ${UP.undoing ? 'disabled' : ''} title="Puts back the program's data from before the update of ${esc(dateLabel(String(UP.last.at).slice(0, 10)))}${UP.last.note ? ' (' + esc(UP.last.note) + ')' : ''}. Deliveries it recorded on orders stay.">${UP.undoing ? 'Undoing…' : 'Undo last update'}</button>` : ''}</header>
         ${hist.length ? `<div style="overflow-x:auto"><table class="mini" style="margin:8px 16px 14px;width:calc(100% - 32px)"><thead><tr><th>Data as of</th><th class="r">Sales YTD</th><th class="r">On hand</th><th class="r">This year budget</th><th class="r">Next year budget</th></tr></thead><tbody>${hist.map(h => `<tr title="${esc((h.notes || []).join(' '))}"><td>${dateLabel(h.asOf)}</td><td class="r num">${moneyK(num(h.ytd))}</td><td class="r num">${moneyK(num(h.onHand))}</td><td class="r num">${moneyK(num(h.otbCur))}</td><td class="r num">${moneyK(num(h.otbNext))}</td></tr>${(h.notes || []).length ? `<tr><td colspan="5" style="font-size:12px;color:var(--muted);border-top:none;padding-top:0">${h.notes.map(esc).join(' · ')}</td></tr>` : ''}`).join('')}</tbody></table></div>` : '<div class="note">No refreshes recorded yet.</div>'}</section>
     </div></div>`;
   fillPeople();
+  loadLastImport();
 }
 async function toggleCheck(m, k, on){
   const cur = CHECKS[m] || {items: {}, by: {}};
@@ -59,13 +60,14 @@ async function toggleCheck(m, k, on){
 
 /* ---------- month-end upload (owner) ----------
    1. POST {base}/api/refresh      a pass for the report reader + last month's documents
-   2. POST /api/merch/reports      the reader (Python) returns a data file and its headline numbers
+   2. POST /api/merch/reports      the reader (Python) reads last month's documents and the files, and returns
+                                   a data file and its headline numbers
    3. POST {base}/api/import       once the owner confirms, the data file replaces the month-end documents */
 const UP = {files: [], note: '', busy: false, applying: false, result: null, error: null, found: null, rcv: null};
 const UP_MAX = 3.2e6;  // raw bytes; base64 adds a third and the reader takes 4.4 MB
 const UP_KINDS = {sku_analysis: 'SKU Analysis', daily_sales: 'Daily Sales Report', best100: 'Cost & margin (BEST 100)', sales_by_category: 'Sales by Category', sales_by_item: 'Sales by Item', rounds: 'Rounds Summary'};
 const ownerHere = () => !!(window.MERCH_HOST && MERCH_HOST.me && MERCH_HOST.me.role === 'owner') && canAct();
-function upReset(){ Object.assign(UP, {files: [], note: '', busy: false, applying: false, result: null, error: null, found: null, rcv: null}); }
+function upReset(){ Object.assign(UP, {files: [], note: '', busy: false, applying: false, result: null, error: null, found: null, rcv: null}); }  // keeps UP.last (Undo last update)
 function upFilesTable(found){
   if (!found || !found.length) return '';
   return `<table class="mini" style="margin:8px 16px 4px;width:calc(100% - 32px)"><thead><tr><th>File</th><th>Read as</th></tr></thead><tbody>${found.map(f => `<tr><td style="word-break:break-all">${esc(f.name)}</td><td>${f.ok ? esc(UP_KINDS[f.kind] || f.kind) + (f.detail ? `<div class="hint">${esc(f.detail)}</div>` : '') : `<span class="neg">${esc(f.note || 'Not used')}</span>`}</td></tr>`).join('')}</tbody></table>`;
@@ -121,13 +123,41 @@ async function readReports(){
   Object.assign(UP, {busy: true, error: null, found: null}); render();
   try {
     const H = window.MERCH_HOST;
-    const start = await upJSON(H.base + '/api/refresh');
+    const start = await upJSON(H.base + '/api/refresh?prior=0');  // the reader reads last month's documents itself
     const files = await Promise.all(UP.files.map(async f => ({name: f.name, data: await fileB64(f)})));
-    UP.result = await upJSON('/api/merch/reports', {ticket: start.ticket, prior: start.prior, note: UP.note, files});
+    UP.result = await upJSON('/api/merch/reports', {ticket: start.ticket, note: UP.note, files});
     const arr = UP.result.bundle && UP.result.bundle.docs && UP.result.bundle.docs['arrivals/' + UP.result.summary.asOf];
     UP.rcv = arr ? matchArrivals(arr) : null;
   } catch (e){ UP.error = e.message; UP.found = e.found || null; }
   UP.busy = false; render();
+}
+/* A month-end upload ticks its reports and "Upload the reports" off the month's checklist. A mid-month
+   upload ticks nothing: the month-end reports are still to come. */
+const UP_TICKS = {sku_analysis: 'sku', daily_sales: 'daily', best100: 'best', rounds: 'rounds'};
+async function tickAfterUpload(r){
+  const s = r.summary || {}, m = String(s.asOf || '').slice(0, 7);
+  if (!m || s.partial || s.actualThrough !== m) return;
+  const mp = typeof rptMonthly === 'function' ? rptMonthly() : null, key = mp && mp.key.slice(0, 7) === m ? mp.key : m;
+  const keys = new Set(['send', ...(r.files || []).filter(f => f.ok && UP_TICKS[f.kind]).map(f => UP_TICKS[f.kind])]);
+  const cur = CHECKS[key] || {items: {}, by: {}}, items = {...(cur.items || {})}, by = {...(cur.by || {})};
+  keys.forEach(k => { if (!items[k]){ items[k] = true; by[k] = myId; } });
+  await write('checklist/' + key, {items, by, month: key});
+}
+/* Undo last update: the latest data load that can be undone (owner only), fetched when Month-end opens. */
+async function loadLastImport(){
+  if (!ownerHere() || UP.lastLoaded) return;
+  UP.lastLoaded = true;
+  try { const r = await fetch(window.MERCH_HOST.base + '/api/import/undo', {credentials: 'same-origin'}); UP.last = (await r.json()).last || null; } catch (_){ UP.last = null; }
+  if (TAB === 'monthend') render();
+}
+async function undoLastImport(){
+  const l = UP.last; if (!l || UP.undoing) return;
+  if (!confirm(`Undo the update of ${dateLabel(String(l.at).slice(0, 10))}? The program's data goes back to what it was before it. Deliveries it recorded on orders stay; change those on the order.`)) return;
+  UP.undoing = true; render();
+  try {
+    await upJSON(window.MERCH_HOST.base + '/api/import/undo', {id: l.id});
+    toast('Update undone. Reloading…'); setTimeout(() => location.reload(), 1000);
+  } catch (e){ UP.undoing = false; toast(e.message); render(); }
 }
 async function applyReports(){
   const r = UP.result; if (!r || UP.applying) return;
@@ -135,6 +165,7 @@ async function applyReports(){
   try {
     await upJSON(window.MERCH_HOST.base + '/api/import', r.bundle);
     const delivered = UP.rcv ? await applyArrivals(UP.rcv) : true;
+    await tickAfterUpload(r).catch(() => {});
     const asOf = r.summary.asOf; upReset(); render();
     toast(delivered ? `Updated to reports as of ${dateLabel(asOf)}. Reloading…` : `Updated to reports as of ${dateLabel(asOf)}, but some deliveries didn't save; record them on the order. Reloading…`);
     setTimeout(() => location.reload(), 1200);
