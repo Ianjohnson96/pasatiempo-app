@@ -319,7 +319,11 @@ def period_text(first, last):
     return f'{MONS[int(first[5:]) - 1]} 1/{first[2:4]}', f'{MONS[m - 1]} {monthrange(y, m)[1]}/{last[2:4]}'
 
 
-def period_label(first, last):
-    """('2026-05', '2026-09') -> 'May 1 – Sep 30, 2026'."""
+def period_label(first, last, day=None):
+    """('2026-05', '2026-09') -> 'May 1 – Sep 30, 2026'. day: the SKU Analysis's latest sale (YYYY-MM-DD), when
+    the reports were run mid-month: the period ends there instead."""
     a, b = period_text(first, last)
-    return f"{a.split('/')[0]}{', 20' + a[-2:] if first[:4] != last[:4] else ''} – {b.split('/')[0]}, 20{b[-2:]}"
+    end = b.split('/')[0]
+    if day and day[:7] == last:
+        end = f"{MONS[int(last[5:]) - 1]} {int(day[8:10])}"
+    return f"{a.split('/')[0]}{', 20' + a[-2:] if first[:4] != last[:4] else ''} – {end}, 20{b[-2:]}"

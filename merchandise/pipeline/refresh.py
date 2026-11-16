@@ -126,7 +126,7 @@ def read_reports(files):
         if per:
             if k in ('sales_by_category', 'best100'):
                 d['period'] = exports.period_text(*per)
-            f['detail'] = exports.period_label(*per) + ' (worked out from the SKU Analysis: the file has no dates)'
+            f['detail'] = exports.period_label(*per, sku.get('day')) + ' (worked out from the SKU Analysis: the file has no dates)'
         else:
             f['detail'] = ('period unknown: the file has no dates and its units match no run of months in the SKU Analysis'
                            + (', so it is kept for the record only' if k == 'sales_by_category' else '')
@@ -228,7 +228,8 @@ def warnings(reports, prior, summary):
         d = datetime.fromisoformat(summary['asOf'])
         out.append(f"These reports run to {d:%b} {d.day}, so {d:%B} stays open: its sales are forecast until the month-end reports "
                    f"come in, and this year's actual sales run through {datetime.fromisoformat(summary['actualThrough'] + '-01'):%B}."
-                   + ('' if reports.get('daily_sales') else ' Add the Daily Sales Report to count the month so far.'))
+                   + (f" Sales so far this month: ${summary['partial']['actual']:,.0f}." if summary.get('partial')
+                      else ' Add the Daily Sales Report or Sales by Category to count the month so far.'))
     if not reports.get('best100'):
         out.append('No cost & margin report (BEST 100): margins stay as they were.')
     if not reports.get('sales_by_item') and not (reports.get('daily_sales') or {}).get('items'):
@@ -239,7 +240,7 @@ def warnings(reports, prior, summary):
     if pb.get('fy') == summary.get('fy') and (pb.get('ytdActual') or 0) > 0 and summary['ytd'] < pb['ytdActual'] * 0.97:
         out.append(f"This year's sales to date come out lower than at the last upload (${pb['ytdActual']:,.0f} -> ${summary['ytd']:,.0f}). "
                    "Check the reports are the latest before updating.")
-    if not reports.get('daily_sales') and not any(model.fytd_by_category([c], int(summary['fy'][2:]), summary['actualThrough']) for c in reports.get('sales_by_category', [])):
+    if not reports.get('daily_sales') and not any(model.fytd_by_category([c], int(summary['fy'][2:]), summary['asOf'][:7]) for c in reports.get('sales_by_category', [])):
         out.append('No Daily Sales Report or Sales by Category (May 1 to date), so this year\'s sales are estimated from the SKU Analysis and prices.')
     if pb.get('fy') and summary.get('fy') and pb['fy'] < summary['fy']:
         out.append(f"{pb['fy']} has closed: its months become last year's sales from the last upload. "
