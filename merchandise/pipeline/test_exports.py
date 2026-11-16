@@ -136,3 +136,11 @@ def test_a_daily_sales_export_stands_in_for_sales_by_item():
     assert any('Sales by Item' in w for w in refresh.warnings(sku_only, None, summary))
     reports, _ = refresh.read_reports([('Daily.csv', csv_bytes(daily_rows())), ('Sku.csv', csv_bytes(sku_rows()))])
     assert not any('Sales by Item' in w for w in refresh.warnings(reports, None, summary))
+
+
+def test_an_export_from_mid_month_leaves_the_month_open():
+    import model
+    rep = dict(as_of='2026-11', day='2026-11-16')
+    assert model.sku_day(rep).isoformat() == '2026-11-16'
+    assert model.sku_day(dict(as_of='2026-11', day='2026-11-29')).isoformat() == '2026-11-30'  # run on the last morning
+    assert model.sku_day(dict(as_of='2026-11')).isoformat() == '2026-11-30'  # a printed one: its month-end
