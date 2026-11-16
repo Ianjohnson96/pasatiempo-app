@@ -110,7 +110,7 @@ function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = fals
 function closeOverlay(){ $('#overlay').innerHTML = ''; D = null; DX = null; }
 
 /* ---------- render + mode ---------- */
-const PAGES = {summary: renderSummaryPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, otb: renderOTB, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
+const PAGES = {summary: renderSummaryPage, mgmt: renderMgmt, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, otb: renderOTB, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
 if (location.hash === '#reports' && RPT){ TAB = 'reports'; history.replaceState(null, '', location.pathname + location.search); }  // the reminder email's link
 function render(){
   if (!BASE && !LEGACY_PLAN){
@@ -264,6 +264,7 @@ document.addEventListener('input', e => {
   if (t.id === 'fQ'){ filt.q = t.value; clearTimeout(document._q); document._q = setTimeout(() => { render(); const f = $('#fQ'); if (f){ f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 250); return; }
   if (t.dataset.cb != null || t.dataset.cc != null) return countTotalsUI();
   if (t.id === 'upNote'){ UP.note = t.value; return; }
+  if (t.id === 'upWeek'){ UP.week = t.value; return; }
   if (t.id === 'bmQ'){ BM.q = t.value; clearTimeout(document._bmq); document._bmq = setTimeout(() => { openBrandMap(); const f = $('#bmQ'); if (f){ f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 250); return; }
   if (t.id === 'ssQ'){ SS.q = t.value; clearTimeout(document._ssq); document._ssq = setTimeout(() => { openSortSkus(); const f = $('#ssQ'); if (f){ f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 250); return; }
   if (t.id === 'beQ'){ BE.q = t.value; clearTimeout(document._beq); document._beq = setTimeout(() => { openBrandList(); const f = $('#beQ'); if (f){ f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 250); return; }
@@ -342,8 +343,10 @@ render(); applyMode();
     subcats: () => coll('subcats', v => SUBCATS = v, 'subcats'),
     counts: () => coll('counts', v => COUNTS = v, 'counts'),
     istate: () => coll('istate', v => ISTATE = Object.fromEntries(v.map(x => [x.id, x])), 'istate'),
-    adj27: () => coll('plan/fy27/adjustments', v => ADJS.fy27 = v, 'adj27'),
-    adj28: () => coll('plan/fy28/adjustments', v => ADJS.fy28 = v, 'adj28'),
+    // budget changes, by fiscal year (plan/fyNN/adjustments, adjKey in 20-engine.js): last year's to three years on
+    ...Object.fromEntries([-1, 0, 1, 2, 3].map(i => fyOf(THIS_MONTH) + i).map(fy => { const k = 'fy' + String(fy).slice(-2);
+      return ['adj' + k, () => coll(`plan/${k}/adjustments`, v => ADJS[k] = v, 'adj' + k)]; })),
+    pulse: () => coll('pulse', v => PULSES = v, 'pulse'),
     assume: () => db.doc('plan/assumptions').onSnapshot(s => { SAVED = s.exists ? s.data() : null; live(); }, onErr('assume')),
     base: () => db.doc('base/current').onSnapshot(s => { if (s.exists) BASE = s.data(); live(); }, onErr('base')),
     brands: () => db.doc('brands/current').onSnapshot(s => { if (s.exists) BRANDS = s.data(); live(); }, onErr('brands')),

@@ -484,6 +484,23 @@ td.h-bad{background:color-mix(in srgb,var(--tint-stop) 90%,transparent);color:va
   table.fc.rt tr.tot{background:var(--sunk)}
 }
 @media (max-width:440px){table.rt tr{grid-template-columns:minmax(0,1fr)}}
+/* management report (37-mgmt.js): one Letter page in print */
+.mg-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;border-bottom:2px solid var(--band);padding-bottom:8px;margin-bottom:12px}
+.mg-head h2{margin:2px 0 0;font-size:22px}.mg-asof{font-size:12.5px;color:var(--muted);text-align:right;line-height:1.5}
+.mg-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin:14px 0}
+.mg-cats td,.mg-cats th{padding:5px 6px}.mg-cats{width:calc(100% - 16px);margin:6px 8px 10px}
+.mg-watch{margin:8px 0 12px;padding:0 16px 0 34px;font-size:13.5px;line-height:1.5}.mg-watch li{margin:4px 0}.mg-do{color:var(--muted)}
+.mg-foot{font-size:11.5px;color:var(--muted);margin-top:10px}
+@media (max-width:900px){.mg-two{grid-template-columns:minmax(0,1fr)}}
+@media print{@page{size:letter;margin:.4in}
+  .mgmt{font-size:11px}.mgmt .tiles{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px}.mgmt .tile{padding:7px 9px}.mgmt .tile .v{font-size:19px}
+  .mgmt .mg-two{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:8px;margin:8px 0}.mgmt .ccard,.mgmt .panel{box-shadow:none;margin:0}
+  .mgmt .mg-cats td,.mgmt .mg-cats th{padding:2px 4px;font-size:10px}.mgmt .mg-watch{font-size:10.5px;margin:4px 0 6px}.mgmt .mg-foot{font-size:9px}
+  .mgmt svg{max-width:100%;height:auto}.top,#pageSub{display:none!important}
+  .mgmt,.mgmt *{box-sizing:border-box}.mgmt .panel,.mgmt .ccard{overflow:hidden;max-width:100%}.mgmt .panel header .lab{display:none}.mgmt table.mg-cats{width:100%!important;margin:4px 0!important}
+  .mgmt .tile .x,.mgmt .tipi{display:none!important}.mgmt .tile .gr{margin-top:3px}.mgmt .panel header{padding:6px 10px}.mgmt .ccard{padding:8px 10px}.mgmt .mg-head{margin-bottom:6px;padding-bottom:4px}.mgmt .mg-head h2{font-size:18px}
+  .mgmt table.rt{display:table!important;width:100%}.mgmt table.rt thead{display:table-header-group!important}.mgmt table.rt tbody{display:table-row-group!important}
+  .mgmt table.rt tr{display:table-row!important;padding:0;border:0}.mgmt table.rt td{display:table-cell!important}.mgmt table.rt td::before{content:none!important}}
 @media print{body{padding:0;background:#fff}.band,.tabs,.subnav,.top .actions,#banner,#wibar,#duebar,.noprint{display:none!important}.ccard,.tiles,.panel{break-inside:avoid}}
 @media (max-width:760px){.band-in{min-height:58px;gap:10px}.back{padding:0 12px 0 8px}.brandmark .k{display:none}.brandmark .t{font-size:16px}.acctbtn .nm{display:none}.acctbtn{padding:0 8px 0 4px}}
 @media (max-width:640px){.atbl td:first-child,.atbl th:first-child{min-width:0;max-width:46vw;white-space:normal}.atbl tr.asub td:first-child{padding-left:18px}

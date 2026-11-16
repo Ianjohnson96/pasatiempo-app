@@ -58,8 +58,9 @@ let PLAN = FALLBACK.plan, INV = FALLBACK.inventory, INS = FALLBACK.insights;
 let ADJ = [], POS = [], VENDORS = [], SUBCATS = [], COUNTS = [], ISTATE = {};
 let db = null, userNS = null, canWrite = null, isAdmin = false, myId = null, dbState = 'connecting', readOnly = false;
 let SEL = (() => { try { return localStorage.getItem('ob.month') || null; } catch (_) { return null; } })();
-// The page last open in this browser; the first time, staff (who log orders) start on Orders, everyone else on Summary.
-const FIRST_TAB = window.MERCH_HOST && MERCH_HOST.me && MERCH_HOST.me.role === 'staff' ? 'orders' : 'summary';
+// The page last open in this browser. The first time: staff (who log orders) start on Orders, view-only members (the
+// General Manager, the Director of Golf) on the management report, the owner on Home.
+const FIRST_TAB = (r => r === 'staff' ? 'orders' : r === 'viewer' ? 'mgmt' : 'summary')(window.MERCH_HOST && MERCH_HOST.me && MERCH_HOST.me.role);
 let TAB = (() => { try { return localStorage.getItem('ob.tab2') || localStorage.getItem('ob.tab') || FIRST_TAB; } catch (_) { return FIRST_TAB; } })();
 let filt = {status:'active', cat:'all', q:'', arriving:false}, sort = {key:'deliveryMonth', dir:1};
 let afilt = {kind:'all', showResolved:false, cat:'all'};

@@ -149,3 +149,34 @@ def test_an_export_from_mid_month_leaves_the_month_open():
 def test_a_mid_month_period_ends_at_the_latest_sale():
     assert exports.period_label('2026-05', '2026-11', '2026-11-15') == 'May 1 – Nov 15, 2026'
     assert exports.period_label('2026-05', '2026-11') == 'May 1 – Nov 30, 2026'
+
+
+def test_a_daily_sales_report_on_its_own_is_the_weekly_numbers():
+    from datetime import date
+    # sales area no, area, SKU, description, then today / month to date / year to date ($, units, avg)
+    rows = [cells('7', 'Pro Shop', f'6200{i:02d}', f'Item {i}', 10.0, 1, 10.0, 100.0 * (i + 1), 10, 10.0, 1000.0, 100, 10.0) for i in range(12)]
+    rows.append(cells('7', 'Pro Shop', '010001', 'Green fee', 0.0, 0, 0.0, 5000.0, 10, 500.0, 90000.0, 180, 500.0))
+    data = io_xlsx(rows)
+    cat_of = {f'6200{i:02d}': '620' for i in range(12)} | {'010001': '10'}
+    reports, found = refresh.read_reports([('DSR 11-23.xlsx', data)], cat_of=cat_of, today=date(2026, 11, 24))
+    assert found[0]['ok'] and 'Nov 23, 2026' in found[0]['detail']
+    bundle, summary, warns = refresh.build_pulse(reports, {'base': {'asOf': '2026-11-15'}})
+    p = bundle['docs']['pulse/2026-11-23']
+    assert p['mtd'] == {'620': 7800.0} and p['fytd'] == {'620': 12000.0}  # green fees aren't merchandise
+    assert summary['kind'] == 'pulse' and not warns
+    # no date in the name and none picked: it asks for one
+    _, found = refresh.read_reports([('DSR.xlsx', data)], cat_of=cat_of)
+    assert not found[0]['ok'] and 'date' in found[0]['note']
+    reports, found = refresh.read_reports([('DSR.xlsx', data)], cat_of=cat_of, week='2026-11-22')
+    assert reports['daily_sales']['date'] == '2026-11-22'
+
+
+def io_xlsx(rows):
+    import io
+    import openpyxl
+    wb = openpyxl.Workbook()
+    for r in rows:
+        wb.active.append([v for v, _ in r])
+    b = io.BytesIO()
+    wb.save(b)
+    return b.getvalue()

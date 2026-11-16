@@ -22,6 +22,7 @@ const OWNER_ONLY = new Set([
   "brandskus",
   "brandin",
   "assort",
+  "pulse",
 ]);
 
 // Collections a month-end data file may replace. Everything people enter by
@@ -32,7 +33,8 @@ const OWNER_ONLY = new Set([
 // (brandmap/current) are entered in the program and never come from a data file.
 // brandin/current holds what Brands -> Update brands needs to rebuild the scorecard between uploads.
 // assort/current is the subcategory report; which subcategory a SKU belongs to (submap/current) is set in the program.
-export const IMPORTABLE = new Set(["base", "inventory", "insights", "brands", "refreshes", "skuhist", "skusnap", "arrivals", "brandskus", "brandin", "assort"]);
+// pulse/{date} is a weekly Daily Sales Report on its own: month and year to date by category, between month-ends.
+export const IMPORTABLE = new Set(["base", "inventory", "insights", "brands", "refreshes", "skuhist", "skusnap", "arrivals", "brandskus", "brandin", "assort", "pulse"]);
 
 // Collections the page never needs; kept out of the initial load.
 // remindersSent/{date} marks a day's reminder email as sent (app/api/cron/merch).

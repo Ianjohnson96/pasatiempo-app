@@ -22,7 +22,7 @@ import exports
 import model
 import parse
 import receipts
-from config import CATS, OTB_EXCLUDE, REPLENISH
+from config import CATS, DAILY_NAMES, OTB_EXCLUDE, REPLENISH
 from extract import SHEETS, detect_kind, is_sheet, pdf_text, rows_text, sheet_rows
 
 # plan/assumptions keys the refresh reads: growth by fiscal year (or the older g27/g27cat/g28) and target weeks
@@ -51,10 +51,12 @@ def _day(d):
     return f'{datetime.fromisoformat(d):%b} {int(d[8:10])}, {d[:4]}'
 
 
-def read_reports(files):
+def read_reports(files, cat_of=None, week=None, today=None):
     """files: [(name, path or bytes)]. Returns (reports, found).
     found: one dict per file: name, kind (None if not recognised), ok, a note when it isn't used, and a
-    detail (the period or date it covers) when that's known."""
+    detail (the period or date it covers) when that's known.
+    A Daily Sales export with no SKU Analysis is the weekly numbers: its categories come from cat_of ({sku: category},
+    the stored SKU history) and its date from the file name, else week (YYYY-MM-DD, picked on the page)."""
     reports, found, seen, undated, rounds_undated = {}, [], {}, [], []
     for name, src in files:
         if not name.lower().endswith(('.pdf',) + SHEETS):
@@ -119,6 +121,14 @@ def read_reports(files):
         if k == 'daily_sales':
             if sku and exports.daily_from_sku(d, sku, CATS):
                 f['detail'] = f"month and fiscal year to date, through {_day(d['date'])} (the SKU Analysis's date: the file has no dates)"
+            elif not sku and cat_of:
+                day = exports.date_from_name(f['name'], today or datetime.now().date()) or week
+                if day and exports.daily_from_cats(d, cat_of, CATS, day):
+                    f['detail'] = f"weekly numbers: month and fiscal year to date, through {_day(day)}"
+                else:
+                    del reports[k]
+                    f.update(ok=False, note="Pick the date it was run for (or put it in the file name, e.g. DSR 11-23.xlsx)." if not day else
+                             "Most of its SKUs aren't in the program's SKU history yet, so its sales can't be placed in categories.")
             else:
                 del reports[k]
                 f.update(ok=False, note="The file has no date, and its month-to-date units don't match the SKU Analysis's newest month. "
@@ -149,6 +159,28 @@ def read_reports(files):
         if tot:
             f['detail'] += f", {tot[12]:,} rounds booked"
     return reports, found
+
+
+def build_pulse(reports, prior=None):
+    """The weekly numbers: a Daily Sales Report uploaded without a SKU Analysis. Month and fiscal year to date by
+    category, kept as pulse/{date} beside the month-end data, which it doesn't change. Returns (bundle, summary)."""
+    d = reports['daily_sales']
+    day = d['date']
+    by_code = {c: v for c, v in d['cats'].items() if c in CATS}
+    by_code.update({DAILY_NAMES[n]: v for n, v in d['cats'].items() if n in DAILY_NAMES})  # the PDF names its categories
+    tot = lambda k: {c: round(v['tot'][k], 2) for c, v in by_code.items() if v.get('tot')}
+    pulse = dict(date=day, mtd=tot('mtd'), fytd=tot('fytd'), mtdU=tot('mtd_u'),
+                 report=dict(mtd=round(sum(tot('mtd').values()), 2), fytd=round(sum(tot('fytd').values()), 2)),
+                 at=datetime.now(timezone.utc).isoformat(timespec='seconds'))
+    base = (prior or {}).get('base') or {}
+    summary = dict(kind='pulse', date=day, mtd=pulse['report']['mtd'], fytd=pulse['report']['fytd'], cats=len(pulse['mtd']))
+    bundle = dict(kind='pasatiempo-merch-bundle', version=1, note=f'Weekly numbers through {day}', docs={f'pulse/{day}': pulse})
+    warn = []
+    if base.get('asOf') and day <= base['asOf']:
+        warn.append(f"The month-end data already runs to {_day(base['asOf'])}; these numbers are kept for the weekly history only.")
+    if 'best100' in reports or 'sales_by_category' in reports or 'sales_by_item' in reports or 'rounds' in reports:
+        warn.append('Only the Daily Sales Report is used for the weekly numbers. The other reports need the SKU Analysis with them.')
+    return bundle, summary, warn
 
 
 def load_reports(folder):

@@ -87,18 +87,19 @@ function renderTabs(S){
 }
 // [section id, name, its pages (the first opens when the section is picked)]
 const SECTIONS = [
-  ['home', 'Home', ['summary']],
+  ['home', 'Home', ['summary', 'mgmt']],
   ['plan', 'Plan', ['overview', 'otb', 'forecast']],
   ['buy', 'Orders', ['orders', 'attention', 'vendors']],
   ['assort', 'Assortment', ['scorecard', 'subcats', 'brands', 'stuck', 'trends', 'rounds']],
   ['close', 'Month-end', ['monthend', 'reports', 'inventory', 'help']]
 ];
 const ANALYSIS_TABS = new Set(['summary', 'scorecard', 'rounds', 'trends', 'stuck']);
-const PAGENAME = {summary: 'Home', scorecard: 'Scorecard', rounds: 'Spend per round', trends: 'Trends', stuck: 'Stuck money', brands: 'Brands',
+const PAGENAME = {summary: 'Home', mgmt: 'Management report', scorecard: 'Scorecard', rounds: 'Spend per round', trends: 'Trends', stuck: 'Stuck money', brands: 'Brands',
   overview: 'Budget', otb: 'Open-to-buy', forecast: 'Forecast', orders: 'Orders', attention: 'To do',
   monthend: 'Month-end', reports: 'Checklists', inventory: 'Inventory & counts', subcats: 'Subcategories', help: 'How it works'};
 const TABHEAD = {
   summary: ['Home', 'The shop at a glance: the last 12 months against the year before, and what to do next.'],
+  mgmt: ['Management report', 'One page for the General Manager and the Director of Golf: sales, margin, stock and buying.'],
   scorecard: ['Scorecard', 'Every category and subcategory side by side, graded against the rules of thumb.'],
   rounds: ['Spend per round', 'Shop sales for every round played, member, guest and public.'],
   trends: ['Trends', 'Two years of sales by month, and when the shop sells.'],
