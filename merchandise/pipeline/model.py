@@ -17,7 +17,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from brands import _SEG, brand_of, brand_split, segment_of, is_hat
 from config import (CATS, OTB_EXCLUDE, TARGET_WOS, MARKDOWN, GROWTH_DEFAULT, COMBINED, DAILY_NAMES, SUB_RULES,
-                    SO_KINDS, SO_NOT_RETAIL, SO_GROUP, SO_SHELF, SO_MEMBER, SO_MEMBER_SUBS, SELLS_AS)
+                    SO_KINDS, SO_NOT_RETAIL, SO_GROUP, SO_SHELF, SO_MEMBER, SO_MEMBER_SUBS, SELLS_AS, ROLE_OF, MEMBER_DISCOUNT)
 
 MERCH = set(CATS)
 MON = {'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6, 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12}
@@ -431,6 +431,29 @@ def _window_units(mo, start, days):
     return tot
 
 
+_MD = round(MEMBER_DISCOUNT * 100)
+OVERSTOCK_ACTION = {
+    'fashion': f'Hold reorders. Members already get {_MD}% off, so a markdown has to go past that (40% off ticket), or move it in a member sale.',
+    'impulse': f'Hold reorders on this style. Feature it, bundle it, or mark it down past the member {_MD}%.',
+    'consumable': 'Hold reorders and order smaller and more often.',
+    'hardgoods': 'Hold reorders on this model; replace only the core models that sell, and order the rest for fittings and special orders.',
+}
+
+
+def _aged_action(role, days):
+    """What to do with a SKU that hasn't sold in a year, by the category's role. Soft goods carry the club's logo,
+    so they can't go back to the vendor, and members already get the member discount off them."""
+    if role == 'demo':
+        return 'Sell it off as a used demo and refresh the fleet.'
+    if role in ('hardgoods', 'consumable'):
+        return ('Ask the rep about a return or trade-in on the old model; otherwise mark it down 30–40% or feature it at a fitting day.'
+                if days <= 730 else 'Clear at or below cost, or trade it in with the rep.')
+    if days > 730:
+        return 'Clear at or below cost: a logo item two years old will not sell at full price.'
+    return (f"Logo goods can't go back to the vendor, and members already get {_MD}% off: mark it down past that "
+            '(40–50% off ticket) or move it in a member sale.')
+
+
 def build_insights(ctx, calls):
     """Item-level to-dos. `calls` maps category -> buy / replenish / stop / excluded."""
     as_of, snap, hist, px, sku_gm = ctx['as_of'], ctx['snap'], ctx['hist'], ctx['px'], ctx['sku_gm']
@@ -471,6 +494,9 @@ def build_insights(ctx, calls):
         ls, lr = pos_date(r['last_sale']), pos_date(r['last_rec'])
         aur = px(s) or r['cost'] * 1.8
         call = calls.get(c, 'buy')
+        role = ROLE_OF.get(c, 'fashion')
+        # Balls and gloves are never let run out, even in an overbought category.
+        may_reorder = call in ("buy", "replenish") or role == "consumable"
         oneoff = bool(re.search(r'\(|invitational|tournament|member.?guest|\b2[4-9]\b|ucsc|event', r['desc'], re.I))
         if oh < 0:
             dnu = bool(re.search(r'not use', r['desc'], re.I))
@@ -480,14 +506,14 @@ def build_insights(ctx, calls):
                 ('Find the SKU staff should be using, re-ring or adjust, and deactivate this one in the POS.' if dnu
                  else 'A receipt was never entered or sales are ringing to the wrong SKU. Fix before the next count.'), dict(oh=oh))
             continue
-        if oh == 0 and recent >= 12 and call in ('buy', 'replenish') and not oneoff:
+        if oh == 0 and recent >= 12 and may_reorder and role != 'demo' and not oneoff:
             add('stockout', recent * aur / 100, r, 'Out of stock and still in demand', f"Sold {recent} in {last3_lbl}; none on hand.",
                 'Reorder if it is a continuing item.', dict(recent=recent, oh=0, suggest=max(round(fwk * 9), 1)))
             continue
         if oh <= 0:
             continue
         wos = oh / fwk if fwk > 0 else None
-        if wos is not None and wos < 6 and recent >= 12 and call in ('buy', 'replenish') and not oneoff:
+        if wos is not None and wos < 6 and recent >= 12 and may_reorder and role != 'demo' and not oneoff:
             need = max(round(fwk * 9 - oh), 1)
             add('reorder', (6 - wos) * fwk * aur / 50, r, f"About {max(round(wos), 1)} week{'s' if round(wos) != 1 else ''} of stock left",
                 f"{oh} on hand; selling about {fwk:.1f} a week over the next few months.",
@@ -499,12 +525,12 @@ def build_insights(ctx, calls):
             add('aged', val / 100, r, 'No sale in over a year' + (' — but restocked' if restock else ''),
                 f"{oh} on hand, ${val:,.0f} at cost. Last sold {r['last_sale'] or 'never'}" + (f"; received again {r['last_rec']}." if restock else '.'),
                 ('Stock was added after it stopped selling — check whether that receipt was an error or a return to vendor.' if restock else
-                 ('Clear at or below cost.' if days > 730 else 'Mark down 40–50% or return to vendor.')),
+                 _aged_action(role, days)),
                 dict(oh=oh, value=round(val), daysSinceSale=days if days < 9000 else None))
             continue
-        if wos is not None and wos > 52 and val >= 750 and days <= 365:
+        if wos is not None and wos > 52 and val >= 750 and days <= 365 and role != 'demo':
             add('overstock', val / 150, r, f"{wos:.0f} weeks of supply", f"{oh} on hand (${val:,.0f} at cost) against about {fwk:.1f} sold a week.",
-                'Hold reorders. Consider a feature table or a markdown to move it.', dict(oh=oh, value=round(val), wos=round(wos)))
+                OVERSTOCK_ACTION.get(role, OVERSTOCK_ACTION['fashion']), dict(oh=oh, value=round(val), wos=round(wos)))
     # cost up at the same retail
     for s, b in sku_gm.items():
         r = snap.get(s)
@@ -542,8 +568,12 @@ def call_for(m):
     t12, oh, wks, aged, gmroi, md = m['t12'], m['oh'], m['wks'], m['agedPct'], m['gmroi'], m['md']
     ly, ty = m['ly'], m['ty']
     trend = (ty / ly - 1) if ly >= 10 else None
-    if gmroi is not None and m['seg'] == 'equipment':
+    equip = m['seg'] == 'equipment'
+    if gmroi is not None and equip:
         gmroi *= 2
+    # The shop carries stock clubs, shoes and bags to back fittings and special orders, so a major equipment brand is
+    # carried thinner rather than dropped on slow shelf stock. Drop it only when it has stopped selling or is too small.
+    thinner = ('reduce', 'Carry a thinner shelf: keep a current fitting range and order the rest for fittings and special orders.')
     if oh <= 0:
         if ty >= 12:
             return 'grow', 'Selling with nothing on hand — restock.'
@@ -553,15 +583,15 @@ def call_for(m):
     if oh > 0 and t12 <= 0:
         return 'drop', 'Stock on hand and no sales in 12 months.'
     if gmroi is not None and gmroi < 0.7 and wks is not None and wks >= 50:
-        return 'drop', 'Earns little on the money tied up, with a year or more of stock.'
+        return thinner if equip else ('drop', 'Earns little on the money tied up, with a year or more of stock.')
     if t12 < 1000 and ty < 25:
         return 'drop', 'Too small to carry its own space and orders.'
     if aged > 0.5 and (gmroi or 0) < 1:
-        return 'drop', 'Most of the stock has not sold in a year.'
+        return thinner if equip else ('drop', 'Most of the stock has not sold in a year.')
     if ly == 0 and ty == 0 and oh > 0:
         return 'drop', 'No recent sales.'
     if t12 < 1500 and oh > 900 and ty < 20:
-        return 'drop', 'Small sales against a large stock position.'
+        return thinner if equip else ('drop', 'Small sales against a large stock position.')
     if gmroi is not None and gmroi >= 2.5 and wks is not None and wks <= 16 and (trend is None or trend >= -0.2):
         return 'grow', 'High return on inventory and turning quickly.'
     if (gmroi is not None and gmroi < 1) or (wks is not None and wks > 40) or (md or 0) > 0.30 or \

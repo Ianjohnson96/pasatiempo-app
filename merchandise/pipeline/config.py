@@ -12,6 +12,15 @@ OTB_EXCLUDE = {'640'}
 # Categories bought to replace what sells rather than to a seasonal assortment.
 REPLENISH = {'200', '160', '350'}
 
+# Each category's job in the shop (mirrors ROLE_OF in app/src/17-metrics.js). fashion: logo apparel, judged on
+# sell-through and markdowns; impulse: accessories and hats; consumable: balls and gloves, never run out; hardgoods:
+# stock clubs, shoes and bags that back fittings and special orders; demo: the demo fleet, a fitting tool.
+# All soft goods carry the club's logo (they can't go back to the vendor) and members get 25% off them.
+ROLE_OF = {'400': 'fashion', '430': 'fashion', '470': 'fashion', '480': 'fashion', '490': 'fashion', '500': 'fashion',
+           '440': 'impulse', '620': 'impulse', '660': 'impulse', '160': 'consumable', '320': 'consumable',
+           '200': 'hardgoods', '300': 'hardgoods', '350': 'hardgoods', '220': 'demo', '640': 'special'}
+MEMBER_DISCOUNT = 0.25
+
 # Target weeks of supply at cost for end-of-month inventory.
 TARGET_WOS = {'620': 14, '440': 13, '480': 10, '490': 11, '400': 10, '200': 14, '500': 12, '470': 12, '160': 14,
               '640': 10, '320': 13, '350': 14, '300': 14, '660': 10, '220': 10, '430': 12}

@@ -85,7 +85,7 @@ function renderSummaryPage(){
 /* ---------- Scorecard ---------- */
 function anaRow(M, isSub, open){
   const g = k => grade(k, M[k], M.seg || SHOPSEG, M.cat);
-  const first = isSub ? `<td>${esc(M.name)}</td>` : `<td><span class="caret" aria-hidden="true">▸</span>${esc(M.name)} <span style="color:var(--faint);font-weight:400;font-size:11.5px">${M.subs.length}</span></td>`;
+  const first = isSub ? `<td>${esc(M.name)}</td>` : `<td title="${esc(roleOf(M.cat).name + ': ' + roleOf(M.cat).judge)}"><span class="caret" aria-hidden="true">▸</span>${esc(M.name)} <span style="color:var(--faint);font-weight:400;font-size:11.5px">${M.subs.length}</span><span class="sm" style="display:block;color:var(--muted);font-size:11px;font-weight:400;padding-left:14px">${esc(roleOf(M.cat).name)}</span></td>`;
   return `<tr class="${isSub ? 'asub' : 'acat' + (open ? ' open' : '')}" ${isSub ? '' : `data-anacat="${esc(M.cat)}" tabindex="0" aria-expanded="${open}"`}>${first}
     <td class="r num">${money(M.t12)}</td><td class="r num ${M.growth == null ? '' : M.growth >= 0 ? 'up' : 'dn'}">${aChg(M.growth)}</td><td class="r num ${M.trend3 == null ? '' : M.trend3 >= 0 ? 'up' : 'dn'}">${aChg(M.trend3)}</td>
     <td><div class="sharebar" title="Sales ${aPct(M.share)} · stock ${aPct(M.stockShare)}"><i class="sb-s" style="width:${Math.min(100, M.share * 250)}%"></i><i class="sb-o" style="width:${Math.min(100, M.stockShare * 250)}%"></i></div><span class="num" style="font-size:11px;color:var(--muted)">${aPct(M.share)} / ${aPct(M.stockShare)}</span></td>
@@ -173,15 +173,15 @@ function renderStuck(){
   const sug = suggest(a).filter(x => x.page === 'stuck');
   $('#pane').innerHTML = `<div class="astack">
     <section class="tiles">
-      ${anaTile('Over the 16-week target', moneyK(over), 'stock above 16 weeks of sales', '', 'At cost, by category.')}
+      ${anaTile('Over the weeks target', moneyK(over), "stock above each category's weeks target", '', "At cost, by category: 16 weeks for apparel, 20 for accessories and hats, 16 for balls and gloves, 26 for hard goods. The demo fleet isn't judged on weeks.")}
       ${anaTile('Aged stock', moneyK(aged), aPct(a.shop.agedPct) + ' of stock unsold 12+ months', aGrade(grade('agedPct', a.shop.agedPct, SHOPSEG)))}
       ${anaTile('Cash from a 30% markdown', moneyK(cash), 'if the aged stock sold at 30% off', '', 'Retail value of the aged stock less 30%.')}
       ${anaTile('Lines to reorder', st.reorder.length, 'under 4 weeks of supply and selling')}
     </section>
     <section class="panel"><header><h2>Where it's stuck</h2><span class="lab">At cost</span></header>
-      <div style="padding:10px 16px 0">${chLegend([{name: 'Over the 16-week target', k: 2}, {name: 'Aged 12+ months', k: 1}])}</div>
+      <div style="padding:10px 16px 0">${chLegend([{name: 'Over the weeks target', k: 2}, {name: 'Aged 12+ months', k: 1}])}</div>
       <div class="atbl"><table style="min-width:640px"><thead><tr><th><span class="h">Category</span></th><th class="r"><span class="h">On hand</span></th><th class="r"><span class="h">Weeks</span></th><th class="r"><span class="h">Over target</span></th><th class="r"><span class="h">Aged</span></th><th style="width:34%"><span class="h">&nbsp;</span></th></tr></thead>
-      <tbody>${byCat.map(x => `<tr class="acat" data-anaopen="${esc(x.c.cat)}"><td>${esc(x.c.name)}</td><td class="r num">${money(x.c.oh)}</td><td${aHeat(grade('wks', x.c.wks, x.c.seg))}>${aWk(x.c.wks)}</td><td class="r num">${money(x.over)}</td><td class="r num">${money(x.aged)}</td><td><div style="display:grid;gap:3px" data-cvt="${esc(x.c.name)}" data-cv="Over target: ${money(x.over)} · Aged: ${money(x.aged)}">${bar(x.over, 2)}${bar(x.aged, 1)}</div></td></tr>`).join('')}</tbody></table></div></section>
+      <tbody>${byCat.map(x => `<tr class="acat" data-anaopen="${esc(x.c.cat)}"><td>${esc(x.c.name)}</td><td class="r num">${money(x.c.oh)}</td><td${aHeat(grade('wks', x.c.wks, x.c.seg, x.c.cat))}>${aWk(x.c.wks)}</td><td class="r num">${money(x.over)}</td><td class="r num">${money(x.aged)}</td><td><div style="display:grid;gap:3px" data-cvt="${esc(x.c.name)}" data-cv="Over target: ${money(x.over)} · Aged: ${money(x.aged)}">${bar(x.over, 2)}${bar(x.aged, 1)}</div></td></tr>`).join('')}</tbody></table></div></section>
     <section class="panel"><header><h2>Suggestions</h2><span class="lab">${sug.length} · ranked by dollars</span></header>${anaSugList(sug)}</section>
     <div class="ccols">
       <section class="panel"><header><h2>Markdown candidates</h2><span class="lab">Aged stock by subcategory</span></header><div class="atbl"><table style="min-width:480px"><thead><tr><th><span class="h">Subcategory</span></th><th class="r"><span class="h">Aged</span></th><th class="r"><span class="h">Aged share</span></th><th class="r"><span class="h">Cash at 30% off</span></th></tr></thead>

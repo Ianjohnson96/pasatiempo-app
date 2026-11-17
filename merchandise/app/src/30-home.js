@@ -11,7 +11,7 @@ function orderAlerts(S){
   for (const c of catList()){
     if (!inOTB(c.code)) continue;
     const used = S.cm(c.code, LAST()), bud = seasonBudget(c.code);
-    if (bud <= 0 && used > 0) out.push({id:'o-stop-'+c.code, kind:'order', sev:'crit', cat:c.code, title:`${c.name}: ordering into an overbought category`, detail:`${money(used)} committed; the plan already holds ${money(-bud)} too much.`, action:'Only order against a customer commitment.'});
+    if (bud <= 0 && used > 0) out.push({id:'o-stop-'+c.code, kind:'order', sev:'crit', cat:c.code, title:`${c.name}: ordering into an overbought category`, detail:`${money(used)} committed; the plan already holds ${money(-bud)} too much.`, action:roleOf(c.code).stop});
     else if (bud > 0 && used > bud) out.push({id:'o-over-'+c.code, kind:'order', sev:'crit', cat:c.code, title:`${c.name}: over the ${PLAN.fy} budget by ${money(used - bud)}`, detail:`${money(used)} committed against ${money(bud)}.`, action:'Trim or push out an order, or change the budget with a reason.'});
     else if (bud > 0 && used > bud * .85) out.push({id:'o-near-'+c.code, kind:'order', sev:'warn', cat:c.code, title:`${c.name}: ${Math.round(used/bud*100)}% of the ${PLAN.fy} budget used`, detail:`${money(bud - used)} left through ${monthLabel(LAST())}.`, action:'Save what is left for proven reorders.'});
   }
