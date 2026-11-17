@@ -95,6 +95,8 @@ function writeError(e){
   if (c === 'invalid_argument' && canWrite !== true){ readOnly = true; applyMode(); toast('Your access is view-only. Ask the owner to make you a Contributor.'); }
   else if (c === 'invalid_argument') toast('That change isn\'t allowed for your access level. Budget changes are for the owner.');
   else if (c === 'quota_exceeded') toast('The order book is full. Download a CSV, then delete old received or cancelled orders.');
+  else if (c === 'too_large') toast('That didn\'t save: the record has grown too large to store. Tell the owner, so it can be split.');
+  else if (c === 'conflict') toast('Someone else kept changing this at the same time, so your change didn\'t save. Their version is showing — make yours again.');
   else if (c === 'revoked'){ readOnly = true; applyMode(); toast('Access to this page changed. Reload to continue.'); }
   else toast('That didn\'t save. Check your connection and try again.');
 }
@@ -342,8 +344,10 @@ render(); applyMode();
     subcats: () => coll('subcats', v => SUBCATS = v, 'subcats'),
     counts: () => coll('counts', v => COUNTS = v, 'counts'),
     istate: () => coll('istate', v => ISTATE = Object.fromEntries(v.map(x => [x.id, x])), 'istate'),
-    adj27: () => coll('plan/fy27/adjustments', v => ADJS.fy27 = v, 'adj27'),
-    adj28: () => coll('plan/fy28/adjustments', v => ADJS.fy28 = v, 'adj28'),
+    // Budget changes for last year through two years out (fiscal years end in April), so the plan year and the year
+    // after it are always loaded whatever year it is: plan/fy27/adjustments, plan/fy28/adjustments, …
+    ...Object.fromEntries((() => { const d = new Date(), fy = d.getFullYear() + (d.getMonth() >= 4 ? 1 : 0);
+      return [fy - 1, fy, fy + 1, fy + 2].map(y => { const k = 'fy' + String(y).slice(-2); return ['adj' + k.slice(2), () => coll(`plan/${k}/adjustments`, v => ADJS[k] = v, 'adj' + k.slice(2))]; }); })()),
     assume: () => db.doc('plan/assumptions').onSnapshot(s => { SAVED = s.exists ? s.data() : null; live(); }, onErr('assume')),
     base: () => db.doc('base/current').onSnapshot(s => { if (s.exists) BASE = s.data(); live(); }, onErr('base')),
     brands: () => db.doc('brands/current').onSnapshot(s => { if (s.exists) BRANDS = s.data(); live(); }, onErr('brands')),
