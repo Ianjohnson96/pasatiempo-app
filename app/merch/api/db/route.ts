@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getMerchViewer } from "@/lib/merch/auth";
-import { canWrite, isDocPath, MAX_DOC_BYTES, NOT_LOADED, topCollection } from "@/lib/merch/rules";
+import { canWrite, docBytes, docProblem, isDocPath, MAX_DOC_BYTES, NOT_LOADED, topCollection } from "@/lib/merch/rules";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +28,10 @@ export async function GET(request: NextRequest) {
   for (let after = since; ; ) {
     // Tombstones are included even on the first load: one written mid-read
     // must still reach the browser, or it would keep the deleted document.
-    const { data, error } = await supa.from("docs").select("path, data, deleted, version, rev").gt("rev", after).order("rev").limit(PAGE);
+    // Collections the page never needs (skuhist is most of the data) are left out in the query, not after it.
+    let q = supa.from("docs").select("path, data, deleted, version, rev").gt("rev", after);
+    for (const c of NOT_LOADED) q = q.not("path", "like", `${c}/%`);
+    const { data, error } = await q.order("rev").limit(PAGE);
     if (error) return NextResponse.json({ error: "unavailable" }, { status: 503 });
     const page = (data ?? []) as DocRow[];
     docs.push(...page);
@@ -60,8 +63,10 @@ export async function POST(request: NextRequest) {
   const data = body.data ?? null;
   if (data !== null && (typeof data !== "object" || Array.isArray(data)))
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
-  if (data !== null && JSON.stringify(data).length > MAX_DOC_BYTES)
+  if (data !== null && docBytes(data) > MAX_DOC_BYTES)
     return NextResponse.json({ error: "too_large" }, { status: 413 });
+  const problem = docProblem(path, data);
+  if (problem) return NextResponse.json({ error: "bad_request", detail: problem }, { status: 400 });
   const ifVersion = Number.isInteger(body.ifVersion) ? (body.ifVersion as number) : null;
   const { data: rows, error } = await createAdminClient("merch").rpc("put_doc", {
     p_path: path,

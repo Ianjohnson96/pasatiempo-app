@@ -95,6 +95,7 @@ function writeError(e){
   if (c === 'invalid_argument' && canWrite !== true){ readOnly = true; applyMode(); toast('Your access is view-only. Ask the owner to make you a Contributor.'); }
   else if (c === 'invalid_argument') toast('That change isn\'t allowed for your access level. Budget changes are for the owner.');
   else if (c === 'quota_exceeded') toast('The order book is full. Download a CSV, then delete old received or cancelled orders.');
+  else if (c === 'bad_data') toast('That didn\'t save: ' + (e.message || 'something in it isn\'t valid') + '. Check the highlighted entry and try again.');
   else if (c === 'too_large') toast('That didn\'t save: the record has grown too large to store. Tell the owner, so it can be split.');
   else if (c === 'conflict') toast('Someone else kept changing this at the same time, so your change didn\'t save. Their version is showing — make yours again.');
   else if (c === 'revoked'){ readOnly = true; applyMode(); toast('Access to this page changed. Reload to continue.'); }

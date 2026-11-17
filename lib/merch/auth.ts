@@ -17,10 +17,16 @@ export async function getMerchViewer(): Promise<MerchViewer | null> {
   return p && role ? { email: p.email, name: p.name, role } : null;
 }
 
-/** Display names for everyone in the hub, for showing who entered what. */
+/** Display names for the people who have the Merchandise Program (its members and the super admins), for showing
+ *  who entered what. Nobody else in the hub is sent to the page. Someone who has since lost access shows by email. */
 export async function memberNames(): Promise<Record<string, string>> {
-  const { data } = await createHubClient().from("people").select("email, name");
-  return Object.fromEntries((data ?? []).map((m) => [m.email, m.name]));
+  const hub = createHubClient();
+  const [{ data: people }, { data: access }] = await Promise.all([
+    hub.from("people").select("email, name, super_admin"),
+    hub.from("access").select("email").eq("app", "merch"),
+  ]);
+  const members = new Set((access ?? []).map((a) => a.email));
+  return Object.fromEntries((people ?? []).filter((m) => m.super_admin || members.has(m.email)).map((m) => [m.email, m.name]));
 }
 
 /**

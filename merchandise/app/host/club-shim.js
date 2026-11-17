@@ -29,7 +29,8 @@
   }
   function start(){
     if (!loaded) loaded = pull().then(() => {
-      setInterval(() => pull().catch(e => { if (e.code === 'revoked') location.reload(); }), POLL_MS);
+      // No polling while the tab is hidden; it catches up as soon as it's shown again (visibilitychange below).
+      setInterval(() => { if (!document.hidden) pull().catch(e => { if (e.code === 'revoked') location.reload(); }); }, POLL_MS);
     }, e => { loaded = null; throw e; });
     return loaded;
   }
@@ -60,6 +61,7 @@
       catch (_){ throw err('unavailable'); }
       if (r.status === 401) throw err('revoked');
       if (r.status === 413) throw err('too_large');
+      if (r.status === 400){ let j = null; try { j = await r.json(); } catch (_) {} if (j && j.detail) throw err('bad_data', j.detail); }
       if (r.status === 403 || r.status === 400) throw err('invalid_argument');
       if (r.status === 409){
         if (attempt >= 3) throw err('conflict');
