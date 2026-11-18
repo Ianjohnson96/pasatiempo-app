@@ -32,7 +32,7 @@ const openAttention = S => allAttention(S).filter(i => !i.state);
 const DECIDE = {cut: 'Cut orders', cancel: 'Cancel or confirm', chase: 'Chase', push: 'Push out', reorder: 'Reorder', markdown: 'Mark down', hold: 'Hold buying', fix: 'Fix'};
 function topDecisions(S, n = 6){
   const out = [];
-  for (const i of openAttention(S)){
+  for (let i of openAttention(S)){
     let verb = null, usd = 0, page = null;
     if (i.kind === 'order'){
       const t = i.id.split('-')[1];
@@ -45,6 +45,8 @@ function topDecisions(S, n = 6){
       else if (i.kind === 'overstock'){ verb = 'hold'; usd = num(m.value); }
       else if (i.kind === 'margin'){ verb = 'fix'; usd = num(m.exposure); }
     }
+    // Cutting orders already placed: say what to do with them, then the category's rule for new ones.
+    if (verb === 'cut') i = {...i, action: `Trim or cancel the open orders before their cancel dates. After that: ${i.action}`};
     if (verb && usd >= 250) out.push({...i, verb, usd, page});
   }
   const a = typeof anaNow === 'function' ? anaNow() : null;
