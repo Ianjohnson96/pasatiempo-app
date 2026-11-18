@@ -157,7 +157,7 @@ function renderImpactIn(p){
       <div class="ln"><span>Already committed</span><span>${money(before)}</span></div>
       <div class="ln"><span>This order</span><span>${money(mine)}</span></div>
       <div class="ln b"><span>Left after this order</span><span class="${left < 0 ? 'neg' : ''}">${money(left)}</span></div></div>
-      ${season <= 0 ? `<div class="warnbox crit">${esc(c.name)} is already overbought for ${PLAN.fy}. Only order against a customer commitment.</div>` : left < 0 ? `<div class="warnbox crit">This takes ${esc(c.name)} over its ${PLAN.fy} budget by ${money(-left)}.</div>` : ''}
+      ${season <= 0 ? `<div class="warnbox crit">${esc(c.name)} is already overbought for ${PLAN.fy}. ${esc(roleOf(code).stop)}</div>` : left < 0 ? `<div class="warnbox crit">This takes ${esc(c.name)} over its ${PLAN.fy} budget by ${money(-left)}.</div>` : ''}
       ${monthMsg ? `<div class="warnbox ${/^Fits/.test(monthMsg) ? 'good' : /next year/.test(monthMsg) ? 'info' : ''}">${monthMsg}</div>` : ''}`;
   }
   box.innerHTML = html + warns.map(w => `<div class="warnbox ${w[0]}">${esc(w[1])}</div>`).join('');

@@ -13,7 +13,7 @@ function openCategory(code){
     return `<tr ${k === selMonth() ? 'style="background:var(--sunk)"' : ''}><td>${monthLabel(k)}</td><td class="r num">${money(mp)}</td><td class="r num">${money(room)}</td><td class="r num">${money(used)}</td><td class="r num ${room - used < 0 ? 'neg' : ''}">${money(room - used)}</td></tr>`; }).join('');
   $('#overlay').innerHTML = `<div class="scrim" data-close="1"></div>
   <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="cTitle">
-    <header><div><div class="lab">Category ${code}</div><h2 id="cTitle">${esc(c.name)} <span class="chip ${c.call}" style="vertical-align:middle">${CALLTXT[c.call]}</span></h2><div style="font-size:12.5px;color:var(--muted);margin-top:4px">${CALLHELP[c.call]}</div></div><button class="x" type="button" data-close="1" aria-label="Close">×</button></header>
+    <header><div><div class="lab">Category ${code}</div><h2 id="cTitle">${esc(c.name)} <span class="chip ${c.call}" style="vertical-align:middle">${CALLTXT[c.call]}</span></h2><div style="font-size:12.5px;color:var(--muted);margin-top:4px">${c.call === 'stop' ? 'Already overbought. ' + esc(roleOf(code).stop) : CALLHELP[c.call]}</div><div style="font-size:12px;color:var(--muted);margin-top:2px"><b>${esc(roleOf(code).name)}.</b> ${esc(roleOf(code).judge)}</div></div><button class="x" type="button" data-close="1" aria-label="Close">×</button></header>
     <div class="body">
       ${excluded ? `<div class="warnbox info">Special Orders is outside the open-to-buy. Its orders are logged here for the record, and its stock is still counted in on-hand and aging.</div>` : `
       <div class="sec">How this budget was set</div>

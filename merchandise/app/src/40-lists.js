@@ -69,7 +69,11 @@ function renderAttention(S){
   const rank = {crit:0, warn:1, good:2, info:3};
   list.sort((a,b) => (!!a.state - !!b.state) || (a.kind === 'order' ? -1 : 0) - (b.kind === 'order' ? -1 : 0) || rank[a.sev] - rank[b.sev] || (b.priority || 0) - (a.priority || 0));
   const fc = (k, l) => `<button type="button" class="fchip" data-akind="${k}" aria-pressed="${afilt.kind === k}">${l}<span class="c">${k === 'all' ? Object.values(counts).reduce((a,b) => a + b, 0) : (counts[k] || 0)}</span></button>`;
-  $('#pane').innerHTML = `<section class="panel">
+  const top = topDecisions(S);
+  $('#pane').innerHTML = `${top.length ? `<section class="panel" style="margin-bottom:16px">
+    <header><h2>Most important this week</h2><span class="lab">${top.length} decisions · biggest dollars first</span></header>
+    <div class="note" style="border-bottom:1px solid var(--rule)">The few decisions worth the most money right now, from the order problems, the item list below and the scorecard's suggestions. Mark one Done when you've acted, or Not now to take it off this list; everything stays in the full list.</div>
+    <ul class="items">${top.map(decisionHtml).join('')}</ul></section>` : ''}<section class="panel">
     <header><h2>To do</h2><span class="lab">Item suggestions from the ${dateLabel(INS.asOf)} SKU Analysis · refreshed each month-end</span></header>
     <div class="chips">${fc('all','All')}${Object.keys(KINDS).map(k => fc(k, KINDS[k])).join('')}
       <span style="flex:1"></span><select id="aCat" class="field-inline" aria-label="Category"><option value="all">All categories</option>${catList().map(c => `<option value="${c.code}" ${afilt.cat === c.code ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>

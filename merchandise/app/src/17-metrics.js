@@ -9,12 +9,49 @@
 const BENCH = {
   agedPct: {good: 0.10, near: 0.15, text: 'Aged stock under 10% of stock'},
   md: {good: 0.15, near: 0.20, text: 'Markdowns under 15% of sales'},
-  wks: {lo: 12, hi: 16, nearLo: 8, nearHi: 24, text: '12–16 weeks of supply'},
+  wks: {lo: 12, hi: 16, nearLo: 8, nearHi: 24, text: 'Weeks of supply by role: apparel 12–16, accessories and hats 12–20, balls and gloves 8–16, hard goods 16–26'},
   gmroi: {apparel: 2, accessories: 2, equipment: 1, near: 0.75, text: 'GMROI above 2 for apparel and accessories, above 1 for equipment'},
   turns: {apparel: 2, accessories: 2, equipment: 2, fast: 3, near: 0.75, text: 'Stock turning 2–3 times a year (3–4 for balls and gloves)'},
   gm: {apparel: 0.45, accessories: 0.40, equipment: 0.25, near: 0.05, text: 'Margin: apparel 45%+, accessories 40%+, equipment 25%+'}
 };
 const FAST_TURN = new Set(['160', '320']);   // balls and gloves
+
+/* Each category's job in the shop, and how it is judged. All soft goods carry the club's logo, so they can't go back to
+   the vendor, and members already get 25% off them: a markdown has to go deeper than that to move anything.
+   wks: [lo, hi, nearLo, nearHi] weeks of supply; over: weeks at which "too much stock" is suggested; null = not judged
+   on weeks (the demo fleet is a fitting tool, not stock for sale). Mirrored in pipeline/config.py ROLE_OF. */
+const ROLES = {
+  fashion: {name: 'Fashion apparel', wks: [12, 16, 8, 24], over: 30, share: true,
+    judge: 'Judged on sell-through, markdowns and return on stock. Logo goods can\'t go back to the vendor.',
+    aged: 'Logo goods can\'t go back to the vendor, and members already get 25% off: mark down past that (40% off ticket) or put it in a member sale',
+    heavy: 'Pause orders until it sells down',
+    stop: 'Only order against a customer commitment.'},
+  impulse: {name: 'Accessories & hats', wks: [12, 20, 8, 30], over: 30, share: true,
+    judge: 'Judged on turns and keeping the best styles in stock; cut the long tail, chase the winners.',
+    aged: 'Mark down past the member 25% (40% off ticket), bundle it, or put it on a feature table',
+    heavy: 'Cut the slow styles and colours; keep buying the best sellers',
+    stop: 'Reorder only the best-selling styles; no new lines.'},
+  consumable: {name: 'Balls & gloves', wks: [8, 16, 6, 24], over: 24, share: false,
+    judge: 'Never run out of the core balls and gloves; judged on in-stock and turns.',
+    aged: 'Swap old models with the rep, or sell them by the dozen at a lower price',
+    heavy: 'Order smaller and more often',
+    stop: 'Reorder the core balls and gloves you can\'t run out of; nothing new.'},
+  hardgoods: {name: 'Hard goods', wks: [16, 26, 12, 40], over: 40, share: false,
+    judge: 'Stock clubs, shoes and bags back fittings and special orders: judged on margin dollars and a thin, current shelf.',
+    aged: 'Ask the rep about a return or trade-in on old models; otherwise feature it at a fitting day',
+    heavy: 'Replace only the core models that sell; order the rest for fittings and special orders',
+    stop: 'Order for fittings and special orders, and replace only core models that sell.'},
+  demo: {name: 'Demo fleet', wks: null, over: null, share: false,
+    judge: 'A fitting tool, not stock for sale: keep it current and sell off demos older than a season.',
+    aged: 'Sell off demo clubs older than a season as used, then refresh the fleet',
+    heavy: 'Sell off older demos before adding new ones',
+    stop: 'Refresh the fleet only after selling off older demos.'}
+};
+const ROLE_OF = {'400': 'fashion', '430': 'fashion', '470': 'fashion', '480': 'fashion', '490': 'fashion', '500': 'fashion',
+  '440': 'impulse', '620': 'impulse', '660': 'impulse', '160': 'consumable', '320': 'consumable',
+  '200': 'hardgoods', '300': 'hardgoods', '350': 'hardgoods', '220': 'demo'};
+const roleKey = cat => ROLE_OF[cat] || 'fashion';
+const roleOf = cat => ROLES[roleKey(cat)];
 /** 'neg' (red) when a figure is off the rules of thumb, for the Subcategories and Brands tables: the same cut-offs the
     Scorecard shades by. seg: apparel | accessories | equipment. */
 const offBench = (metric, v, seg, cat) => grade(metric, v, seg, cat) === 'bad' ? 'neg' : '';
@@ -26,7 +63,12 @@ function grade(metric, v, seg, cat){
   if (v == null || !isFinite(v)) return null;
   const b = BENCH[metric];
   if (metric === 'agedPct' || metric === 'md') return v <= b.good ? 'good' : v <= b.near ? 'near' : 'bad';
-  if (metric === 'wks') return v >= b.lo && v <= b.hi ? 'good' : v >= b.nearLo && v <= b.nearHi ? 'near' : 'bad';
+  // Weeks, turns and GMROI don't apply to the demo fleet.
+  if (cat && !roleOf(cat).wks && (metric === 'wks' || metric === 'turns' || metric === 'gmroi')) return null;
+  if (metric === 'wks'){
+    const [lo, hi, nLo, nHi] = cat ? roleOf(cat).wks : [b.lo, b.hi, b.nearLo, b.nearHi];
+    return v >= lo && v <= hi ? 'good' : v >= nLo && v <= nHi ? 'near' : 'bad';
+  }
   if (metric === 'gm') return v >= b[seg] ? 'good' : v >= b[seg] - b.near ? 'near' : 'bad';
   const want = metric === 'turns' && FAST_TURN.has(cat) ? b.fast : b[seg];
   return v >= want ? 'good' : v >= want * b.near ? 'near' : 'bad';
@@ -97,12 +139,13 @@ function seasonality(ana){
   return out;
 }
 
-const target16 = M => M.cogsWk * BENCH.wks.hi;   // stock needed for 16 weeks of shelf sales at the last year's pace
+// Stock needed for the top of the category role's weeks range at the last year's pace (16 weeks for apparel); none for the demo fleet.
+const targetWks = M => { const r = roleOf(M.cat); return r.wks ? M.cogsWk * r.wks[1] : null; };
 /** Stock over target, aged stock, markdown candidates and lines to reorder. Subcategory level. */
 function stuckMoney(ana){
   const subs = ana.cats.flatMap(c => c.subs);
   return {
-    overstock: ana.cats.map(M => ({M, excess: Math.max(0, M.oh - target16(M))})).filter(x => x.excess > 0).sort((a, b) => b.excess - a.excess),
+    overstock: ana.cats.filter(M => targetWks(M) != null).map(M => ({M, excess: Math.max(0, M.oh - targetWks(M))})).filter(x => x.excess > 0).sort((a, b) => b.excess - a.excess),
     aged: subs.filter(M => M.aged > 0).map(M => ({M, aged: M.aged})).sort((a, b) => b.aged - a.aged),
     agedSkus: subs.flatMap(M => M.agedSkus).sort((a, b) => nz(b.value) - nz(a.value)),
     markdown: subs.filter(M => M.aged > 0).map(M => ({M, cashAt30: M.aged / (1 - Math.min(nz(M.gm), 0.9)) * 0.7})).sort((a, b) => b.cashAt30 - a.cashAt30),
@@ -117,7 +160,8 @@ function suggest(ana){
   const out = [], pctS = v => Math.round(v * 100) + '%', usd = v => '$' + Math.round(v).toLocaleString('en-US');
   const add = (M, kind, impact, title, why, action, page) => { if (impact >= 250) out.push({id: kind + ':' + M.key, key: M.key, kind, title, why, impact: Math.round(impact), action, page, cat: M.cat, sub: M.sub == null ? null : M.sub, name: M.name, catName: M.catName || M.name}); };
   for (const c of ana.cats){
-    if (c.stockShare - c.share > 0.05 && c.oh > 5000)
+    // Expensive hard goods and the demo fleet always hold more of the stock than their share of sales.
+    if (roleOf(c.cat).share && c.stockShare - c.share > 0.05 && c.oh > 5000)
       add(c, 'share', c.oh - c.share * ana.shop.oh, `${c.name}: hold back open-to-buy`,
         `${pctS(c.stockShare)} of the shop's stock but ${pctS(c.share)} of its sales.`, 'Buy less until stock matches its share of sales', 'scorecard');
     if (c.md != null && c.md > BENCH.md.good && c.t12 > 5000)
@@ -125,15 +169,15 @@ function suggest(ana){
         `Markdowns are ${pctS(c.md)} of sales, against a rule of thumb of 15%.`, 'Buy shallower and review full-price sell-through', 'scorecard');
   }
   for (const c of ana.cats) for (const s of c.subs){
-    const nm = `${c.name} › ${s.name}`, g = BENCH.gmroi[s.seg];
+    const nm = `${c.name} › ${s.name}`, g = BENCH.gmroi[s.seg], role = roleOf(c.cat);
     if (s.agedPct != null && s.agedPct > BENCH.agedPct.good && s.aged >= 500)
-      add(s, 'aged', s.aged, `${nm}: clear aged stock`, `${usd(s.aged)} (${pctS(s.agedPct)}) hasn't sold in 12 months.`, 'Mark down, bundle or return to the vendor', 'stuck');
-    if (s.wks != null && s.wks > 30)
-      add(s, 'wks', s.oh - target16(s), `${nm}: too much stock`, `${Math.round(s.wks)} weeks of supply at the last year's pace; 12–16 is the rule of thumb.`, 'Pause orders until it sells down', 'stuck');
-    if (s.growth != null && s.growth > 0.15 && s.t12 - s.so >= 2000 && (s.oh <= 0 || (s.wks != null && s.wks < 8)))
+      add(s, 'aged', s.aged, `${nm}: clear aged stock`, `${usd(s.aged)} (${pctS(s.agedPct)}) hasn't sold in 12 months.`, role.aged, 'stuck');
+    if (role.over && s.wks != null && s.wks > role.over)
+      add(s, 'wks', s.oh - targetWks(s), `${nm}: too much stock`, `${Math.round(s.wks)} weeks of supply at the last year's pace; ${role.wks[0]}–${role.wks[1]} is the rule of thumb for ${role.name.toLowerCase()}.`, role.heavy, 'stuck');
+    if (role.wks && s.growth != null && s.growth > 0.15 && s.t12 - s.so >= 2000 && (s.oh <= 0 || (s.wks != null && s.wks < 8)))
       add(s, 'short', (s.t12 - s.so) / 52 * (12 - (s.wks || 0)), `${nm}: buy deeper`, `Sales up ${pctS(s.growth)} on last year with ${s.oh <= 0 ? 'nothing in stock' : 'only ' + Math.round(s.wks) + ' weeks of stock'}.`, 'Reorder before it runs out', 'scorecard');
-    if (s.gmroi != null && s.gmroi < g && s.oh > 5000)
-      add(s, 'gmroi', s.oh - s.gp / g, `${nm}: stock isn't earning its keep`, `GMROI ${s.gmroi.toFixed(2)} against a rule of thumb of ${g}.`, 'Carry less of it, or buy it at a better margin', 'scorecard');
+    if (role.wks && s.gmroi != null && s.gmroi < g && s.oh > 5000)
+      add(s, 'gmroi', s.oh - s.gp / g, `${nm}: stock isn't earning its keep`, `GMROI ${s.gmroi.toFixed(2)} against a rule of thumb of ${g}.`, role.share ? 'Carry less of it, or buy it at a better margin' : role.heavy, 'scorecard');
     if (s.trend3 != null && s.trend3 <= -0.25 && s.oh > 2000)
       add(s, 'falling', s.oh, `${nm}: sales are falling`, `Units in the last 3 months down ${pctS(-s.trend3)} on a year ago, with ${usd(s.oh)} in stock.`, 'Cut the next buy and move what is left', 'trends');
   }

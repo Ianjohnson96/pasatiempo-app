@@ -4,20 +4,20 @@ function orderAlerts(S){
   for (const p of POS){
     if (!isOpen(p)) continue;
     const tag = `PO ${p.poNumber} · ${vendorName(p)}`;
-    if (p.cancelDate && p.cancelDate < todayISO) out.push({id:'o-cx-'+p.id, kind:'order', sev:'crit', po:p.id, title:`${tag}: past its cancel date`, detail:`Cancel-by was ${dateLabel(p.cancelDate)}.`, action:'Confirm with the vendor that it is still coming, or cancel it.'});
-    else if (p.cancelDate && daysBetween(todayISO, p.cancelDate) <= 14) out.push({id:'o-cw-'+p.id, kind:'order', sev:'warn', po:p.id, title:`${tag}: cancel window closes in ${daysBetween(todayISO, p.cancelDate)} days`, detail:`Last day to cancel or trim is ${dateLabel(p.cancelDate)}.`, action:'Decide now whether you still want all of it.'});
-    if (p.deliveryMonth && p.deliveryMonth < THIS_MONTH) out.push({id:'o-late-'+p.id, kind:'order', sev:'warn', po:p.id, title:`${tag}: late`, detail:`Was due ${monthLabel(p.deliveryMonth)}; ${money(onOrder(p))} still to come${num(p.received) ? ` (${money(num(p.received))} has arrived)` : ''}.`, action:'Chase the vendor for a ship date and change the expected month, or set the order to Cancelled if the rest won\'t come. What arrived still counts.'});
+    if (p.cancelDate && p.cancelDate < todayISO) out.push({id:'o-cx-'+p.id, kind:'order', sev:'crit', po:p.id, title:`${tag}: past its cancel date`, detail:`Cancel-by was ${dateLabel(p.cancelDate)}.`, action:'Confirm with the vendor that it is still coming, or cancel it.', usd:onOrder(p)});
+    else if (p.cancelDate && daysBetween(todayISO, p.cancelDate) <= 14) out.push({id:'o-cw-'+p.id, kind:'order', sev:'warn', po:p.id, title:`${tag}: cancel window closes in ${daysBetween(todayISO, p.cancelDate)} days`, detail:`Last day to cancel or trim is ${dateLabel(p.cancelDate)}.`, action:'Decide now whether you still want all of it.', usd:onOrder(p)});
+    if (p.deliveryMonth && p.deliveryMonth < THIS_MONTH) out.push({id:'o-late-'+p.id, kind:'order', sev:'warn', po:p.id, title:`${tag}: late`, detail:`Was due ${monthLabel(p.deliveryMonth)}; ${money(onOrder(p))} still to come${num(p.received) ? ` (${money(num(p.received))} has arrived)` : ''}.`, action:'Chase the vendor for a ship date and change the expected month, or set the order to Cancelled if the rest won\'t come. What arrived still counts.', usd:onOrder(p)});
   }
   for (const c of catList()){
     if (!inOTB(c.code)) continue;
     const used = S.cm(c.code, LAST()), bud = seasonBudget(c.code);
-    if (bud <= 0 && used > 0) out.push({id:'o-stop-'+c.code, kind:'order', sev:'crit', cat:c.code, title:`${c.name}: ordering into an overbought category`, detail:`${money(used)} committed; the plan already holds ${money(-bud)} too much.`, action:'Only order against a customer commitment.'});
-    else if (bud > 0 && used > bud) out.push({id:'o-over-'+c.code, kind:'order', sev:'crit', cat:c.code, title:`${c.name}: over the ${PLAN.fy} budget by ${money(used - bud)}`, detail:`${money(used)} committed against ${money(bud)}.`, action:'Trim or push out an order, or change the budget with a reason.'});
+    if (bud <= 0 && used > 0) out.push({id:'o-stop-'+c.code, kind:'order', sev:'crit', cat:c.code, title:`${c.name}: ordering into an overbought category`, detail:`${money(used)} committed; the plan already holds ${money(-bud)} too much.`, action:roleOf(c.code).stop, usd:used});
+    else if (bud > 0 && used > bud) out.push({id:'o-over-'+c.code, kind:'order', sev:'crit', cat:c.code, title:`${c.name}: over the ${PLAN.fy} budget by ${money(used - bud)}`, detail:`${money(used)} committed against ${money(bud)}.`, action:'Trim or push out an order, or change the budget with a reason.', usd:used - bud});
     else if (bud > 0 && used > bud * .85) out.push({id:'o-near-'+c.code, kind:'order', sev:'warn', cat:c.code, title:`${c.name}: ${Math.round(used/bud*100)}% of the ${PLAN.fy} budget used`, detail:`${money(bud - used)} left through ${monthLabel(LAST())}.`, action:'Save what is left for proven reorders.'});
   }
   let worst = 0, wm = null;
   for (const k of WIN()){ let r = 0, c = 0; for (const x of catList()) if (inOTB(x.code)){ r += roomThrough(x.code, k); c += S.cm(x.code, k); } const over = c - Math.max(r, 0); if (over > worst + 1){ worst = over; wm = k; } }
-  if (wm) out.push({id:'o-room', kind:'order', sev:'warn', title:`${money(worst)} of deliveries arrive before there is room for them`, detail:`Orders landing through ${monthLabel(wm)} run ahead of the plan's receiving room.`, action:'Ask vendors for later ship dates where you can.'});
+  if (wm) out.push({id:'o-room', kind:'order', sev:'warn', title:`${money(worst)} of deliveries arrive before there is room for them`, detail:`Orders landing through ${monthLabel(wm)} run ahead of the plan's receiving room.`, action:'Ask vendors for later ship dates where you can.', usd:worst});
   return out;
 }
 function allAttention(S){
@@ -25,6 +25,53 @@ function allAttention(S){
   return items.map(i => ({...i, state: ISTATE[i.id] || null}));
 }
 const openAttention = S => allAttention(S).filter(i => !i.state);
+
+/* The few decisions worth making this week: order problems, item to-dos and the analysis's suggestions on one scale
+   (dollars at stake, at cost), at most two of each kind of decision so one problem can't fill the list. Each can be
+   marked Done or Not now (istate/{id}); the full To do list keeps everything. */
+const DECIDE = {cut: 'Cut orders', cancel: 'Cancel or confirm', chase: 'Chase', push: 'Push out', reorder: 'Reorder', markdown: 'Mark down', hold: 'Hold buying', fix: 'Fix'};
+function topDecisions(S, n = 6){
+  const out = [];
+  for (let i of openAttention(S)){
+    let verb = null, usd = 0, page = null;
+    if (i.kind === 'order'){
+      const t = i.id.split('-')[1];
+      verb = t === 'stop' || t === 'over' ? 'cut' : t === 'cx' || t === 'cw' ? 'cancel' : t === 'late' ? 'chase' : t === 'room' ? 'push' : null;
+      usd = num(i.usd);
+    } else {
+      const m = i.metrics || {};
+      if (i.kind === 'reorder' || i.kind === 'stockout'){ verb = 'reorder'; usd = num(m.suggest) * num(m.cost); }
+      else if (i.kind === 'aged'){ verb = 'markdown'; usd = num(m.value); }
+      else if (i.kind === 'overstock'){ verb = 'hold'; usd = num(m.value); }
+      else if (i.kind === 'margin'){ verb = 'fix'; usd = num(m.exposure); }
+    }
+    // Cutting orders already placed: say what to do with them, then the category's rule for new ones.
+    if (verb === 'cut') i = {...i, action: `Trim or cancel the open orders before their cancel dates. After that: ${i.action}`};
+    if (verb && usd >= 250) out.push({...i, verb, usd, page});
+  }
+  const a = typeof anaNow === 'function' ? anaNow() : null;
+  for (const x of a ? suggest(a) : []){
+    const id = ('sug-' + x.kind + '-' + x.key).replace(/[^A-Za-z0-9_.~:@+-]/g, '_');
+    if (ISTATE[id]) continue;
+    const verb = x.kind === 'aged' ? 'markdown' : x.kind === 'short' ? 'reorder' : 'hold';
+    out.push({id, kind: 'suggestion', sev: x.kind === 'short' ? 'good' : 'warn', title: x.title, detail: x.why, action: x.action, cat: x.cat, verb, usd: x.impact, page: x.page});
+  }
+  out.sort((p, q) => q.usd - p.usd);
+  const per = {}, pick = [];
+  for (const d of out){ if ((per[d.verb] || 0) >= 2) continue; per[d.verb] = (per[d.verb] || 0) + 1; pick.push(d); if (pick.length >= n) break; }
+  return pick;
+}
+function decisionHtml(d, k){
+  const go = d.po ? `<button class="btn sm" type="button" data-openpo="${esc(d.po)}">Open order</button>`
+    : d.page ? `<button class="btn sm" type="button" data-tab="${esc(d.page)}">Look at it</button>`
+    : d.cat ? `<button class="btn sm" type="button" data-cat="${esc(d.cat)}">Open category</button>` : '';
+  const btns = canAct() ? `<button class="btn sm" type="button" data-istate="${esc(d.id)}" data-v="done">Done</button><button class="btn ghost sm" type="button" data-istate="${esc(d.id)}" data-v="dismissed">Not now</button>` : '';
+  return `<li class="item ${d.sev}"><div class="stripe"></div><div class="body">
+    <div class="t"><span class="num" style="color:var(--muted);margin-right:6px">${k + 1}.</span><span class="kind order">${DECIDE[d.verb]}</span>${esc(d.title)} <span class="num" style="color:var(--muted);font-weight:400">· ${moneyK(d.usd)}</span></div>
+    ${d.sku ? `<div class="d"><span class="num">${esc(d.sku)}</span> · ${esc(d.desc)}</div>` : ''}
+    <div class="d">${esc(d.detail)}</div><div class="a"><b>Do:</b> ${esc(d.action)}</div>
+  </div><div class="side">${go}${btns}</div></li>`;
+}
 
 /* ---------- top of page ---------- */
 function renderMonths(){
@@ -145,7 +192,7 @@ function catRow(c, S){
   return `<div class="cat" data-cat="${c.code}" tabindex="0" role="button" aria-label="${esc(c.name)} details"><span class="code">${c.code}</span><span class="nm">${esc(c.name)} ${chip}</span><span class="fig">${fig}</span>${bar}<div class="detail">${msg}${invLine}</div></div>`;
 }
 function renderOverview(S){
-  const att = openAttention(S).sort((a,b) => ({crit:0,warn:1,good:2,info:3}[a.sev] - {crit:0,warn:1,good:2,info:3}[b.sev]) || (b.priority || 0) - (a.priority || 0)).slice(0,6);
+  const att = topDecisions(S, 5);
   $('#pane').innerHTML = `<div class="grid">
     <section class="panel"><header><h2>Budget by category</h2><span class="lab">Committed / room ${selMonth() === 'season' ? 'for ' + PLAN.fy : 'through ' + monthShort(S.m)}</span></header>
       ${catList().map(c => catRow(c, S)).join('')}
@@ -155,8 +202,8 @@ function renderOverview(S){
         <div class="legend"><span><i class="sw line" style="background:var(--ink)"></i>Plan room</span><span><i class="sw" style="background:var(--cypress)"></i>Committed deliveries</span><span><i class="sw" style="background:var(--brick)"></i>Over the room</span></div>
         <div class="chart" id="chart"></div>
         <div class="note" id="roomNote"></div></section>
-      <section class="panel"><header><h2>Top things to do</h2><button class="btn ghost sm" type="button" data-tab="attention">See all</button></header>
-        <ul class="items">${att.length ? att.map(i => itemHtml(i, true)).join('') : '<li class="item good"><div class="stripe"></div><div class="body"><div class="t">Nothing needs attention.</div></div></li>'}</ul></section>
+      <section class="panel"><header><h2>Most important this week</h2><button class="btn ghost sm" type="button" data-tab="attention">See the full list</button></header>
+        <ul class="items">${att.length ? att.map(decisionHtml).join("") : '<li class="item good"><div class="stripe"></div><div class="body"><div class="t">Nothing needs attention.</div></div></li>'}</ul></section>
     </div></div>`;
   renderChart(S);
 }

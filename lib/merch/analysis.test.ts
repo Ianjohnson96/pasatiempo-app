@@ -148,6 +148,30 @@ describe("merchandise analysis", () => {
     expect(M.stuckMoney(a).reorder.map((m: { sub: string }) => m.sub)).toEqual(["s-400-polos"]);
   });
 
+  it("judges weeks of supply by the category's role", () => {
+    expect(M.grade("wks", 20, "equipment", "200")).toBe("good"); // hard goods: 16–26
+    expect(M.grade("wks", 20, "apparel", "480")).toBe("near"); // apparel: 12–16
+    expect(M.grade("wks", 400, "equipment", "220")).toBeNull(); // the demo fleet isn't judged on weeks
+    expect(M.grade("gmroi", 0.1, "equipment", "220")).toBeNull();
+    expect(M.grade("agedPct", 0.4, "equipment", "220")).toBe("bad"); // but old demos still show
+  });
+
+  it("words suggestions by role, and leaves hard goods out of the stock-share rule", () => {
+    const a = M.analyze({ months, rows: [
+      row("480", "s-480-polos", { series: flat(1000, 1000), t12: 12000, oh: 1500, aged: 600, gm: 0.5 }),
+      row("200", "s-200-drivers", { series: flat(100, 100), t12: 1200, oh: 20000, aged: 9000, gm: 0.2 }),
+      row("220", "s-220-demo", { series: flat(10, 10), t12: 120, oh: 9000, aged: 4000, gm: 0.1 }),
+    ] }, NAMES);
+    const s = M.suggest(a);
+    const of = (sub: string) => s.find((x: { sub: string }) => x.sub === sub);
+    expect(of("s-480-polos").action).toMatch(/25%/);
+    expect(of("s-200-drivers").action).toMatch(/fitting/);
+    expect(of("s-220-demo").action).toMatch(/demo/);
+    expect(s.some((x: { kind: string; cat: string }) => x.kind === "share" && x.cat === "200")).toBe(false);
+    expect(s.some((x: { kind: string; cat: string }) => x.cat === "220" && x.kind === "wks")).toBe(false);
+    expect(M.stuckMoney(a).overstock.some((o: { M: { cat: string } }) => o.M.cat === "220")).toBe(false);
+  });
+
   it("ranks the suggestions by dollars, the aged-heavy line first, one per line", () => {
     const s = M.suggest(M.analyze(ASSORT, NAMES));
     expect(s[0].sub).toBe("s-480-other");

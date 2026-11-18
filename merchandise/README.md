@@ -17,16 +17,40 @@ The page is served by `app/merch/route.ts`. It assembles `app/src` with the shim
 | Role | Can |
 |---|---|
 | owner | everything, including the forecast (`plan/…`), budget changes, brand calls and month-end data (the Month-end upload, or `/merch/admin`) |
-| staff | orders, receipts, vendors, subcategories, counts, to-do states, month-end checklist |
+| staff | orders, receipts, vendors, subcategories, counts, to-do states, month-end checklist, brand assignments and SKU sorting |
 | viewer | read only |
 
 Roles are granted per app on the hub's **People & access** page (`/admin/people`, stored in `hub.access`; see `lib/hub/access.ts`). A super admin is an owner here. Everyone signs in once for all Pasatiempo apps.
 
 ## Setup (once)
 
-1. Run `supabase/migration-merch-schema.sql`, then `supabase/migration-merch-imports.sql`, in the hub project. Then add `merch` under Settings → API → Exposed schemas.
+1. Run `supabase/migration-merch-schema.sql`, then `supabase/migration-merch-imports.sql` and `supabase/migration-merch-history.sql`, in the hub project. Then add `merch` under Settings → API → Exposed schemas.
 2. For now the program is served by path at `pasatiempo-app.vercel.app/merch`. To give it its own domain later, add the domain to the Vercel project and list it under the `merch` entry in `lib/sections.ts`.
 3. Sign in at that address. Open your name (top right) → **Load month-end data** and load the latest data file. Add staff on `/admin/people`. After that, each month's reports are uploaded on the Month-end page.
+
+Staff can write only the collections listed in `STAFF_WRITABLE` (`lib/merch/rules.ts`); anything new is owner-only until it's added there. `docProblem()` rejects an order, budget change or assignment document whose numbers, dates or status the page couldn't use, and the page says what was wrong.
+
+**Saving.** Every save sends the version it was read at (`ifVersion`). If someone saved the same document since, the page fetches theirs and merges field by field, two levels deep (`merge3` in `app/host/club-shim.js`): a field this person changed keeps their value, every other field keeps the other person's. That covers two people assigning different SKUs' brands, sorting SKUs, or ticking the same checklist. After three tries it gives up and says so.
+
+**History.** `merch.doc_history` (`supabase/migration-merch-history.sql`) keeps what each hand-entered document held before every change or delete, for 400 days, so a deleted order can be found and put back (the query is in the migration).
+
+## Category roles
+
+Every category has a job in the shop (`ROLES` and `ROLE_OF` in `app/src/17-metrics.js`, mirrored in `pipeline/config.py`), and is judged by it:
+
+| Role | Categories | Weeks of supply | Judged on |
+|---|---|---|---|
+| Fashion apparel | 400, 430, 470, 480, 490, 500 | 12–16 | sell-through, markdowns, GMROI |
+| Accessories & hats | 440, 620, 660 | 12–20 | turns, the best styles in stock |
+| Balls & gloves | 160, 320 | 8–16 | never running out (reorders are suggested even when the category is overbought) |
+| Hard goods | 200, 300, 350 | 16–26 | margin dollars and a thin, current shelf that backs fittings and special orders |
+| Demo fleet | 220 | not judged on weeks | a fitting tool: sell off demos older than a season |
+
+The shop sells only logo soft goods, which can't go back to the vendor, and members get 25% off them (`MEMBER_DISCOUNT`), so markdown advice for soft goods says to go past the member discount. Equipment brands that sell slowly are carried thinner (*Reduce*) rather than dropped, since the shop carries stock clubs; one is dropped only when it has stopped selling or is too small. The Budget page's overbought advice, the To do wording, the Scorecard's role label and the Stuck money target all follow the role.
+
+## Most important this week
+
+The top of **To do** (and the Budget page) lists the six decisions worth the most money (`topDecisions` in `app/src/30-home.js`): order problems, item to-dos and the scorecard's suggestions on one scale, dollars at stake at cost, at most two of each kind (cut, cancel, chase, push out, reorder, mark down, hold, fix). Done or Not now takes one off the list (`istate/{id}`); the full To do list below is unchanged.
 
 ## Pages
 

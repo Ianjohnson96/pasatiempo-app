@@ -29,21 +29,54 @@
   }
   function start(){
     if (!loaded) loaded = pull().then(() => {
-      setInterval(() => pull().catch(e => { if (e.code === 'revoked') location.reload(); }), POLL_MS);
+      // No polling while the tab is hidden; it catches up as soon as it's shown again (visibilitychange below).
+      setInterval(() => { if (!document.hidden) pull().catch(e => { if (e.code === 'revoked') location.reload(); }); }, POLL_MS);
     }, e => { loaded = null; throw e; });
     return loaded;
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden && loaded) pull().catch(() => {}); });
+  /* Three-way merge of a document someone else saved while we were editing it: base is what we started from, ours
+     what we want to save, theirs what is saved now. A field we changed keeps our value; a field we didn't keeps
+     theirs. Objects inside are merged the same way one level down (brandmap/current skus, submap/current skus,
+     checklist items), so two people's edits to different SKUs or ticks both survive. */
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const isObj = v => v != null && typeof v === 'object' && !Array.isArray(v);
+  function merge3(base, ours, theirs, depth){
+    if (!isObj(ours) || !isObj(theirs) || !depth) return same(ours, base) ? theirs : ours;
+    const b = isObj(base) ? base : {}, out = {};
+    for (const k of new Set([...Object.keys(b), ...Object.keys(ours), ...Object.keys(theirs)])){
+      const v = same(ours[k], b[k]) ? theirs[k] : isObj(ours[k]) && isObj(theirs[k]) ? merge3(b[k], ours[k], theirs[k], depth - 1) : ours[k];
+      if (v !== undefined) out[k] = v;
+    }
+    return out;
+  }
   async function write(path, data){
-    let r;
-    try { r = await fetch(API, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({path, data})}); }
-    catch (_){ throw err('unavailable'); }
-    if (r.status === 401) throw err('revoked');
-    if (r.status === 403 || r.status === 400 || r.status === 413) throw err('invalid_argument');
-    if (!r.ok) throw err('unavailable');
-    const j = await r.json();
-    if (data == null) store.delete(path); else store.set(path, {data: JSON.parse(JSON.stringify(data)), version: j.version});
-    notify([path]);
+    const start0 = store.get(path), base = start0 && JSON.parse(JSON.stringify(start0.data));
+    let ver = start0 ? start0.version : null, sent = data;
+    for (let attempt = 0; ; attempt++){
+      let r;
+      const body = {path, data: sent};
+      if (ver != null) body.ifVersion = ver;   // only applies if nobody saved it since we read it
+      try { r = await fetch(API, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}); }
+      catch (_){ throw err('unavailable'); }
+      if (r.status === 401) throw err('revoked');
+      if (r.status === 413) throw err('too_large');
+      if (r.status === 400){ let j = null; try { j = await r.json(); } catch (_) {} if (j && j.detail) throw err('bad_data', j.detail); }
+      if (r.status === 403 || r.status === 400) throw err('invalid_argument');
+      if (r.status === 409){
+        if (attempt >= 3) throw err('conflict');
+        await pull();   // their version, which the page now shows
+        const now = store.get(path);
+        ver = now ? now.version : null;
+        if (data != null) sent = now ? merge3(base, data, now.data, 2) : data;
+        continue;
+      }
+      if (!r.ok) throw err('unavailable');
+      const j = await r.json();
+      if (sent == null) store.delete(path); else store.set(path, {data: JSON.parse(JSON.stringify(sent)), version: j.version});
+      notify([path]);
+      return;
+    }
   }
   const listen = (map, key, next, error, snap) => {
     const f = {next}; (map.get(key) || map.set(key, new Set()).get(key)).add(f);
