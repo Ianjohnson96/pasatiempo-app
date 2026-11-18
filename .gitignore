@@ -27,3 +27,4 @@ supabase/schema-mhi.sql
 # python
 __pycache__/
 .vercel
+.superpowers/
