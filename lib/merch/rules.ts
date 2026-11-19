@@ -87,6 +87,17 @@ export function docProblem(path: string, data: unknown): string | null {
       for (const k of ["cost", "units", "received"]) if (!isNum(d[k])) return `${k} must be a number`;
       if (!isMonth(d.deliveryMonth)) return "deliveryMonth must be YYYY-MM";
       for (const k of ["cancelDate", "receivedDate"]) if (!isDate(d[k])) return `${k} must be a date`;
+      if (d.invoicesIn != null) {
+        if (!Array.isArray(d.invoicesIn)) return "invoicesIn must be a list";
+        for (const e of d.invoicesIn as unknown[]) {
+          if (e == null || typeof e !== "object" || Array.isArray(e)) return "each invoicesIn entry must be an object";
+          const entry = e as Record<string, unknown>;
+          if (typeof entry.date !== "string" || !/^\d{4}-\d{2}-\d{2}/.test(entry.date)) return "invoicesIn date must be a date";
+          if (!isNum(entry.amount)) return "invoicesIn amount must be a number";
+          if (entry.source != null && entry.source !== "hand" && entry.source !== "log") return "invoicesIn source must be hand or log";
+        }
+      }
+      if (d.invoicesClearedAt != null && typeof d.invoicesClearedAt !== "string") return "invoicesClearedAt must be a string";
       if (d.lines != null) {
         if (!Array.isArray(d.lines)) return "lines must be a list";
         for (const l of d.lines as unknown[]) {

@@ -21,6 +21,15 @@ describe("merch access rules", () => {
     expect(docProblem("pos/a", null)).toBeNull(); // a delete
   });
 
+  it("checks invoice-arrival entries on an order", () => {
+    expect(docProblem("pos/a", { invoicesIn: [{ date: "2026-11-18", amount: "abc", source: "hand" }] })).toMatch(/amount/);
+    expect(docProblem("pos/a", { invoicesIn: [{ date: "Nov 18", source: "hand" }] })).toMatch(/date/);
+    expect(docProblem("pos/a", { invoicesIn: "x" })).toMatch(/invoicesIn/);
+    expect(docProblem("pos/a", { invoicesIn: [{ date: "2026-11-18", amount: 250, source: "log" }], invoicesClearedAt: "2026-11-20T00:00:00Z" })).toBeNull();
+    expect(docProblem("pos/a", { invoicesIn: [{ date: "2026-11-18", source: "fax" }] })).toMatch(/source/);
+    expect(docProblem("pos/a", { invoicesClearedAt: 5 })).toMatch(/invoicesClearedAt/);
+  });
+
   it("checks budget change amounts and assignment maps", () => {
     expect(docProblem("plan/fy27/adjustments/x", { amount: "nope" })).toMatch(/amount/);
     expect(docProblem("plan/fy27/adjustments/x", { amount: -500 })).toBeNull();
