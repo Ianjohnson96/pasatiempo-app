@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 // merchandise/app/src/18-ops.js is plain browser JS joined into the page. It is pure, so it runs here as it is.
 const src = readFileSync(path.join(process.cwd(), "merchandise/app/src/18-ops.js"), "utf8");
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots, makeInvoiceEntry, liveInvoices, storeRoomValue})");
+const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots, makeInvoiceEntry, liveInvoices, storeRoomValue, seasonMonths, seasonList, seasonBuys})");
 
 describe("arrivedValue", () => {
   it("sums amounts, counts an amountless entry as the whole order, caps and floors", () => {
@@ -145,5 +145,39 @@ describe("liveInvoices and storeRoomValue", () => {
     expect(O.storeRoomValue([{}], 1000, 400)).toBe(600);
     expect(O.storeRoomValue([{ amount: 5000 }], 1000, 0)).toBe(1000);
     expect(O.storeRoomValue([{ amount: 300 }], 1000, 400)).toBe(0);
+  });
+});
+
+describe("season buys", () => {
+  const spring = () => O.seasonOf("2027-03");
+  const rows = [
+    { month: "2027-02", cat: "400", brand: "Peter Millar", orderDate: "2026-09-10", amount: 1000, units: 10 },
+    { month: "2027-03", cat: "400", brand: "Peter Millar", orderDate: "2027-02-20", amount: 300, units: 3 },
+    { month: "2027-04", cat: "500", brand: "", orderDate: "2026-12-01", amount: 200, units: 4 },
+    { month: "2027-03", cat: "640", brand: "Peter Millar", orderDate: "2026-09-10", amount: 999, units: 9 },
+    { month: "2027-05", cat: "400", brand: "Peter Millar", orderDate: "2026-09-10", amount: 500, units: 5 },
+    { month: "2027-03", cat: "400", brand: "Peter Millar", orderDate: "2026-09-10", amount: 0, units: 0 },
+  ];
+  it("lists a season's months", () => {
+    expect(O.seasonMonths(spring())).toEqual(["2027-01", "2027-02", "2027-03", "2027-04"]);
+    expect(O.seasonMonths(O.seasonOf("2026-12"))).toEqual(["2026-11", "2026-12"]);
+    expect(O.seasonMonths(null)).toEqual([]);
+  });
+  it("splits prebooked from reorders, leaves out Special Orders, and groups by month, category and brand", () => {
+    const t = O.seasonBuys(rows, spring());
+    expect(t.committed).toBe(1500);
+    expect(t.prebooked).toBe(1200);
+    expect(t.reorders).toBe(300);
+    expect(t.units).toBe(17);
+    expect(t.byMonth["2027-02"]).toEqual({ prebooked: 1000, reorders: 0 });
+    expect(t.byMonth["2027-03"]).toEqual({ prebooked: 0, reorders: 300 });
+    expect(t.byCat).toEqual({ "400": 1300, "500": 200 });
+    expect(t.byBrand.map((b: { brand: string }) => b.brand)).toEqual(["Peter Millar", "Other / no brand"]);
+    expect(t.byBrand[0]).toMatchObject({ committed: 1300, prebooked: 1000, reorders: 300, units: 13 });
+  });
+  it("orders seasons: current first, then coming, then past latest first", () => {
+    const rs = ["2026-03", "2026-08", "2026-11", "2027-02", "2027-06"].map((month) => ({ month, cat: "400", amount: 1 }));
+    expect(O.seasonList(rs, "2026-11").map((s: { label: string }) => s.label)).toEqual(["Holiday 2026", "Spring 2027", "Summer 2027", "Fall 2026", "Spring 2026"]);
+    expect(O.seasonList([{ month: "2026-11", cat: "640", amount: 5 }], "2026-11")).toEqual([]);
   });
 });

@@ -98,3 +98,50 @@ function liveInvoices(invoicesIn, clearedAt) {
 function storeRoomValue(invoicesIn, totalValue, receivedValue) {
   return Math.max(0, arrivedValue(invoicesIn, totalValue) - (Number(receivedValue) || 0));
 }
+
+/** The calendar months ('YYYY-MM') a season covers. */
+function seasonMonths(season) {
+  if (!season) return [];
+  const n = { spring: 4, summer: 3, fall: 3, holiday: 2 }[season.key] || 0;
+  return Array.from({ length: n }, (_, i) => slotMonth(season.first, i));
+}
+
+/**
+ * Season buys from flat rows {month, cat, brand, orderDate, amount, units}: each is committed cost for one order line
+ * in the month it counts (delivery month, or the month it arrived). Special Orders (640) are left out. An order placed
+ * before the season began is "prebooked", one placed during or after it a "reorder" (isPrebook).
+ * seasonList: the seasons that have orders, current first, then coming, then past (latest first).
+ */
+function seasonList(rows, thisMonth) {
+  const m = new Map();
+  for (const r of rows) {
+    if (r.cat === "640" || !(Number(r.amount) > 0)) continue;
+    const s = seasonOf(r.month);
+    if (s) m.set(s.key + s.year, s);
+  }
+  const cur = seasonOf(thisMonth), ck = cur ? cur.first : "";
+  const rank = (s) => (s.first === ck ? 0 : s.first > ck ? 1 : 2);
+  return [...m.values()].sort((a, b) => rank(a) - rank(b) || (rank(a) === 2 ? b.first.localeCompare(a.first) : a.first.localeCompare(b.first)));
+}
+
+/** One season's totals: committed, prebooked, reorders, units, by month, by category and by brand (largest first). */
+function seasonBuys(rows, season) {
+  const out = { committed: 0, prebooked: 0, reorders: 0, units: 0, byMonth: {}, byCat: {}, byBrand: [] };
+  const brands = new Map();
+  for (const m of seasonMonths(season)) out.byMonth[m] = { prebooked: 0, reorders: 0 };
+  for (const r of rows) {
+    const a = Number(r.amount) || 0;
+    if (r.cat === "640" || !(a > 0)) continue;
+    const s = seasonOf(r.month);
+    if (!s || s.first !== season.first) continue;
+    const pre = isPrebook(r.orderDate, season), k = pre ? "prebooked" : "reorders";
+    out.committed += a; out[k] += a; out.units += Number(r.units) || 0;
+    out.byMonth[r.month.slice(0, 7)][k] += a;
+    out.byCat[r.cat] = (out.byCat[r.cat] || 0) + a;
+    const name = r.brand || "Other / no brand";
+    const b = brands.get(name) || { brand: name, committed: 0, prebooked: 0, reorders: 0, units: 0 };
+    b.committed += a; b[k] += a; b.units += Number(r.units) || 0; brands.set(name, b);
+  }
+  out.byBrand = [...brands.values()].sort((x, y) => y.committed - x.committed || x.brand.localeCompare(y.brand));
+  return out;
+}
