@@ -151,7 +151,7 @@ function openInvoiceIn(poId){
 }
 async function saveInvoiceIn(poId, btn){
   const p = POS.find(x => x.id === poId); if (!p) return;
-  const r = makeInvoiceEntry({date: $('#iiDate').value, amount: $('#iiAmt').value, invoice: $('#iiInv').value, note: $('#iiNote').value}, myId);
+  const r = makeInvoiceEntry({date: $('#iiDate').value, amount: $('#iiAmt').value, invoice: $('#iiInv').value, note: $('#iiNote').value}, myId, num(p.received));
   if (r.error){ toast(r.error); return; }
   if (btn) btn.disabled = true;
   const body = {...p, invoicesIn: [...(p.invoicesIn || []), r.entry], updatedBy: myId, updatedAt: new Date().toISOString()};

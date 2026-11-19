@@ -26,7 +26,9 @@ describe("rcvState", () => {
   });
   it("arrived until cleared or month-end catches up", () => {
     expect(O.rcvState(base, "2026-11")).toBe("arrived");
-    expect(O.rcvState({ ...base, invoicesClearedAt: "2026-11-20T00:00:00Z" }, "2026-11")).toBe("received");
+    // A Clear (nothing newer) only takes it off the store-room list: the open balance is late / due / later by month.
+    expect(O.rcvState({ ...base, invoicesIn: [], invoicesClearedAt: "2026-11-20T00:00:00Z" }, "2026-11")).toBe("later");
+    expect(O.rcvState({ ...base, invoicesIn: [], invoicesClearedAt: "2026-11-20T00:00:00Z", receivedValue: 3000 }, "2026-11")).toBe("received");
     expect(O.rcvState({ ...base, receivedValue: 1000 }, "2026-11")).toBe("received");
   });
   it("without invoices, goes by delivery month", () => {
@@ -35,6 +37,31 @@ describe("rcvState", () => {
     expect(O.rcvState({ ...o, deliveryMonth: "2026-11" }, "2026-11")).toBe("due");
     expect(O.rcvState({ ...o, deliveryMonth: "2027-02" }, "2026-11")).toBe("later");
     expect(O.rcvState(o, "2026-11")).toBe("later");
+  });
+  it("cleared, past its delivery month, with an open balance → late", () => {
+    const o = { status: "open", invoicesIn: [], invoicesClearedAt: "2026-11-20T00:00:00Z", openValue: 3000, receivedValue: 500, deliveryMonth: "2026-09" };
+    expect(O.rcvState(o, "2026-11")).toBe("late");
+    expect(O.rcvState({ ...o, deliveryMonth: "2026-11" }, "2026-11")).toBe("due");
+    expect(O.rcvState({ ...o, status: "cancelled" }, "2026-11")).toBe("received");
+  });
+  it("an invoice on a partly received order counts from what was received at entry (rcvd)", () => {
+    const o = { status: "partial", invoicesIn: [{ date: "2026-11-18", amount: 500, rcvd: 1000 }], openValue: 3000, receivedValue: 1000, deliveryMonth: "2026-10" };
+    expect(O.rcvState(o, "2026-11")).toBe("arrived");
+    expect(O.storeRoomValue(o.invoicesIn, 3000, 1000)).toBe(500);
+    expect(O.storeRoomValue(o.invoicesIn, 3000, 1500)).toBe(0);
+    expect(O.rcvState({ ...o, receivedValue: 1500 }, "2026-11")).toBe("received");
+    const whole = [{ date: "2026-11-18", rcvd: 1000 }];
+    expect(O.storeRoomValue(whole, 3000, 1000)).toBe(2000);
+    expect(O.rcvState({ ...o, invoicesIn: whole }, "2026-11")).toBe("arrived");
+    // two entries: base is the smaller rcvd; the total is capped at what was still open at the base
+    expect(O.storeRoomValue([{ amount: 500, rcvd: 1000 }, { amount: 5000, rcvd: 1200 }], 3000, 1200)).toBe(1800);
+  });
+  it("entries without rcvd behave as before (counted from zero)", () => {
+    const o = { status: "partial", invoicesIn: [{ date: "2026-11-18", amount: 500 }], openValue: 3000, receivedValue: 1000, deliveryMonth: "2026-10" };
+    expect(O.rcvState(o, "2026-11")).toBe("received");
+    expect(O.storeRoomValue(o.invoicesIn, 3000, 1000)).toBe(0);
+    expect(O.storeRoomValue([{ amount: 1500 }], 3000, 1000)).toBe(500);
+    expect(O.storeRoomValue([{}], 3000, 1000)).toBe(2000);
   });
 });
 
@@ -106,6 +133,8 @@ describe("makeInvoiceEntry", () => {
   it("makes a hand entry; the amount is optional", () => {
     expect(O.makeInvoiceEntry({ date: "2026-11-18" }, "u1").entry).toMatchObject({ date: "2026-11-18", source: "hand", by: "u1" });
     expect(typeof O.makeInvoiceEntry({ date: "2026-11-18" }, "u1").entry.at).toBe("string");
+    expect(O.makeInvoiceEntry({ date: "2026-11-18" }, "u1", 1000).entry.rcvd).toBe(1000);
+    expect(O.makeInvoiceEntry({ date: "2026-11-18" }, "u1").entry.rcvd).toBe(0);
     expect(O.makeInvoiceEntry({ date: "2026-11-18", amount: "$1,000.456", invoice: " A-7 ", note: " box 2 " }, "u1").entry).toMatchObject({
       date: "2026-11-18", source: "hand", by: "u1", amount: 1000.46, invoice: "A-7", note: "box 2",
     });

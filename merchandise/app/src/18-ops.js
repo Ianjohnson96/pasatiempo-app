@@ -13,12 +13,18 @@ function arrivedValue(invoicesIn, openValue) {
   return Math.min(total, Math.max(0, sum));
 }
 
-/** 'received' | 'arrived' | 'late' | 'due' | 'later'. openValue is the order's total cost;
-    receivedValue is what month-end recorded as received. */
+/** 'received' | 'arrived' | 'late' | 'due' | 'later'. openValue is the order's total cost; receivedValue is what
+    month-end recorded as received; invoicesIn are the live entries (liveInvoices). An order is 'arrived' while
+    storeRoomValue says goods are in the store room. A Clear (invoicesClearedAt, with nothing newer) only takes an
+    order off the store-room list: an open balance then counts as late / due / later by its delivery month. */
 function rcvState(o, thisMonth) {
-  if (o.status === "received" || o.status === "cancelled" || o.invoicesClearedAt) return "received";
-  const arrived = arrivedValue(o.invoicesIn, o.openValue);
-  if (arrived > 0.5) return (Number(o.receivedValue) || 0) >= arrived ? "received" : "arrived";
+  if (o.status === "received" || o.status === "cancelled") return "received";
+  const total = Number(o.openValue) || 0, rec = Number(o.receivedValue) || 0;
+  if (o.invoicesClearedAt) {
+    if (total - rec <= 0.5) return "received";
+  } else if ((o.invoicesIn || []).length) {
+    return storeRoomValue(o.invoicesIn, total, rec) > 0.5 ? "arrived" : "received";
+  }
   const m = o.deliveryMonth;
   if (!m) return "later";
   return m < thisMonth ? "late" : m === thisMonth ? "due" : "later";
@@ -79,12 +85,13 @@ function deliverySlots(deliveryMonths, thisMonth) {
   return {months, early, later, slot: m => { m = m.slice(0, 7); return m < start ? 0 : m > months[months.length - 1] ? months.length + (early ? 1 : 0) : months.indexOf(m) + (early ? 1 : 0); }};
 }
 
-/** A hand-entered "invoice in" entry from the form values, or {error}. Amount is optional (blank = the whole open balance). */
-function makeInvoiceEntry(f, by) {
+/** A hand-entered "invoice in" entry from the form values, or {error}. Amount is optional (blank = the whole open balance).
+    rcvd is what the POS showed received on the order when the entry was made (num(p.received)); see storeRoomValue. */
+function makeInvoiceEntry(f, by, rcvd) {
   const date = String((f && f.date) || "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Pick the date the invoice came in." };
   const raw = f.amount == null ? "" : String(f.amount).replace(/[$,\s]/g, "");
-  const e = { date, source: "hand", at: new Date().toISOString() };
+  const e = { date, source: "hand", at: new Date().toISOString(), rcvd: Math.max(0, Number(rcvd) || 0) };
   if (raw !== "") {
     const a = /^\d*\.?\d+$|^\d+\.$/.test(raw) ? Number(raw) : NaN;
     if (!Number.isFinite(a) || a <= 0) return { error: "The invoice amount must be a number above zero, like 1000 or $1,000.50, or left blank for the whole order." };
@@ -106,10 +113,23 @@ function liveInvoices(invoicesIn, clearedAt) {
   return { entries, cleared: !entries.length };
 }
 
-/** Goods in the store room for an order: what the invoices add up to (capped at the order total), less what the POS
-    already shows received. */
+/** Goods in the store room for an order, from its live invoice entries. Each entry records `rcvd`, what the POS
+    showed received when it was made (missing = 0, the old behaviour). Counting starts at base, the smallest `rcvd`:
+    the entries add up to what arrived since then (an entry without an amount is the whole open balance at its
+    entry, total - its rcvd), capped at total - base. The store room holds what of that the POS hasn't received since. */
 function storeRoomValue(invoicesIn, totalValue, receivedValue) {
-  return Math.max(0, arrivedValue(invoicesIn, totalValue) - (Number(receivedValue) || 0));
+  const es = (invoicesIn || []).filter(Boolean);
+  if (!es.length) return 0;
+  const total = Math.max(0, Number(totalValue) || 0);
+  const rcvdOf = (e) => Math.max(0, Number(e.rcvd) || 0);
+  const base = Math.min(...es.map(rcvdOf));
+  let sum = 0;
+  for (const e of es) {
+    const a = e.amount != null && e.amount !== "" ? Number(e.amount) : NaN;
+    sum += Number.isFinite(a) ? a : Math.max(0, total - rcvdOf(e));
+  }
+  const since = Math.min(Math.max(0, total - base), Math.max(0, sum));
+  return Math.max(0, since - ((Number(receivedValue) || 0) - base));
 }
 
 /** The calendar months ('YYYY-MM') a season covers. */

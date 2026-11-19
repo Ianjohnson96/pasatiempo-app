@@ -31,6 +31,8 @@ describe("merch access rules", () => {
     expect(docProblem("pos/a", { invoicesIn: "x" })).toMatch(/invoicesIn/);
     expect(docProblem("pos/a", { invoicesIn: [{ date: "2026-11-18", amount: 250, source: "log" }], invoicesClearedAt: "2026-11-20T00:00:00Z" })).toBeNull();
     expect(docProblem("pos/a", { invoicesIn: [{ date: "2026-11-18", source: "fax" }] })).toMatch(/source/);
+    expect(docProblem("pos/a", { invoicesIn: [{ date: "2026-11-18", amount: 500, source: "hand", rcvd: 1000 }] })).toBeNull();
+    expect(docProblem("pos/a", { invoicesIn: [{ date: "2026-11-18", source: "hand", rcvd: "lots" }] })).toMatch(/rcvd/);
     expect(docProblem("pos/a", { invoicesClearedAt: 5 })).toMatch(/invoicesClearedAt/);
   });
 

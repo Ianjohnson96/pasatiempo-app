@@ -95,6 +95,7 @@ export function docProblem(path: string, data: unknown): string | null {
           const entry = e as Record<string, unknown>;
           if (typeof entry.date !== "string" || !/^\d{4}-\d{2}-\d{2}/.test(entry.date)) return "invoicesIn date must be a date";
           if (!isNum(entry.amount)) return "invoicesIn amount must be a number";
+          if (!isNum(entry.rcvd)) return "invoicesIn rcvd must be a number";
           if (entry.source != null && entry.source !== "hand" && entry.source !== "log") return "invoicesIn source must be hand or log";
         }
       }
