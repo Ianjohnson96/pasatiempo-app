@@ -2,6 +2,8 @@
    Mix = each category role's share of stock dollars at cost, against a target range in percent of a total the owner
    types. Suggested ranges come from each role's share of 12-month sales; the suggested total from what those sales cost
    divided by the turns target. Special Orders (640) are never part of the mix. */
+// The owner's saved guidelines/current (90-io.js keeps it live and applies it with applyGuides), or null.
+let GUIDE = null;
 const MIX_ROLES = ['fashion', 'impulse', 'hardgoods', 'consumable', 'demo'];
 
 /** "$700,000", "700000", "700k", "1.2m" -> dollars; blank, unreadable or not above zero -> null. */

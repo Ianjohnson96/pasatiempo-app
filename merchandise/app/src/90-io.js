@@ -406,6 +406,7 @@ render(); applyMode();
     // after it are always loaded whatever year it is: plan/fy27/adjustments, plan/fy28/adjustments, …
     ...Object.fromEntries((() => { const d = new Date(), fy = d.getFullYear() + (d.getMonth() >= 4 ? 1 : 0);
       return [fy - 1, fy, fy + 1, fy + 2].map(y => { const k = 'fy' + String(y).slice(-2); return ['adj' + k.slice(2), () => coll(`plan/${k}/adjustments`, v => ADJS[k] = v, 'adj' + k.slice(2))]; }); })()),
+    guide: () => db.doc('guidelines/current').onSnapshot(s => { GUIDE = s.exists ? s.data() : null; applyGuides(GUIDE); live(); }, onErr('guide')),
     assume: () => db.doc('plan/assumptions').onSnapshot(s => { SAVED = s.exists ? s.data() : null; live(); }, onErr('assume')),
     base: () => db.doc('base/current').onSnapshot(s => { if (s.exists) BASE = s.data(); live(); }, onErr('base')),
     brands: () => db.doc('brands/current').onSnapshot(s => { if (s.exists) BRANDS = s.data(); live(); }, onErr('brands')),

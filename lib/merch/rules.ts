@@ -22,6 +22,7 @@ const OWNER_ONLY = new Set([
   "brandskus",
   "brandin",
   "assort",
+  "guidelines",
 ]);
 
 // Collections a month-end data file may replace. Everything people enter by
@@ -110,6 +111,8 @@ export function docProblem(path: string, data: unknown): string | null {
       }
       return null;
     }
+    case "guidelines":
+      return guidelinesProblem(d);
     case "plan":
       if (path.includes("/adjustments/") && !isNum(d.amount)) return "amount must be a number";
       return null;
@@ -120,4 +123,65 @@ export function docProblem(path: string, data: unknown): string | null {
     default:
       return null;
   }
+}
+
+const ROLE_KEYS = new Set(["fashion", "impulse", "consumable", "hardgoods", "demo"]);
+const isObj = (v: unknown): v is Record<string, unknown> => v != null && typeof v === "object" && !Array.isArray(v);
+const numIn = (v: unknown, lo: number, hi: number) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi;
+// The bench numbers the Guidelines page may save and the range each must fall in (17-metrics.js BENCH_LIMITS).
+const BENCH_LIMITS: Record<string, Record<string, [number, number]>> = {
+  agedPct: { good: [0, 0.9], near: [0, 0.9] }, md: { good: [0, 0.9], near: [0, 0.9] },
+  wks: { lo: [1, 104], hi: [1, 104], nearLo: [1, 104], nearHi: [1, 104] },
+  gmroi: { apparel: [0, 20], accessories: [0, 20], equipment: [0, 20], near: [0, 1] },
+  turns: { apparel: [0, 52], accessories: [0, 52], equipment: [0, 52], fast: [0, 52], near: [0, 1] },
+  gm: { apparel: [0, 0.9], accessories: [0, 0.9], equipment: [0, 0.9], near: [0, 0.5] },
+};
+
+/** guidelines/current: the owner's rules of thumb (the Guidelines page). Every value the page grades by must be a
+    number in its range, so a bad save can't turn the Scorecard into NaN for everyone. */
+function guidelinesProblem(d: Record<string, unknown>): string | null {
+  if (d.bench != null) {
+    if (!isObj(d.bench)) return "bench must be an object";
+    for (const [m, keys] of Object.entries(d.bench)) {
+      const lim = BENCH_LIMITS[m];
+      if (!lim || !isObj(keys)) return `bench ${m} is not a guideline`;
+      for (const [k, v] of Object.entries(keys)) if (!lim[k] || !numIn(v, lim[k][0], lim[k][1])) return `bench ${m}.${k} is out of range`;
+    }
+  }
+  if (d.roles != null) {
+    if (!isObj(d.roles)) return "roles must be an object";
+    for (const [r, v] of Object.entries(d.roles)) {
+      if (!ROLE_KEYS.has(r) || !isObj(v)) return `${r} is not a role`;
+      const w = v.wks;
+      if (w != null && !(Array.isArray(w) && w.length === 4 && w.every((x) => numIn(x, 1, 104)) && w[2] <= w[0] && w[0] <= w[1] && w[1] <= w[3]))
+        return `${r} weeks of supply must be four numbers 1-104 in order`;
+      if (v.over != null && !numIn(v.over, 1, 104)) return `${r} weeks of supply for too much stock must be 1-104`;
+    }
+  }
+  if (d.roleOf != null) {
+    if (!isObj(d.roleOf)) return "roleOf must be an object";
+    for (const [c, r] of Object.entries(d.roleOf)) if (!/^\d{3}$/.test(c) || c === "640" || !ROLE_KEYS.has(String(r))) return `${c}: unknown role`;
+  }
+  if (d.memberDiscount != null && !numIn(d.memberDiscount, 0, 0.9)) return "memberDiscount must be between 0 and 0.9";
+  if (d.seasons != null) {
+    const s = d.seasons as Record<string, unknown>;
+    const ok = isObj(s) && s.spring === 1 && [s.summer, s.fall, s.holiday].every(Number.isInteger)
+      && 1 < (s.summer as number) && (s.summer as number) < (s.fall as number) && (s.fall as number) < (s.holiday as number) && (s.holiday as number) <= 12;
+    if (!ok) return "seasons must start in January and stay in calendar order";
+  }
+  if (d.mix != null) {
+    if (!isObj(d.mix)) return "mix must be an object";
+    if (d.mix.total != null && !numIn(d.mix.total, 1, 1e9)) return "mix total must be a positive amount";
+    if (d.mix.ranges != null) {
+      if (!isObj(d.mix.ranges)) return "mix ranges must be an object";
+      for (const [r, x] of Object.entries(d.mix.ranges))
+        if (!ROLE_KEYS.has(r) || !Array.isArray(x) || x.length !== 2 || !numIn(x[0], 0, 100) || !numIn(x[1], 0, 100) || x[0] > x[1])
+          return `${r} mix range must be two percentages, low to high`;
+    }
+  }
+  if (d.history != null) {
+    if (!Array.isArray(d.history) || d.history.length > 200) return "history must be a list of at most 200 changes";
+    for (const e of d.history) if (!isObj(e) || typeof e.at !== "string" || typeof e.what !== "string") return "each history entry needs at and what";
+  }
+  return null;
 }

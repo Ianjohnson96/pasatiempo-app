@@ -431,13 +431,26 @@ def _window_units(mo, start, days):
     return tot
 
 
+# The role map and member discount this run uses: config's defaults, or the owner's saved Guidelines (use_guidelines,
+# called by refresh.build_bundle for one upload).
+_ROLE_OF = ROLE_OF
 _MD = round(MEMBER_DISCOUNT * 100)
-OVERSTOCK_ACTION = {
-    'fashion': f'Hold reorders. Members already get {_MD}% off, so a markdown has to go past that (40% off ticket), or move it in a member sale.',
-    'impulse': f'Hold reorders on this style. Feature it, bundle it, or mark it down past the member {_MD}%.',
-    'consumable': 'Hold reorders and order smaller and more often.',
-    'hardgoods': 'Hold reorders on this model; replace only the core models that sell, and order the rest for fittings and special orders.',
-}
+OVERSTOCK_ACTION = {}
+
+
+def use_guidelines(role_of, member_discount):
+    global _ROLE_OF, _MD
+    _ROLE_OF, _MD = role_of, round(member_discount * 100)
+    OVERSTOCK_ACTION.clear()
+    OVERSTOCK_ACTION.update({
+        'fashion': f'Hold reorders. Members already get {_MD}% off, so a markdown has to go past that (40% off ticket), or move it in a member sale.',
+        'impulse': f'Hold reorders on this style. Feature it, bundle it, or mark it down past the member {_MD}%.',
+        'consumable': 'Hold reorders and order smaller and more often.',
+        'hardgoods': 'Hold reorders on this model; replace only the core models that sell, and order the rest for fittings and special orders.',
+    })
+
+
+use_guidelines(ROLE_OF, MEMBER_DISCOUNT)
 
 
 def _aged_action(role, days):
@@ -494,7 +507,7 @@ def build_insights(ctx, calls):
         ls, lr = pos_date(r['last_sale']), pos_date(r['last_rec'])
         aur = px(s) or r['cost'] * 1.8
         call = calls.get(c, 'buy')
-        role = ROLE_OF.get(c, 'fashion')
+        role = _ROLE_OF.get(c, 'fashion')
         # Balls and gloves are never let run out, even in an overbought category.
         may_reorder = call in ("buy", "replenish") or role == "consumable"
         oneoff = bool(re.search(r'\(|invitational|tournament|member.?guest|\b2[4-9]\b|ucsc|event', r['desc'], re.I))
