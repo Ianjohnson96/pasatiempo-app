@@ -241,7 +241,10 @@ document.addEventListener('click', async e => {
   if (ds.brand && !D) return openBrand(ds.brand);
   if (ds.month){ SEL = ds.month; try { localStorage.setItem('ob.month', SEL); } catch (_) {} return render(); }
   if (ds.sccatgo){ SC.cat = ds.sccatgo; UIF.sub = true; }
-  if (ds.tab){ goTab(ds.tab); return scrollY > 0 ? window.scrollTo({top: 0}) : undefined; }
+  if (ds.tab){ goTab(ds.tab);
+    // Open Subcategories (from a category drawer): the subcategory section is at the foot of the Scorecard, so scroll to it.
+    if (ds.sccatgo){ const f = $('#subFold'); if (f){ f.open = true; f.scrollIntoView({block: 'start'}); } return; }
+    return scrollY > 0 ? window.scrollTo({top: 0}) : undefined; }
   if (t.id === 'btnSide') return toggleSide();
   if (t.id === 'btnMore') return togglePop('#morePop', '#btnMore');
   if (t.id === 'btnAcct') return togglePop('#acctPop', '#btnAcct');

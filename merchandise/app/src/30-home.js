@@ -121,8 +121,11 @@ function renderSide(S){
   const grp = NAV.find(g => g.key === pageGroup(TAB));
   $('#pageGroup').textContent = grp ? grp.label : '';
   $('#pageTitle').textContent = title; $('#pageSub').textContent = sub;
+  $('#pageActs').innerHTML = PAGE_ACTIONS[TAB] ? PAGE_ACTIONS[TAB]() : '';
 }
-const ANALYSIS_TABS = new Set(['today', 'scorecard', 'rounds', 'trends', 'stuck']);
+const ANALYSIS_TABS = new Set(['today', 'scorecard', 'rounds', 'trends', 'stuck', 'inventory']);
+// A page can put its own buttons in the header, beside + New order: PAGE_ACTIONS[page id] returns their HTML (empty for viewers).
+const PAGE_ACTIONS = {brands: () => brandActions()};
 // Each page's title (its sidebar label) and one line saying what it is for.
 const TABHEAD = Object.fromEntries(Object.entries({
   today: "What needs you this week, and how the shop is doing.",

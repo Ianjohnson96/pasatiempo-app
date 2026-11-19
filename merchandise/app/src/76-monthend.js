@@ -23,7 +23,7 @@ function renderMonthEnd(S){
   const fcFor = k => { const r = hist.filter(h => h.forecast && h.forecast[k] != null && h.asOf < k + '-01').sort((a, b) => String(b.asOf).localeCompare(String(a.asOf)))[0]; return r ? r.forecast[k] : null; };
   const res = closed.map(k => ({k, act: monthTotal(k), ly: monthLY(k), fc: fcFor(k)}));
   // The reporting calendar (its monthly list is the checklist above) and how the program works fold into this page.
-  const cal = RPT ? paneOf(renderReports, S, {skipMonthly: !!mp}) : '', help = paneOf(renderHelp);
+  const cal = RPT ? paneOf(renderReports, S, {skipKey: mp ? mp.key : null}) : '', help = paneOf(renderHelp);
   $('#pane').innerHTML = `<div class="grid">
     <div class="stack">
       ${renderUpload()}
