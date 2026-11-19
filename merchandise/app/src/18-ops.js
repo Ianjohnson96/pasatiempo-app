@@ -16,15 +16,14 @@ function arrivedValue(invoicesIn, openValue) {
 /** 'received' | 'arrived' | 'late' | 'due' | 'later'. openValue is the order's total cost; receivedValue is what
     month-end recorded as received; invoicesIn are the live entries (liveInvoices). An order is 'arrived' while
     storeRoomValue says goods are in the store room. A Clear (invoicesClearedAt, with nothing newer) only takes an
-    order off the store-room list: an open balance then counts as late / due / later by its delivery month. */
+    order off the store-room list. Then, or when everything invoiced is already received, an open balance counts as
+    late / due / later by its delivery month; with none left the order is 'received'. */
 function rcvState(o, thisMonth) {
   if (o.status === "received" || o.status === "cancelled") return "received";
   const total = Number(o.openValue) || 0, rec = Number(o.receivedValue) || 0;
-  if (o.invoicesClearedAt) {
-    if (total - rec <= 0.5) return "received";
-  } else if ((o.invoicesIn || []).length) {
-    return storeRoomValue(o.invoicesIn, total, rec) > 0.5 ? "arrived" : "received";
-  }
+  if (!o.invoicesClearedAt && (o.invoicesIn || []).length && storeRoomValue(o.invoicesIn, total, rec) > 0.5) return "arrived";
+  // Cleared, or everything invoiced is already received: an open balance still counts as late / due / later.
+  if ((o.invoicesClearedAt || (o.invoicesIn || []).length) && total - rec <= 0.5) return "received";
   const m = o.deliveryMonth;
   if (!m) return "later";
   return m < thisMonth ? "late" : m === thisMonth ? "due" : "later";
