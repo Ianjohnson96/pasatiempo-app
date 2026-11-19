@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 // merchandise/app/src/18-ops.js is plain browser JS joined into the page. It is pure, so it runs here as it is.
 const src = readFileSync(path.join(process.cwd(), "merchandise/app/src/18-ops.js"), "utf8");
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook})");
+const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots})");
 
 describe("arrivedValue", () => {
   it("sums amounts, counts an amountless entry as the whole order, caps and floors", () => {
@@ -73,5 +73,31 @@ describe("seasons", () => {
     expect(O.isPrebook(undefined, O.seasonOf("2027-03"))).toBe(false);
     expect(O.isPrebook("2027-04-15", O.seasonOf("2027-06"))).toBe(true);
     expect(O.isPrebook("2027-05-02", O.seasonOf("2027-06"))).toBe(false);
+  });
+});
+
+describe("deliverySlots", () => {
+  it("starts two months before this month and folds earlier deliveries into one column", () => {
+    const d = O.deliverySlots(["2024-03", "2026-10", "2027-02"], "2026-11");
+    expect(d.months[0]).toBe("2026-09");
+    expect(d.months.at(-1)).toBe("2027-02");
+    expect(d.early).toBe(true);
+    expect(d.slot("2024-03")).toBe(0);
+    expect(d.slot("2026-09")).toBe(1);
+    expect(d.slot("2027-02")).toBe(d.months.length);
+  });
+  it("starts at the first delivery when it is recent, and caps at 24 months with a Later column", () => {
+    const a = O.deliverySlots(["2026-10", "2026-12"], "2026-11");
+    expect(a.early).toBe(false);
+    expect(a.months).toEqual(["2026-10", "2026-11", "2026-12"]);
+    const b = O.deliverySlots(["2026-11", "2030-01"], "2026-11");
+    expect(b.months.length).toBe(24);
+    expect(b.later).toBe(true);
+    expect(b.slot("2030-01")).toBe(24);
+  });
+  it("adds months across a year end and handles no dates", () => {
+    expect(O.slotMonth("2026-11", 3)).toBe("2027-02");
+    expect(O.slotMonth("2026-11", -2)).toBe("2026-09");
+    expect(O.deliverySlots([null, ""], "2026-11").months).toEqual([]);
   });
 });

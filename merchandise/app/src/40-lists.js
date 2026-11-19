@@ -24,23 +24,22 @@ function vendorOpen(){
   for (const p of POS){ if (!isOpen(p)) continue; const k = vkey(p), o = m.get(k) || {key: k, name: vendorName(p), n: 0, cost: 0}; o.n++; o.cost += onOrder(p); m.set(k, o); }
   return [...m.values()].sort((a, b) => b.cost - a.cost || a.name.localeCompare(b.name));
 }
-const nextMonth = m => (+m.slice(0, 4) + (+m.slice(5, 7) === 12 ? 1 : 0)) + '-' + String(+m.slice(5, 7) % 12 + 1).padStart(2, '0');
 // The five biggest vendors by month of delivery (open orders, still to come); everyone else is "Other".
 function deliveriesChart(vs){
   const top = vs.slice(0, 5), topK = new Set(top.map(v => v.key)), open = POS.filter(p => isOpen(p) && /^\d{4}-\d{2}/.test(p.deliveryMonth || ''));
   if (!open.length) return '';
-  const ms = open.map(p => p.deliveryMonth.slice(0, 7)).sort(), months = [];
-  for (let m = ms[0]; m <= ms[ms.length - 1] && months.length < 24; m = nextMonth(m)) months.push(m);
-  const idx = new Map(months.map((m, i) => [m, i])), series = top.map((v, j) => ({name: v.name, key: v.key, k: j + 1, values: months.map(() => 0)}));
-  const other = {name: 'Other vendors', k: 'ly', values: months.map(() => 0)};
-  for (const p of open){ const i = idx.get(p.deliveryMonth.slice(0, 7)); if (i == null) continue; const s = topK.has(vkey(p)) ? series.find(z => z.key === vkey(p)) : other; s.values[i] += onOrder(p); }
-  const hasOther = other.values.some(v => v), all = hasOther ? [...series, other] : series, labs = months.map(monthLabel);
+  const ds = deliverySlots(open.map(p => p.deliveryMonth), THIS_MONTH), cols = (ds.early ? ['Earlier / late'] : []).concat(ds.months.map(monthLabel), ds.later ? ['Later'] : []), n = cols.length;
+  const series = top.map((v, j) => ({name: v.name, key: v.key, k: j + 1, values: cols.map(() => 0)}));
+  const other = {name: 'Other vendors', k: 'ly', values: cols.map(() => 0)};
+  for (const p of open){ const i = ds.slot(p.deliveryMonth), s = topK.has(vkey(p)) ? series.find(z => z.key === vkey(p)) : other; s.values[i] += onOrder(p); }
+  const hasOther = other.values.some(v => v), all = hasOther ? [...series, other] : series, labs = cols;
   const legend = `<div class="lg">${series.map(s => `<button type="button" class="lgb" data-ovend="${esc(s.key)}" aria-pressed="${filt.vendor === s.key}" title="Show only ${esc(s.name)}"><i class="csw k${s.k}"></i>${esc(s.name)}</button>`).join('')}${hasOther ? '<span><i class="csw kly"></i>Other vendors</span>' : ''}</div>`;
   return `<section class="ccard"><h3>Deliveries by month</h3><div class="cs">What is still to come on open orders, by the month it is due, for the ${series.length} vendors with the most open cost. Click a vendor to show only its orders.</div>
     ${legend}${chStack({labels: labs, series: all, fmt: moneyK, label: 'Open orders by delivery month, by vendor'})}
-    ${anaNumbers(['Month', ...all.map(s => s.name), 'Total'], months.map((m, i) => [labs[i], ...all.map(s => money(s.values[i])), money(all.reduce((a, s) => a + s.values[i], 0))]))}</section>`;
+    ${anaNumbers(['Month', ...all.map(s => s.name), 'Total'], cols.map((m, i) => [labs[i], ...all.map(s => money(s.values[i])), money(all.reduce((a, s) => a + s.values[i], 0))]))}</section>`;
 }
 function renderOrders(S){
+  if (filt.vendor !== 'all' && !POS.some(p => vkey(p) === filt.vendor)) filt.vendor = 'all';
   const sel = selMonth(), q = filt.q.trim().toLowerCase();
   let rows = POS.filter(p => {
     if (filt.status === 'active' && !isOpen(p)) return false;
@@ -78,7 +77,7 @@ function renderOrders(S){
       <td>${catSummary(p)}</td><td>${itemsSummary(p)}</td><td>${monthLabel(p.deliveryMonth)}</td><td class="num">${p.cancelDate ? dateLabel(p.cancelDate) : '—'}</td>
       <td class="r num">${money(poTotal(p))}</td><td class="r num">${onOrder(p) ? money(onOrder(p)) : '—'}</td>
       <td><span class="pill ${esc(p.status)}">${STATUS[p.status] || esc(p.status)}</span>${p.status === 'hold' && p.fix ? `<span class="sm fixnote" title="${esc(p.fix)}">${esc(p.fix)}</span>` : ''}</td><td><span class="person" data-uid="${esc(p.createdBy || '')}"></span></td></tr>`).join('')}</tbody></table></div>
-    ${!POS.length ? `<div class="empty"><h3>No purchase orders yet</h3><p>Click <b>+ New order</b> to write one, or use <b>Tools → Paste orders from a spreadsheet</b> to load your current open orders all at once.</p>${canAct() ? '<button class="btn primary" type="button" data-act="new">+ New order</button>' : ''}</div>` : !rows.length ? '<div class="empty"><p>No orders match these filters.</p></div>' : ''}
+    ${!POS.length ? `<div class="empty"><h3>No purchase orders yet</h3><p>Click <b>+ New order</b> to write one, or use <b>Tools → Paste orders from a spreadsheet</b> to load your current open orders all at once.</p>${canAct() ? '<button class="btn primary" type="button" data-act="new">+ New order</button>' : ''}</div>` : !rows.length ? `<div class="empty"><p>No orders match these filters.</p>${filtered ? '<button type="button" class="btn sm" data-oclear="1">Clear vendor and season</button>' : ''}</div>` : ''}
   </section>`;
   fillPeople();
 }

@@ -45,3 +45,23 @@ function seasonOf(month) {
 function isPrebook(orderDate, season) {
   return !!orderDate && !!season && orderDate.slice(0, 7) < season.first;
 }
+
+/** 'YYYY-MM' plus n months. */
+function slotMonth(m, n) {
+  const t = +m.slice(0, 4) * 12 + (+m.slice(5, 7) - 1) + n;
+  return Math.floor(t / 12) + "-" + String((t % 12) + 1).padStart(2, "0");
+}
+
+/**
+ * The columns for a deliveries-by-month chart: from two months before `thisMonth` (or the first delivery, if later) for at
+ * most 24 months. Deliveries before that are one "Earlier / late" column and any after it one "Later" column, so nothing drops out.
+ * Returns {months, early, later, slot(m)}: slot is the column index (early first, later last).
+ */
+function deliverySlots(deliveryMonths, thisMonth) {
+  const ms = deliveryMonths.filter(m => /^\d{4}-\d{2}/.test(m || "")).map(m => m.slice(0, 7)).sort();
+  if (!ms.length) return {months: [], early: false, later: false, slot: () => null};
+  const floor = slotMonth(thisMonth, -2), start = ms[0] > floor ? ms[0] : floor, months = [];
+  for (let m = start; m <= ms[ms.length - 1] && months.length < 24; m = slotMonth(m, 1)) months.push(m);
+  const early = ms[0] < start, later = ms[ms.length - 1] > months[months.length - 1];
+  return {months, early, later, slot: m => { m = m.slice(0, 7); return m < start ? 0 : m > months[months.length - 1] ? months.length + (early ? 1 : 0) : months.indexOf(m) + (early ? 1 : 0); }};
+}
