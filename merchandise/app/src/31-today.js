@@ -45,7 +45,7 @@ function todayDue(){
   const due = POS.filter(isOpen).map(p => ({p, st: rcvOf(p)})).filter(x => x.st === 'due' || x.st === 'late')
     .sort((x, y) => (x.st === 'late' ? 0 : 1) - (y.st === 'late' ? 0 : 1) || String(x.p.deliveryMonth).localeCompare(String(y.p.deliveryMonth)) || onOrder(y.p) - onOrder(x.p));
   const tot = due.reduce((a, x) => a + onOrder(x.p), 0), show = due.slice(0, 8);
-  return `<section class="panel"><header><h2>Due in the next 30 days</h2><button class="btn ghost sm" type="button" data-tab="receiving">Receiving</button></header>
+  return `<section class="panel"><header><h2>Late or due this month</h2><button class="btn ghost sm" type="button" data-tab="receiving">Receiving</button></header>
     ${due.length ? `<div class="note" style="padding-bottom:4px">${due.length} order${due.length === 1 ? '' : 's'} late or due in ${monthFull(THIS_MONTH)}, ${money(tot)} still to come. Click one to open it.</div>
     <div class="tbl"><table class="mini rt duetbl" style="min-width:0"><thead><tr><th>Order</th><th>Expected</th><th class="r">Still to come</th></tr></thead><tbody class="click">${show.map(({p, st}) =>
       `<tr data-po="${esc(p.id)}" tabindex="0"><td class="wrapv"><b>PO ${esc(p.poNumber)}</b> · ${esc(vendorName(p))}</td><td data-l="Expected">${monthLabel(p.deliveryMonth)} <span class="rstat ${st === 'late' ? 'overdue' : 'due'}">${st === 'late' ? 'Late' : 'Due'}</span></td><td data-l="Still to come" class="r num">${money(onOrder(p))}</td></tr>`).join('')}</tbody></table></div>

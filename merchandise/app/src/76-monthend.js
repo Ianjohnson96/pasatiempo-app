@@ -14,7 +14,7 @@ function renderMonthEnd(S){
   if (!BASE){ $('#pane').innerHTML = `<section class="panel"><div class="note">Month-end status appears after the first refresh.</div></section>`; return; }
   const due = nextRefreshMonth(), dueEnd = due + '-' + pad(new Date(+due.slice(0,4), +due.slice(5,7), 0).getDate());
   const late = todayISO > dueEnd ? daysBetween(dueEnd, todayISO) : 0;
-  // The checklist follows the calendar (Checklists page) when the club app provides it; otherwise the data's next refresh month.
+  // The checklist follows the reporting calendar when the club app provides it; otherwise the data's next refresh month.
   const mp = typeof rptMonthly === 'function' ? rptMonthly() : null;
   const ckKey = mp ? mp.key : due, ckItems = mp ? mp.items : MONTH_END, ckTitle = mp ? `${mp.label} checklist` : `${monthFull(due)} month-end checklist`;
   const chk = CHECKS[ckKey] || {items: {}}, done = ckItems.filter(x => chk.items && chk.items[x.k]).length;
@@ -34,7 +34,7 @@ function renderMonthEnd(S){
           <p style="margin-bottom:0">Orders, vendors, counts, budget changes and brand calls are live — they never wait for a refresh.</p></div></section>
       <section class="panel"><header><h2>${esc(ckTitle)}</h2><span class="lab">${done} of ${ckItems.length} done</span></header>
         ${checklistHTML(ckKey, ckItems)}
-        <div class="note">Anyone who can log orders can tick these off; everyone sees the same list${RPT ? ', here and on the Checklists page' : ''}. Save each report as Excel if you can (it reads in seconds), PDF otherwise.</div></section>
+        <div class="note">Anyone who can log orders can tick these off; everyone sees the same list${RPT ? ', here and on Today while it is due' : ''}. Save each report as Excel if you can (it reads in seconds), PDF otherwise.</div></section>
     </div>
     <div class="stack">
       <section class="panel"><header><h2>What happens at a refresh</h2></header><div class="note" style="font-size:13.5px;color:var(--ink)">
