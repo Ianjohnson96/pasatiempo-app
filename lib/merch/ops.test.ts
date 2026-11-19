@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 // merchandise/app/src/18-ops.js is plain browser JS joined into the page. It is pure, so it runs here as it is.
 const src = readFileSync(path.join(process.cwd(), "merchandise/app/src/18-ops.js"), "utf8");
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots, makeInvoiceEntry, liveInvoices, storeRoomValue, seasonMonths, seasonList, seasonBuys})");
+const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots, makeInvoiceEntry, liveInvoices, storeRoomValue, seasonMonths, seasonList, seasonBuys, orderDateISO})");
 
 describe("arrivedValue", () => {
   it("sums amounts, counts an amountless entry as the whole order, caps and floors", () => {
@@ -179,5 +179,29 @@ describe("season buys", () => {
     const rs = ["2026-03", "2026-08", "2026-11", "2027-02", "2027-06"].map((month) => ({ month, cat: "400", amount: 1 }));
     expect(O.seasonList(rs, "2026-11").map((s: { label: string }) => s.label)).toEqual(["Holiday 2026", "Spring 2027", "Summer 2027", "Fall 2026", "Spring 2026"]);
     expect(O.seasonList([{ month: "2026-11", cat: "640", amount: 5 }], "2026-11")).toEqual([]);
+  });
+});
+
+describe("orderDateISO", () => {
+  it("reads ISO, M/D/YYYY and M/D/YY; rejects the rest", () => {
+    expect(O.orderDateISO("2026-09-21")).toBe("2026-09-21");
+    expect(O.orderDateISO("8/25/2026")).toBe("2026-08-25");
+    expect(O.orderDateISO("09/21/26")).toBe("2026-09-21");
+    expect(O.orderDateISO("09/07/26")).toBe("2026-09-07");
+    for (const bad of ["Print date", "", "13/1/26", "2/40/26", null, undefined, 5]) expect(O.orderDateISO(bad)).toBeNull();
+  });
+  it("isPrebook reads those dates", () => {
+    expect(O.isPrebook("09/21/26", O.seasonOf("2027-03"))).toBe(true);
+    expect(O.isPrebook("Print date", O.seasonOf("2027-03"))).toBe(false);
+  });
+  it("seasonBuys puts unreadable order dates in their own bucket", () => {
+    const rows = [
+      { month: "2027-03", cat: "400", brand: "A", orderDate: "", dateUnknown: true, po: "p1", amount: 100, units: 1 },
+      { month: "2027-03", cat: "400", brand: "A", orderDate: "", dateUnknown: true, po: "p1", amount: 50, units: 1 },
+      { month: "2027-03", cat: "400", brand: "A", orderDate: "", po: "p2", amount: 10, units: 1 },
+    ];
+    const t = O.seasonBuys(rows, O.seasonOf("2027-03"));
+    expect(t).toMatchObject({ committed: 160, unknown: 150, unknownOrders: 1, reorders: 10, prebooked: 0 });
+    expect(t.byBrand[0].unknown).toBe(150);
   });
 });

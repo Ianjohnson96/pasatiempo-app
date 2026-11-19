@@ -86,6 +86,7 @@ export function docProblem(path: string, data: unknown): string | null {
       if (d.status != null && !ORDER_STATUS.has(String(d.status))) return "unknown order status";
       for (const k of ["cost", "units", "received"]) if (!isNum(d[k])) return `${k} must be a number`;
       if (!isMonth(d.deliveryMonth)) return "deliveryMonth must be YYYY-MM";
+      if (!isDate(d.orderDate)) return "orderDate must be YYYY-MM-DD";
       for (const k of ["cancelDate", "receivedDate"]) if (!isDate(d[k])) return `${k} must be a date`;
       if (d.invoicesIn != null) {
         if (!Array.isArray(d.invoicesIn)) return "invoicesIn must be a list";

@@ -88,6 +88,12 @@ function exportLines(){
 
 /* ---------- writes, people, toast ---------- */
 async function write(path, body){
+  // Order dates are saved as YYYY-MM-DD (the server refuses anything else). Read M/D/Y; blank one that can't be read.
+  if (path.startsWith('pos/') && body && typeof body.orderDate === 'string' && body.orderDate.trim() !== ''){
+    const iso = orderDateISO(body.orderDate);
+    if (!iso) toast("The order date couldn't be read, so it was left blank. Fill it in on the order.");
+    body = {...body, orderDate: iso || ''};
+  }
   try { await db.doc(path).set(JSON.parse(JSON.stringify(body))); return true; } catch (e){ writeError(e); return false; }
 }
 function writeError(e){

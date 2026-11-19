@@ -16,6 +16,10 @@ describe("merch access rules", () => {
     expect(docProblem("pos/a", { status: "lost" })).toMatch(/status/);
     expect(docProblem("pos/a", { cost: "abc" })).toMatch(/cost/);
     expect(docProblem("pos/a", { deliveryMonth: "Feb" })).toMatch(/deliveryMonth/);
+    expect(docProblem("pos/a", { orderDate: "2026-09-21" })).toBeNull();
+    expect(docProblem("pos/a", { orderDate: "" })).toBeNull();
+    expect(docProblem("pos/a", { orderDate: "9/21/26" })).toMatch(/orderDate/);
+    expect(docProblem("pos/a", { orderDate: "Print date" })).toMatch(/orderDate/);
     expect(docProblem("pos/a", { lines: "x" })).toMatch(/lines/);
     expect(docProblem("pos/a", { lines: [{ cost: "twelve" }] })).toMatch(/line cost/);
     expect(docProblem("pos/a", null)).toBeNull(); // a delete
