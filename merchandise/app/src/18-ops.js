@@ -71,10 +71,10 @@ function makeInvoiceEntry(f, by) {
   const date = String((f && f.date) || "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Pick the date the invoice came in." };
   const raw = f.amount == null ? "" : String(f.amount).replace(/[$,\s]/g, "");
-  const e = { date, source: "hand" };
+  const e = { date, source: "hand", at: new Date().toISOString() };
   if (raw !== "") {
-    const a = Number(raw);
-    if (!Number.isFinite(a) || a <= 0) return { error: "The invoice amount must be more than zero, or left blank for the whole order." };
+    const a = /^\d*\.?\d+$|^\d+\.$/.test(raw) ? Number(raw) : NaN;
+    if (!Number.isFinite(a) || a <= 0) return { error: "The invoice amount must be a number above zero, like 1000 or $1,000.50, or left blank for the whole order." };
     e.amount = Math.round(a * 100) / 100;
   }
   if (by) e.by = by;
@@ -82,4 +82,19 @@ function makeInvoiceEntry(f, by) {
   if (inv) e.invoice = inv.slice(0, 60);
   if (note) e.note = note.slice(0, 300);
   return { entry: e };
+}
+
+/** After a Clear: only entries made later than invoicesClearedAt still count (entries with no `at` are treated as cleared).
+    Returns {entries, cleared}; cleared is true when the order was cleared and nothing newer has come in. */
+function liveInvoices(invoicesIn, clearedAt) {
+  const all = invoicesIn || [];
+  if (!clearedAt) return { entries: all, cleared: false };
+  const entries = all.filter((e) => e && typeof e.at === "string" && e.at > clearedAt);
+  return { entries, cleared: !entries.length };
+}
+
+/** Goods in the store room for an order: what the invoices add up to (capped at the order total), less what the POS
+    already shows received. */
+function storeRoomValue(invoicesIn, totalValue, receivedValue) {
+  return Math.max(0, arrivedValue(invoicesIn, totalValue) - (Number(receivedValue) || 0));
 }

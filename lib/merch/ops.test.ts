@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 // merchandise/app/src/18-ops.js is plain browser JS joined into the page. It is pure, so it runs here as it is.
 const src = readFileSync(path.join(process.cwd(), "merchandise/app/src/18-ops.js"), "utf8");
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots, makeInvoiceEntry})");
+const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots, makeInvoiceEntry, liveInvoices, storeRoomValue})");
 
 describe("arrivedValue", () => {
   it("sums amounts, counts an amountless entry as the whole order, caps and floors", () => {
@@ -104,15 +104,46 @@ describe("deliverySlots", () => {
 
 describe("makeInvoiceEntry", () => {
   it("makes a hand entry; the amount is optional", () => {
-    expect(O.makeInvoiceEntry({ date: "2026-11-18" }, "u1").entry).toEqual({ date: "2026-11-18", source: "hand", by: "u1" });
-    expect(O.makeInvoiceEntry({ date: "2026-11-18", amount: "$1,000.456", invoice: " A-7 ", note: " box 2 " }, "u1").entry).toEqual({
+    expect(O.makeInvoiceEntry({ date: "2026-11-18" }, "u1").entry).toMatchObject({ date: "2026-11-18", source: "hand", by: "u1" });
+    expect(typeof O.makeInvoiceEntry({ date: "2026-11-18" }, "u1").entry.at).toBe("string");
+    expect(O.makeInvoiceEntry({ date: "2026-11-18", amount: "$1,000.456", invoice: " A-7 ", note: " box 2 " }, "u1").entry).toMatchObject({
       date: "2026-11-18", source: "hand", by: "u1", amount: 1000.46, invoice: "A-7", note: "box 2",
     });
+    expect(O.makeInvoiceEntry({ date: "2026-11-18", amount: "$1,000.50" }, "u1").entry.amount).toBe(1000.5);
+    expect(O.makeInvoiceEntry({ date: "2026-11-18", amount: "1000" }, "u1").entry.amount).toBe(1000);
   });
   it("refuses a missing date or a non-positive amount", () => {
     expect(O.makeInvoiceEntry({ date: "" }, "u1").error).toBeTruthy();
     expect(O.makeInvoiceEntry({ date: "11/18/2026" }, "u1").error).toBeTruthy();
     expect(O.makeInvoiceEntry({ date: "2026-11-18", amount: "0" }, "u1").error).toBeTruthy();
     expect(O.makeInvoiceEntry({ date: "2026-11-18", amount: "abc" }, "u1").error).toBeTruthy();
+    expect(O.makeInvoiceEntry({ date: "2026-11-18", amount: "-5" }, "u1").error).toBeTruthy();
+    expect(O.makeInvoiceEntry({ date: "2026-11-18", amount: "12abc" }, "u1").error).toBeTruthy();
+  });
+});
+
+describe("liveInvoices and storeRoomValue", () => {
+  const old = { date: "2026-11-01", amount: 300, at: "2026-11-01T10:00:00.000Z" };
+  const noAt = { date: "2026-10-01", amount: 50 };
+  it("counts everything when never cleared", () => {
+    expect(O.liveInvoices([old, noAt], undefined)).toEqual({ entries: [old, noAt], cleared: false });
+  });
+  it("a Clear with nothing newer takes the order off the list", () => {
+    const r = O.liveInvoices([old, noAt], "2026-11-05T00:00:00.000Z");
+    expect(r.entries).toEqual([]);
+    expect(r.cleared).toBe(true);
+  });
+  it("a new invoice after a Clear shows again, with only the new amount", () => {
+    const fresh = { date: "2026-11-10", amount: 200, at: "2026-11-10T09:00:00.000Z" };
+    const r = O.liveInvoices([old, noAt, fresh], "2026-11-05T00:00:00.000Z");
+    expect(r.entries).toEqual([fresh]);
+    expect(r.cleared).toBe(false);
+    expect(O.rcvState({ status: "open", deliveryMonth: "2026-11", invoicesIn: r.entries, receivedValue: 0, openValue: 1000 }, "2026-11")).toBe("arrived");
+  });
+  it("store-room value is less what the POS already shows received", () => {
+    expect(O.storeRoomValue([{ amount: 600 }], 1000, 400)).toBe(200);
+    expect(O.storeRoomValue([{}], 1000, 400)).toBe(600);
+    expect(O.storeRoomValue([{ amount: 5000 }], 1000, 0)).toBe(1000);
+    expect(O.storeRoomValue([{ amount: 300 }], 1000, 400)).toBe(0);
   });
 });

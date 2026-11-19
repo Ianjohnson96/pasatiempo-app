@@ -4,7 +4,8 @@
    upload works out what arrived since the last one, by category and brand (merchandise/pipeline/receipts.py),
    and this matches it to open orders, oldest expected delivery first, for the owner to confirm. */
 /* Where an order stands for receiving (18-ops.js rcvState): received, arrived (not yet in the POS), late, due or later. */
-function rcvOf(p){ return rcvState({status:p.status, deliveryMonth:p.deliveryMonth, invoicesIn:p.invoicesIn||[], invoicesClearedAt:p.invoicesClearedAt, receivedValue:num(p.received), openValue:poTotal(p)}, THIS_MONTH); }
+function rcvLive(p){ return liveInvoices(p.invoicesIn, p.invoicesClearedAt); }
+function rcvOf(p){ const L = rcvLive(p); return rcvState({status:p.status, deliveryMonth:p.deliveryMonth, invoicesIn:L.entries, invoicesClearedAt:L.cleared ? p.invoicesClearedAt : null, receivedValue:num(p.received), openValue:poTotal(p)}, THIS_MONTH); }
 const RCV_TOL = p => Math.max(25, poTotal(p) * 0.03);  // a balance this small left after a delivery counts as delivered
 function owedIn(p, cat, taken){
   const ext = poParts(p).filter(x => x.cat === cat).reduce((a, x) => a + x.ext, 0);
@@ -81,18 +82,18 @@ function rcvRows(){
   for (const p of POS){
     if (!isOpen(p)) continue;
     const st = rcvOf(p); if (st === 'received' || st === 'later') continue;
-    const inv = p.invoicesIn || [];
-    rows.push({p, st, arrived: arrivedValue(inv, poTotal(p)), days: daysWaiting(inv, todayISO)});
+    const inv = rcvLive(p).entries;
+    rows.push({p, st, inv, arrived: storeRoomValue(inv, poTotal(p), num(p.received)), days: daysWaiting(inv, todayISO)});
   }
   return rows;
 }
 const rcvBtns = p => canAct() ? `<button class="btn sm" type="button" data-invin="${esc(p.id)}">Invoice in</button>` : '';
 function rcvTable(rows, kind){
   const head = kind === 'arrived' ? '<th>Order</th><th class="r">Days waiting</th><th class="r">Arrived</th><th>Invoice</th><th></th>' : '<th>Order</th><th>Expected</th><th class="r">Still to come</th><th></th>';
-  return `<div class="tbl"><table class="mini rt" style="min-width:0"><thead><tr>${head}</tr></thead><tbody class="click">${rows.map(({p, arrived, days}) => {
+  return `<div class="tbl"><table class="mini rt" style="min-width:0"><thead><tr>${head}</tr></thead><tbody class="click">${rows.map(({p, inv, arrived, days}) => {
     const first = `<td class="wrapv"><b>PO ${esc(p.poNumber)}</b> · ${esc(vendorName(p))}</td>`;
     if (kind === 'arrived'){
-      const refs = (p.invoicesIn || []).map(e => e.invoice).filter(Boolean).map(esc).join(', ');
+      const refs = (inv || []).map(e => e.invoice).filter(Boolean).map(esc).join(', ');
       return `<tr data-po="${esc(p.id)}" tabindex="0">${first}<td data-l="Days waiting" class="r num">${days}</td><td data-l="Arrived" class="r num">${money(arrived)}</td><td data-l="Invoice">${refs || '—'}</td>
         <td class="r">${canAct() ? `<button class="btn ghost sm" type="button" data-invclear="${esc(p.id)}" title="Take it off this list. It doesn't change what the POS or the budget say.">Clear</button>` : ''}</td></tr>`;
     }
@@ -142,7 +143,7 @@ function openInvoiceIn(poId){
     <header><div><div class="lab">Invoice in</div><h2 id="iiTitle" style="margin:0;font-size:19px">PO ${esc(p.poNumber)} · ${esc(vendorName(p))}</h2></div><button class="x" type="button" data-close="1" aria-label="Close">×</button></header>
     <div class="body"><p style="margin:0 0 12px;color:var(--muted);font-size:13px">The goods are in the store room. Leave the amount blank if the whole order came (${money(onOrder(p))} still to come); type the invoice total for a partial shipment. This doesn't change the budget.</p>
       <div class="row3"><div class="f"><label for="iiDate">Date</label><input id="iiDate" type="date" value="${todayISO}"></div>
-      <div class="f"><label for="iiAmt">Invoice amount ($, optional)</label><input id="iiAmt" type="number" min="0" step="0.01" placeholder="whole order"></div>
+      <div class="f"><label for="iiAmt">Invoice amount ($, optional)</label><input id="iiAmt" inputmode="decimal" autocomplete="off" placeholder="whole order"></div>
       <div class="f"><label for="iiInv">Invoice # (optional)</label><input id="iiInv" autocomplete="off"></div></div>
       <div class="f"><label for="iiNote">Note (optional)</label><input id="iiNote" autocomplete="off"></div></div>
     <footer><button class="btn" type="button" data-close="1">Cancel</button><button class="btn primary" type="button" data-invsave="${esc(p.id)}">Mark arrived</button></footer></div>`;
