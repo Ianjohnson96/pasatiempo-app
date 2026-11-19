@@ -200,7 +200,7 @@ document.addEventListener('click', e => {
   const d = t.dataset;
   if (d.print) return window.print();
   if (d.anacat){ AN.open.has(d.anacat) ? AN.open.delete(d.anacat) : AN.open.add(d.anacat); return render(); }
-  if (d.anaopen){ AN.open.add(d.anaopen); TAB = 'scorecard'; try { localStorage.setItem('ob.tab2', TAB); } catch (_) {} render();
+  if (d.anaopen){ AN.open.add(d.anaopen); goTab('scorecard');
     return setTimeout(() => document.querySelector(`tr[data-anacat="${CSS.escape(d.anaopen)}"]`)?.scrollIntoView({block: 'center'}), 0); }
   if (d.analevel){ AN.level = d.analevel; return render(); }
   if (d.anaall){ const a = anaNow(); if (!a) return; if (AN.open.size >= a.cats.length) AN.open.clear(); else a.cats.forEach(c => AN.open.add(c.cat)); return render(); }

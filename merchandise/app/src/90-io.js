@@ -113,8 +113,9 @@ function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = fals
 function closeOverlay(){ $('#overlay').innerHTML = ''; D = null; DX = null; }
 
 /* ---------- render + mode ---------- */
-const PAGES = {summary: renderSummaryPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, otb: renderOTB, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
-if (location.hash === '#reports' && RPT){ TAB = 'reports'; history.replaceState(null, '', location.pathname + location.search); }  // the reminder email's link
+const renderSoon = () => { $('#pane').innerHTML = `<section class="panel"><div class="note" style="font-size:14px">Coming in this build.</div></section>`; };
+const PAGES = {today: renderSummaryPage, receiving: renderSoon, seasons: renderSoon, vendors: renderSoon, summary: renderSummaryPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, otb: renderOTB, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
+if (location.hash === '#reports' && RPT){ TAB = resolveTab('reports'); history.replaceState(null, '', location.pathname + location.search); }  // the reminder email's link
 function render(){
   if (!BASE && !LEGACY_PLAN){
     $('.monthbar').hidden = true; $('#summary').hidden = true; $('#kpis').hidden = true; $('#tabs').innerHTML = '';
@@ -122,7 +123,7 @@ function render(){
     return;
   }
   derive();
-  if (!PAGES[TAB]) TAB = FIRST_TAB;
+  TAB = resolveTab(TAB); if (!PAGES[TAB]) TAB = FIRST_TAB;
   const S = stats(), bar = TAB === 'overview' || TAB === 'orders';
   $('.monthbar').hidden = !bar; $('#summary').hidden = TAB !== 'overview'; $('#kpis').hidden = TAB !== 'overview';
   if (bar) renderMonths();
@@ -135,6 +136,13 @@ function render(){
   PAGES[TAB](S);
   window.scrollTo(0, scrollY);
   if (D && $('#dImpact')) updateTotals();
+}
+// Every page change goes through here: old ids are routed to their new page; the Vendors page is still the drawer for now.
+function goTab(id, key){
+  if (id === 'otb'){ try { localStorage.setItem('mp.budgetView', 'months'); } catch (_) {} }
+  if (id === 'vendors'){ closePops(); return openVendors(); }
+  TAB = resolveTab(id); try { localStorage.setItem('ob.tab2', TAB); } catch (_) {}
+  closePops(); closeOverlay(); render();
 }
 let renderQ = null;
 const schedule = () => { if (renderQ) return; renderQ = requestAnimationFrame(() => { renderQ = null; render(); }); };
@@ -198,7 +206,7 @@ document.addEventListener('click', async e => {
   if (ds.brand && !D) return openBrand(ds.brand);
   if (ds.month){ SEL = ds.month; try { localStorage.setItem('ob.month', SEL); } catch (_) {} return render(); }
   if (ds.sccatgo) SC.cat = ds.sccatgo;
-  if (ds.tab){ TAB = ds.tab; try { localStorage.setItem('ob.tab2', TAB); } catch (_) {} closePops(); closeOverlay(); render();
+  if (ds.tab){ goTab(ds.tab); if (ds.tab === 'vendors') return;
     const top = $('#tabsAnchor').getBoundingClientRect().top + scrollY; return scrollY > top ? window.scrollTo({top}) : undefined; }
   if (t.id === 'btnMore') return togglePop('#morePop', '#btnMore');
   if (t.id === 'btnAcct') return togglePop('#acctPop', '#btnAcct');
