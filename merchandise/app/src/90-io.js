@@ -114,7 +114,7 @@ function closeOverlay(){ $('#overlay').innerHTML = ''; D = null; DX = null; }
 
 /* ---------- render + mode ---------- */
 const renderSoon = () => { $('#pane').innerHTML = `<section class="panel"><div class="note" style="font-size:14px">Coming in this build.</div></section>`; };
-const PAGES = {today: renderSummaryPage, receiving: renderSoon, seasons: renderSoon, vendors: renderSoon, summary: renderSummaryPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, otb: renderOTB, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
+const PAGES = {today: renderToday, receiving: renderSoon, seasons: renderSoon, vendors: renderSoon, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
 if (location.hash === '#reports' && RPT){ TAB = resolveTab('reports'); history.replaceState(null, '', location.pathname + location.search); }  // the reminder email's link
 function render(){
   if (!BASE && !LEGACY_PLAN){
@@ -124,13 +124,15 @@ function render(){
   }
   derive();
   TAB = resolveTab(TAB); if (!PAGES[TAB]) TAB = FIRST_TAB;
-  const S = stats(), bar = TAB === 'overview' || TAB === 'orders';
-  $('.monthbar').hidden = !bar; $('#summary').hidden = TAB !== 'overview'; $('#kpis').hidden = TAB !== 'overview';
+  // The month bar belongs to Orders and to Budget & open-to-buy's By category view; #summary and #kpis are retired
+  // (Budget & open-to-buy draws its own tiles).
+  const S = stats(), bar = (TAB === 'overview' && BV === 'cats') || TAB === 'orders';
+  $('.monthbar').hidden = !bar; $('#summary').hidden = true; $('#kpis').hidden = true;
+  renderBVBar();
   if (bar) renderMonths();
-  if (TAB === 'overview'){ renderSummary(S); renderKpis(S); }
   renderSide(S);
-  // What's due on the reporting calendar: on Today and Upload & close only, not over every page.
-  if (RPT && (TAB === 'today' || TAB === 'monthend')) renderDueBar(); else if ($('#duebar')) $('#duebar').hidden = true;
+  // What's due on the reporting calendar: a bar on Upload & close; Today shows it as a card in the page.
+  if (RPT && TAB === 'monthend') renderDueBar(); else if ($('#duebar')) $('#duebar').hidden = true;
   const w = $('#wibar'); w.hidden = !WHATIF || TAB === 'forecast';
   if (WHATIF) w.innerHTML = `<span><b>What-if in use.</b> Budgets on every page reflect forecast changes that aren't saved.</span><span style="display:flex;gap:8px"><button class="btn sm" type="button" data-tab="forecast">Review</button><button class="btn sm" type="button" data-fc="discard">Discard</button></span>`;
   const scrollY = window.scrollY;
@@ -139,12 +141,29 @@ function render(){
   if (D && $('#dImpact')) updateTotals();
 }
 // Every page change goes through here: old ids are routed to their new page; the Vendors page is still the drawer for now.
+// key (from a chart or row's data-go="tab:key") opens the keyed thing there: a YYYY-MM month becomes the selected
+// month (Budget & open-to-buy by category), a brand opens its drawer on Brands, a category code opens its drawer.
+const isMonthKey = k => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(k || ''));
 function goTab(id, key){
-  if (id === 'otb'){ try { localStorage.setItem('mp.budgetView', 'months'); } catch (_) {} }
+  if (id === 'otb') setBV('months');
   if (id === 'vendors'){ closePops(); closeSide(); return openVendors(); }
-  TAB = resolveTab(id); try { localStorage.setItem('ob.tab2', TAB); } catch (_) {}
-  closePops(); closeOverlay(); closeSide(); render();
+  const tab = resolveTab(id), moved = tab !== TAB;
+  if (isMonthKey(key)){
+    if (tab === 'overview') setBV('cats');
+    if (BASE){ const k = planKeyFor(key); if (PLANS[k] && k !== FYSEL){ FYSEL = k; try { localStorage.setItem('mp.fy', FYSEL); } catch (_) {} } }
+    SEL = key; try { localStorage.setItem('ob.month', SEL); } catch (_) {}
+  }
+  TAB = tab; try { localStorage.setItem('ob.tab2', TAB); } catch (_) {}
+  closePops(); closeOverlay(); closeSide();
+  if (moved || isMonthKey(key) || !key) render();
+  if (key && !isMonthKey(key)){
+    if (TAB === 'brands' && typeof BRANDS !== 'undefined' && BRANDS && (BRANDS.rows || []).some(r => r.id === key)) openBrand(key);
+    else if (PLAN && PLAN.cats && PLAN.cats[key]) openCategory(key);
+  }
+  return moved;
 }
+// A click on anything with data-go: the page, then the keyed thing, from the top of the page if it moved.
+function goFrom(s){ const g = parseGo(s); if (!g.tab) return; if (goTab(g.tab, g.key) && window.scrollY > 0) window.scrollTo({top: 0}); }
 // Under 900px the sidebar is a bar across the top with a Menu button that opens the pages.
 function toggleSide(on){
   const s = $('#side'); on = on == null ? !s.classList.contains('open') : !!on;
@@ -170,9 +189,11 @@ function closePops(except){ for (const [p, b] of POPS){ if (p === except || !$(p
 function togglePop(p, b){ closePops(p); const el = $(p); el.hidden = !el.hidden; $(b).setAttribute('aria-expanded', String(!el.hidden)); }
 document.addEventListener('click', e => { const m = e.target.closest('.menu'); closePops(m ? '#' + (m.querySelector('.pop') || {}).id : null); if (!e.target.closest('#side')) closeSide(); }, true);
 document.addEventListener('click', async e => {
-  const t = e.target.closest('button,[data-cat],[data-po],[data-count],tr[data-po],tr[data-brand],tr[data-subrow]'); if (!t) return;
+  const t = e.target.closest('button,[data-go],[data-cat],[data-po],[data-count],tr[data-po],tr[data-brand],tr[data-subrow]'); if (!t) return;
   const ds = t.dataset;
   if (ds.close) return closeOverlay();
+  if (ds.go != null) return goFrom(ds.go);
+  if (ds.bv){ setBV(ds.bv); return render(); }
   if (ds.fy){ FYSEL = ds.fy; SEL = null; try { localStorage.setItem('mp.fy', FYSEL); localStorage.removeItem('ob.month'); } catch (_) {} return render(); }
   if (ds.fc === 'discard'){ WHATIF = null; return render(); }
   if (ds.fc === 'save') return saveAssumptions();
@@ -265,7 +286,7 @@ document.addEventListener('click', async e => {
   }
   if (ds.count) return openCount(ds.count);
   if (ds.po) return openOrder(ds.po);
-  if (ds.cat && !D){ if (TAB === 'otb' && BASE){ const k = OTBV.view === 'next' ? 'next' : 'cur'; if (FYSEL !== k){ FYSEL = k; try { localStorage.setItem('mp.fy', FYSEL); } catch (_) {} render(); } } return openCategory(ds.cat); }
+  if (ds.cat && !D){ if (TAB === 'overview' && BV === 'months' && BASE){ const k = OTBV.view === 'next' ? 'next' : 'cur'; if (FYSEL !== k){ FYSEL = k; try { localStorage.setItem('mp.fy', FYSEL); } catch (_) {} render(); } } return openCategory(ds.cat); }
 });
 document.addEventListener('click', e => {
   const t = e.target; if (!t.matches || !t.matches('input[data-sssel],#ssAll')) return;
@@ -275,6 +296,8 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape'){ if ($('#overlay').innerHTML) closeOverlay(); closePops(); closeSide(); }
   if (e.key === 'Enter' && e.target.matches && e.target.matches('tr[data-po],[data-cat][tabindex],tr[data-brand],tr[data-subrow]')){ e.preventDefault(); e.target.click(); }
+  // Chart marks are SVG (no .click()), so a focused data-go goes straight there.
+  else if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[data-go][tabindex]')){ e.preventDefault(); goFrom(e.target.dataset.go); }
 });
 document.addEventListener('input', e => {
   const t = e.target;

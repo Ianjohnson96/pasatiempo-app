@@ -1,5 +1,5 @@
-/* ---------- Summary and Analysis pages ----------
-   Summary (the one-page view), Scorecard, Spend per round, Trends and Stuck money. Measures come from 17-metrics.js
+/* ---------- Analysis pages ----------
+   Scorecard, Spend per round, Trends and Stuck money, and the tiles and sales chart Today reuses. Measures come from 17-metrics.js
    over assort/current (ASSORT), charts from 16-charts.js. Brands (74-brands.js) sits in the same section. */
 let ANA = null, ANA_KEY = null;
 const AN = {open: new Set(), level: 'cats'};
@@ -53,33 +53,20 @@ const anaNumbers = (head, rows) => `<details class="tview"><summary>Show the num
 const badOf = c => ['agedPct', 'gmroi', 'md', 'wks', 'gm'].filter(k => grade(k, c[k], c.seg, c.cat) === 'bad');
 const BADNAME = {agedPct: 'aged stock', gmroi: 'GMROI', md: 'markdowns', wks: 'weeks of supply', gm: 'margin'};
 
-/* ---------- Summary ---------- */
-function renderSummaryPage(){
-  const a = anaNow(); if (!a) return $('#pane').innerHTML = anaEmpty();
-  const s = a.shop, n = a.months.length, sug = suggest(a), sp = anaSpr(a);
-  const labs = a.months.slice(n - 12).map(mLab);
-  const ty = s.series.slice(n - 12), ly = s.series.slice(n - 24, n - 12).map((v, i) => n - 24 + i >= a.first ? v : null);
-  $('#pane').innerHTML = `<div class="astack">
-    <div class="noprint" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:12.5px;color:var(--muted)">Data through ${monthLabel(a.through)}. Growth compares ${anaCmpText(a)}.</span><button class="btn sm" type="button" data-print="1">Print this page</button></div>
-    <section class="tiles" aria-label="Headline figures">
-      ${anaTile('Sales, last 12 months', moneyK(s.t12), s.growth == null ? '' : aDelta(s.growth) + ' growth', '', 'Retail sales, with special orders filed in a category.')}
-      ${anaTile('Gross margin', aPct(s.gm), `${moneyK(s.gp)} earned`, aGrade(grade('gm', s.gm, SHOPSEG)))}
-      ${anaTile('Stock turns', aX(s.turns), `${aWk(s.wks)} weeks of supply`, aGrade(grade('turns', s.turns, SHOPSEG)))}
-      ${anaTile('GMROI', aX(s.gmroi, 2), 'margin per $1 of stock', aGrade(grade('gmroi', s.gmroi, SHOPSEG)))}
-      ${anaTile('Aged stock', aPct(s.agedPct), `${moneyK(s.aged)} unsold 12+ months`, aGrade(grade('agedPct', s.agedPct, SHOPSEG)))}
-      ${anaTile('Sales per round', sp.spr == null ? '—' : money2(sp.spr), sp.sprNow && sp.sprLY ? aDelta(sp.sprNow / sp.sprLY - 1) + ' on a year earlier' : `${int(sp.rounds)} rounds`, '', 'Retail sales ÷ rounds played.')}
-    </section>
-    <section class="ccard"><h3>Sales by month</h3><div class="cs">The last 12 months against the same months a year earlier.</div>
-      ${chLegend([{name: 'This year', k: 1}, {name: 'A year earlier', k: 'ly'}])}
-      ${chBars({labels: labs, series: [{name: 'This year', values: ty, k: 1}, {name: 'A year earlier', values: ly, k: 'ly'}], label: 'Sales by month, this year against a year earlier',
-        tips: i => `This year: ${money(ty[i])} · A year earlier: ${ly[i] == null ? '—' : money(ly[i])}${ly[i] ? ' · Change: ' + aChg(ty[i] / ly[i] - 1) : ''}`})}
-      ${anaNumbers(['Month', 'This year', 'A year earlier', 'Change'], labs.map((l, i) => [l, money(ty[i]), ly[i] == null ? '—' : money(ly[i]), ly[i] ? aChg(ty[i] / ly[i] - 1) : '—']))}</section>
-    <section class="panel"><header><h2>Category health</h2><span class="lab">Graded on margin, markdowns, weeks, GMROI and aged stock</span></header>
-      <div class="health">${a.cats.map(c => { const b = badOf(c), h = b.length >= 2 ? 'bad' : b.length ? 'near' : 'good';
-        return `<button type="button" class="h-${h}" data-anaopen="${esc(c.cat)}" title="${b.length ? 'Outside the rule of thumb on ' + b.map(k => BADNAME[k]).join(', ') : 'Within the rules of thumb'}"><span class="n">${esc(c.name)}</span><span class="s">${moneyK(c.t12)} · ${aChg(c.growth)}</span><span class="s">${b.length ? b.length + ' to fix' : 'healthy'}</span></button>`; }).join('')}</div></section>
-    <section class="panel"><header><h2>Top suggestions</h2><span class="lab">${sug.length} in all · ranked by dollars</span></header>${anaSugList(sug.slice(0, 5))}
-      ${sug.length > 5 ? `<div class="note noprint"><button class="btn sm" type="button" data-tab="scorecard">All suggestions on the scorecard</button> <button class="btn sm" type="button" data-tab="stuck">Stuck money</button></div>` : ''}</section>
-    ${anaBench()}</div>`;
+/* ---------- pieces Today uses (31-today.js) ---------- */
+// The last 12 months' sales and the same months a year earlier (null before the data starts).
+function anaSalesMonths(a){
+  const s = a.shop, n = a.months.length;
+  return {months: a.months.slice(n - 12), labs: a.months.slice(n - 12).map(mLab), ty: s.series.slice(n - 12), ly: s.series.slice(n - 24, n - 12).map((v, i) => n - 24 + i >= a.first ? v : null)};
+}
+// Sales by month, this year against a year earlier, with its numbers. go: where a month's bars lead.
+function anaSalesCard(a, {w, go} = {}){
+  const {labs, ty, ly} = anaSalesMonths(a);
+  return `<section class="ccard"><h3>Sales by month</h3><div class="cs">The last 12 months against the same months a year earlier.${go ? ' Click a month for the trends.' : ''}</div>
+    ${chLegend([{name: 'This year', k: 1}, {name: 'A year earlier', k: 'ly'}])}
+    ${chBars({labels: labs, series: [{name: 'This year', values: ty, k: 1}, {name: 'A year earlier', values: ly, k: 'ly'}], label: 'Sales by month, this year against a year earlier', w, go: go ? () => go : null,
+      tips: i => `This year: ${money(ty[i])} · A year earlier: ${ly[i] == null ? '—' : money(ly[i])}${ly[i] ? ' · Change: ' + aChg(ty[i] / ly[i] - 1) : ''}`})}
+    ${anaNumbers(['Month', 'This year', 'A year earlier', 'Change'], labs.map((l, i) => [l, money(ty[i]), ly[i] == null ? '—' : money(ly[i]), ly[i] ? aChg(ty[i] / ly[i] - 1) : '—']))}</section>`;
 }
 
 /* ---------- Scorecard ---------- */

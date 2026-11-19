@@ -2,12 +2,17 @@
    Small SVG charts drawn as strings, sized to the page when they're drawn (render() redraws on a real resize).
    Colours come from the chart tokens in shell.html (--c1..--c3 for series, --c-ly for last year), picked and
    checked for colour-blind readers with the dataviz palette validator, light and dark. Every mark, or a hit area
-   wider than it, carries data-cvt/data-cv, which 15-tips.js shows as the hover readout. One y axis, always. */
+   wider than it, carries data-cvt/data-cv, which 15-tips.js shows as the hover readout. One y axis, always.
+   A chart can be clicked through: go(i) (or a point's go) gives "tab" or "tab:key" for the mark's data-go, which
+   90-io.js sends to goTab (a category, brand or YYYY-MM month as the key). */
 const CHP = {l: 48, r: 14, t: 14, b: 26};
 function chWidth(){ const p = document.querySelector('#pane'); return Math.max(280, Math.min(1180, (p ? p.clientWidth : 800) - 34)); }
 function chNice(v){ if (!(v > 0)) return 1; const e = 10 ** Math.floor(Math.log10(v)), f = v / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e; }
 const chEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const chCv = (t, v) => ` data-cvt="${chEsc(t)}" data-cv="${chEsc(v)}"`;
+// A hit area that goes somewhere: focusable, announced, and Enter works (90-io.js).
+const chGo = (g, name) => g ? ` data-go="${chEsc(g)}" tabindex="0" role="button" aria-label="${chEsc(name)}"` : '';
+const chHit = (x, w, h, t, v, g) => `<rect class="hit${g ? ' go' : ''}" x="${x}" y="${CHP.t}" width="${w}" height="${h - CHP.t - CHP.b}"${chCv(t, v)}${chGo(g, t + ': ' + v)}/>`;
 
 function chFrame(w, h, lo, hi, fmt, body, labels, label){
   const pw = w - CHP.l - CHP.r, ph = h - CHP.t - CHP.b, y = v => CHP.t + ph - (v - lo) / (hi - lo) * ph;
@@ -35,7 +40,7 @@ function chBarPath(x, y0, y1, bw){
 }
 
 /** Grouped bars. series: [{name, values, k: 1|2|3|'ly'}]. */
-function chBars({labels, series, fmt = moneyK, h = 230, w = chWidth(), label, tips}){
+function chBars({labels, series, fmt = moneyK, h = 230, w = chWidth(), label, tips, go}){
   const [lo, hi] = chRange(series.flatMap(s => s.values));
   return chFrame(w, h, lo, hi, fmt, (y, band) => {
     const gap = 2, inner = band * .74, bw = Math.max(2, (inner - gap * (series.length - 1)) / series.length);
@@ -44,14 +49,14 @@ function chBars({labels, series, fmt = moneyK, h = 230, w = chWidth(), label, ti
       const x0 = CHP.l + band * i + (band - inner) / 2;
       series.forEach((s, j) => { const v = s.values[i]; if (v == null) return;
         out += `<path class="k${s.k}" d="${chBarPath(x0 + j * (bw + gap), y(Math.max(lo, 0)), y(v), bw)}"/>`; });
-      out += `<rect class="hit" x="${CHP.l + band * i}" y="${CHP.t}" width="${band}" height="${h - CHP.t - CHP.b}"${chCv(l, tips ? tips(i) : series.map(s => s.name + ': ' + (s.values[i] == null ? '—' : fmt(s.values[i]))).join(' · '))}/>`;
+      out += chHit(CHP.l + band * i, band, h, l, tips ? tips(i) : series.map(s => s.name + ': ' + (s.values[i] == null ? '—' : fmt(s.values[i]))).join(' · '), go && go(i));
     });
     return out;
   }, labels, label);
 }
 
 /** Stacked bars (all values >= 0), a 2px gap between segments. */
-function chStack({labels, series, fmt = v => Math.round(v).toLocaleString('en-US'), h = 230, w = chWidth(), label}){
+function chStack({labels, series, fmt = v => Math.round(v).toLocaleString('en-US'), h = 230, w = chWidth(), label, go}){
   const tot = labels.map((_, i) => series.reduce((a, s) => a + (s.values[i] || 0), 0)), [lo, hi] = chRange(tot);
   return chFrame(w, h, lo, hi, fmt, (y, band) => {
     const bw = Math.max(3, band * .62); let out = '';
@@ -62,14 +67,14 @@ function chStack({labels, series, fmt = v => Math.round(v).toLocaleString('en-US
         const y0 = y(base) - (n ? 1 : 0), y1 = y(base + z.v) + (n < segs.length - 1 ? 1 : 0);
         out += n === segs.length - 1 ? `<path class="k${z.s.k}" d="${chBarPath(x, y0, y1, bw)}"/>` : `<rect class="k${z.s.k}" x="${x}" y="${Math.min(y0, y1)}" width="${bw}" height="${Math.max(0, Math.abs(y0 - y1))}"/>`;
         base += z.v; });
-      out += `<rect class="hit" x="${CHP.l + band * i}" y="${CHP.t}" width="${band}" height="${h - CHP.t - CHP.b}"${chCv(l, series.map(s => s.name + ': ' + fmt(s.values[i] || 0)).join(' · ') + ' · Total: ' + fmt(tot[i]))}/>`;
+      out += chHit(CHP.l + band * i, band, h, l, series.map(s => s.name + ': ' + fmt(s.values[i] || 0)).join(' · ') + ' · Total: ' + fmt(tot[i]), go && go(i));
     });
     return out;
   }, labels, label);
 }
 
 /** Lines, 2px, gaps where a value is null, the last point marked. */
-function chLine({labels, series, fmt = moneyK, h = 230, w = chWidth(), label, zeroBase = true}){
+function chLine({labels, series, fmt = moneyK, h = 230, w = chWidth(), label, zeroBase = true, go}){
   const [lo, hi] = chRange(series.flatMap(s => s.values), zeroBase);
   return chFrame(w, h, lo, hi, fmt, (y, band) => {
     let out = '';
@@ -80,12 +85,12 @@ function chLine({labels, series, fmt = moneyK, h = 230, w = chWidth(), label, ze
       out += `<path class="ln l${s.k}${s.dash ? ' dash' : ''}" d="${d}"/>`;
       if (last >= 0) out += `<circle class="k${s.k} dot" cx="${x(last)}" cy="${y(s.values[last])}" r="4"/>`;
     });
-    labels.forEach((l, i) => { out += `<rect class="hit" x="${CHP.l + band * i}" y="${CHP.t}" width="${band}" height="${h - CHP.t - CHP.b}"${chCv(l, series.map(s => s.name + ': ' + (s.values[i] == null ? '—' : fmt(s.values[i]))).join(' · '))}/>`; });
+    labels.forEach((l, i) => { out += chHit(CHP.l + band * i, band, h, l, series.map(s => s.name + ': ' + (s.values[i] == null ? '—' : fmt(s.values[i]))).join(' · '), go && go(i)); });
     return out;
   }, labels, label);
 }
 
-/** Scatter with reference lines and quadrant names. points: [{x, y, r, label, k, cvt, cv, attrs}]. */
+/** Scatter with reference lines and quadrant names. points: [{x, y, r, label, k, cvt, cv, attrs, go}]. */
 function chScatter({points, xFmt, yFmt, xRef = 0, yRef, quads = [], h = 340, w = chWidth(), label, xName, yName, named = 7, xClamp}){
   if (!points.length) return '';
   // An outlier past xClamp sits on the edge (its readout keeps the real figure) rather than squashing everything else.
@@ -104,7 +109,7 @@ function chScatter({points, xFmt, yFmt, xRef = 0, yRef, quads = [], h = 340, w =
     + `<text class="quad" x="${L + 6}" y="${B - 6}">${chEsc(bl || '')}</text><text class="quad" x="${R - 6}" y="${B - 6}" text-anchor="end">${chEsc(br || '')}</text>`;
   const rmax = Math.max(...points.map(p => p.r || 1)), rr = p => 5 + 12 * Math.sqrt(Math.max(0, p.r || 1) / rmax);
   const bySize = points.slice().sort((a, b) => (b.r || 0) - (a.r || 0)), big = bySize.slice(0, named);
-  for (const p of bySize) g += `<circle class="k${p.k || 1} pt" cx="${X(p.x)}" cy="${Y(p.y)}" r="${rr(p)}"${chCv(p.cvt || p.label, p.cv || '')}${p.attrs || ''}/>`;
+  for (const p of bySize) g += `<circle class="k${p.k || 1} pt" cx="${X(p.x)}" cy="${Y(p.y)}" r="${rr(p)}"${chCv(p.cvt || p.label, p.cv || '')}${p.go ? chGo(p.go, (p.cvt || p.label) + ': ' + (p.cv || '')) : ''}${p.attrs || ''}/>`;
   const placed = [];   // skip a name that would sit on top of one already drawn
   for (const p of big){
     const lx = Math.max(L + 40, Math.min(R - 40, X(p.x))), ly = Math.max(T + 22, Y(p.y) - rr(p) - 4), hw = String(p.label).length * 3.1 + 4;
@@ -125,6 +130,14 @@ function chSpark(values, {w = 120, h = 28, k = 1} = {}){
   let d = '', pen = false;
   v.forEach((x, i) => { if (x == null){ pen = false; return; } d += (pen ? 'L' : 'M') + (2 + i * (w - 4) / (v.length - 1)).toFixed(1) + ',' + (h - 3 - (x - lo) / s * (h - 6)).toFixed(1); pen = true; });
   return `<svg class="ch spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true"><path class="ln l${k}" d="${d}"/></svg>`;
+}
+
+/** Small bars for a tile (values >= 0), tallest = full height; title says what they are. */
+function chSparkBars(values, {w = 120, h = 28, k = 1, title = ''} = {}){
+  const v = values.map(x => Math.max(0, +x || 0)), hi = Math.max(...v, 0);
+  if (v.length < 2 || !(hi > 0)) return '';
+  const band = w / v.length, bw = Math.max(2, band * .66);
+  return `<svg class="ch spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true">${title ? `<title>${chEsc(title)}</title>` : ''}${v.map((x, i) => `<path class="k${k}" d="${chBarPath(i * band + (band - bw) / 2, h, h - Math.max(1, x / hi * (h - 2)), bw)}"/>`).join('')}</svg>`;
 }
 
 /** A legend: a swatch and the series name, in ink. */
