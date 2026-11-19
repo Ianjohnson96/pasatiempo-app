@@ -50,28 +50,30 @@ The shop sells only logo soft goods, which can't go back to the vendor, and memb
 
 ## Most important this week
 
-The top of **To do** (and the Budget page) lists the six decisions worth the most money (`topDecisions` in `app/src/30-home.js`): order problems, item to-dos and the scorecard's suggestions on one scale, dollars at stake at cost, at most two of each kind (cut, cancel, chase, push out, reorder, mark down, hold, fix). Done or Not now takes one off the list (`istate/{id}`); the full To do list below is unchanged.
+The top of **Today** (and the To do page) lists the six decisions worth the most money (`topDecisions` in `app/src/30-home.js`): order problems, item to-dos and the scorecard's suggestions on one scale, dollars at stake at cost, at most two of each kind (cut, cancel, chase, push out, reorder, mark down, hold, fix). Done or Not now takes one off the list (`istate/{id}`); the full To do list below is unchanged.
 
 ## Pages
 
-Five sections, each with its pages as a row of pills: **Home**, **Plan** (Budget, Open-to-buy, Forecast), **Orders** (Orders, To do, Vendors), **Assortment** (Scorecard, Subcategories, Brands, Stuck money, Trends, Spend per round) and **Month-end** (Month-end, Checklists, Inventory & counts, How it works). Staff open on Orders the first time; the owner and view-only members (the GM and board) open on Home.
+Fourteen pages in four groups, listed in the sidebar (`NAV` in `app/src/05-nav.js`). Everyone opens on **Today**.
 
-| Page | What it shows |
-|---|---|
-| Home | Six headline figures against a year earlier and the rules of thumb, sales by month, category health, and the top suggestions ranked by dollars. Prints on one page |
-| Scorecard | Every category, opening to its subcategories: sales, growth, share of sales against share of stock, margin, markdowns, turns, GMROI, weeks and aged stock, shaded against the rules of thumb; a growth-against-GMROI bubble chart |
-| Spend per round | Retail sales per round by month against a year earlier; rounds by member, guest, public and other |
-| Trends | Shop sales by month, seasonality (each month's share of the year), and each category's two years |
-| Stuck money | Stock over 16 weeks of sales, aged stock, the cash a 30% markdown would free, lines to reorder, and the oldest items |
-| Budget | Budget left by category for the chosen fiscal year and month; top to-dos |
-| Forecast | Sales by month for this year and next. Growth, extra category growth and target weeks can be edited as a what-if, and the owner can save them as the plan (`plan/assumptions`) |
-| Open-to-buy | Category × month grid (this FY, next FY, calendar year), the inherited-stock table, and the classic OTB worksheet |
-| Orders | Purchase orders with sizes. Each order is checked against the budget of the fiscal year it arrives in. **On hold** marks an order that was placed but needs fixing (missing sizes or quantities, or held by the vendor); `fix` says what. It still counts against the budget, and can be saved with lines that have no quantities yet |
-| Brands | Scorecard by segment with a suggested call (Grow / Keep / Watch / Reduce / Drop). The owner can override a call in `brandCalls/{id}`. Orders link to brands by vendor name |
-| To do | Order alerts plus item suggestions (`insights/current`) |
-| Inventory & counts | On hand by category; quarterly counts |
-| Month-end | The upload, checklist (`checklist/{YYYY-MM}`), refresh history (`refreshes/{asOf}`) with Undo last update, forecast vs actual |
-| Checklists | Every report and task on the reporting calendar, with shared ticks (see Reports calendar below) |
+| Group | Page | What it shows |
+|---|---|---|
+| Every day | Today | Four headline tiles (sales, margin, room to buy, sales per round), the decisions worth the most money this week, sales and receiving room by month, checklists that are due, and orders due in. Charts click through to the detail. Prints on one page |
+| | Orders | Purchase orders with sizes. Each order is checked against the budget of the fiscal year it arrives in. **On hold** marks an order that was placed but needs fixing (missing sizes or quantities, or held by the vendor); `fix` says what. It still counts against the budget, and can be saved with lines that have no quantities yet. Each order has an order date, which is required |
+| | Receiving | What has arrived but is not in the POS yet (see Receiving below) |
+| | To do | Order alerts plus item suggestions (`insights/current`) |
+| | Vendors | Vendor list, opened as a drawer |
+| Plan & buy | Budget & open-to-buy | Budget left by category for the chosen fiscal year and month, the category × month open-to-buy grid (this FY, next FY, calendar year), the inherited-stock table and the classic OTB worksheet |
+| | Season buys | Each season's buy, prebooked against reorders, with what is held back (see Season buys below) |
+| | Forecast | Sales by month for this year and next. Growth, extra category growth and target weeks can be edited as a what-if, and the owner can save them as the plan (`plan/assumptions`) |
+| Analyse | Scorecard | Every category, opening to its subcategories: sales, growth, share of sales against share of stock, margin, markdowns, turns, GMROI, weeks and aged stock, shaded against the rules of thumb; a growth-against-GMROI bubble chart. Subcategory calls, special orders and **Sort SKUs** are here |
+| | Brands | Scorecard by segment with a suggested call (Grow / Keep / Watch / Reduce / Drop). The owner can override a call in `brandCalls/{id}`. Orders link to brands by vendor name |
+| | Stuck money & markdowns | Stock over 16 weeks of sales, aged stock, the cash a 30% markdown would free, markdown candidates by subcategory, lines to reorder, and the oldest items |
+| | Trends & rounds | Shop sales by month, seasonality, each category's two years, and spend per round: retail sales per round by month against a year earlier, and rounds by member, guest, public and other |
+| Month-end | Upload & close | The upload, the checklists on the reporting calendar (`checklist/{key}`), refresh history (`refreshes/{asOf}`) with Undo last update, forecast vs actual, and How the program works |
+| | Counts | On hand by category; quarterly counts |
+
+Every chart has a hover readout and a table or readout of the numbers behind it, and most click through to the page that holds the detail. Charts are hand-built SVG (`app/src/16-charts.js`), with no chart library.
 
 ## Analysis
 
@@ -140,7 +142,31 @@ Items bought for one member (custom clubs, a named order, imprinted balls) or on
 
 ## Navigation
 
-Five sections sit at the top, **Home**, **Plan**, **Orders**, **Assortment** and **Month-end** (in two rows on a phone), with the chosen section's pages as a wrapping row of pills underneath (`SECTIONS` in `app/src/30-home.js`; How it works lists the pages from it). The bar stays pinned as the page scrolls and never scrolls sideways. Vendors opens as a drawer. The open page is remembered in the browser (`ob.tab2`).
+The four groups sit in a sidebar, each listing its pages (`NAV` in `app/src/05-nav.js`). The open page is remembered in the browser (`ob.tab2`). Old page ids still work, from a saved browser, an emailed link or an older button, and `TAB_ALIAS` sends them to where they live now: `summary` to Today, `otb` to Budget & open-to-buy, `subcats` to Scorecard, `rounds` to Trends & rounds, and `reports` and `help` to Upload & close. A link can name a spot on a page as `page:key` (for example `overview:2027-03`).
+
+## Receiving
+
+Boxes go to the store room, the invoice goes to Chris or CJ, and the goods are received into the POS when time allows. Until then neither the POS nor the program knows they are in the building, so the **Receiving** page lists, oldest first, every order with goods that have arrived but are not in the POS yet, with the dollars waiting in the store room. There is no box-by-box check-off.
+
+- **Invoice in** on an order adds one entry to its `invoicesIn` list: `{date, by, at, amount?, invoice?, note?, source}`. The amount is optional; with no amount the whole order counts as arrived. `source` says where the entry came from (`'hand'` for the button).
+- **Store room** dollars for an order are what the invoices add up to (capped at the order total) minus what is already recorded as received (`storeRoomValue` in `app/src/18-ops.js`). It is a reminder only. Budget, open-to-buy and the order's own status never change because of an invoice entry.
+- **Clear** takes an order off the list once its goods are in the POS. It sets `invoicesClearedAt`, hides the entries made before that, and never sets received or receipts. An invoice entered after a Clear brings the order back.
+- Month-end matching (see Deliveries) still records the deliveries from the POS. When it does, the order's `received` rises and the store-room figure falls by the same amount.
+- Orders are marked late when the delivery month has passed with no invoice in.
+
+The receiving log, an Excel spreadsheet, will later write the same `invoicesIn` entries with `source: 'log'`, so nothing on this page needs to change when it is linked.
+
+## Season buys
+
+**Season buys** shows what is committed to each season, by delivery month. Seasons: Spring is January to April, Summer May to July, Fall August to October, and Holiday November and December (`seasonOf` in `app/src/18-ops.js`). Pick a season with the chips at the top.
+
+- **Committed** is the cost of what is on order for delivery in the season plus goods already received. It comes from the same ledger as the Budget page, and a received delivery counts in the month it arrived.
+- **Prebooked** is an order placed before the season began. **Reorders** are orders placed during or after the season. **Order date unknown** is an order whose order date the program cannot read; open it on Orders and fix it.
+- **Held back** is the Budget page's Left to buy summed over the season's months, so it matches that page. If the season runs past the end of the budget, only the months inside it count, and the page says so.
+- Special Orders (640) are left out. Anything outside the budget categories shows on an Other row.
+- A chart shows committed by month (prebooked, reorders, unknown), with tables by category and by brand. Clicking a month opens that month on Budget & open-to-buy.
+
+The page is read only and adds no budget math. The order date is stored as `YYYY-MM-DD`: the page writes it that way on every save of a `pos/` document, and `docProblem` in `lib/merch/rules.ts` rejects an order without one.
 
 ## Deliveries
 
