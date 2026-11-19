@@ -118,7 +118,7 @@ const PAGES = {today: renderSummaryPage, receiving: renderSoon, seasons: renderS
 if (location.hash === '#reports' && RPT){ TAB = resolveTab('reports'); history.replaceState(null, '', location.pathname + location.search); }  // the reminder email's link
 function render(){
   if (!BASE && !LEGACY_PLAN){
-    $('.monthbar').hidden = true; $('#summary').hidden = true; $('#kpis').hidden = true; $('#tabs').innerHTML = '';
+    $('.monthbar').hidden = true; $('#summary').hidden = true; $('#kpis').hidden = true; renderSide(null);
     $('#pane').innerHTML = `<section class="panel"><div class="note" style="font-size:14px">${dbState === 'connecting' ? 'Loading the program…' : 'The forecast and budgets appear after the first month-end data is loaded.'}</div></section>`;
     return;
   }
@@ -128,8 +128,9 @@ function render(){
   $('.monthbar').hidden = !bar; $('#summary').hidden = TAB !== 'overview'; $('#kpis').hidden = TAB !== 'overview';
   if (bar) renderMonths();
   if (TAB === 'overview'){ renderSummary(S); renderKpis(S); }
-  renderTabs(S);
-  if (RPT) renderDueBar();
+  renderSide(S);
+  // What's due on the reporting calendar: on Today and Upload & close only, not over every page.
+  if (RPT && (TAB === 'today' || TAB === 'monthend')) renderDueBar(); else if ($('#duebar')) $('#duebar').hidden = true;
   const w = $('#wibar'); w.hidden = !WHATIF || TAB === 'forecast';
   if (WHATIF) w.innerHTML = `<span><b>What-if in use.</b> Budgets on every page reflect forecast changes that aren't saved.</span><span style="display:flex;gap:8px"><button class="btn sm" type="button" data-tab="forecast">Review</button><button class="btn sm" type="button" data-fc="discard">Discard</button></span>`;
   const scrollY = window.scrollY;
@@ -140,10 +141,16 @@ function render(){
 // Every page change goes through here: old ids are routed to their new page; the Vendors page is still the drawer for now.
 function goTab(id, key){
   if (id === 'otb'){ try { localStorage.setItem('mp.budgetView', 'months'); } catch (_) {} }
-  if (id === 'vendors'){ closePops(); return openVendors(); }
+  if (id === 'vendors'){ closePops(); closeSide(); return openVendors(); }
   TAB = resolveTab(id); try { localStorage.setItem('ob.tab2', TAB); } catch (_) {}
-  closePops(); closeOverlay(); render();
+  closePops(); closeOverlay(); closeSide(); render();
 }
+// Under 900px the sidebar is a bar across the top with a Menu button that opens the pages.
+function toggleSide(on){
+  const s = $('#side'); on = on == null ? !s.classList.contains('open') : !!on;
+  s.classList.toggle('open', on); $('#btnSide').setAttribute('aria-expanded', String(on));
+}
+const closeSide = () => { if ($('#side').classList.contains('open')) toggleSide(false); };
 let renderQ = null;
 const schedule = () => { if (renderQ) return; renderQ = requestAnimationFrame(() => { renderQ = null; render(); }); };
 function applyMode(){
@@ -161,7 +168,7 @@ function applyMode(){
 const POPS = [['#morePop', '#btnMore'], ['#acctPop', '#btnAcct']];
 function closePops(except){ for (const [p, b] of POPS){ if (p === except || !$(p)) continue; $(p).hidden = true; $(b)?.setAttribute('aria-expanded', 'false'); } }
 function togglePop(p, b){ closePops(p); const el = $(p); el.hidden = !el.hidden; $(b).setAttribute('aria-expanded', String(!el.hidden)); }
-document.addEventListener('click', e => { const m = e.target.closest('.menu'); closePops(m ? '#' + (m.querySelector('.pop') || {}).id : null); }, true);
+document.addEventListener('click', e => { const m = e.target.closest('.menu'); closePops(m ? '#' + (m.querySelector('.pop') || {}).id : null); if (!e.target.closest('#side')) closeSide(); }, true);
 document.addEventListener('click', async e => {
   const t = e.target.closest('button,[data-cat],[data-po],[data-count],tr[data-po],tr[data-brand],tr[data-subrow]'); if (!t) return;
   const ds = t.dataset;
@@ -206,8 +213,8 @@ document.addEventListener('click', async e => {
   if (ds.brand && !D) return openBrand(ds.brand);
   if (ds.month){ SEL = ds.month; try { localStorage.setItem('ob.month', SEL); } catch (_) {} return render(); }
   if (ds.sccatgo) SC.cat = ds.sccatgo;
-  if (ds.tab){ goTab(ds.tab); if (ds.tab === 'vendors') return;
-    const top = $('#tabsAnchor').getBoundingClientRect().top + scrollY; return scrollY > top ? window.scrollTo({top}) : undefined; }
+  if (ds.tab){ goTab(ds.tab); if (ds.tab === 'vendors') return; return scrollY > 0 ? window.scrollTo({top: 0}) : undefined; }
+  if (t.id === 'btnSide') return toggleSide();
   if (t.id === 'btnMore') return togglePop('#morePop', '#btnMore');
   if (t.id === 'btnAcct') return togglePop('#acctPop', '#btnAcct');
   if (ds.act === 'import'){ $('#morePop').hidden = true; return openImport(); }
@@ -266,7 +273,7 @@ document.addEventListener('click', e => {
   ssTick(t.dataset.sssel, t.checked, e.shiftKey);
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape'){ if ($('#overlay').innerHTML) closeOverlay(); closePops(); }
+  if (e.key === 'Escape'){ if ($('#overlay').innerHTML) closeOverlay(); closePops(); closeSide(); }
   if (e.key === 'Enter' && e.target.matches && e.target.matches('tr[data-po],[data-cat][tabindex],tr[data-brand],tr[data-subrow]')){ e.preventDefault(); e.target.click(); }
 });
 document.addEventListener('input', e => {
@@ -324,7 +331,7 @@ document.addEventListener('change', e => {
 
 /* ---------- start ---------- */
 if (window.MERCH_HOST){
-  // The band: back to the Club Hub (the program runs at /merch on the club app) and your account.
+  // The sidebar's foot: back to the Club Hub (the program runs at /merch on the club app) and your account.
   const H = window.MERCH_HOST, who = H.me.name || H.me.email;
   $('#backHub').hidden = !H.base;
   $('#acct').hidden = false;

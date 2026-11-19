@@ -135,8 +135,8 @@ function renderHelp(){
   const P = PLANS.cur || PLAN, ga = P.cats['620'] || {};
   $('#pane').innerHTML = `<div class="help">
   <section class="panel"><div class="in"><h3>The pages</h3>
-    <p>The sections across the top hold the pages, shown as a row underneath the section you pick. They stay at the top of the screen as you scroll.</p>
-    ${SECTIONS.map(([id, name, pages]) => `<h4 style="margin:12px 0 4px">${esc(name)}</h4><dl class="gl">${pages.filter(t => PAGES[t] || t === 'vendors').map(t => `<dt>${esc(PAGENAME[t] || (t === 'vendors' ? 'Vendors' : t))}</dt><dd>${esc((TABHEAD[t] || [, t === 'vendors' ? 'Vendor contacts, account numbers, terms and lead times. Every order picks its vendor from this list.' : ''])[1])}</dd>`).join('')}</dl>`).join('')}
+    <p>The sidebar on the left groups the pages by the job you're doing. On a narrow screen it folds into the Menu button at the top.</p>
+    ${NAV.map(g => `<h4 style="margin:12px 0 4px">${esc(g.label)}</h4><dl class="gl">${g.pages.map(([id, label]) => `<dt>${esc(label)}</dt><dd>${esc(id === 'vendors' ? 'Vendor contacts, account numbers, terms and lead times. Every order picks its vendor from this list.' : (TABHEAD[id] || [])[1] || '')}</dd>`).join('')}</dl>`).join('')}
     <h3 style="margin-top:14px">What the open-to-buy is</h3>
     <p>A spending limit for merchandise, set by category and month, at cost. It tells you how much you can bring in without ending the year with more stock than you need.</p>
     <div class="formula"><div class="ln"><span class="op"></span><span>Stock you want at the end of the year</span><span>target</span></div>

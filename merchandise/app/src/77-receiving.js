@@ -3,6 +3,8 @@
    The shop receives into the POS without purchase orders, so nobody logs deliveries here. Each month-end
    upload works out what arrived since the last one, by category and brand (merchandise/pipeline/receipts.py),
    and this matches it to open orders, oldest expected delivery first, for the owner to confirm. */
+/* Where an order stands for receiving (18-ops.js rcvState): received, arrived (not yet in the POS), late, due or later. */
+function rcvOf(p){ return rcvState({status:p.status, deliveryMonth:p.deliveryMonth, invoicesIn:p.invoicesIn||[], invoicesClearedAt:p.invoicesClearedAt, receivedValue:num(p.received), openValue:poTotal(p)}, THIS_MONTH); }
 const RCV_TOL = p => Math.max(25, poTotal(p) * 0.03);  // a balance this small left after a delivery counts as delivered
 function owedIn(p, cat, taken){
   const ext = poParts(p).filter(x => x.cat === cat).reduce((a, x) => a + x.ext, 0);

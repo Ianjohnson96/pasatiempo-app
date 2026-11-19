@@ -116,52 +116,64 @@ function renderKpis(S){
     k('On order', money(S.open), S.later ? `+ ${money(S.later)} after ${monthShort(LAST())} ${LAST().slice(0,4)}` : 'not yet received', 'Still to arrive from vendors on open orders.') +
     k('To do', `<span style="color:${crit ? 'var(--brick)' : att.length ? 'var(--ochre)' : 'inherit'}">${att.length}</span>`, `${crit} urgent`, 'Order problems and item suggestions to work through.');
 }
-function renderTabs(S){
-  const att = openAttention(S), crit = att.filter(i => i.sev === 'crit').length;
-  const due = BASE ? nextRefreshMonth() : null, overdue = due && todayISO > due + '-' + pad(new Date(+due.slice(0,4), +due.slice(5,7), 0).getDate());
-  // Five sections in one row; the section's pages as a wrapping row of pills under it. Nothing scrolls sideways.
-  const badge = {orders: [POS.length], attention: [att.length, crit], subcats: [(ssUnsorted().length + ssPlace().length) || null], monthend: [overdue ? '!' : null, overdue]};
-  if (RPT){ const a = rptAlerts(); badge.reports = [a.length ? a.reduce((n, x) => n + x.left, 0) : null, a.some(x => x.status === 'overdue')]; }
-  const cnt = id => { const [c, hot] = badge[id] || []; return c != null ? `<span class="cnt ${hot ? 'hot' : ''}">${c}</span>` : ''; };
-  const sec = SECTIONS.find(x => x[2].includes(TAB)) || SECTIONS[0];
-  const hotIn = x => x[2].some(id => id !== TAB && badge[id] && badge[id][1]);
-  $('#tabs').innerHTML = `<div class="secs">${SECTIONS.map(x => `<button type="button" role="tab" data-tab="${x[2][0]}" aria-selected="${x === sec}">${x[1]}${x !== sec && hotIn(x) ? '<span class="dot" title="Something here needs attention"></span>' : ''}</button>`).join('')}</div>`
-    + (sec[2].length > 1 ? `<div class="subnav" role="group" aria-label="${sec[1]} pages">${sec[2].filter(id => id !== 'reports' || RPT).map(id => id === 'vendors'
-      ? `<button type="button" class="snav" data-vendors="1" title="Vendor contacts, terms and lead times">Vendors</button>`
-      : `<button type="button" class="snav" data-tab="${id}" aria-pressed="${TAB === id}">${PAGENAME[id] || id}${cnt(id)}</button>`).join('')}</div>` : '');
-  const [title, sub] = TABHEAD[TAB] || [PAGENAME[TAB] || 'Summary', ''];
+/* ---------- sidebar ----------
+   The pages grouped by job (NAV, 05-nav.js), each with a live count where one helps: red when something is urgent,
+   green for the open order book. Under 900px the same list folds into the Menu button (shell.html). */
+const NAV_NEW = new Set(['receiving', 'seasons']);
+function sideBadges(S){
+  const b = {};
+  if (!S) return b;
+  // One count failing (a page's data still loading) must not take the whole sidebar with it.
+  const put = (id, f) => { try { const v = f(); if (v) b[id] = v; } catch (e){ console.error('Sidebar count for ' + id + ' failed', e); } };
+  put('today', () => { const d = topDecisions(S); return d.length ? [d.length, d.some(x => x.sev === 'crit') ? 'hot' : ''] : null; });
+  put('orders', () => { const n = POS.filter(isOpen).length; return n ? [n, 'ok'] : null; });
+  put('receiving', () => {
+    let n = 0, late = false;
+    for (const p of POS){ const st = rcvOf(p); if (st === 'arrived' || st === 'late'){ n++; if (st === 'late') late = true; } }
+    return n ? [n, late ? 'hot' : ''] : null;
+  });
+  put('attention', () => { const a = openAttention(S); return a.length ? [a.length, a.some(i => i.sev === 'crit') ? 'hot' : ''] : null; });
+  put('monthend', () => {
+    const a = RPT ? rptAlerts() : [], left = a.reduce((n, x) => n + x.left, 0);
+    const due = BASE ? nextRefreshMonth() : null, late = !!due && todayISO > due + '-' + pad(new Date(+due.slice(0,4), +due.slice(5,7), 0).getDate());
+    const hot = late || a.some(x => x.status === 'overdue');
+    return left ? [left, hot ? 'hot' : ''] : late ? ['!', 'hot'] : null;
+  });
+  put('scorecard', () => { const n = ssUnsorted().length + ssPlace().length; return n ? [n, ''] : null; });
+  return b;
+}
+function renderSide(S){
+  const b = sideBadges(S);
+  const item = ([id, label]) => {
+    const [c, tone] = b[id] || [];
+    const tail = c != null ? `<span class="sb ${tone || ''}">${c}</span>` : NAV_NEW.has(id) ? '<span class="snew">new</span>' : '';
+    const tip = id === 'vendors' ? ' title="Vendor contacts, terms and lead times"' : '';
+    return `<button type="button" class="sitem" data-tab="${id}"${TAB === id ? ' aria-current="page"' : ''}${tip}><span class="sl">${esc(label)}</span>${tail}</button>`;
+  };
+  $('#sideNav').innerHTML = NAV.map(g => `<div class="sgroup" role="group" aria-label="${esc(g.label)}"><div class="sglab" aria-hidden="true">${esc(g.label)}</div>${g.pages.map(item).join('')}</div>`).join('');
+  const [title, sub] = TABHEAD[TAB] || [pageLabel(TAB) || 'Today', ''];
+  const grp = NAV.find(g => g.key === pageGroup(TAB));
+  $('#pageGroup').textContent = grp ? grp.label : '';
   $('#pageTitle').textContent = title; $('#pageSub').textContent = sub;
 }
-// [section id, name, its pages (the first opens when the section is picked)]
-const SECTIONS = [
-  ['home', 'Home', ['summary']],
-  ['plan', 'Plan', ['overview', 'otb', 'forecast']],
-  ['buy', 'Orders', ['orders', 'attention', 'vendors']],
-  ['assort', 'Assortment', ['scorecard', 'subcats', 'brands', 'stuck', 'trends', 'rounds']],
-  ['close', 'Month-end', ['monthend', 'reports', 'inventory', 'help']]
-];
-const ANALYSIS_TABS = new Set(['summary', 'scorecard', 'rounds', 'trends', 'stuck']);
-const PAGENAME = {summary: 'Home', scorecard: 'Scorecard', rounds: 'Spend per round', trends: 'Trends', stuck: 'Stuck money', brands: 'Brands',
-  overview: 'Budget', otb: 'Open-to-buy', forecast: 'Forecast', orders: 'Orders', attention: 'To do',
-  monthend: 'Month-end', reports: 'Checklists', inventory: 'Inventory & counts', subcats: 'Subcategories', help: 'How it works'};
-const TABHEAD = {
-  summary: ['Home', 'The shop at a glance: the last 12 months against the year before, and what to do next.'],
-  scorecard: ['Scorecard', 'Every category and subcategory side by side, graded against the rules of thumb.'],
-  rounds: ['Spend per round', 'Shop sales for every round played, member, guest and public.'],
-  trends: ['Trends', 'Two years of sales by month, and when the shop sells.'],
-  stuck: ['Stuck money', 'Stock that is over target or not selling, and lines about to run out.'],
-  overview: ['Budget', 'Budget left by category for the year and month you pick.'],
-  orders: ['Orders', 'Purchase orders, each checked against the budget for the year it arrives in.'],
-  otb: ['Open-to-buy', 'How much each category can receive, month by month.'],
-  brands: ['Brands', 'How each brand sells, earns and turns, with a suggested call.'],
-  attention: ['To do', 'Order problems and item suggestions to work through.'],
-  forecast: ['Forecast', 'Sales by month for this year and next.'],
-  subcats: ['Subcategories', 'Sort SKUs into subcategories, and see how each one sells.'],
-  inventory: ['Inventory & counts', 'Stock on hand by category, and the quarterly counts.'],
-  monthend: ['Month-end', 'Upload the reports, work the checklist, and see forecast against actual.'],
-  reports: ['Checklists', 'Every report and task on the calendar: what is due, and who has done it.'],
-  help: ['How it works', 'The monthly routine, and the words used on this page.']
-};
+const ANALYSIS_TABS = new Set(['today', 'summary', 'scorecard', 'rounds', 'trends', 'stuck']);
+// Each page's title (its sidebar label) and one line saying what it is for.
+const TABHEAD = Object.fromEntries(Object.entries({
+  today: "What needs you this week, and how the shop is doing.",
+  orders: "Every purchase order, by vendor, season and month.",
+  receiving: "What's arrived but isn't in the POS yet, and what's due.",
+  attention: "Every order problem and item suggestion to work through.",
+  vendors: "The vendors you buy from.",
+  overview: "Room to buy by category and month, against what's committed.",
+  seasons: "Each season's buy: prebooked, reorders and what's held back.",
+  forecast: "Sales by month for this year and next.",
+  scorecard: "Every category and subcategory, graded against the rules of thumb.",
+  brands: "Brand scorecard and the call for each brand.",
+  stuck: "Stock over target and stock that isn't selling, with markdown candidates.",
+  trends: "Sales trends, seasonality and spend per round.",
+  monthend: "Upload the month-end reports, work the checklist, and see how the program works.",
+  inventory: "Quarterly counts and stock on hand by category."
+}).map(([id, d]) => [id, [pageLabel(id), d]]));
 
 /* ---------- overview ---------- */
 function catRow(c, S){
