@@ -45,4 +45,23 @@ describe("merch access rules", () => {
   it("measures size in UTF-8 bytes", () => {
     expect(docBytes({ a: "é" })).toBe(JSON.stringify({ a: "é" }).length + 1);
   });
+
+  it('keeps the guidelines owner-only and checks them', () => {
+    expect(canWrite('staff', 'guidelines/current')).toBe(false);
+    expect(canWrite('owner', 'guidelines/current')).toBe(true);
+    expect(docProblem('guidelines/current', { memberDiscount: 2 })).toMatch(/memberDiscount/);
+    expect(docProblem('guidelines/current', { roles: { fashion: { wks: [16, 12, 8, 24] } } })).toMatch(/weeks/);
+    expect(docProblem('guidelines/current', { mix: { total: -1 } })).toMatch(/total/);
+    expect(docProblem('guidelines/current', { mix: { ranges: { fashion: [50, 40] } } })).toMatch(/range/);
+    expect(docProblem('guidelines/current', { seasons: { spring: 1, summer: 9, fall: 8, holiday: 11 } })).toMatch(/season/);
+    expect(docProblem('guidelines/current', { history: 'x' })).toMatch(/history/);
+    expect(docProblem('guidelines/current', { history: Array(201).fill({ at: '2026-11-19T00:00:00Z', what: 'x' }) })).toMatch(/history/);
+    expect(docProblem('guidelines/current', { roleOf: { '480': 'bogus' } })).toMatch(/role/);
+    expect(docProblem('guidelines/current', { bench: { gm: { apparel: 'x' } } })).toMatch(/bench/);
+    expect(docProblem('guidelines/current', {
+      bench: { gm: { apparel: 0.48 } }, roles: { fashion: { wks: [12, 16, 8, 24], over: 30 } }, roleOf: { '480': 'impulse' },
+      mix: { total: 700000, ranges: { fashion: [38, 48] } }, seasons: { spring: 1, summer: 5, fall: 8, holiday: 11 }, memberDiscount: 0.25,
+      history: [{ at: '2026-11-19T00:00:00Z', by: 'u', what: 'Apparel margin', from: '45%', to: '48%' }],
+    })).toBeNull();
+  });
 });

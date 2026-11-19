@@ -19,7 +19,9 @@ async function saveAssumptions(){
   const a = assumptions(), fy = curFY(), growth = byYear(SAVED);
   growth[fy] = {months: a.g27, cats: a.g27cat};
   growth[fy + 1] = {months: (growth[fy + 1] || {}).months || {}, cats: a.g28};
-  const body = {growth, wos: a.wos, fy: fyLabel(fy), by: myId, at: new Date().toISOString(), basedOn: BASE.asOf};
+  // Only the weeks someone chose are saved (the Guidelines page or a what-if); the rest follow the defaults.
+  const wos = {...((SAVED || {}).wos || {}), ...((WHATIF || {}).wos || {})};
+  const body = {growth, wos, fy: fyLabel(fy), by: myId, at: new Date().toISOString(), basedOn: BASE.asOf};
   if (await write('plan/assumptions', body)){ WHATIF = null; toast('Saved. Every budget now uses this forecast.'); }
 }
 function whatIfBar(){

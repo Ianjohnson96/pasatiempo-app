@@ -87,7 +87,7 @@ function itemHtml(i, compact){
   const cat = i.cat ? CAT(i.cat).name : '';
   const st = i.state;
   const who = st ? `<span class="who">${st.status === 'done' ? 'Done' : 'Dismissed'} ${dateLabel((st.at || '').slice(0,10))} · <span class="person" data-uid="${esc(st.by || '')}"></span></span>` : '';
-  const btns = compact ? '' : (i.kind === 'order' ? (i.po ? `<button class="btn sm" type="button" data-openpo="${esc(i.po)}">Open order</button>` : i.cat ? `<button class="btn sm" type="button" data-cat="${esc(i.cat)}">Open category</button>` : '')
+  const btns = compact ? '' : (i.kind === 'order' ? (i.guide ? `<button class="btn sm" type="button" data-go="guidelines:${esc(i.guide)}">Open the guideline</button>` : i.po ? `<button class="btn sm" type="button" data-openpo="${esc(i.po)}">Open order</button>` : i.cat ? `<button class="btn sm" type="button" data-cat="${esc(i.cat)}">Open category</button>` : '')
       : (st ? (canAct() ? `<button class="btn sm" type="button" data-istate="${esc(i.id)}" data-v="">Undo</button>` : '')
       : `${(i.kind === 'reorder' || i.kind === 'stockout') && canAct() ? `<button class="btn primary sm" type="button" data-startorder="${esc(i.id)}">Start an order</button>` : ''}
          ${canAct() ? `<button class="btn sm" type="button" data-istate="${esc(i.id)}" data-v="done">Done</button><button class="btn ghost sm" type="button" data-istate="${esc(i.id)}" data-v="dismissed">Dismiss</button>` : ''}`));

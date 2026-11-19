@@ -1,3 +1,4 @@
+import re
 """Planning constants for the Pro Shop merchandise program. Edit here, re-run the refresh."""
 
 # Merchandise categories (POS category number -> name). Special Orders are reported but not bought against OTB.
@@ -20,6 +21,23 @@ ROLE_OF = {'400': 'fashion', '430': 'fashion', '470': 'fashion', '480': 'fashion
            '440': 'impulse', '620': 'impulse', '660': 'impulse', '160': 'consumable', '320': 'consumable',
            '200': 'hardgoods', '300': 'hardgoods', '350': 'hardgoods', '220': 'demo', '640': 'special'}
 MEMBER_DISCOUNT = 0.25
+ROLE_KEYS = {'fashion', 'impulse', 'consumable', 'hardgoods', 'demo'}
+
+
+def guided(g):
+    """(role map, member discount) for one month-end run: these defaults with the owner's saved Guidelines on top
+    (guidelines/current, sent by the Month-end page). Anything missing or invalid keeps its default."""
+    role_of, md = dict(ROLE_OF), MEMBER_DISCOUNT
+    if isinstance(g, dict):
+        ro = g.get('roleOf')
+        if isinstance(ro, dict):
+            for c, r in ro.items():
+                if isinstance(c, str) and re.fullmatch(r'\d{3}', c) and c != '640' and r in ROLE_KEYS:
+                    role_of[c] = r
+        v = g.get('memberDiscount')
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 0.9:
+            md = float(v)
+    return role_of, md
 
 # Target weeks of supply at cost for end-of-month inventory.
 TARGET_WOS = {'620': 14, '440': 13, '480': 10, '490': 11, '400': 10, '200': 14, '500': 12, '470': 12, '160': 14,

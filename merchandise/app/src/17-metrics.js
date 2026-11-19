@@ -6,7 +6,7 @@
    Pure functions, no page globals: lib/merch/analysis.test.ts runs this file on its own. */
 
 // Rules of thumb for a private-club pro shop. General guidelines, not the club's own targets.
-const BENCH = {
+const BENCH_DEFAULT = {
   agedPct: {good: 0.10, near: 0.15, text: 'Aged stock under 10% of stock'},
   md: {good: 0.15, near: 0.20, text: 'Markdowns under 15% of sales'},
   wks: {lo: 12, hi: 16, nearLo: 8, nearHi: 24, text: 'Weeks of supply by role: apparel 12–16, accessories and hats 12–20, balls and gloves 8–16, hard goods 16–26'},
@@ -17,18 +17,18 @@ const BENCH = {
 const FAST_TURN = new Set(['160', '320']);   // balls and gloves
 
 /* Each category's job in the shop, and how it is judged. All soft goods carry the club's logo, so they can't go back to
-   the vendor, and members already get 25% off them: a markdown has to go deeper than that to move anything.
+   the vendor, and members already get 25% off them (the member discount guideline): a markdown has to go deeper than that to move anything.
    wks: [lo, hi, nearLo, nearHi] weeks of supply; over: weeks at which "too much stock" is suggested; null = not judged
    on weeks (the demo fleet is a fitting tool, not stock for sale). Mirrored in pipeline/config.py ROLE_OF. */
-const ROLES = {
+const ROLES_DEFAULT = {
   fashion: {name: 'Fashion apparel', wks: [12, 16, 8, 24], over: 30, share: true,
     judge: 'Judged on sell-through, markdowns and return on stock. Logo goods can\'t go back to the vendor.',
-    aged: 'Logo goods can\'t go back to the vendor, and members already get 25% off: mark down past that (40% off ticket) or put it in a member sale',
+    aged: 'Logo goods can\'t go back to the vendor, and members already get {MD} off: mark down past that (40% off ticket) or put it in a member sale',
     heavy: 'Pause orders until it sells down',
     stop: 'Only order against a customer commitment.'},
   impulse: {name: 'Accessories & hats', wks: [12, 20, 8, 30], over: 30, share: true,
     judge: 'Judged on turns and keeping the best styles in stock; cut the long tail, chase the winners.',
-    aged: 'Mark down past the member 25% (40% off ticket), bundle it, or put it on a feature table',
+    aged: 'Mark down past the member {MD} (40% off ticket), bundle it, or put it on a feature table',
     heavy: 'Cut the slow styles and colours; keep buying the best sellers',
     stop: 'Reorder only the best-selling styles; no new lines.'},
   consumable: {name: 'Balls & gloves', wks: [8, 16, 6, 24], over: 24, share: false,
@@ -47,9 +47,78 @@ const ROLES = {
     heavy: 'Sell off older demos before adding new ones',
     stop: 'Refresh the fleet only after selling off older demos.'}
 };
-const ROLE_OF = {'400': 'fashion', '430': 'fashion', '470': 'fashion', '480': 'fashion', '490': 'fashion', '500': 'fashion',
+const ROLE_OF_DEFAULT = {'400': 'fashion', '430': 'fashion', '470': 'fashion', '480': 'fashion', '490': 'fashion', '500': 'fashion',
   '440': 'impulse', '620': 'impulse', '660': 'impulse', '160': 'consumable', '320': 'consumable',
   '200': 'hardgoods', '300': 'hardgoods', '350': 'hardgoods', '220': 'demo'};
+const MEMBER_DISCOUNT_DEFAULT = 0.25;
+
+/* ---------- the owner's guidelines (guidelines/current) over the defaults above ----------
+   guideValues(doc) keeps every valid saved value and falls back to the default key by key, so a missing, partial or
+   hand-edited document can never break a page. applyGuides(doc) makes those values the ones every page grades by. */
+const pctTxt = v => Math.round(v * 100) + '%';
+const numTxt = v => String(+v.toFixed(2));
+function benchTexts(b, roles){
+  const w = k => roles[k] && roles[k].wks ? roles[k].wks[0] + '–' + roles[k].wks[1] : 'not judged';
+  const g = b.gmroi, t = b.turns, m = b.gm;
+  b.agedPct.text = `Aged stock under ${pctTxt(b.agedPct.good)} of stock`;
+  b.md.text = `Markdowns under ${pctTxt(b.md.good)} of sales`;
+  b.wks.text = `Weeks of supply by role: apparel ${w('fashion')}, accessories and hats ${w('impulse')}, balls and gloves ${w('consumable')}, hard goods ${w('hardgoods')}`;
+  b.gmroi.text = g.apparel === g.accessories ? `GMROI above ${numTxt(g.apparel)} for apparel and accessories, above ${numTxt(g.equipment)} for equipment`
+    : `GMROI above ${numTxt(g.apparel)} for apparel, ${numTxt(g.accessories)} for accessories, above ${numTxt(g.equipment)} for equipment`;
+  b.turns.text = `Stock turning ${numTxt(t.apparel)}–${numTxt(t.fast)} times a year (${numTxt(t.fast)}–${numTxt(t.fast + 1)} for balls and gloves)`;
+  b.gm.text = `Margin: apparel ${pctTxt(m.apparel)}+, accessories ${pctTxt(m.accessories)}+, equipment ${pctTxt(m.equipment)}+`;
+  return b;
+}
+// The numbers a saved document may change, and the range each must fall in.
+const BENCH_LIMITS = {agedPct: {good: [0, 0.9], near: [0, 0.9]}, md: {good: [0, 0.9], near: [0, 0.9]},
+  wks: {lo: [1, 104], hi: [1, 104], nearLo: [1, 104], nearHi: [1, 104]},
+  gmroi: {apparel: [0, 20], accessories: [0, 20], equipment: [0, 20], near: [0, 1]},
+  turns: {apparel: [0, 52], accessories: [0, 52], equipment: [0, 52], fast: [0, 52], near: [0, 1]},
+  gm: {apparel: [0, 0.9], accessories: [0, 0.9], equipment: [0, 0.9], near: [0, 0.5]}};
+const SEASONS_DEFAULT = {spring: 1, summer: 5, fall: 8, holiday: 11};
+const isNumIn = (v, lo, hi) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
+const isObj = v => v != null && typeof v === 'object' && !Array.isArray(v);
+const goodWks = w => Array.isArray(w) && w.length === 4 && w.every(x => isNumIn(x, 1, 104)) && w[2] <= w[0] && w[0] <= w[1] && w[1] <= w[3];
+function guideValues(doc){
+  const d = isObj(doc) ? doc : {};
+  const bench = JSON.parse(JSON.stringify(BENCH_DEFAULT));
+  if (isObj(d.bench)) for (const m in BENCH_LIMITS) if (isObj(d.bench[m])) for (const k in BENCH_LIMITS[m]){
+    const v = d.bench[m][k], [lo, hi] = BENCH_LIMITS[m][k];
+    if (isNumIn(v, lo, hi)) bench[m][k] = v;
+  }
+  const roles = {};
+  for (const r in ROLES_DEFAULT){
+    roles[r] = {...ROLES_DEFAULT[r], wks: ROLES_DEFAULT[r].wks && ROLES_DEFAULT[r].wks.slice()};
+    const s = isObj(d.roles) && isObj(d.roles[r]) ? d.roles[r] : {};
+    if (goodWks(s.wks)) roles[r].wks = s.wks.slice();
+    if (isNumIn(s.over, 1, 104) && roles[r].wks && s.over >= roles[r].wks[1]) roles[r].over = s.over;
+  }
+  const roleOf = {...ROLE_OF_DEFAULT};
+  if (isObj(d.roleOf)) for (const c in d.roleOf) if (/^\d{3}$/.test(c) && Object.prototype.hasOwnProperty.call(ROLES_DEFAULT, d.roleOf[c])) roleOf[c] = d.roleOf[c];
+  const memberDiscount = isNumIn(d.memberDiscount, 0, 0.9) ? d.memberDiscount : MEMBER_DISCOUNT_DEFAULT;
+  const s = d.seasons, seasons = isObj(s) && s.spring === 1 && [s.summer, s.fall, s.holiday].every(Number.isInteger)
+    && 1 < s.summer && s.summer < s.fall && s.fall < s.holiday && s.holiday <= 12
+    ? {spring: 1, summer: s.summer, fall: s.fall, holiday: s.holiday} : {...SEASONS_DEFAULT};
+  const mix = {total: null, ranges: {}};
+  if (isObj(d.mix)){
+    if (isNumIn(d.mix.total, 1, 1e9)) mix.total = d.mix.total;
+    if (isObj(d.mix.ranges)) for (const r in d.mix.ranges){
+      const x = d.mix.ranges[r];
+      if (Object.prototype.hasOwnProperty.call(ROLES_DEFAULT, r) && Array.isArray(x) && x.length === 2 && isNumIn(x[0], 0, 100) && isNumIn(x[1], 0, 100) && x[0] <= x[1]) mix.ranges[r] = [x[0], x[1]];
+    }
+  }
+  const md = pctTxt(memberDiscount);
+  for (const r in roles) for (const k of ['judge', 'aged', 'heavy', 'stop']) roles[r][k] = String(roles[r][k]).split('{MD}').join(md);
+  return {bench: benchTexts(bench, roles), roles, roleOf, memberDiscount, seasons, mix};
+}
+const GUIDE_DEFAULTS = guideValues(null);
+let BENCH = GUIDE_DEFAULTS.bench, ROLES = GUIDE_DEFAULTS.roles, ROLE_OF = GUIDE_DEFAULTS.roleOf, MEMBER_DISCOUNT = GUIDE_DEFAULTS.memberDiscount;
+function applyGuides(doc){
+  const v = guideValues(doc);
+  BENCH = v.bench; ROLES = v.roles; ROLE_OF = v.roleOf; MEMBER_DISCOUNT = v.memberDiscount;
+  if (typeof SEASON_FIRSTS !== 'undefined') SEASON_FIRSTS = v.seasons;
+  return v;
+}
 const roleKey = cat => ROLE_OF[cat] || 'fashion';
 const roleOf = cat => ROLES[roleKey(cat)];
 /** 'neg' (red) when a figure is off the rules of thumb, for the Subcategories and Brands tables: the same cut-offs the

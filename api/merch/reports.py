@@ -133,7 +133,7 @@ def run(req):
     if not reports.get('sku_analysis'):
         return 422, {'error': 'No SKU Analysis among these files. It is needed for on-hand stock and unit sales.', 'files': found}
     try:
-        _docs, bundle, summary = refresh.build_bundle(reports, prior, notes)
+        _docs, bundle, summary = refresh.build_bundle(reports, prior, notes, req.get('guidelines'))
     except ValueError as e:
         return 422, {'error': str(e), 'files': found}
     was = docs.get('base/current') if isinstance(docs.get('base/current'), dict) else None

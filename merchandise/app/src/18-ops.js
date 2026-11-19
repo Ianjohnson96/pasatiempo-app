@@ -37,16 +37,17 @@ function daysWaiting(invoicesIn, todayISO) {
   return Math.max(0, Math.round((t(todayISO) - t(ds[0])) / 86400000));
 }
 
-/** The buying season a 'YYYY-MM' month falls in (null when missing or malformed): spring Jan-Apr, summer May-Jul, fall Aug-Oct, holiday Nov-Dec. */
-function seasonOf(month) {
+/** The buying season a 'YYYY-MM' month falls in (null when missing or malformed). firsts: the first month of each season,
+    in calendar order within the year (the Guidelines page; default spring Jan-Apr, summer May-Jul, fall Aug-Oct, holiday Nov-Dec). */
+let SEASON_FIRSTS = {spring: 1, summer: 5, fall: 8, holiday: 11};
+function seasonOf(month, firsts = SEASON_FIRSTS) {
   if (typeof month !== "string" || !/^\d{4}-(0[1-9]|1[0-2])/.test(month)) return null;
-  const y = +month.slice(0, 4), m = +month.slice(5, 7);
+  const y = +month.slice(0, 4), m = +month.slice(5, 7), f = firsts || {spring: 1, summer: 5, fall: 8, holiday: 11};
   const [key, label, firstMonth] =
-    m <= 4 ? ["spring", "Spring", 1] : m <= 7 ? ["summer", "Summer", 5] : m <= 10 ? ["fall", "Fall", 8] : ["holiday", "Holiday", 11];
+    m < f.summer ? ["spring", "Spring", f.spring] : m < f.fall ? ["summer", "Summer", f.summer] : m < f.holiday ? ["fall", "Fall", f.fall] : ["holiday", "Holiday", f.holiday];
   return { key, label: label + " " + y, year: y, first: y + "-" + String(firstMonth).padStart(2, "0") };
 }
 
-/** True when the order was placed before its season began. */
 function isPrebook(orderDate, season) {
   const d = orderDateISO(orderDate);
   return !!d && !!season && d.slice(0, 7) < season.first;
@@ -131,11 +132,14 @@ function storeRoomValue(invoicesIn, totalValue, receivedValue) {
   return Math.max(0, since - ((Number(receivedValue) || 0) - base));
 }
 
-/** The calendar months ('YYYY-MM') a season covers. */
-function seasonMonths(season) {
+/** The calendar months ('YYYY-MM') a season covers: from its first month up to the next season's (holiday runs to
+    December), by the same season months seasonOf uses. */
+function seasonMonths(season, firsts = SEASON_FIRSTS) {
   if (!season) return [];
-  const n = { spring: 4, summer: 3, fall: 3, holiday: 2 }[season.key] || 0;
-  return Array.from({ length: n }, (_, i) => slotMonth(season.first, i));
+  const f = firsts || { spring: 1, summer: 5, fall: 8, holiday: 11 }, order = ["spring", "summer", "fall", "holiday"], i = order.indexOf(season.key);
+  if (i < 0) return [];
+  const start = +season.first.slice(5, 7), end = i < 3 ? f[order[i + 1]] - 1 : 12;
+  return Array.from({ length: Math.max(0, end - start + 1) }, (_, k) => slotMonth(season.first, k));
 }
 
 /**

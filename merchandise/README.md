@@ -168,6 +168,30 @@ The receiving log, an Excel spreadsheet, will later write the same `invoicesIn` 
 
 The page is read only and adds no budget math. The order date is stored as `YYYY-MM-DD`: the page writes it that way on every save of a `pos/` document, and `docProblem` in `lib/merch/rules.ts` rejects any other non-blank form. A blank order date is allowed, and on Season buys it counts as a Reorder; only a non-blank date the program can't read shows as **Order date unknown**.
 
+## Guidelines
+
+The **Guidelines** page (bottom of the sidebar) holds every rule the program grades and suggests by. Each line shows
+**Suggested** (the program's default and where it comes from), **Your shop now** (the latest month-end figure, red when
+it misses) and **Pasatiempo** (the owner's value). Only the owner changes them; everyone else reads. Tabs:
+
+- **Targets** — margin, GMROI, markdowns, aged stock, turns, and how close counts as "near".
+- **Category roles** — each category's role, and each role's weeks-of-supply range and "too much stock" weeks.
+- **Budget inputs** — target weeks of supply per category. An edit shows Left to buy by month now and with the change
+  (the budget engine run twice, `wosPreview` in `19-guides.js`); **Save to the budget** writes only the changed
+  categories into `plan/assumptions.wos`, the same document the Forecast page saves growth to.
+- **Merchandise mix** — a total stock to plan for (typed, the suggested cost of 12-month sales ÷ the turns target, or
+  today's on hand) and each role's target range in percent; each role shows its dollars short or over. A role out of
+  range adds a To do item.
+- **Seasons & discount** — the season months (saved as one set, in calendar order from January) and the member discount.
+- **Change history** — who changed what and why (newest 200).
+
+Everything except the weeks of supply is saved in `guidelines/current` (owner-only, checked by `docProblem`). The code
+defaults stay in `17-metrics.js` (`BENCH_DEFAULT`, `ROLES_DEFAULT`, `ROLE_OF_DEFAULT`, `MEMBER_DISCOUNT_DEFAULT`) and
+`18-ops.js` (`SEASON_FIRSTS`); `guideValues` lays the saved values over them key by key and ignores anything invalid,
+and `applyGuides` makes them the values every page uses. With nothing saved, everything behaves as before. The month-end
+upload sends the saved role map and member discount to the reader (`config.guided`, `model.use_guidelines`), so
+suggestions written at month-end follow them from the next upload on.
+
 ## Deliveries
 
 Boxes are received into the POS without purchase orders, so nobody logs deliveries in the program. Each month-end upload works them out instead (`pipeline/receipts.py`):

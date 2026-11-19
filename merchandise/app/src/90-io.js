@@ -120,7 +120,7 @@ function closeOverlay(){ $('#overlay').innerHTML = ''; D = null; DX = null; }
 
 /* ---------- render + mode ---------- */
 const renderSoon = () => { $('#pane').innerHTML = `<section class="panel"><div class="note" style="font-size:14px">Coming in this build.</div></section>`; };
-const PAGES = {today: renderToday, receiving: renderReceiving, seasons: renderSeasons, vendors: renderVendorsPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
+const PAGES = {guidelines: renderGuidelines, today: renderToday, receiving: renderReceiving, seasons: renderSeasons, vendors: renderVendorsPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
 if (location.hash === '#reports' && RPT){ TAB = resolveTab('reports'); history.replaceState(null, '', location.pathname + location.search); }  // the reminder email's link
 function render(){
   if (!BASE && !LEGACY_PLAN){
@@ -151,7 +151,9 @@ function render(){
 // month (Budget & open-to-buy by category), a brand opens its drawer on Brands, a category code opens its drawer.
 const isMonthKey = k => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(k || ''));
 function goTab(id, key){
+  if (TAB === 'guidelines' && resolveTab(id) !== 'guidelines' && !gdLeaveOk()) return;
   if (id === 'otb') setBV('months');
+  if (resolveTab(id) === 'guidelines' && key){ GD.tab = key; try { localStorage.setItem('mp.guideTab', key); } catch (_) {} }
   const toOrders = id === 'orders' && key && !isMonthKey(key);
   if (toOrders){ filt.status = 'active'; filt.vendor = key; filt.season = 'all'; filt.cat = 'all'; filt.q = ''; filt.arriving = false; }
   const tab = resolveTab(id), moved = tab !== TAB;
@@ -406,6 +408,7 @@ render(); applyMode();
     // after it are always loaded whatever year it is: plan/fy27/adjustments, plan/fy28/adjustments, …
     ...Object.fromEntries((() => { const d = new Date(), fy = d.getFullYear() + (d.getMonth() >= 4 ? 1 : 0);
       return [fy - 1, fy, fy + 1, fy + 2].map(y => { const k = 'fy' + String(y).slice(-2); return ['adj' + k.slice(2), () => coll(`plan/${k}/adjustments`, v => ADJS[k] = v, 'adj' + k.slice(2))]; }); })()),
+    guide: () => db.doc('guidelines/current').onSnapshot(s => { GUIDE = s.exists ? s.data() : null; applyGuides(GUIDE); live(); }, onErr('guide')),
     assume: () => db.doc('plan/assumptions').onSnapshot(s => { SAVED = s.exists ? s.data() : null; live(); }, onErr('assume')),
     base: () => db.doc('base/current').onSnapshot(s => { if (s.exists) BASE = s.data(); live(); }, onErr('base')),
     brands: () => db.doc('brands/current').onSnapshot(s => { if (s.exists) BRANDS = s.data(); live(); }, onErr('brands')),

@@ -22,7 +22,7 @@ import exports
 import model
 import parse
 import receipts
-from config import CATS, OTB_EXCLUDE, REPLENISH
+from config import CATS, OTB_EXCLUDE, REPLENISH, guided
 from extract import SHEETS, detect_kind, is_sheet, pdf_text, rows_text, sheet_rows
 
 # plan/assumptions keys the refresh reads: growth by fiscal year (or the older g27/g27cat/g28) and target weeks
@@ -277,9 +277,18 @@ def category_calls(base, a=None):
     return calls, engine.run(base, a, carry)
 
 
-def build_bundle(reports, prior=None, notes=None):
+def build_bundle(reports, prior=None, notes=None, guidelines=None):
     """Run the month-end refresh. Returns (docs, bundle, summary): docs by file name, the data file the
-    club app loads (More -> Load month-end data), and the headline numbers."""
+    club app loads (More -> Load month-end data), and the headline numbers. guidelines: the owner's saved role map
+    and member discount (config.guided), used for this run only."""
+    model.use_guidelines(*guided(guidelines))
+    try:
+        return _build_bundle(reports, prior, notes)
+    finally:
+        model.use_guidelines(*guided(None))
+
+
+def _build_bundle(reports, prior=None, notes=None):
     if not reports.get('sku_analysis'):
         raise ValueError('No SKU Analysis among the reports. It is needed for on-hand stock and unit sales.')
     notes = notes or []
