@@ -88,3 +88,61 @@ describe("applyGuides", () => {
     expect(G.seasonOf("2027-04").key).toBe("summer");
   });
 });
+
+// 19-guides.js: merchandise mix and suggested values (pure).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const X: any = vm.runInNewContext(read("17-metrics.js") + "\n" + read("19-guides.js")
+  + ";({parseMoney, salesShareByRole, suggestedRanges, suggestedTotal, mixRows, rangeSum})");
+
+describe("mix and suggestions", () => {
+  it("parseMoney", () => {
+    expect(X.parseMoney("$700,000")).toBe(700000);
+    expect(X.parseMoney("700k")).toBe(700000);
+    expect(X.parseMoney("1.2m")).toBe(1200000);
+    expect(X.parseMoney(" 685352 ")).toBe(685352);
+    expect(X.parseMoney("")).toBeNull();
+    expect(X.parseMoney("abc")).toBeNull();
+    expect(X.parseMoney("-5")).toBeNull();
+    expect(X.parseMoney("0")).toBeNull();
+  });
+
+  it("sales share by role leaves out special orders", () => {
+    const s = X.salesShareByRole([{ cat: "480", t12: 300 }, { cat: "620", t12: 100 }, { cat: "640", t12: 600 }]);
+    expect(s.fashion).toBeCloseTo(0.75);
+    expect(s.impulse).toBeCloseTo(0.25);
+    expect(s.demo).toBe(0);
+  });
+
+  it("suggested ranges are sales share plus or minus 5 points", () => {
+    expect(X.suggestedRanges({ fashion: 0.432, demo: 0.003 })).toEqual({ fashion: [38, 48], demo: [0, 5] });
+  });
+
+  it("suggested total is cost of sales over the turns target", () => {
+    expect(X.suggestedTotal([{ cat: "480", t12: 1000, gm: 0.4 }, { cat: "640", t12: 5000, gm: 0.1 }], 2.5)).toBe(240);
+    expect(X.suggestedTotal([], 2.5)).toBe(0);
+  });
+
+  const onHand = { fashion: 223463, impulse: 299966, hardgoods: 111568, consumable: 40230, demo: 10125 };
+  const ranges = { fashion: [38, 48], impulse: [36, 46], hardgoods: [5, 15], consumable: [4, 8], demo: [0, 3] };
+  it("mix rows at today's stock", () => {
+    const rows = X.mixRows(onHand, {}, ranges, 685352);
+    expect(rows.map((r: { role: string }) => r.role)).toEqual(["fashion", "impulse", "hardgoods", "consumable", "demo"]);
+    const f = rows[0];
+    expect(f.status).toBe("short");
+    expect(f.gap).toBeCloseTo(36971, -1);
+    expect(f.loDollar).toBeCloseTo(260434, -1);
+    expect(rows[2].status).toBe("over");
+    expect(rows[2].gap).toBeCloseTo(8765, -1);
+    expect(rows[1].status).toBe("in");
+  });
+
+  it("mix rows follow a typed total", () => {
+    const rows = X.mixRows(onHand, {}, ranges, 750000);
+    expect(rows[0].gap).toBeCloseTo(61537, -1);
+    expect(rows[2].status).toBe("in");
+  });
+
+  it("range sum", () => {
+    expect(X.rangeSum(ranges)).toEqual({ lo: 83, hi: 120 });
+  });
+});
