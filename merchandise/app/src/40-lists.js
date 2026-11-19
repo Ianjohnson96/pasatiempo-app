@@ -16,6 +16,30 @@ function catSummary(p){
   const cats = [...new Set((p.lines && p.lines.length ? p.lines.map(l => l.cat || p.cat) : [p.cat]))];
   return cats.length > 1 ? `${cats.length} categories<span class="sm">${esc(cats.map(c => CAT(c).name).join(', ').slice(0,40))}</span>` : `${esc(CAT(cats[0]).name)}<span class="sm">${esc(cats[0])}</span>`;
 }
+// Orders are grouped by vendor record, or by the typed name when an order has no vendor record.
+const vkey = p => p.vendorId || ('n:' + vendorName(p));
+// Open cost (still to come) by vendor, biggest first.
+function vendorOpen(){
+  const m = new Map();
+  for (const p of POS){ if (!isOpen(p)) continue; const k = vkey(p), o = m.get(k) || {key: k, name: vendorName(p), n: 0, cost: 0}; o.n++; o.cost += onOrder(p); m.set(k, o); }
+  return [...m.values()].sort((a, b) => b.cost - a.cost || a.name.localeCompare(b.name));
+}
+const nextMonth = m => (+m.slice(0, 4) + (+m.slice(5, 7) === 12 ? 1 : 0)) + '-' + String(+m.slice(5, 7) % 12 + 1).padStart(2, '0');
+// The five biggest vendors by month of delivery (open orders, still to come); everyone else is "Other".
+function deliveriesChart(vs){
+  const top = vs.slice(0, 5), topK = new Set(top.map(v => v.key)), open = POS.filter(p => isOpen(p) && /^\d{4}-\d{2}/.test(p.deliveryMonth || ''));
+  if (!open.length) return '';
+  const ms = open.map(p => p.deliveryMonth.slice(0, 7)).sort(), months = [];
+  for (let m = ms[0]; m <= ms[ms.length - 1] && months.length < 24; m = nextMonth(m)) months.push(m);
+  const idx = new Map(months.map((m, i) => [m, i])), series = top.map((v, j) => ({name: v.name, key: v.key, k: j + 1, values: months.map(() => 0)}));
+  const other = {name: 'Other vendors', k: 'ly', values: months.map(() => 0)};
+  for (const p of open){ const i = idx.get(p.deliveryMonth.slice(0, 7)); if (i == null) continue; const s = topK.has(vkey(p)) ? series.find(z => z.key === vkey(p)) : other; s.values[i] += onOrder(p); }
+  const hasOther = other.values.some(v => v), all = hasOther ? [...series, other] : series, labs = months.map(monthLabel);
+  const legend = `<div class="lg">${series.map(s => `<button type="button" class="lgb" data-ovend="${esc(s.key)}" aria-pressed="${filt.vendor === s.key}" title="Show only ${esc(s.name)}"><i class="csw k${s.k}"></i>${esc(s.name)}</button>`).join('')}${hasOther ? '<span><i class="csw kly"></i>Other vendors</span>' : ''}</div>`;
+  return `<section class="ccard"><h3>Deliveries by month</h3><div class="cs">What is still to come on open orders, by the month it is due, for the ${series.length} vendors with the most open cost. Click a vendor to show only its orders.</div>
+    ${legend}${chStack({labels: labs, series: all, fmt: moneyK, label: 'Open orders by delivery month, by vendor'})}
+    ${anaNumbers(['Month', ...all.map(s => s.name), 'Total'], months.map((m, i) => [labs[i], ...all.map(s => money(s.values[i])), money(all.reduce((a, s) => a + s.values[i], 0))]))}</section>`;
+}
 function renderOrders(S){
   const sel = selMonth(), q = filt.q.trim().toLowerCase();
   let rows = POS.filter(p => {
@@ -24,17 +48,30 @@ function renderOrders(S){
     if (filt.status === 'received' && p.status !== 'received') return false;
     if (filt.status === 'cancelled' && p.status !== 'cancelled') return false;
     if (filt.cat !== 'all' && !(p.cat === filt.cat || (p.lines || []).some(l => l.cat === filt.cat))) return false;
+    if (filt.vendor !== 'all' && vkey(p) !== filt.vendor) return false;
+    if (filt.season !== 'all' && (seasonOf(p.deliveryMonth) || {}).label !== filt.season) return false;
     if (filt.arriving && sel !== 'season' && bucket(p) !== sel) return false;
     if (q && !`${p.poNumber} ${vendorName(p)} ${p.notes || ''} ${p.fix || ''} ${(p.lines || []).map(l => l.style + ' ' + l.color).join(' ')}`.toLowerCase().includes(q)) return false;
     return true;
   });
   rows.sort((a,b) => { const x = sortVal(a, sort.key), y = sortVal(b, sort.key); return (x < y ? -1 : x > y ? 1 : 0) * sort.dir; });
+  const vs = vendorOpen(), allV = new Map(POS.map(p => [vkey(p), vendorName(p)])), vopts = [...allV].sort((a, b) => a[1].localeCompare(b[1]));
+  const seasons = new Map(); for (const p of POS){ const z = seasonOf(p.deliveryMonth); if (z) seasons.set(z.label, z.first); }
+  const sopts = [...seasons].sort((a, b) => a[1].localeCompare(b[1])).map(z => z[0]);
+  const filtered = filt.vendor !== 'all' || filt.season !== 'all';
   const segB = (v,l) => `<button type="button" data-ofilt="${v}" aria-pressed="${filt.status === v}">${l}</button>`;
-  $('#pane').innerHTML = `<section class="panel">
+  const strip = vs.length ? `<div class="chips vstrip" role="group" aria-label="Open cost by vendor"><span class="lab" style="margin-right:4px">Open cost</span>${vs.slice(0, 8).map(v => `<button type="button" class="fchip" data-ovend="${esc(v.key)}" aria-pressed="${filt.vendor === v.key}" title="${v.n} open order${v.n === 1 ? '' : 's'}, ${esc(money(v.cost))} still to come">${esc(v.name)}<span class="c">${moneyK(v.cost)}</span></button>`).join('')}${vs.length > 8 ? `<span class="sm" style="color:var(--muted)">and ${vs.length - 8} more vendors</span>` : ''}</div>` : '';
+  const chart = vs.length ? deliveriesChart(vs) : '';
+  const sumCost = rows.reduce((a, p) => a + poTotal(p), 0), sumOpen = rows.reduce((a, p) => a + onOrder(p), 0);
+  $('#pane').innerHTML = `${chart ? `<div class="astack" style="margin-bottom:18px">${chart}</div>` : ''}<section class="panel">
+    ${strip}
     <div class="toolbar"><div class="filters"><div class="seg" role="group" aria-label="Status">${segB('active','Open')}${POS.some(p => p.status === 'hold') ? segB('hold', `On hold (${POS.filter(p => p.status === 'hold').length})`) : ''}${segB('all','All')}${segB('received','Received')}${segB('cancelled','Cancelled')}</div>
       ${sel !== 'season' ? `<label style="font-size:13px;display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="fArr" ${filt.arriving ? 'checked' : ''}> Only arriving in ${monthFull(sel)}</label>` : ''}</div>
-      <div class="filters"><label for="fCat" class="sr">Category</label><select id="fCat" class="field-inline"><option value="all">All categories</option>${catList().map(c => `<option value="${c.code}" ${filt.cat === c.code ? 'selected' : ''}>${c.code} · ${esc(c.name)}</option>`).join('')}</select>
+      <div class="filters"><label for="fVend" class="sr">Vendor</label><select id="fVend" class="field-inline"><option value="all">All vendors</option>${vopts.map(([k, n]) => `<option value="${esc(k)}" ${filt.vendor === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
+      <label for="fSeason" class="sr">Season</label><select id="fSeason" class="field-inline"><option value="all">All seasons</option>${sopts.map(n => `<option value="${esc(n)}" ${filt.season === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
+      <label for="fCat" class="sr">Category</label><select id="fCat" class="field-inline"><option value="all">All categories</option>${catList().map(c => `<option value="${c.code}" ${filt.cat === c.code ? 'selected' : ''}>${c.code} · ${esc(c.name)}</option>`).join('')}</select>
       <label for="fQ" class="sr">Search</label><input id="fQ" class="field-inline" type="search" placeholder="Search PO #, vendor, style" value="${esc(filt.q)}"></div></div>
+    ${rows.length ? `<div class="note" style="padding:6px 18px">${int(rows.length)} order${rows.length === 1 ? '' : 's'} · ${money(sumCost)} ordered · ${money(sumOpen)} still to come${filtered ? ' <button type="button" class="btn ghost sm" data-oclear="1">Clear vendor and season</button>' : ''}</div>` : ''}
     <div class="tbl"><table><thead><tr>${COLS.map(c => `<th class="${c.r ? 'r' : ''}" aria-sort="${sort.key === c.k ? (sort.dir > 0 ? 'ascending' : 'descending') : 'none'}"><button type="button" data-sort="${c.k}">${c.l}${sort.key === c.k ? (sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('')}</tr></thead>
     <tbody class="click">${rows.map(p => `<tr class="${rowFlag(p)}" data-po="${esc(p.id)}" tabindex="0">
       <td class="po">${esc(p.poNumber)}</td><td>${esc(vendorName(p))}${RISK_VENDORS.test(vendorName(p)) ? '<span class="sm" style="color:var(--ochre)">cost risk</span>' : ''}</td>

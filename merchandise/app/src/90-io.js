@@ -114,7 +114,7 @@ function closeOverlay(){ $('#overlay').innerHTML = ''; D = null; DX = null; }
 
 /* ---------- render + mode ---------- */
 const renderSoon = () => { $('#pane').innerHTML = `<section class="panel"><div class="note" style="font-size:14px">Coming in this build.</div></section>`; };
-const PAGES = {today: renderToday, receiving: renderSoon, seasons: renderSoon, vendors: renderSoon, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
+const PAGES = {today: renderToday, receiving: renderSoon, seasons: renderSoon, vendors: renderVendorsPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
 if (location.hash === '#reports' && RPT){ TAB = resolveTab('reports'); history.replaceState(null, '', location.pathname + location.search); }  // the reminder email's link
 function render(){
   if (!BASE && !LEGACY_PLAN){
@@ -140,13 +140,14 @@ function render(){
   window.scrollTo(0, scrollY);
   if (D && $('#dImpact')) updateTotals();
 }
-// Every page change goes through here: old ids are routed to their new page; the Vendors page is still the drawer for now.
+// Every page change goes through here: old ids are routed to their new page; the Vendors page is a page; the drawer (openVendors) is for adding and editing.
 // key (from a chart or row's data-go="tab:key") opens the keyed thing there: a YYYY-MM month becomes the selected
 // month (Budget & open-to-buy by category), a brand opens its drawer on Brands, a category code opens its drawer.
 const isMonthKey = k => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(k || ''));
 function goTab(id, key){
   if (id === 'otb') setBV('months');
-  if (id === 'vendors'){ closePops(); closeSide(); return openVendors(); }
+  const toOrders = id === 'orders' && key && !isMonthKey(key);
+  if (toOrders){ filt.vendor = key; filt.season = 'all'; }
   const tab = resolveTab(id), moved = tab !== TAB;
   if (isMonthKey(key)){
     if (tab === 'overview') setBV('cats');
@@ -155,7 +156,7 @@ function goTab(id, key){
   }
   TAB = tab; try { localStorage.setItem('ob.tab2', TAB); } catch (_) {}
   closePops(); closeOverlay(); closeSide();
-  if (moved || isMonthKey(key) || !key) render();
+  if (moved || isMonthKey(key) || !key || toOrders) render();
   if (key && !isMonthKey(key)){
     if (TAB === 'brands' && typeof BRANDS !== 'undefined' && BRANDS && (BRANDS.rows || []).some(r => r.id === key)) openBrand(key);
     else if (PLAN && PLAN.cats && PLAN.cats[key]) openCategory(key);
@@ -234,7 +235,7 @@ document.addEventListener('click', async e => {
   if (ds.brand && !D) return openBrand(ds.brand);
   if (ds.month){ SEL = ds.month; try { localStorage.setItem('ob.month', SEL); } catch (_) {} return render(); }
   if (ds.sccatgo) SC.cat = ds.sccatgo;
-  if (ds.tab){ goTab(ds.tab); if (ds.tab === 'vendors') return; return scrollY > 0 ? window.scrollTo({top: 0}) : undefined; }
+  if (ds.tab){ goTab(ds.tab); return scrollY > 0 ? window.scrollTo({top: 0}) : undefined; }
   if (t.id === 'btnSide') return toggleSide();
   if (t.id === 'btnMore') return togglePop('#morePop', '#btnMore');
   if (t.id === 'btnAcct') return togglePop('#acctPop', '#btnAcct');
@@ -250,6 +251,8 @@ document.addEventListener('click', async e => {
   if (ds.vdel){ if (!confirm('Delete this vendor? It has no orders.')) return; try { await db.doc('vendors/' + ds.vdel).delete(); toast('Vendor deleted'); openVendors(); } catch (err){ writeError(err); } return; }
   if (ds.sort){ sort = {key: ds.sort, dir: sort.key === ds.sort ? -sort.dir : 1}; return render(); }
   if (ds.ofilt){ filt.status = ds.ofilt; return render(); }
+  if (ds.ovend){ filt.vendor = filt.vendor === ds.ovend ? 'all' : ds.ovend; return render(); }
+  if (ds.oclear){ filt.vendor = 'all'; filt.season = 'all'; return render(); }
   if (ds.akind){ afilt.kind = ds.akind; return render(); }
   if (ds.openpo) return openOrder(ds.openpo);
   if (ds.startorder) return startOrderFromItem(ds.startorder);
@@ -321,6 +324,8 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.id === 'fVend'){ filt.vendor = t.value; return render(); }
+  if (t.id === 'fSeason'){ filt.season = t.value; return render(); }
   if (t.id === 'fCat'){ filt.cat = t.value; return render(); }
   if (t.id === 'fArr'){ filt.arriving = t.checked; return render(); }
   if (t.id === 'aCat'){ afilt.cat = t.value; return render(); }
