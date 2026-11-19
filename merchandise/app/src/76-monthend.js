@@ -10,7 +10,7 @@ const MONTH_END = [
   {k: 'send', t: 'Upload the reports', d: 'The owner uploads them on this page, PDF or Excel, checks what changes, then updates the program.'}
 ];
 function nextRefreshMonth(){ return BASE ? (BASE.partial ? BASE.partial.m : addMonths(BASE.actualThrough, 1)) : THIS_MONTH; }
-function renderMonthEnd(){
+function renderMonthEnd(S){
   if (!BASE){ $('#pane').innerHTML = `<section class="panel"><div class="note">Month-end status appears after the first refresh.</div></section>`; return; }
   const due = nextRefreshMonth(), dueEnd = due + '-' + pad(new Date(+due.slice(0,4), +due.slice(5,7), 0).getDate());
   const late = todayISO > dueEnd ? daysBetween(dueEnd, todayISO) : 0;
@@ -22,6 +22,8 @@ function renderMonthEnd(){
   const fyNow = curFY(), closed = fyMonths(fyNow).filter(k => monthStatus(k) === 'actual');
   const fcFor = k => { const r = hist.filter(h => h.forecast && h.forecast[k] != null && h.asOf < k + '-01').sort((a, b) => String(b.asOf).localeCompare(String(a.asOf)))[0]; return r ? r.forecast[k] : null; };
   const res = closed.map(k => ({k, act: monthTotal(k), ly: monthLY(k), fc: fcFor(k)}));
+  // The reporting calendar (its monthly list is the checklist above) and how the program works fold into this page.
+  const cal = RPT ? paneOf(renderReports, S, {skipMonthly: !!mp}) : '', help = paneOf(renderHelp);
   $('#pane').innerHTML = `<div class="grid">
     <div class="stack">
       ${renderUpload()}
@@ -48,7 +50,9 @@ function renderMonthEnd(){
         <div class="note">"Forecast" is what the plan expected for the month at the refresh before it. It fills in from the next refresh on.</div></section>
       <section class="panel"><header><h2>Refresh history</h2>${ownerHere() && UP.last ? `<button type="button" class="btn sm" id="upUndo" ${UP.undoing ? 'disabled' : ''} title="Puts back the program's data from before the update of ${esc(dateLabel(String(UP.last.at).slice(0, 10)))}${UP.last.note ? ' (' + esc(UP.last.note) + ')' : ''}. Deliveries it recorded on orders stay.">${UP.undoing ? 'Undoing…' : 'Undo last update'}</button>` : ''}</header>
         ${hist.length ? `<div style="overflow-x:auto"><table class="mini" style="margin:8px 16px 14px;width:calc(100% - 32px)"><thead><tr><th>Data as of</th><th class="r">Sales YTD</th><th class="r">On hand</th><th class="r">This year budget</th><th class="r">Next year budget</th></tr></thead><tbody>${hist.map(h => `<tr title="${esc((h.notes || []).join(' '))}"><td>${dateLabel(h.asOf)}</td><td class="r num">${moneyK(num(h.ytd))}</td><td class="r num">${moneyK(num(h.onHand))}</td><td class="r num">${moneyK(num(h.otbCur))}</td><td class="r num">${moneyK(num(h.otbNext))}</td></tr>${(h.notes || []).length ? `<tr><td colspan="5" style="font-size:12px;color:var(--muted);border-top:none;padding-top:0">${h.notes.map(esc).join(' · ')}</td></tr>` : ''}`).join('')}</tbody></table></div>` : '<div class="note">No refreshes recorded yet.</div>'}</section>
-    </div></div>`;
+    </div></div>
+    ${cal ? `<div class="subhead"><h2>Reporting calendar</h2><span>Everything else due, with the weekly, quarterly and yearly lists.</span></div>${cal}` : ''}
+    <details class="fold" id="helpFold" ${UIF.help ? 'open' : ''}><summary>How the program works</summary>${help}</details>`;
   fillPeople();
   loadLastImport();
 }

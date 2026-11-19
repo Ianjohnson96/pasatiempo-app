@@ -36,16 +36,16 @@ function renderDueBar(){
   bar.classList.toggle('late', late);
   bar.innerHTML = `<span>${a.map(x => `<b>${esc(x.p.label)}</b> ${x.status === 'overdue' ? 'is overdue' : x.p.due === RPT.today ? 'is due today' : 'is due'} (${x.left} left)`).join(' · ')}${a.some(x => x.p.cadence === 'monthly' && x.p.due === RPT.today && !((CHECKS[x.p.key] || {}).items || {}).sku) ? '. Run the SKU Analysis today: on-hand can\'t be recreated later.' : ''}</span>${upNeeded(a) ? '<button class="btn sm primary" type="button" data-tab="monthend">Upload reports</button>' : ''}<button class="btn sm" type="button" data-tab="reports">Open Checklists</button>`;
 }
-function renderReports(){
+function renderReports(S, opts){
   if (!RPT){ $('#pane').innerHTML = `<section class="panel"><div class="note">The reports calendar is part of the club app.</div></section>`; return; }
-  const open = rptOpen(), order = {overdue: 0, due: 1, upcoming: 2, done: 3};
+  const open = rptOpen().filter(x => !(opts && opts.skipMonthly && x.p.cadence === 'monthly')), order = {overdue: 0, due: 1, upcoming: 2, done: 3};
   open.sort((a, b) => order[a.status] - order[b.status] || a.p.due.localeCompare(b.p.due));
   const panel = x => `<section class="panel"><header><h2>${esc(x.p.label)}</h2><span class="rstat ${x.status}">${esc(rptWhen(x))}</span></header>
     <div class="note" style="padding-bottom:0">${esc(RPT.cadences[x.p.cadence] || '')} · ${x.p.items.length - x.left} of ${x.p.items.length} done</div>
     ${checklistHTML(x.p.key, x.p.items)}
     ${x.p.cadence === 'monthly' && upNeeded([x]) ? '<div style="padding:0 16px 14px"><button class="btn primary" type="button" data-tab="monthend">Upload this month\'s reports</button></div>' : ''}</section>`;
   $('#pane').innerHTML = `<div class="grid">
-    <div class="stack">${open.length ? open.map(panel).join('') : '<section class="panel"><div class="note">Nothing is due right now.</div></section>'}</div>
+    <div class="stack">${open.length ? open.map(panel).join('') : '<section class="panel"><div class="note">Nothing ' + (opts && opts.skipMonthly ? 'else ' : '') + 'is due right now.</div></section>'}</div>
     <div class="stack">
       <section class="panel"><header><h2>Coming up</h2></header>
         <table class="mini" style="margin:8px 16px 12px;width:calc(100% - 32px)"><tbody>${RPT.upcoming.map(p => `<tr><td><b>${esc(p.label)}</b><br><span style="color:var(--muted);font-size:12px">${esc(RPT.cadences[p.cadence] || '')}</span></td><td class="r num" style="white-space:nowrap">${dateLabel(p.due)}</td></tr>`).join('')}</tbody></table></section>

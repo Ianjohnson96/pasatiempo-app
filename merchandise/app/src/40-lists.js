@@ -137,7 +137,13 @@ function renderInventory(S){
     return {c, i, wks, tgt: c.target, gap: i.cost - (c.target || 0)}; });
   const T = rows.reduce((a,r) => ({units:a.units + r.i.units, cost:a.cost + r.i.cost, aged:a.aged + r.i.aged, skus:a.skus + r.i.skus}), {units:0,cost:0,aged:0,skus:0});
   const counts = [...COUNTS].sort((a,b) => String(b.date).localeCompare(String(a.date)));
+  const lastCt = counts[0], ctCats = lastCt ? Object.entries(lastCt.cats || {}).filter(([, c]) => num(c.book) || num(c.counted)).sort((a, b) => num(b[1].book) - num(a[1].book)) : [];
+  const ctChart = ctCats.length ? `<section class="ccard"><h3>Book against counted</h3><div class="cs">${esc(lastCt.label || 'Latest count')}, ${dateLabel(lastCt.date)}: what the system said you had against what was counted, by category, at cost. Counted below book is shrink.</div>
+    ${chLegend([{name: 'Book', k: 1}, {name: 'Counted', k: 2}])}
+    ${chBars({labels: ctCats.map(([c]) => CAT(c).name), series: [{name: 'Book', values: ctCats.map(([, c]) => num(c.book)), k: 1}, {name: 'Counted', values: ctCats.map(([, c]) => num(c.counted)), k: 2}], label: 'Book against counted by category',
+      tips: i => `Book: ${money(num(ctCats[i][1].book))} · Counted: ${money(num(ctCats[i][1].counted))} · Difference: ${money(num(ctCats[i][1].counted) - num(ctCats[i][1].book))}`})}</section>` : '';
   $('#pane').innerHTML = `<div class="stack">
+  ${ctChart}
   <section class="panel"><header><h2>Inventory on hand</h2><span class="lab">${esc(INV.source)} · as of ${dateLabel(INV.asOf)}</span></header>
     <div class="note" style="border-bottom:1px solid var(--rule)">This is the starting point for every budget. It updates each month-end when the new SKU Analysis comes in. <b>Weeks of supply</b> is how long the stock lasts at the sales pace forecast for the coming months. <b>Target by Apr 30</b> is the stock level the plan is steering towards.</div>
     <div class="tbl"><table style="min-width:900px"><thead><tr><th><span class="h">Category</span></th><th class="r"><span class="h">SKUs</span></th><th class="r"><span class="h">Units</span></th><th class="r"><span class="h">At cost</span></th><th class="r"><span class="h">Not sold 12+ mo</span></th><th class="r"><span class="h">Weeks of supply</span></th><th class="r"><span class="h">Target by Apr 30</span></th><th><span class="h">Read</span></th></tr></thead>

@@ -240,7 +240,7 @@ document.addEventListener('click', async e => {
   if (ds.bcclear){ try { await db.doc('brandCalls/' + ds.bcclear).delete(); toast('Back to the suggested call'); setTimeout(() => openBrand(ds.bcclear), 300); } catch (err){ writeError(err); } return; }
   if (ds.brand && !D) return openBrand(ds.brand);
   if (ds.month){ SEL = ds.month; try { localStorage.setItem('ob.month', SEL); } catch (_) {} return render(); }
-  if (ds.sccatgo) SC.cat = ds.sccatgo;
+  if (ds.sccatgo){ SC.cat = ds.sccatgo; UIF.sub = true; }
   if (ds.tab){ goTab(ds.tab); return scrollY > 0 ? window.scrollTo({top: 0}) : undefined; }
   if (t.id === 'btnSide') return toggleSide();
   if (t.id === 'btnMore') return togglePop('#morePop', '#btnMore');
