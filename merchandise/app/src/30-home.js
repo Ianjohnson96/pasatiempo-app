@@ -21,7 +21,7 @@ function orderAlerts(S){
   return out;
 }
 function allAttention(S){
-  const items = orderAlerts(S).concat((INS.items || []).map(i => ({...i, sev: KIND_SEV[i.kind] || 'info'})));
+  const items = orderAlerts(S).concat(mixAlerts(),(INS.items || []).map(i => ({...i, sev: KIND_SEV[i.kind] || 'info'})));
   return items.map(i => ({...i, state: ISTATE[i.id] || null}));
 }
 const openAttention = S => allAttention(S).filter(i => !i.state);

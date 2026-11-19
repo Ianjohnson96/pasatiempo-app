@@ -153,6 +153,7 @@ const isMonthKey = k => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(k || ''));
 function goTab(id, key){
   if (TAB === 'guidelines' && resolveTab(id) !== 'guidelines' && !gdLeaveOk()) return;
   if (id === 'otb') setBV('months');
+  if (resolveTab(id) === 'guidelines' && key){ GD.tab = key; try { localStorage.setItem('mp.guideTab', key); } catch (_) {} }
   const toOrders = id === 'orders' && key && !isMonthKey(key);
   if (toOrders){ filt.status = 'active'; filt.vendor = key; filt.season = 'all'; filt.cat = 'all'; filt.q = ''; filt.arriving = false; }
   const tab = resolveTab(id), moved = tab !== TAB;
