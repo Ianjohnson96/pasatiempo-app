@@ -5,7 +5,7 @@ let ANA = null, ANA_KEY = null;
 const AN = {open: new Set(), level: 'cats'};
 function anaNow(){
   // Redo the analysis when the upload, a subcategory's name or a category's name changes.
-  const key = ASSORT ? [ASSORT.at || '', SUBCATS.map(s => s.id + ':' + s.name).join(','), BASE ? Object.values(BASE.cats || {}).map(c => c.name).join(',') : ''].join('|') : null;
+  const key = ASSORT ? [ASSORT.at || '', (GUIDE && GUIDE.at) || '', SUBCATS.map(s => s.id + ':' + s.name).join(','), BASE ? Object.values(BASE.cats || {}).map(c => c.name).join(',') : ''].join('|') : null;
   if (key !== ANA_KEY){
     ANA_KEY = key;
     const names = Object.fromEntries(Object.entries((BASE && BASE.cats) || (PLAN && PLAN.cats) || {}).map(([k, v]) => [k, v.name]));

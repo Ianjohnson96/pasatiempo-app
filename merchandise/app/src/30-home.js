@@ -117,6 +117,7 @@ function renderSide(S){
     return `<button type="button" class="sitem" data-tab="${id}"${TAB === id ? ' aria-current="page"' : ''}${tip}><span class="sl">${esc(label)}</span>${tail}</button>`;
   };
   $('#sideNav').innerHTML = NAV.map(g => `<div class="sgroup" role="group" aria-label="${esc(g.label)}"><div class="sglab" aria-hidden="true">${esc(g.label)}</div>${g.pages.map(item).join('')}</div>`).join('');
+  const foot = $('#sideFootNav'); if (foot) foot.innerHTML = FOOT_PAGES.map(item).join('');
   const [title, sub] = TABHEAD[TAB] || [pageLabel(TAB) || 'Today', ''];
   const grp = NAV.find(g => g.key === pageGroup(TAB));
   $('#pageGroup').textContent = grp ? grp.label : '';
@@ -136,6 +137,7 @@ const TABHEAD = Object.fromEntries(Object.entries({
   overview: "Room to buy by category and month, against what's committed.",
   seasons: "Each season's buy: prebooked, reorders and what's held back.",
   forecast: "Sales by month for this year and next.",
+  guidelines: "The rules the program grades and suggests by, beside what's suggested and where the shop is now.",
   scorecard: "Every category and subcategory, graded against the rules of thumb.",
   brands: "Brand scorecard and the call for each brand.",
   stuck: "Stock over target and stock that isn't selling, with markdown candidates.",

@@ -41,3 +41,11 @@ describe("merchandise navigation", () => {
     expect(out.TAB).toBe("today");
   });
 });
+
+describe("guidelines page", () => {
+  it("is a page reached from the sidebar foot", () => {
+    expect(N.resolveTab("guidelines")).toBe("guidelines");
+    expect(N.pageLabel("guidelines")).toBe("Guidelines");
+    expect(N.pageGroup("guidelines")).toBe("foot");
+  });
+});
