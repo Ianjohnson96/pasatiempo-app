@@ -1,18 +1,22 @@
 /* ---------- Guidelines page, Merchandise mix tab: each role's share of stock dollars against a range in percent of a
    total the owner types (spec 2026-11-19-merch-guidelines). Pure math lives in 19-guides.js. ---------- */
-function gdMixData(){
+/** The mix as the page shows it (saved values with the owner's unsaved edits on top), or, with saved = true, as saved —
+    what To do uses, so its items never change while someone is still editing. null before the first upload. */
+function gdMixData(saved){
   if (!BASE) return null;
+  const val = p => saved ? gdSaved(p) : gdValue(p);
   const oh = {}; for (const [c, v] of Object.entries(BASE.cats || {})) if (c !== '640'){ const r = roleKey(c); oh[r] = (oh[r] || 0) + num(v.onHand); }
   const rows = (ASSORT && ASSORT.rows) || [], shares = salesShareByRole(rows), sug = suggestedRanges(shares);
   const onHand = Object.values(oh).reduce((t, x) => t + x, 0);
-  const total = gdValue('mix.total') || onHand;
-  const ranges = Object.fromEntries(MIX_ROLES.map(r => [r, gdValue('mix.ranges.' + r) || sug[r] || [0, 100]]));
+  const total = val('mix.total') || onHand;
+  const ranges = Object.fromEntries(MIX_ROLES.map(r => [r, val('mix.ranges.' + r) || sug[r] || [0, 100]]));
   const turnsMid = (BENCH.turns.apparel + BENCH.turns.fast) / 2;
-  return {oh, onHand, shares, sug, total, ranges, rows: mixRows(oh, shares, ranges, total), sugTotal: suggestedTotal(rows, turnsMid), turnsMid};
+  return {oh, onHand, shares, sug, total, ranges, rows: mixRows(oh, shares || {}, ranges, total), sugTotal: suggestedTotal(rows, turnsMid), turnsMid, noSales: !shares};
 }
 
 function gdMix(){
   const D = gdMixData(); if (!D) return gdCard('Merchandise mix', '', '<div class="empty"><p>The mix loads after the first month-end upload.</p></div>');
+  if (D.noSales) return gdCard('Merchandise mix', '', '<div class="empty"><p>The mix needs the subcategory report from a month-end upload: suggested ranges come from each role\'s share of sales.</p></div>');
   const owner = gdOwner(), sum = rangeSum(D.ranges), off = sum.lo > 100 || sum.hi < 100;
   const max = Math.max(55, ...D.rows.map(r => Math.max(r.hi, r.onHand / D.total * 100, r.salesShare * 100) + 5));
   const X = v => (Math.min(v, max) / max * 100).toFixed(2) + '%';
@@ -61,9 +65,12 @@ document.addEventListener('click', e => {
   gdEdit('mix.total', b.dataset.gdtotal === 'sug' ? D.sugTotal : D.onHand);
 });
 
-/** To do items for roles outside their mix range at the saved (or on-hand) total. */
+/** To do items for roles outside their saved mix range at the saved (or on-hand) total. Only once the owner has saved a
+    mix (total or a range), so nothing changes for anyone until then, and never without sales data. */
 function mixAlerts(){
-  const D = gdMixData(); if (!D) return [];
+  const m = guideValues(GUIDE).mix;
+  if (!m.total && !Object.keys(m.ranges).length) return [];
+  const D = gdMixData(true); if (!D || D.noSales) return [];
   return D.rows.filter(r => r.status !== 'in').map(r => ({id: 'o-mix-' + r.role, kind: 'order', sev: 'info', guide: 'mix',
     title: `${r.name} is ${money(r.gap)} ${r.status === 'short' ? 'short of' : 'over'} its mix range`,
     detail: `${money(r.onHand)} on hand is ${Math.round(r.onHand / D.total * 100)}% of the ${money(D.total)} you plan to carry; the target is ${r.lo}–${r.hi}%.`,

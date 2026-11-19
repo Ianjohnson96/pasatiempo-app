@@ -178,3 +178,30 @@ const THIS_MONTH = '2026-11', FALLBACK = {}, localStorage = {getItem: () => null
     expect(Object.keys(p.before)).toEqual(["total"]);
   });
 });
+
+// Final review fixes: season lengths follow the saved seasons; no sales data means no suggested mix.
+describe("seasons and mix after the final review", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const S: any = vm.runInNewContext(read("17-metrics.js") + "\n" + read("18-ops.js") + "\n" + read("19-guides.js")
+    + ";({applyGuides, seasonOf, seasonMonths, seasonBuys, salesShareByRole, suggestedRanges})");
+  beforeEach(() => S.applyGuides(null));
+
+  it("a longer season has all its months and Season buys doesn't break", () => {
+    S.applyGuides({ seasons: { spring: 1, summer: 4, fall: 8, holiday: 11 } });
+    expect(S.seasonMonths(S.seasonOf("2027-04"))).toEqual(["2027-04", "2027-05", "2027-06", "2027-07"]);
+    expect(S.seasonMonths(S.seasonOf("2027-02"))).toEqual(["2027-01", "2027-02", "2027-03"]);
+    const t = S.seasonBuys([{ month: "2027-04", cat: "480", amount: 100, units: 2, orderDate: "2026-12-01", po: "p" }], S.seasonOf("2027-04"));
+    expect(t.committed).toBe(100);
+    expect(t.byMonth["2027-04"].prebooked).toBe(100);
+  });
+
+  it("default seasons keep their lengths", () => {
+    expect(S.seasonMonths(S.seasonOf("2027-02"))).toHaveLength(4);
+    expect(S.seasonMonths(S.seasonOf("2027-12"))).toEqual(["2027-11", "2027-12"]);
+  });
+
+  it("no sales data, no suggested mix ranges", () => {
+    expect(S.salesShareByRole([])).toBeNull();
+    expect(S.suggestedRanges(S.salesShareByRole([]))).toEqual({});
+  });
+});

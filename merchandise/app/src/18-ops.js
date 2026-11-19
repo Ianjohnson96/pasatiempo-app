@@ -132,11 +132,14 @@ function storeRoomValue(invoicesIn, totalValue, receivedValue) {
   return Math.max(0, since - ((Number(receivedValue) || 0) - base));
 }
 
-/** The calendar months ('YYYY-MM') a season covers. */
-function seasonMonths(season) {
+/** The calendar months ('YYYY-MM') a season covers: from its first month up to the next season's (holiday runs to
+    December), by the same season months seasonOf uses. */
+function seasonMonths(season, firsts = SEASON_FIRSTS) {
   if (!season) return [];
-  const n = { spring: 4, summer: 3, fall: 3, holiday: 2 }[season.key] || 0;
-  return Array.from({ length: n }, (_, i) => slotMonth(season.first, i));
+  const f = firsts || { spring: 1, summer: 5, fall: 8, holiday: 11 }, order = ["spring", "summer", "fall", "holiday"], i = order.indexOf(season.key);
+  if (i < 0) return [];
+  const start = +season.first.slice(5, 7), end = i < 3 ? f[order[i + 1]] - 1 : 12;
+  return Array.from({ length: Math.max(0, end - start + 1) }, (_, k) => slotMonth(season.first, k));
 }
 
 /**

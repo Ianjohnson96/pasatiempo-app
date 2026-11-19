@@ -152,13 +152,23 @@ const GD_PANES = {targets: () => gdTargets(shopNow()), roles: gdRoles, seasons: 
 const gdTabCount = t => Object.keys(GD.draft).filter(p => gdTabOf(p) === t).length;
 const gdTabOf = p => p.startsWith('bench.') ? 'targets' : p.startsWith('roles.') || p.startsWith('roleOf.') ? 'roles' : p === 'seasons' || p === 'memberDiscount' ? 'seasons' : p.startsWith('mix.') ? 'mix' : '';
 
+/** Every saved path a tab can change, for "Reset this tab". */
+function gdTabPaths(t){
+  if (t === 'targets') return GD_TARGETS.flatMap(([, , rows]) => rows.map(r => r[0]));
+  if (t === 'roles') return Object.keys(ROLES_DEFAULT).filter(r => ROLES_DEFAULT[r].wks).flatMap(r => [`roles.${r}.wks`, `roles.${r}.over`])
+    .concat(Object.keys((BASE || {}).cats || {}).filter(c => c !== '640').map(c => 'roleOf.' + c));
+  if (t === 'seasons') return ['seasons', 'memberDiscount'];
+  if (t === 'mix') return ['mix.total', ...MIX_ROLES.map(r => 'mix.ranges.' + r)];
+  return [];
+}
 function renderGuidelines(){
   if (!GD_PANES[GD.tab]) GD.tab = 'targets';
   const n = Object.keys(GD.draft).length, owner = gdOwner();
+  const resetAll = gdTabPaths(GD.tab).filter(p => !same(gdValue(p), gdDefault(p)));
   const tabs = GD_TABS.map(([id, l]) => { const c = gdTabCount(id); return `<button type="button" role="tab" data-gdtab="${id}" aria-selected="${GD.tab === id}">${esc(l)}${c ? `<span class="gd-ct">${c} unsaved</span>` : ''}</button>`; }).join('');
   $('#pane').innerHTML = `<p class="gd-intro">Suggested values are general rules of thumb for a private-club shop, or worked out from your own sales; change any of them to fit Pasatiempo.
       ${owner ? '' : ' Only the owner can change them.'} Month-end suggestions update at your next upload.</p>
-    <div class="gd-tabs" role="tablist" aria-label="Guidelines">${tabs}</div>
+    <div class="gd-tabs" role="tablist" aria-label="Guidelines">${tabs}${owner && resetAll.length ? `<button type="button" class="btn ghost sm gd-resetall" data-gdreset="${esc(resetAll.join(','))}">Reset this tab to suggested</button>` : ''}</div>
     <div class="gd-pane">${GD_PANES[GD.tab]()}</div>
     ${owner && n ? `<div class="gd-save" role="region" aria-label="Unsaved changes"><b>${n} unsaved change${n === 1 ? '' : 's'}</b>
       <input class="field-inline" id="gdNote" placeholder="Why (optional), e.g. Peter Millar carries better margin now" value="${esc(GD.note)}">

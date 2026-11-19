@@ -14,7 +14,7 @@ function parseMoney(s){
   return Number.isFinite(v) && v > 0 ? Math.round(v) : null;
 }
 
-/** {role: share of 12-month sales} from assort rows (cat, t12); every mix role present, 640 left out. */
+/** {role: share of 12-month sales} from assort rows (cat, t12); every mix role present, 640 left out; null without sales. */
 function salesShareByRole(rows){
   const by = Object.fromEntries(MIX_ROLES.map(r => [r, 0]));
   let tot = 0;
@@ -23,7 +23,8 @@ function salesShareByRole(rows){
     const v = Math.max(0, Number(r.t12) || 0);
     by[roleKey(r.cat)] = (by[roleKey(r.cat)] || 0) + v; tot += v;
   }
-  for (const r in by) by[r] = tot > 0 ? by[r] / tot : 0;
+  if (!(tot > 0)) return null;   // no sales data yet: nothing to suggest from
+  for (const r in by) by[r] = by[r] / tot;
   return by;
 }
 
