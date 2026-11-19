@@ -65,3 +65,21 @@ function deliverySlots(deliveryMonths, thisMonth) {
   const early = ms[0] < start, later = ms[ms.length - 1] > months[months.length - 1];
   return {months, early, later, slot: m => { m = m.slice(0, 7); return m < start ? 0 : m > months[months.length - 1] ? months.length + (early ? 1 : 0) : months.indexOf(m) + (early ? 1 : 0); }};
 }
+
+/** A hand-entered "invoice in" entry from the form values, or {error}. Amount is optional (blank = the whole open balance). */
+function makeInvoiceEntry(f, by) {
+  const date = String((f && f.date) || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Pick the date the invoice came in." };
+  const raw = f.amount == null ? "" : String(f.amount).replace(/[$,\s]/g, "");
+  const e = { date, source: "hand" };
+  if (raw !== "") {
+    const a = Number(raw);
+    if (!Number.isFinite(a) || a <= 0) return { error: "The invoice amount must be more than zero, or left blank for the whole order." };
+    e.amount = Math.round(a * 100) / 100;
+  }
+  if (by) e.by = by;
+  const inv = String((f && f.invoice) || "").trim(), note = String((f && f.note) || "").trim();
+  if (inv) e.invoice = inv.slice(0, 60);
+  if (note) e.note = note.slice(0, 300);
+  return { entry: e };
+}

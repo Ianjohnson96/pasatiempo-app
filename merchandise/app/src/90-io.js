@@ -114,7 +114,7 @@ function closeOverlay(){ $('#overlay').innerHTML = ''; D = null; DX = null; }
 
 /* ---------- render + mode ---------- */
 const renderSoon = () => { $('#pane').innerHTML = `<section class="panel"><div class="note" style="font-size:14px">Coming in this build.</div></section>`; };
-const PAGES = {today: renderToday, receiving: renderSoon, seasons: renderSoon, vendors: renderVendorsPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
+const PAGES = {today: renderToday, receiving: renderReceiving, seasons: renderSoon, vendors: renderVendorsPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
 if (location.hash === '#reports' && RPT){ TAB = resolveTab('reports'); history.replaceState(null, '', location.pathname + location.search); }  // the reminder email's link
 function render(){
   if (!BASE && !LEGACY_PLAN){
@@ -254,6 +254,9 @@ document.addEventListener('click', async e => {
   if (ds.ovend){ filt.vendor = filt.vendor === ds.ovend ? 'all' : ds.ovend; return render(); }
   if (ds.oclear){ filt.vendor = 'all'; filt.season = 'all'; return render(); }
   if (ds.akind){ afilt.kind = ds.akind; return render(); }
+  if (ds.invin) return openInvoiceIn(ds.invin);
+  if (ds.invsave) return saveInvoiceIn(ds.invsave, t);
+  if (ds.invclear) return clearArrived(ds.invclear);
   if (ds.openpo) return openOrder(ds.openpo);
   if (ds.startorder) return startOrderFromItem(ds.startorder);
   if (ds.neworderCat) return openOrder(null, {cat: ds.neworderCat, lines: [newLine(ds.neworderCat)]});

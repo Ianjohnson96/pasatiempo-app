@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 // merchandise/app/src/18-ops.js is plain browser JS joined into the page. It is pure, so it runs here as it is.
 const src = readFileSync(path.join(process.cwd(), "merchandise/app/src/18-ops.js"), "utf8");
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots})");
+const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots, makeInvoiceEntry})");
 
 describe("arrivedValue", () => {
   it("sums amounts, counts an amountless entry as the whole order, caps and floors", () => {
@@ -99,5 +99,20 @@ describe("deliverySlots", () => {
     expect(O.slotMonth("2026-11", 3)).toBe("2027-02");
     expect(O.slotMonth("2026-11", -2)).toBe("2026-09");
     expect(O.deliverySlots([null, ""], "2026-11").months).toEqual([]);
+  });
+});
+
+describe("makeInvoiceEntry", () => {
+  it("makes a hand entry; the amount is optional", () => {
+    expect(O.makeInvoiceEntry({ date: "2026-11-18" }, "u1").entry).toEqual({ date: "2026-11-18", source: "hand", by: "u1" });
+    expect(O.makeInvoiceEntry({ date: "2026-11-18", amount: "$1,000.456", invoice: " A-7 ", note: " box 2 " }, "u1").entry).toEqual({
+      date: "2026-11-18", source: "hand", by: "u1", amount: 1000.46, invoice: "A-7", note: "box 2",
+    });
+  });
+  it("refuses a missing date or a non-positive amount", () => {
+    expect(O.makeInvoiceEntry({ date: "" }, "u1").error).toBeTruthy();
+    expect(O.makeInvoiceEntry({ date: "11/18/2026" }, "u1").error).toBeTruthy();
+    expect(O.makeInvoiceEntry({ date: "2026-11-18", amount: "0" }, "u1").error).toBeTruthy();
+    expect(O.makeInvoiceEntry({ date: "2026-11-18", amount: "abc" }, "u1").error).toBeTruthy();
   });
 });
