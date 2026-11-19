@@ -61,3 +61,19 @@ function rangeSum(ranges){
   for (const r in ranges || {}){ lo += Number(ranges[r][0]) || 0; hi += Number(ranges[r][1]) || 0; }
   return {lo, hi};
 }
+
+/** Room to buy by month for the plan year, as saved and with changed target weeks of supply ({code: weeks}): runs the
+    budget engine (20-engine.js runEngine) twice, so the preview is exactly what saving would give. Only the changed
+    categories and the total are returned; nothing global changes. */
+function wosPreview(base, a, changes, carry){
+  const codes = Object.keys(changes || {}).filter(c => base.cats[c]);
+  const E0 = runEngine(base, a, carry || {}), E1 = codes.length ? runEngine(base, {...a, wos: {...a.wos, ...changes}}, carry || {}) : E0;
+  const months = E0.m27.filter(k => E0.months.includes(k));
+  const room = (E, c) => months.map(k => { const r = E.cats[c].find(x => x.m === k); return r ? r.otb : 0; });
+  const pick = E => {
+    const out = {}; for (const c of codes) out[c] = room(E, c);
+    out.total = months.map((k, i) => Object.keys(base.cats).filter(c => !(base.exclude || ['640']).includes(c)).reduce((t, c) => t + room(E, c)[i], 0));
+    return out;
+  };
+  return {months, before: pick(E0), after: pick(E1)};
+}

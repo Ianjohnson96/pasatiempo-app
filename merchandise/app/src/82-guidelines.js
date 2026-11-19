@@ -233,3 +233,76 @@ function gdShow(p, v){
   if (p === 'memberDiscount') return gdFmt('pct', v);
   return String(v);
 }
+
+/* ----- Budget inputs: target weeks of supply per category, saved in plan/assumptions (the budget engine's own input).
+   Edits wait in GW and are previewed by running the engine (wosPreview); the Forecast page's WHATIF is never touched. */
+let GW = {};
+const gdWosNow = c => assumptions().wos[c];
+function gdBudget(){
+  if (!BASE) return gdCard('Target weeks of supply', '', '<div class="empty"><p>The budget loads after the first month-end upload.</p></div>');
+  const owner = gdOwner(), sug = (BASE.defaults || {}).wos || {};
+  const codes = BASE.order.filter(c => !(BASE.exclude || ['640']).includes(c));
+  const rows = codes.map(c => {
+    const v = c in GW ? GW[c] : gdWosNow(c), changed = v !== sug[c], wk = wksNow(c, num(BASE.cats[c].onHand));
+    const input = owner ? `<input class="gd-in num" data-gdwos="${c}" inputmode="decimal" value="${v}" aria-label="Target weeks for ${esc(BASE.cats[c].name)}"><span class="gd-u">wks</span>` : `<span class="num">${v} wks</span>`;
+    return `<div class="gd-row${changed ? ' changed' : ''}${c in GW ? ' pending' : ''}"><div class="gd-what"><b>${c} ${esc(BASE.cats[c].name)}</b><span>On hand ${money(num(BASE.cats[c].onHand))}</span></div>
+      <div class="gd-sug"><b class="num">${sug[c] == null ? '—' : sug[c] + ' wks'}</b><span>program default</span></div>
+      <div class="gd-now num">${wk == null ? '—' : Math.round(wk) + ' wks'}</div><div class="gd-val">${input}</div>
+      <div>${owner && changed ? `<button type="button" class="btn ghost sm" data-gdwosreset="${c}">Reset to ${sug[c]}</button>` : ''}</div></div>`;
+  }).join('');
+  return gdCard('Target weeks of supply', 'How much stock the budget plans to end each month with. Changing it moves open-to-buy.', gdHead('Category', 'Suggested', 'Weeks now', 'Pasatiempo') + rows
+    + '<div class="note">Nothing changes in the budget until you look at the effect and press Save to the budget.</div>') + gdBudgetPreview();
+}
+/** Left to buy by month, now and with the unsaved weeks: the Budget page's figure (budget less committed) plus the
+    change in the plan the engine gives. */
+function gdBudgetPreview(){
+  const codes = Object.keys(GW); if (!codes.length) return '';
+  const P = wosPreview(BASE, assumptions(), GW, {}), cm = committedMatrix();
+  const left = (c, k) => budgetAt(c, k) - num((cm[c] || {})[k]);
+  const line = (label, vals, cls) => `<tr><td>${label}</td>${vals.map(v => `<td class="r num ${cls ? cls(v) : ''}">${money(v)}</td>`).join('')}</tr>`;
+  let body = '';
+  for (const c of codes){
+    const now = P.months.map(k => left(c, k)), wth = P.months.map((k, i) => now[i] + P.after[c][i] - P.before[c][i]);
+    body += `<tr class="gd-pv-h"><td colspan="${P.months.length + 1}"><b>${c} ${esc(BASE.cats[c].name)}</b>: ${gdWosNow(c)} → ${GW[c]} weeks</td></tr>`
+      + line('Left to buy now', now) + line(`With ${GW[c]} weeks`, wth, v => v >= 0 ? 'pos' : 'neg');
+  }
+  const d = P.months.map((k, i) => P.after.total[i] - P.before.total[i]);
+  body += line('Change, all categories', d, v => v > 0 ? 'pos' : v < 0 ? 'neg' : '');
+  return `<section class="panel gd-card gd-pv" role="region" aria-label="Effect before you save"><header><h2>Effect before you save</h2><span class="lab">${esc(PLANS.cur ? PLANS.cur.fy : '')} by month</span></header>
+    <div class="tbl"><table><thead><tr><th></th>${P.months.map(k => `<th class="r">${esc(monthLabel(k))}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>
+    <div class="gd-save"><b>${codes.length} unsaved budget change${codes.length === 1 ? '' : 's'}</b>
+      <input class="field-inline" id="gdNote" placeholder="Why (optional)" value="${esc(GD.note)}">
+      <button type="button" class="btn" data-gdwosact="discard">Discard</button><button type="button" class="btn primary" data-gdwosact="save">Save to the budget</button></div></section>`;
+}
+document.addEventListener('change', e => {
+  const t = e.target; if (!t.dataset || !t.dataset.gdwos || !gdOwner()) return;
+  const c = t.dataset.gdwos, n = gdParse('n', t.value);
+  if (n == null || n < 1 || n > 104){ toast('Type a number of weeks between 1 and 104.'); return render(); }
+  if (n === gdWosNow(c)) delete GW[c]; else GW[c] = n;
+  render();
+});
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('[data-gdwosreset],[data-gdwosact]');
+  if (!b || !$('#pane').contains(b) || !gdOwner()) return;
+  if (b.dataset.gdwosreset){ const c = b.dataset.gdwosreset, d = ((BASE.defaults || {}).wos || {})[c]; if (d === gdWosNow(c)) delete GW[c]; else GW[c] = d; return render(); }
+  if (b.dataset.gdwosact === 'discard'){ GW = {}; return render(); }
+  if (b.dataset.gdwosact === 'save'){
+    const sug = (BASE.defaults || {}).wos || {}, P = wosPreview(BASE, assumptions(), GW, {});
+    const wos = {...((SAVED || {}).wos || {})};
+    for (const c in GW){ if (GW[c] === sug[c]) delete wos[c]; else wos[c] = GW[c]; }
+    const change = P.months.reduce((t, k, i) => t + P.after.total[i] - P.before.total[i], 0);
+    const entries = Object.keys(GW).map(c => ({what: `Target weeks of supply, ${c} ${BASE.cats[c].name}`, from: gdWosNow(c) + ' wks', to: GW[c] + ' wks'}));
+    b.disabled = true;
+    if (await write('plan/assumptions', {...(SAVED || {}), wos, by: myId, at: new Date().toISOString()})){
+      entries[0].budget = {through: P.months[P.months.length - 1], change: Math.round(change)};
+      await saveGuides({}, entries, GD.note.trim());
+      GW = {}; GD.note = ''; toast('Saved. The budget now uses these weeks of supply.');
+    } else b.disabled = false;
+  }
+});
+/** Leaving the Guidelines page with unsaved changes asks first (goTab in 90-io.js). */
+function gdLeaveOk(){
+  if (!Object.keys(GW).length && !Object.keys(GD.draft).length) return true;
+  if (!confirm('You have unsaved guideline changes. Leave without saving them?')) return false;
+  GW = {}; GD.draft = {}; return true;
+}

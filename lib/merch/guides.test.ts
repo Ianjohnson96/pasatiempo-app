@@ -146,3 +146,35 @@ describe("mix and suggestions", () => {
     expect(X.rangeSum(ranges)).toEqual({ lo: 83, hi: 120 });
   });
 });
+
+// wosPreview (19-guides.js) runs the budget engine (20-engine.js) twice: as saved, and with changed weeks of supply.
+describe("budget weeks-of-supply preview", () => {
+  const fx = JSON.parse(readFileSync(path.join(process.cwd(), "merchandise/pipeline/fixtures/engine_parity.json"), "utf8"));
+  const helpers = `
+const num = v => { const n = +v; return isFinite(n) ? n : 0; };
+const pad = n => String(n).padStart(2,'0');
+const addMonths = (m, k) => { let y = +m.slice(0,4), mo = +m.slice(5,7) - 1 + k; y += Math.floor(mo/12); mo = ((mo%12)+12)%12; return y + '-' + pad(mo+1); };
+const THIS_MONTH = '2026-11', FALLBACK = {}, localStorage = {getItem: () => null};
+`;
+  const ctx = vm.createContext({});
+  vm.runInContext(helpers + read("20-engine.js") + "\n" + read("17-metrics.js") + "\n" + read("19-guides.js"), ctx);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const preview = (changes: Record<string, number>): any => vm.runInContext(`BASE = ${JSON.stringify(fx.base)}; SAVED = null; WHATIF = null;
+    (() => { const a = assumptions(); return {a, p: wosPreview(BASE, a, ${JSON.stringify(changes)}, {})}; })()`, ctx);
+
+  it("raising a category's weeks raises its room in every month, and nothing else", () => {
+    const { a } = preview({});
+    const { p } = preview({ "620": a.wos["620"] + 2 });
+    expect(p.months.length).toBeGreaterThan(0);
+    expect(Object.keys(p.before)).toEqual(["620", "total"]);
+    const after = p.after["620"], before = p.before["620"];
+    expect(after.reduce((t: number, v: number) => t + v, 0)).toBeGreaterThan(before.reduce((t: number, v: number) => t + v, 0));
+    p.months.forEach((_: string, i: number) => expect(p.after.total[i] - p.before.total[i]).toBeCloseTo(after[i] - before[i], 6));
+  });
+
+  it("no changes, no difference", () => {
+    const { p } = preview({});
+    expect(p.before).toEqual(p.after);
+    expect(Object.keys(p.before)).toEqual(["total"]);
+  });
+});
