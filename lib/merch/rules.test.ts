@@ -16,9 +16,24 @@ describe("merch access rules", () => {
     expect(docProblem("pos/a", { status: "lost" })).toMatch(/status/);
     expect(docProblem("pos/a", { cost: "abc" })).toMatch(/cost/);
     expect(docProblem("pos/a", { deliveryMonth: "Feb" })).toMatch(/deliveryMonth/);
+    expect(docProblem("pos/a", { orderDate: "2026-09-21" })).toBeNull();
+    expect(docProblem("pos/a", { orderDate: "" })).toBeNull();
+    expect(docProblem("pos/a", { orderDate: "9/21/26" })).toMatch(/orderDate/);
+    expect(docProblem("pos/a", { orderDate: "Print date" })).toMatch(/orderDate/);
     expect(docProblem("pos/a", { lines: "x" })).toMatch(/lines/);
     expect(docProblem("pos/a", { lines: [{ cost: "twelve" }] })).toMatch(/line cost/);
     expect(docProblem("pos/a", null)).toBeNull(); // a delete
+  });
+
+  it("checks invoice-arrival entries on an order", () => {
+    expect(docProblem("pos/a", { invoicesIn: [{ date: "2026-11-18", amount: "abc", source: "hand" }] })).toMatch(/amount/);
+    expect(docProblem("pos/a", { invoicesIn: [{ date: "Nov 18", source: "hand" }] })).toMatch(/date/);
+    expect(docProblem("pos/a", { invoicesIn: "x" })).toMatch(/invoicesIn/);
+    expect(docProblem("pos/a", { invoicesIn: [{ date: "2026-11-18", amount: 250, source: "log" }], invoicesClearedAt: "2026-11-20T00:00:00Z" })).toBeNull();
+    expect(docProblem("pos/a", { invoicesIn: [{ date: "2026-11-18", source: "fax" }] })).toMatch(/source/);
+    expect(docProblem("pos/a", { invoicesIn: [{ date: "2026-11-18", amount: 500, source: "hand", rcvd: 1000 }] })).toBeNull();
+    expect(docProblem("pos/a", { invoicesIn: [{ date: "2026-11-18", source: "hand", rcvd: "lots" }] })).toMatch(/rcvd/);
+    expect(docProblem("pos/a", { invoicesClearedAt: 5 })).toMatch(/invoicesClearedAt/);
   });
 
   it("checks budget change amounts and assignment maps", () => {

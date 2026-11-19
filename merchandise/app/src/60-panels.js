@@ -61,6 +61,24 @@ async function saveAdj(code, amount, month, note){
 }
 
 /* ---------- vendors ---------- */
+// The Vendors page: one row per vendor, with what is still open. A row opens that vendor's orders; Edit opens the drawer.
+function renderVendorsPage(){
+  const ro = !canAct(), g = new Map();
+  const row = (k, v, name) => { if (!g.has(k)) g.set(k, {key: k, v, name, n: 0, cost: 0, months: []}); return g.get(k); };
+  for (const v of VENDORS) row(v.id, v, v.name);
+  for (const p of POS){ if (!isOpen(p)) continue; const r = row(vkey(p), vendorOf(p), vendorName(p)); r.n++; r.cost += onOrder(p); if (/^\d{4}-\d{2}/.test(p.deliveryMonth || '')) r.months.push(p.deliveryMonth.slice(0, 7)); }
+  const rows = [...g.values()].sort((a, b) => ((a.v || {}).active === false) - ((b.v || {}).active === false) || b.cost - a.cost || a.name.localeCompare(b.name));
+  const next = r => { const m = r.months.slice().sort(), up = m.find(x => x >= THIS_MONTH); return up ? monthLabel(up) : m.length ? `${monthLabel(m[0])} <span class="rstat overdue">Late</span>` : '—'; };
+  const active = rows.filter(r => (r.v || {}).active !== false).length;
+  $('#pane').innerHTML = `<section class="panel"><header><h2>Vendors</h2><span style="display:flex;gap:8px;align-items:center"><span class="lab">${active} active</span>${ro ? '' : '<button class="btn primary sm" type="button" data-vedit="__new">+ Add a vendor</button>'}</span></header>
+    <div class="note">Open orders and cost are what is still to come. Click a vendor to see its orders.</div>
+    <div class="tbl"><table class="rt"><thead><tr><th>Vendor</th><th class="r">Open orders</th><th class="r">Open cost</th><th>Next delivery</th><th>Terms</th><th>Rep</th><th></th></tr></thead>
+    <tbody class="click">${rows.map(r => { const v = r.v || {}, off = v.active === false;
+      return `<tr ${off ? 'style="opacity:.55"' : ''} data-go="orders:${esc(r.key)}" tabindex="0"><td><b>${esc(r.name)}</b>${off ? ' <span class="chip excluded">hidden</span>' : ''}${v.id ? '' : '<span class="sm">not in the vendor list</span>'}</td>
+      <td data-l="Open orders" class="r num">${r.n || '—'}</td><td data-l="Open cost" class="r num">${r.cost ? money(r.cost) : '—'}</td><td data-l="Next delivery">${next(r)}</td>
+      <td data-l="Terms">${esc(v.terms || '—')}</td><td data-l="Rep">${esc([v.rep, v.phone].filter(Boolean).join(' · ') || '—')}</td><td>${ro || !v.id ? '' : `<button class="btn ghost sm" type="button" data-vedit="${esc(v.id)}">Edit</button>`}</td></tr>`; }).join('')}</tbody></table></div>
+    ${rows.length ? '' : `<div class="empty"><p>No vendors yet.${ro ? '' : ' Click <b>+ Add a vendor</b>, or they are added for you when you paste orders.'}</p></div>`}</section>`;
+}
 function openVendors(editId){
   const ro = !canAct();
   const cnt = {}, open = {}; for (const p of POS){ const k = p.vendorId || ''; cnt[k] = (cnt[k] || 0) + 1; open[k] = (open[k] || 0) + onOrder(p); }

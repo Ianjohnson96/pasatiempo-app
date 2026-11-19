@@ -88,6 +88,12 @@ function exportLines(){
 
 /* ---------- writes, people, toast ---------- */
 async function write(path, body){
+  // Order dates are saved as YYYY-MM-DD (the server refuses anything else). Read M/D/Y; blank one that can't be read.
+  if (path.startsWith('pos/') && body && typeof body.orderDate === 'string' && body.orderDate.trim() !== ''){
+    const iso = orderDateISO(body.orderDate);
+    if (!iso) toast("The order date couldn't be read, so it was left blank. Fill it in on the order.");
+    body = {...body, orderDate: iso || ''};
+  }
   try { await db.doc(path).set(JSON.parse(JSON.stringify(body))); return true; } catch (e){ writeError(e); return false; }
 }
 function writeError(e){
@@ -113,22 +119,26 @@ function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = fals
 function closeOverlay(){ $('#overlay').innerHTML = ''; D = null; DX = null; }
 
 /* ---------- render + mode ---------- */
-const PAGES = {summary: renderSummaryPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, otb: renderOTB, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
-if (location.hash === '#reports' && RPT){ TAB = 'reports'; history.replaceState(null, '', location.pathname + location.search); }  // the reminder email's link
+const renderSoon = () => { $('#pane').innerHTML = `<section class="panel"><div class="note" style="font-size:14px">Coming in this build.</div></section>`; };
+const PAGES = {today: renderToday, receiving: renderReceiving, seasons: renderSeasons, vendors: renderVendorsPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
+if (location.hash === '#reports' && RPT){ TAB = resolveTab('reports'); history.replaceState(null, '', location.pathname + location.search); }  // the reminder email's link
 function render(){
   if (!BASE && !LEGACY_PLAN){
-    $('.monthbar').hidden = true; $('#summary').hidden = true; $('#kpis').hidden = true; $('#tabs').innerHTML = '';
+    $('.monthbar').hidden = true; $('#summary').hidden = true; $('#kpis').hidden = true; renderSide(null);
     $('#pane').innerHTML = `<section class="panel"><div class="note" style="font-size:14px">${dbState === 'connecting' ? 'Loading the program…' : 'The forecast and budgets appear after the first month-end data is loaded.'}</div></section>`;
     return;
   }
   derive();
-  if (!PAGES[TAB]) TAB = FIRST_TAB;
-  const S = stats(), bar = TAB === 'overview' || TAB === 'orders';
-  $('.monthbar').hidden = !bar; $('#summary').hidden = TAB !== 'overview'; $('#kpis').hidden = TAB !== 'overview';
+  TAB = resolveTab(TAB); if (!PAGES[TAB]) TAB = FIRST_TAB;
+  // The month bar belongs to Orders and to Budget & open-to-buy's By category view; #summary and #kpis are retired
+  // (Budget & open-to-buy draws its own tiles).
+  const S = stats(), bar = (TAB === 'overview' && BV === 'cats') || TAB === 'orders';
+  $('.monthbar').hidden = !bar; $('#summary').hidden = true; $('#kpis').hidden = true;
+  renderBVBar();
   if (bar) renderMonths();
-  if (TAB === 'overview'){ renderSummary(S); renderKpis(S); }
-  renderTabs(S);
-  if (RPT) renderDueBar();
+  renderSide(S);
+  // What's due on the reporting calendar: a bar on Upload & close; Today shows it as a card in the page.
+  if (RPT && TAB === 'monthend') renderDueBar(); else if ($('#duebar')) $('#duebar').hidden = true;
   const w = $('#wibar'); w.hidden = !WHATIF || TAB === 'forecast';
   if (WHATIF) w.innerHTML = `<span><b>What-if in use.</b> Budgets on every page reflect forecast changes that aren't saved.</span><span style="display:flex;gap:8px"><button class="btn sm" type="button" data-tab="forecast">Review</button><button class="btn sm" type="button" data-fc="discard">Discard</button></span>`;
   const scrollY = window.scrollY;
@@ -136,6 +146,37 @@ function render(){
   window.scrollTo(0, scrollY);
   if (D && $('#dImpact')) updateTotals();
 }
+// Every page change goes through here: old ids are routed to their new page; the Vendors page is a page; the drawer (openVendors) is for adding and editing.
+// key (from a chart or row's data-go="tab:key") opens the keyed thing there: a YYYY-MM month becomes the selected
+// month (Budget & open-to-buy by category), a brand opens its drawer on Brands, a category code opens its drawer.
+const isMonthKey = k => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(k || ''));
+function goTab(id, key){
+  if (id === 'otb') setBV('months');
+  const toOrders = id === 'orders' && key && !isMonthKey(key);
+  if (toOrders){ filt.status = 'active'; filt.vendor = key; filt.season = 'all'; filt.cat = 'all'; filt.q = ''; filt.arriving = false; }
+  const tab = resolveTab(id), moved = tab !== TAB;
+  if (isMonthKey(key)){
+    if (tab === 'overview') setBV('cats');
+    if (BASE){ const k = planKeyFor(key); if (PLANS[k] && k !== FYSEL){ FYSEL = k; try { localStorage.setItem('mp.fy', FYSEL); } catch (_) {} } }
+    SEL = key; try { localStorage.setItem('ob.month', SEL); } catch (_) {}
+  }
+  TAB = tab; try { localStorage.setItem('ob.tab2', TAB); } catch (_) {}
+  closePops(); closeOverlay(); closeSide();
+  if (moved || isMonthKey(key) || !key || toOrders) render();
+  if (key && !isMonthKey(key)){
+    if (TAB === 'brands' && typeof BRANDS !== 'undefined' && BRANDS && (BRANDS.rows || []).some(r => r.id === key)) openBrand(key);
+    else if (PLAN && PLAN.cats && PLAN.cats[key]) openCategory(key);
+  }
+  return moved;
+}
+// A click on anything with data-go: the page, then the keyed thing, from the top of the page if it moved.
+function goFrom(s){ const g = parseGo(s); if (!g.tab) return; if (goTab(g.tab, g.key) && window.scrollY > 0) window.scrollTo({top: 0}); }
+// Under 900px the sidebar is a bar across the top with a Menu button that opens the pages.
+function toggleSide(on){
+  const s = $('#side'); on = on == null ? !s.classList.contains('open') : !!on;
+  s.classList.toggle('open', on); $('#btnSide').setAttribute('aria-expanded', String(on));
+}
+const closeSide = () => { if ($('#side').classList.contains('open')) toggleSide(false); };
 let renderQ = null;
 const schedule = () => { if (renderQ) return; renderQ = requestAnimationFrame(() => { renderQ = null; render(); }); };
 function applyMode(){
@@ -153,11 +194,13 @@ function applyMode(){
 const POPS = [['#morePop', '#btnMore'], ['#acctPop', '#btnAcct']];
 function closePops(except){ for (const [p, b] of POPS){ if (p === except || !$(p)) continue; $(p).hidden = true; $(b)?.setAttribute('aria-expanded', 'false'); } }
 function togglePop(p, b){ closePops(p); const el = $(p); el.hidden = !el.hidden; $(b).setAttribute('aria-expanded', String(!el.hidden)); }
-document.addEventListener('click', e => { const m = e.target.closest('.menu'); closePops(m ? '#' + (m.querySelector('.pop') || {}).id : null); }, true);
+document.addEventListener('click', e => { const m = e.target.closest('.menu'); closePops(m ? '#' + (m.querySelector('.pop') || {}).id : null); if (!e.target.closest('#side')) closeSide(); }, true);
 document.addEventListener('click', async e => {
-  const t = e.target.closest('button,[data-cat],[data-po],[data-count],tr[data-po],tr[data-brand],tr[data-subrow]'); if (!t) return;
+  const t = e.target.closest('button,[data-go],[data-cat],[data-po],[data-count],tr[data-po],tr[data-brand],tr[data-subrow]'); if (!t) return;
   const ds = t.dataset;
   if (ds.close) return closeOverlay();
+  if (ds.go != null) return goFrom(ds.go);
+  if (ds.bv){ setBV(ds.bv); return render(); }
   if (ds.fy){ FYSEL = ds.fy; SEL = null; try { localStorage.setItem('mp.fy', FYSEL); localStorage.removeItem('ob.month'); } catch (_) {} return render(); }
   if (ds.fc === 'discard'){ WHATIF = null; return render(); }
   if (ds.fc === 'save') return saveAssumptions();
@@ -197,9 +240,12 @@ document.addEventListener('click', async e => {
   if (ds.bcclear){ try { await db.doc('brandCalls/' + ds.bcclear).delete(); toast('Back to the suggested call'); setTimeout(() => openBrand(ds.bcclear), 300); } catch (err){ writeError(err); } return; }
   if (ds.brand && !D) return openBrand(ds.brand);
   if (ds.month){ SEL = ds.month; try { localStorage.setItem('ob.month', SEL); } catch (_) {} return render(); }
-  if (ds.sccatgo) SC.cat = ds.sccatgo;
-  if (ds.tab){ TAB = ds.tab; try { localStorage.setItem('ob.tab2', TAB); } catch (_) {} closePops(); closeOverlay(); render();
-    const top = $('#tabsAnchor').getBoundingClientRect().top + scrollY; return scrollY > top ? window.scrollTo({top}) : undefined; }
+  if (ds.sccatgo){ SC.cat = ds.sccatgo; UIF.sub = true; }
+  if (ds.tab){ goTab(ds.tab);
+    // Open Subcategories (from a category drawer): the subcategory section is at the foot of the Scorecard, so scroll to it.
+    if (ds.sccatgo){ const f = $('#subFold'); if (f){ f.open = true; f.scrollIntoView({block: 'start'}); } return; }
+    return scrollY > 0 ? window.scrollTo({top: 0}) : undefined; }
+  if (t.id === 'btnSide') return toggleSide();
   if (t.id === 'btnMore') return togglePop('#morePop', '#btnMore');
   if (t.id === 'btnAcct') return togglePop('#acctPop', '#btnAcct');
   if (ds.act === 'import'){ $('#morePop').hidden = true; return openImport(); }
@@ -214,7 +260,14 @@ document.addEventListener('click', async e => {
   if (ds.vdel){ if (!confirm('Delete this vendor? It has no orders.')) return; try { await db.doc('vendors/' + ds.vdel).delete(); toast('Vendor deleted'); openVendors(); } catch (err){ writeError(err); } return; }
   if (ds.sort){ sort = {key: ds.sort, dir: sort.key === ds.sort ? -sort.dir : 1}; return render(); }
   if (ds.ofilt){ filt.status = ds.ofilt; return render(); }
+  if (ds.ovend){ filt.vendor = filt.vendor === ds.ovend ? 'all' : ds.ovend; return render(); }
+  if (ds.sbseason){ SB.season = ds.sbseason; return render(); }
+  if (ds.sborders){ filt = {...filt, status: 'all', cat: 'all', vendor: 'all', season: ds.sborders, q: '', arriving: false}; return goTab('orders'); }
+  if (ds.oclear){ filt.vendor = 'all'; filt.season = 'all'; return render(); }
   if (ds.akind){ afilt.kind = ds.akind; return render(); }
+  if (ds.invin) return openInvoiceIn(ds.invin);
+  if (ds.invsave) return saveInvoiceIn(ds.invsave, t);
+  if (ds.invclear) return clearArrived(ds.invclear);
   if (ds.openpo) return openOrder(ds.openpo);
   if (ds.startorder) return startOrderFromItem(ds.startorder);
   if (ds.neworderCat) return openOrder(null, {cat: ds.neworderCat, lines: [newLine(ds.neworderCat)]});
@@ -250,7 +303,7 @@ document.addEventListener('click', async e => {
   }
   if (ds.count) return openCount(ds.count);
   if (ds.po) return openOrder(ds.po);
-  if (ds.cat && !D){ if (TAB === 'otb' && BASE){ const k = OTBV.view === 'next' ? 'next' : 'cur'; if (FYSEL !== k){ FYSEL = k; try { localStorage.setItem('mp.fy', FYSEL); } catch (_) {} render(); } } return openCategory(ds.cat); }
+  if (ds.cat && !D){ if (TAB === 'overview' && BV === 'months' && BASE){ const k = OTBV.view === 'next' ? 'next' : 'cur'; if (FYSEL !== k){ FYSEL = k; try { localStorage.setItem('mp.fy', FYSEL); } catch (_) {} render(); } } return openCategory(ds.cat); }
 });
 document.addEventListener('click', e => {
   const t = e.target; if (!t.matches || !t.matches('input[data-sssel],#ssAll')) return;
@@ -258,8 +311,10 @@ document.addEventListener('click', e => {
   ssTick(t.dataset.sssel, t.checked, e.shiftKey);
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape'){ if ($('#overlay').innerHTML) closeOverlay(); closePops(); }
+  if (e.key === 'Escape'){ if ($('#overlay').innerHTML) closeOverlay(); closePops(); closeSide(); }
   if (e.key === 'Enter' && e.target.matches && e.target.matches('tr[data-po],[data-cat][tabindex],tr[data-brand],tr[data-subrow]')){ e.preventDefault(); e.target.click(); }
+  // Chart marks are SVG (no .click()), so a focused data-go goes straight there.
+  else if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[data-go][tabindex]')){ e.preventDefault(); goFrom(e.target.dataset.go); }
 });
 document.addEventListener('input', e => {
   const t = e.target;
@@ -283,6 +338,8 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.id === 'fVend'){ filt.vendor = t.value; return render(); }
+  if (t.id === 'fSeason'){ filt.season = t.value; return render(); }
   if (t.id === 'fCat'){ filt.cat = t.value; return render(); }
   if (t.id === 'fArr'){ filt.arriving = t.checked; return render(); }
   if (t.id === 'aCat'){ afilt.cat = t.value; return render(); }
@@ -316,7 +373,7 @@ document.addEventListener('change', e => {
 
 /* ---------- start ---------- */
 if (window.MERCH_HOST){
-  // The band: back to the Club Hub (the program runs at /merch on the club app) and your account.
+  // The sidebar's foot: back to the Club Hub (the program runs at /merch on the club app) and your account.
   const H = window.MERCH_HOST, who = H.me.name || H.me.email;
   $('#backHub').hidden = !H.base;
   $('#acct').hidden = false;
