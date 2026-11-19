@@ -39,8 +39,17 @@ viewers (Ken, Steve) read the page to understand why something is flagged; only 
 
 1. A **Guidelines** page, linked at the bottom of the sidebar above Tools (page id `guidelines`), with tabs:
    **Targets**, **Category roles**, **Budget inputs**, **Merchandise mix**, **Seasons & discount**, **Change history**.
-2. Every rule shows the program's default and Pasatiempo's value; a changed value is marked (brass dot, field tint) with
-   "Reset to <default>". Each tab has "Reset this tab".
+2. Every rule shows three reference columns before Pasatiempo's value, so a change is made against something (Ian: "I
+   want the suggested settings/data points to be there so we can reference when we change it"):
+   - **Suggested** — the program's recommended value and, under it, where it comes from in plain words ("rule of thumb
+     for club apparel", "AGM private-club average 2.65", "share of 12-month sales ± 5 points", "cost of 12-month sales ÷
+     2.5 turns"). Suggested values are the code defaults, or computed from the shop's own data where the rule is
+     data-driven (mix ranges, total stock).
+   - **Your shop now** — the shop's actual figure for that rule from the latest month-end data (e.g. apparel margin,
+     shop GMROI 1.53, aged stock %, turns, each category's current weeks of supply), red when it misses Pasatiempo's
+     value.
+   - **Pasatiempo** — the editable value. A changed value is marked (brass dot, field tint) with "Reset to suggested".
+     Each tab has "Reset this tab".
 3. **Targets:** margin by segment (apparel 45%, accessories 40%, equipment 25%), GMROI (apparel/accessories 2.0,
    equipment 1.0), markdowns under 15% of sales, aged stock under 10% of stock, turns 2–3 (fast-turn 3), and the "near"
    tolerances — the values in `BENCH` (`17-metrics.js`).
@@ -50,7 +59,9 @@ viewers (Ken, Steve) read the page to understand why something is flagged; only 
    `WHATIF.wos` and opens a pinned preview panel: Left to buy by month for the plan year, before and after, for each
    changed category and in total. **Save to the budget** merges into `plan/assumptions` (keeping growth); **Discard**
    clears the what-if. Leaving the page with an unsaved change asks first.
-6. **Merchandise mix:** a typed total (default: current on hand at cost, 640 excluded), and per role a percentage range
+6. **Merchandise mix:** a typed total (default: current on hand at cost, 640 excluded), shown beside a **suggested
+   total** (cost of the last 12 months' sales ÷ the midpoint of the turns target — about $637,000 today) and today's on
+   hand, each with a "Use" button; and per role a percentage range
    (defaults: the role's share of 12-month sales ± 5 points, floored at 0, rounded to whole points). Each role row shows
    on hand $, target $ range at the typed total, a range bar (target band, stock-share dot, sales-share tick), and
    "In range" / "$X short" / "$X over". A line shows what the ranges add up to. Opening a role lists its categories'
