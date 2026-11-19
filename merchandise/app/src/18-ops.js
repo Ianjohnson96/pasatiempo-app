@@ -32,15 +32,16 @@ function daysWaiting(invoicesIn, todayISO) {
   return Math.max(0, Math.round((t(todayISO) - t(ds[0])) / 86400000));
 }
 
-/** The buying season a 'YYYY-MM' month falls in: spring Jan-Mar, summer Apr-Jul, fall Aug-Oct, holiday Nov-Dec. */
+/** The buying season a 'YYYY-MM' month falls in (null when missing or malformed): spring Jan-Apr, summer May-Jul, fall Aug-Oct, holiday Nov-Dec. */
 function seasonOf(month) {
+  if (typeof month !== "string" || !/^\d{4}-(0[1-9]|1[0-2])/.test(month)) return null;
   const y = +month.slice(0, 4), m = +month.slice(5, 7);
   const [key, label, firstMonth] =
-    m <= 3 ? ["spring", "Spring", 1] : m <= 7 ? ["summer", "Summer", 4] : m <= 10 ? ["fall", "Fall", 8] : ["holiday", "Holiday", 11];
+    m <= 4 ? ["spring", "Spring", 1] : m <= 7 ? ["summer", "Summer", 5] : m <= 10 ? ["fall", "Fall", 8] : ["holiday", "Holiday", 11];
   return { key, label: label + " " + y, year: y, first: y + "-" + String(firstMonth).padStart(2, "0") };
 }
 
 /** True when the order was placed before its season began. */
 function isPrebook(orderDate, season) {
-  return !!orderDate && orderDate.slice(0, 7) < season.first;
+  return !!orderDate && !!season && orderDate.slice(0, 7) < season.first;
 }

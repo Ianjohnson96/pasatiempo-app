@@ -56,9 +56,22 @@ describe("seasons", () => {
     expect(h.label).toBe("Holiday 2026");
     expect(h.first).toBe("2026-11");
   });
+  it("covers all twelve months", () => {
+    const keys = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => O.seasonOf(`2027-${String(m).padStart(2, "0")}`).key);
+    expect(keys).toEqual(["spring", "spring", "spring", "spring", "summer", "summer", "summer", "fall", "fall", "fall", "holiday", "holiday"]);
+    expect(O.seasonOf("2027-06").first).toBe("2027-05");
+  });
+  it("returns null for a missing or malformed month", () => {
+    expect(O.seasonOf(undefined)).toBeNull();
+    expect(O.seasonOf("")).toBeNull();
+    expect(O.seasonOf(5)).toBeNull();
+    expect(O.isPrebook("2026-08-01", null)).toBe(false);
+  });
   it("a prebook is ordered before the season starts", () => {
     expect(O.isPrebook("2026-08-01", O.seasonOf("2027-03"))).toBe(true);
     expect(O.isPrebook("2027-02-10", O.seasonOf("2027-03"))).toBe(false);
     expect(O.isPrebook(undefined, O.seasonOf("2027-03"))).toBe(false);
+    expect(O.isPrebook("2027-04-15", O.seasonOf("2027-06"))).toBe(true);
+    expect(O.isPrebook("2027-05-02", O.seasonOf("2027-06"))).toBe(false);
   });
 });
