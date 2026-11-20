@@ -60,7 +60,9 @@ let db = null, userNS = null, canWrite = null, isAdmin = false, myId = null, dbS
 let SEL = (() => { try { return localStorage.getItem('ob.month') || null; } catch (_) { return null; } })();
 // The page last open in this browser; the first time, everyone starts on Today.
 const FIRST_TAB = 'today';
-let TAB = resolveTab((() => { try { return localStorage.getItem('ob.tab2') || localStorage.getItem('ob.tab') || FIRST_TAB; } catch (_) { return FIRST_TAB; } })());
+// The page is in the address (#orders, 90-io.js), so a refresh, a bookmark or a shared link opens that page; plain
+// /merch opens Today.
+let TAB = resolveTab(decodeURIComponent((location.hash || '').slice(1)) || FIRST_TAB);
 let filt = {status:'active', cat:'all', vendor:'all', season:'all', q:'', arriving:false}, sort = {key:'deliveryMonth', dir:1};
 let afilt = {kind:'all', showResolved:false, cat:'all'};
 

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 // merchandise/app/src/18-ops.js is plain browser JS joined into the page. It is pure, so it runs here as it is.
 const src = readFileSync(path.join(process.cwd(), "merchandise/app/src/18-ops.js"), "utf8");
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots, makeInvoiceEntry, liveInvoices, storeRoomValue, seasonMonths, seasonList, seasonBuys, orderDateISO})");
+const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots, makeInvoiceEntry, liveInvoices, storeRoomValue, seasonMonths, seasonList, seasonBuys, orderDateISO, posDates})");
 
 describe("arrivedValue", () => {
   it("sums amounts, counts an amountless entry as the whole order, caps and floors", () => {
@@ -241,5 +241,14 @@ describe("orderDateISO", () => {
     const t = O.seasonBuys(rows, O.seasonOf("2027-03"));
     expect(t).toMatchObject({ committed: 160, unknown: 150, unknownOrders: 1, reorders: 10, prebooked: 0 });
     expect(t.byBrand[0].unknown).toBe(150);
+  });
+});
+
+describe("posDates", () => {
+  it("rewrites POS dates like Nov06/26 as Nov 6, 2026 and leaves other text alone", () => {
+    expect(O.posDates("Last sold Jul01/23; received again Nov11/26.")).toBe("Last sold Jul 1, 2023; received again Nov 11, 2026.");
+    expect(O.posDates("System shows -1 on hand (last sale Nov06/26).")).toBe("System shows -1 on hand (last sale Nov 6, 2026).");
+    expect(O.posDates("Shirt 3/4 sleeve, Nov 2026")).toBe("Shirt 3/4 sleeve, Nov 2026");
+    expect(O.posDates(null)).toBe("");
   });
 });

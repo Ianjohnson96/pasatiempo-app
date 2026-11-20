@@ -2,7 +2,7 @@
 const vendorOf = p => VENDORS.find(v => v.id === p.vendorId);
 const vendorName = p => (vendorOf(p) || {}).name || p.vendorName || p.vendor || '—';
 const subName = id => (SUBCATS.find(s => s.id === id) || {}).name || '';
-const COLS = [{k:'poNumber',l:'PO #'},{k:'vendor',l:'Vendor'},{k:'cat',l:'Category'},{k:'items',l:'Items'},{k:'deliveryMonth',l:'Delivery'},{k:'cancelDate',l:'Cancel by'},{k:'cost',l:'Cost',r:1},{k:'open',l:'Still to come',r:1},{k:'status',l:'Status'},{k:'createdBy',l:'Entered by'}];
+const COLS = [{k:'poNumber',l:'PO #'},{k:'vendor',l:'Vendor'},{k:'cat',l:'Category'},{k:'items',l:'Items'},{k:'deliveryMonth',l:'Delivery'},{k:'cancelDate',l:'Cancel by'},{k:'cost',l:'Cost',r:1},{k:'open',l:'Still to come',r:1},{k:'status',l:'Status'}];  // who entered an order is in its drawer
 function sortVal(p, k){ if (k === 'open') return onOrder(p); if (k === 'cost') return poTotal(p); if (k === 'items') return poUnits(p); if (k === 'vendor') return vendorName(p).toLowerCase(); if (k === 'cat') return CAT(p.cat).name; return String(p[k] || ''); }
 function rowFlag(p){ if (!isOpen(p)) return ''; if (p.status === 'hold') return 'flag-hold';
   if (p.cancelDate && p.cancelDate < todayISO) return 'flag-crit';
@@ -62,6 +62,10 @@ function renderOrders(S){
   const strip = vs.length ? `<div class="chips vstrip" role="group" aria-label="Open cost by vendor"><span class="lab" style="margin-right:4px">Open cost</span>${vs.slice(0, 8).map(v => `<button type="button" class="fchip" data-ovend="${esc(v.key)}" aria-pressed="${filt.vendor === v.key}" title="${v.n} open order${v.n === 1 ? '' : 's'}, ${esc(money(v.cost))} still to come">${esc(v.name)}<span class="c">${moneyK(v.cost)}</span></button>`).join('')}${vs.length > 8 ? `<span class="sm" style="color:var(--muted)">and ${vs.length - 8} more vendors</span>` : ''}</div>` : '';
   const chart = vs.length ? deliveriesChart(vs) : '';
   const sumCost = rows.reduce((a, p) => a + poTotal(p), 0), sumOpen = rows.reduce((a, p) => a + onOrder(p), 0);
+  // Sorted by delivery (the default), the orders fall under a heading for each month with its count and what's still to come.
+  const byMonth = sort.key === 'deliveryMonth', mkey = p => String(p.deliveryMonth || '').slice(0, 7);
+  const mtot = new Map(); for (const p of rows){ const k = mkey(p), t = mtot.get(k) || {n: 0, open: 0}; t.n++; t.open += onOrder(p); mtot.set(k, t); }
+  const monthHead = k => { const t = mtot.get(k); return `<tr class="mgrp"><td colspan="${COLS.length}"><b>${k ? monthLabel(k) : 'No delivery month'}</b><span>${t.n} order${t.n === 1 ? '' : 's'} · ${money(t.open)} still to come</span></td></tr>`; };
   $('#pane').innerHTML = `${chart ? `<div class="astack" style="margin-bottom:18px">${chart}</div>` : ''}<section class="panel">
     ${strip}
     <div class="toolbar"><div class="filters"><div class="seg" role="group" aria-label="Status">${segB('active','Open')}${POS.some(p => p.status === 'hold') ? segB('hold', `On hold (${POS.filter(p => p.status === 'hold').length})`) : ''}${segB('all','All')}${segB('received','Received')}${segB('cancelled','Cancelled')}</div>
@@ -72,11 +76,11 @@ function renderOrders(S){
       <label for="fQ" class="sr">Search</label><input id="fQ" class="field-inline" type="search" placeholder="Search PO #, vendor, style" value="${esc(filt.q)}"></div></div>
     ${rows.length ? `<div class="note" style="padding:6px 18px">${int(rows.length)} order${rows.length === 1 ? '' : 's'} · ${money(sumCost)} ordered · ${money(sumOpen)} still to come${filtered ? ' <button type="button" class="btn ghost sm" data-oclear="1">Clear vendor and season</button>' : ''}</div>` : ''}
     <div class="tbl"><table><thead><tr>${COLS.map(c => `<th class="${c.r ? 'r' : ''}" aria-sort="${sort.key === c.k ? (sort.dir > 0 ? 'ascending' : 'descending') : 'none'}"><button type="button" data-sort="${c.k}">${c.l}${sort.key === c.k ? (sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('')}</tr></thead>
-    <tbody class="click">${rows.map(p => `<tr class="${rowFlag(p)}" data-po="${esc(p.id)}" tabindex="0">
+    <tbody class="click">${rows.map((p, i) => `${byMonth && (i === 0 || mkey(rows[i - 1]) !== mkey(p)) ? monthHead(mkey(p)) : ''}<tr class="${rowFlag(p)}" data-po="${esc(p.id)}" tabindex="0">
       <td class="po">${esc(p.poNumber)}</td><td>${esc(vendorName(p))}${RISK_VENDORS.test(vendorName(p)) ? '<span class="sm" style="color:var(--ochre)">cost risk</span>' : ''}</td>
-      <td>${catSummary(p)}</td><td>${itemsSummary(p)}</td><td>${monthLabel(p.deliveryMonth)}</td><td class="num">${p.cancelDate ? dateLabel(p.cancelDate) : '—'}</td>
+      <td>${catSummary(p)}</td><td>${itemsSummary(p)}</td><td class="nowrap">${monthLabel(p.deliveryMonth)}</td><td class="num nowrap">${p.cancelDate ? dateLabel(p.cancelDate) : '—'}</td>
       <td class="r num">${money(poTotal(p))}</td><td class="r num">${onOrder(p) ? money(onOrder(p)) : '—'}</td>
-      <td><span class="pill ${esc(p.status)}">${STATUS[p.status] || esc(p.status)}</span>${p.status === 'hold' && p.fix ? `<span class="sm fixnote" title="${esc(p.fix)}">${esc(p.fix)}</span>` : ''}</td><td><span class="person" data-uid="${esc(p.createdBy || '')}"></span></td></tr>`).join('')}</tbody></table></div>
+      <td><span class="pill ${esc(p.status)}">${STATUS[p.status] || esc(p.status)}</span>${p.status === 'hold' && p.fix ? `<span class="sm fixnote" title="${esc(p.fix)}">${esc(p.fix)}</span>` : ''}</td></tr>`).join('')}</tbody></table></div>
     ${!POS.length ? `<div class="empty"><h3>No purchase orders yet</h3><p>Click <b>+ New order</b> to write one, or use <b>Tools → Paste orders from a spreadsheet</b> to load your current open orders all at once.</p>${canAct() ? '<button class="btn primary" type="button" data-act="new">+ New order</button>' : ''}</div>` : !rows.length ? `<div class="empty"><p>No orders match these filters.</p>${filtered ? '<button type="button" class="btn sm" data-oclear="1">Clear vendor and season</button>' : ''}</div>` : ''}
   </section>`;
   fillPeople();
@@ -86,15 +90,16 @@ function renderOrders(S){
 function itemHtml(i, compact){
   const cat = i.cat ? CAT(i.cat).name : '';
   const st = i.state;
-  const who = st ? `<span class="who">${st.status === 'done' ? 'Done' : 'Dismissed'} ${dateLabel((st.at || '').slice(0,10))} · <span class="person" data-uid="${esc(st.by || '')}"></span></span>` : '';
-  const btns = compact ? '' : (i.kind === 'order' ? (i.guide ? `<button class="btn sm" type="button" data-go="guidelines:${esc(i.guide)}">Open the guideline</button>` : i.po ? `<button class="btn sm" type="button" data-openpo="${esc(i.po)}">Open order</button>` : i.cat ? `<button class="btn sm" type="button" data-cat="${esc(i.cat)}">Open category</button>` : '')
-      : (st ? (canAct() ? `<button class="btn sm" type="button" data-istate="${esc(i.id)}" data-v="">Undo</button>` : '')
+  const who = st ? `<span class="who">${st.status === 'done' ? 'Done' : 'Set aside'} ${dateLabel((st.at || '').slice(0,10))} · <span class="person" data-uid="${esc(st.by || '')}"></span></span>` : '';
+  const go = i.kind === 'order' ? (i.guide ? `<button class="btn sm" type="button" data-go="guidelines:${esc(i.guide)}">Open the guideline</button>` : i.po ? `<button class="btn sm" type="button" data-openpo="${esc(i.po)}">Open order</button>` : i.cat ? `<button class="btn sm" type="button" data-cat="${esc(i.cat)}">Open category</button>` : '') : '';
+  // Every item, order problems included, can be marked Done or Not now (and undone); Not now is the one word for setting one aside.
+  const btns = compact ? '' : go + (st ? (canAct() ? `<button class="btn sm" type="button" data-istate="${esc(i.id)}" data-v="">Undo</button>` : '')
       : `${(i.kind === 'reorder' || i.kind === 'stockout') && canAct() ? `<button class="btn primary sm" type="button" data-startorder="${esc(i.id)}">Start an order</button>` : ''}
-         ${canAct() ? `<button class="btn sm" type="button" data-istate="${esc(i.id)}" data-v="done">Done</button><button class="btn ghost sm" type="button" data-istate="${esc(i.id)}" data-v="dismissed">Dismiss</button>` : ''}`));
+         ${canAct() ? `<button class="btn sm" type="button" data-istate="${esc(i.id)}" data-v="done">Done</button><button class="btn ghost sm" type="button" data-istate="${esc(i.id)}" data-v="dismissed">Not now</button>` : ''}`);
   return `<li class="item ${i.sev} ${st ? 'resolved' : ''}"><div class="stripe"></div><div class="body">
     <div class="t"><span class="kind ${i.kind}">${KINDS[i.kind]}</span>${esc(i.title)}</div>
     ${i.sku ? `<div class="d"><span class="num">${esc(i.sku)}</span> · ${esc(i.desc)}${cat ? ' · ' + esc(cat) : ''}</div>` : ''}
-    <div class="d">${esc(i.detail)}</div>
+    <div class="d">${esc(posDates(i.detail))}</div>
     ${compact ? '' : `<div class="a"><b>What to do:</b> ${esc(i.action)}</div>`}${who ? `<div class="d">${who}</div>` : ''}
   </div><div class="side">${btns}</div></li>`;
 }
@@ -115,12 +120,24 @@ function renderAttention(S){
       <span style="flex:1"></span><select id="aCat" class="field-inline" aria-label="Category"><option value="all">All categories</option>${catList().map(c => `<option value="${c.code}" ${afilt.cat === c.code ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
       <label style="font-size:12.5px;display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="aRes" ${afilt.showResolved ? 'checked' : ''}> Show done</label></div>
     <div class="note" style="border-bottom:1px solid var(--rule)">${esc(KIND_NOTE[afilt.kind] || KIND_NOTE.all)}</div>
-    <ul class="items">${list.length ? list.map(i => itemHtml(i, false)).join('') : '<li class="item good"><div class="stripe"></div><div class="body"><div class="t">Nothing here.</div><div class="d">Everything in this view has been dealt with.</div></div></li>'}</ul>
+    ${list.length ? (afilt.kind === 'all' ? attnGroups(list) : `<ul class="items">${list.map(i => itemHtml(i, false)).join('')}</ul>`) : '<ul class="items"><li class="item good"><div class="stripe"></div><div class="body"><div class="t">Nothing here.</div><div class="d">Everything in this view has been dealt with.</div></div></li></ul>'}
   </section>`;
   fillPeople();
 }
+/* The All view in groups, one per kind in KINDS order, each showing its first ATTN_SHOW items (already ranked) with
+   a button for the rest; afilt.more holds the kinds opened in full. */
+const ATTN_SHOW = 5;
+function attnGroups(list){
+  const by = {}; for (const i of list) (by[i.kind] = by[i.kind] || []).push(i);
+  return Object.keys(KINDS).filter(k => by[k]).map(k => {
+    const xs = by[k], open = !!(afilt.more || {})[k], show = open ? xs : xs.slice(0, ATTN_SHOW);
+    const more = xs.length > ATTN_SHOW ? `<button type="button" class="btn ghost sm agmore" data-amore="${k}" aria-expanded="${open}">${open ? 'Show the first ' + ATTN_SHOW : `Show all ${xs.length}`}</button>` : '';
+    return `<div class="agrp"><h3 class="agh"><span class="kind ${k}">${esc(KINDS[k])}</span><span class="c">${xs.length}</span></h3>
+      <ul class="items">${show.map(i => itemHtml(i, false)).join('')}</ul>${more}</div>`;
+  }).join('');
+}
 const KIND_NOTE = {
-  all:'Order problems come first, then item suggestions ranked by dollars at stake. Mark each one Done when you have acted on it, or Dismiss it if it doesn\'t apply. I see what you mark when I roll the plan.',
+  all:'Order problems come first, then item suggestions ranked by dollars at stake. Each group shows its five biggest first. Mark one Done when you have acted on it, or Not now if it doesn\'t apply; what you mark stays through each month-end refresh.',
   order:'Problems with orders you have written: cancel dates, late deliveries, and categories going over budget. These update the moment an order changes.',
   reorder:'Fast sellers that will run out in under 6 weeks at the pace forecast for the coming weeks. "Start an order" fills in a new order for you.',
   stockout:'Items that sold well in the last three months but have none on hand. Reorder the ones you are keeping in the line.',
@@ -207,10 +224,10 @@ function renderHelp(){
   <section class="panel"><div class="in"><h3>Your routine</h3><ul class="routine">
     <li><span class="when">Every order</span><span>Enter it the day you write it: vendor, delivery month, cancel date, and the lines with sizes. The budget check happens as you type.</span></li>
     <li><span class="when">Deliveries</span><span>Receive boxes into the POS as usual. At each month-end upload the program works out what arrived from the SKU Analysis and matches it to open orders; the owner confirms the list. Whatever hasn't come stays on order.</span></li>
-    <li><span class="when">Mondays</span><span>Go through <b>To do</b>. Mark each item Done or Dismiss.</span></li>
+    <li><span class="when">Mondays</span><span>Go through <b>To do</b>. Mark each item Done or Not now.</span></li>
     <li><span class="when">Month-end</span><span>Work through the <b>Month-end</b> checklist: run the reports and the owner uploads them on that page, PDF or Excel. The forecast, budgets, on-hand, suggestions and brand scorecard are then refreshed.</span></li>
     <li><span class="when">Each season</span><span>Review the <b>Brands</b> page before market or a buying appointment. Set your own call where you disagree.</span></li>
-    <li><span class="when">Quarterly</span><span>After the count, go to <b>Inventory &amp; counts</b> and record book and counted values by category.</span></li></ul></div></section>
+    <li><span class="when">Quarterly</span><span>After the count, go to <b>Stock &amp; counts</b> and record book and counted values by category.</span></li></ul></div></section>
   <section class="panel"><div class="in"><h3>Words used on this page</h3><dl class="gl">
     <dt>At cost</dt><dd>What you pay the vendor, not the retail price. Every budget and inventory figure here is at cost.</dd>
     <dt>Room</dt><dd>How much the plan lets you receive by a given date.</dd>

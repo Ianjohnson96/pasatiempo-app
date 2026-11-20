@@ -2,8 +2,8 @@
 const NAV = [
   {key: 'daily', label: 'Every day', pages: [['today', 'Today'], ['orders', 'Orders'], ['receiving', 'Receiving'], ['attention', 'To do'], ['vendors', 'Vendors']]},
   {key: 'plan', label: 'Plan & buy', pages: [['overview', 'Budget & open-to-buy'], ['seasons', 'Season buys'], ['forecast', 'Forecast']]},
-  {key: 'analyse', label: 'Analyse', pages: [['scorecard', 'Scorecard'], ['brands', 'Brands'], ['stuck', 'Stuck money & markdowns'], ['trends', 'Trends & rounds']]},
-  {key: 'close', label: 'Month-end', pages: [['monthend', 'Upload & close'], ['inventory', 'Counts']]}
+  {key: 'analyse', label: 'Analyze', pages: [['scorecard', 'Scorecard'], ['brands', 'Brands'], ['stuck', 'Stuck money & markdowns'], ['trends', 'Trends & rounds']]},
+  {key: 'close', label: 'Month-end', pages: [['monthend', 'Upload & close'], ['inventory', 'Stock & counts']]}
 ];
 // Old page ids (saved in a browser, linked from an email, or used by an older button) and where they live now.
 const TAB_ALIAS = {summary: 'today', otb: 'overview', subcats: 'scorecard', rounds: 'trends', reports: 'monthend', help: 'monthend'};

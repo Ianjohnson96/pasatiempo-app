@@ -70,13 +70,15 @@ function renderVendorsPage(){
   const rows = [...g.values()].sort((a, b) => ((a.v || {}).active === false) - ((b.v || {}).active === false) || b.cost - a.cost || a.name.localeCompare(b.name));
   const next = r => { const m = r.months.slice().sort(), up = m.find(x => x >= THIS_MONTH); return up ? monthLabel(up) : m.length ? `${monthLabel(m[0])} <span class="rstat overdue">Late</span>` : '—'; };
   const active = rows.filter(r => (r.v || {}).active !== false).length;
+  // Terms and Rep show once any vendor has them filled in; until then they'd be a column of dashes.
+  const hasTerms = rows.some(r => (r.v || {}).terms), hasRep = rows.some(r => (r.v || {}).rep || (r.v || {}).phone);
   $('#pane').innerHTML = `<section class="panel"><header><h2>Vendors</h2><span style="display:flex;gap:8px;align-items:center"><span class="lab">${active} active</span>${ro ? '' : '<button class="btn primary sm" type="button" data-vedit="__new">+ Add a vendor</button>'}</span></header>
-    <div class="note">Open orders and cost are what is still to come. Click a vendor to see its orders.</div>
-    <div class="tbl"><table class="rt"><thead><tr><th>Vendor</th><th class="r">Open orders</th><th class="r">Open cost</th><th>Next delivery</th><th>Terms</th><th>Rep</th><th></th></tr></thead>
+    <div class="note">Open orders and cost are what is still to come. Click a vendor to see its orders.${hasTerms && hasRep ? '' : ro ? '' : ' Use Edit to add terms and a rep for a vendor; those columns appear once one has them.'}</div>
+    <div class="tbl"><table class="rt"><thead><tr><th>Vendor</th><th class="r">Open orders</th><th class="r">Open cost</th><th>Next delivery</th>${hasTerms ? '<th>Terms</th>' : ''}${hasRep ? '<th>Rep</th>' : ''}<th></th></tr></thead>
     <tbody class="click">${rows.map(r => { const v = r.v || {}, off = v.active === false;
       return `<tr ${off ? 'style="opacity:.55"' : ''} data-go="orders:${esc(r.key)}" tabindex="0"><td><b>${esc(r.name)}</b>${off ? ' <span class="chip excluded">hidden</span>' : ''}${v.id ? '' : '<span class="sm">not in the vendor list</span>'}</td>
       <td data-l="Open orders" class="r num">${r.n || '—'}</td><td data-l="Open cost" class="r num">${r.cost ? money(r.cost) : '—'}</td><td data-l="Next delivery">${next(r)}</td>
-      <td data-l="Terms">${esc(v.terms || '—')}</td><td data-l="Rep">${esc([v.rep, v.phone].filter(Boolean).join(' · ') || '—')}</td><td>${ro || !v.id ? '' : `<button class="btn ghost sm" type="button" data-vedit="${esc(v.id)}">Edit</button>`}</td></tr>`; }).join('')}</tbody></table></div>
+      ${hasTerms ? `<td data-l="Terms">${esc(v.terms || '—')}</td>` : ''}${hasRep ? `<td data-l="Rep">${esc([v.rep, v.phone].filter(Boolean).join(' · ') || '—')}</td>` : ''}<td>${ro || !v.id ? '' : `<button class="btn ghost sm" type="button" data-vedit="${esc(v.id)}">Edit</button>`}</td></tr>`; }).join('')}</tbody></table></div>
     ${rows.length ? '' : `<div class="empty"><p>No vendors yet.${ro ? '' : ' Click <b>+ Add a vendor</b>, or they are added for you when you paste orders.'}</p></div>`}</section>`;
 }
 function openVendors(editId){

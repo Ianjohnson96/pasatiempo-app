@@ -29,7 +29,7 @@ const ROLES_DEFAULT = {
   impulse: {name: 'Accessories & hats', wks: [12, 20, 8, 30], over: 30, share: true,
     judge: 'Judged on turns and keeping the best styles in stock; cut the long tail, chase the winners.',
     aged: 'Mark down past the member {MD} (40% off ticket), bundle it, or put it on a feature table',
-    heavy: 'Cut the slow styles and colours; keep buying the best sellers',
+    heavy: 'Cut the slow styles and colors; keep buying the best sellers',
     stop: 'Reorder only the best-selling styles; no new lines.'},
   consumable: {name: 'Balls & gloves', wks: [8, 16, 6, 24], over: 24, share: false,
     judge: 'Never run out of the core balls and gloves; judged on in-stock and turns.',

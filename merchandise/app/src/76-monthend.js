@@ -42,7 +42,7 @@ function renderMonthEnd(S){
           <li>The owner uploads the reports on this page (PDF or Excel) and checks the new numbers before updating.</li>
           <li>The month just closed becomes an actual. The forecast moves forward from there.</li>
           <li>On-hand stock resets to the new SKU Analysis. Every budget, this year's and next year's, is worked out again.</li>
-          <li>The To do list and the brand scorecard are rebuilt from the new numbers. Anything you'd marked done or dismissed stays that way.</li>
+          <li>The To do list and the brand scorecard are rebuilt from the new numbers. Anything you'd marked Done or Not now stays that way.</li>
           <li>A line is added to the history below, so you can see how the plan moved.</li></ol></div></section>
       <section class="panel"><header><h2>Month results</h2><span class="lab">${fyLabel(fyNow)} closed months</span></header>
         <div style="overflow-x:auto"><table class="mini" style="margin:8px 16px 4px;width:calc(100% - 32px)"><thead><tr><th>Month</th><th class="r">Actual</th><th class="r">Last year</th><th class="r">vs LY</th><th class="r">Forecast</th><th class="r">vs forecast</th></tr></thead>
