@@ -17,7 +17,7 @@ function openOrder(id, preset){
   const ro = !canAct();
   $('#overlay').innerHTML = `<div class="scrim" data-close="1"></div>
   <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="dTitle">
-    <header><div><div class="lab">${DX ? 'Purchase order' : 'New purchase order'}</div><h2 id="dTitle">${DX ? 'PO ' + esc(DX.poNumber) : 'Write an order'}</h2></div><button class="x" type="button" data-close="1" aria-label="Close">×</button></header>
+    <header><div><div class="lab">${DX ? 'Purchase order' : 'New purchase order'}</div><h2 id="dTitle">${DX ? 'PO ' + esc(DX.poNumber) : 'Write an order'}</h2>${DX && DX.createdBy ? `<div class="lab" style="margin-top:2px">Entered by <span class="person" data-uid="${esc(DX.createdBy)}"></span>${DX.createdAt ? ' · ' + dateLabel(String(DX.createdAt).slice(0, 10)) : ''}</div>` : ''}</div><button class="x" type="button" data-close="1" aria-label="Close">×</button></header>
     <div class="body">
       <div class="sec">1 · Order</div>
       <div class="row3">
@@ -53,7 +53,7 @@ function openOrder(id, preset){
     <footer><div>${DX && !ro ? '<button class="btn danger" type="button" id="dDelete">Delete</button>' : ''}</div>
       <div style="display:flex;gap:8px">${ro ? '<button class="btn" type="button" data-close="1">Close</button>' : `<button class="btn" type="button" data-close="1">Cancel</button><button class="btn primary" type="button" id="dSave">${DX ? 'Save changes' : 'Save order'}</button>`}</div></footer>
   </aside>`;
-  renderVendorBox(); renderLines(); updateTotals();
+  renderVendorBox(); renderLines(); updateTotals(); fillPeople();
   (DX ? $('.x') : $('#dPo')).focus();
 }
 function renderVendorBox(){

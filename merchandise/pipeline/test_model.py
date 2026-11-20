@@ -184,6 +184,23 @@ def test_budgets_count_shelf_sales_and_reports_show_special_orders_in_their_cate
     special_budget(ctx)
     assert ctx['base']['cats']['480']['so'] == v['so']
 
+
+def test_aged_text_restocked_long_ago_and_new_stock_on_an_old_sku():
+    from datetime import date
+    from model import aged_text
+    as_of = date(2026, 11, 15)
+    # Sold last in 2023, received again in 2025: a receipt to check.
+    t, d, a, new = aged_text(14, 5014.0, 'Jul01/23', 'Apr23/25', as_of, 'fashion', 1233)
+    assert t == 'No sale in over a year — but restocked' and not new
+    assert d == '14 on hand, $5,014 at cost. Last sold Jul 1, 2023; received again Apr 23, 2025.'
+    # Received in the last 60 days: almost always a new style put on an old SKU.
+    t, d, a, new = aged_text(20, 3300.0, 'Nov03/17', 'Nov11/26', as_of, 'fashion', 3300)
+    assert new and t == 'New stock on an old SKU'
+    assert 'Last sold Nov 3, 2017; received Nov 11, 2026' in d and 'own SKU' in a
+    # Never restocked: the role's markdown advice, and readable dates.
+    t, d, a, new = aged_text(3, 900.0, 'Jan05/25', None, as_of, 'fashion', 680)
+    assert t == 'No sale in over a year' and d.endswith('Last sold Jan 5, 2025.') and not new
+
 if __name__ == '__main__':
     for name, fn in list(globals().items()):
         if name.startswith('test_'):

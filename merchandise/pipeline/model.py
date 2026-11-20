@@ -467,6 +467,29 @@ def _aged_action(role, days):
             '(40–50% off ticket) or move it in a member sale.')
 
 
+def long_date(s):
+    """A POS date ('Nov06/26') as the program writes dates ('Nov 6, 2026'); other text as it is."""
+    d = pos_date(s)
+    return f"{d:%b} {d.day}, {d.year}" if d else (s or 'never')
+
+
+def aged_text(oh, val, last_sale, last_rec, as_of, role, days):
+    """Title, detail and action for a SKU with no sale in over a year, and whether it is new stock on an old SKU.
+    Stock received in the last 60 days after a year without sales is almost always a new style put on an old SKU,
+    not a mistake; stock received long after sales stopped is a receipt to check."""
+    ls, lr = pos_date(last_sale), pos_date(last_rec)
+    restock = bool(lr and ls and (lr - ls).days > 180)
+    head = f"{oh} on hand, ${val:,.0f} at cost. Last sold {long_date(last_sale)}"
+    if restock and (as_of - lr).days <= 60:
+        return ('New stock on an old SKU', f"{head}; received {long_date(last_rec)}.",
+                'If this is a new style, give it its own SKU in the POS so its sales can be told apart from the old one; '
+                'if not, check the receipt.', True)
+    if restock:
+        return ('No sale in over a year — but restocked', f"{head}; received again {long_date(last_rec)}.",
+                'Stock was added after it stopped selling — check whether that receipt was an error or a return to vendor.', False)
+    return 'No sale in over a year', head + '.', _aged_action(role, days), False
+
+
 def build_insights(ctx, calls):
     """Item-level to-dos. `calls` maps category -> buy / replenish / stop / excluded."""
     as_of, snap, hist, px, sku_gm = ctx['as_of'], ctx['snap'], ctx['hist'], ctx['px'], ctx['sku_gm']
@@ -514,8 +537,8 @@ def build_insights(ctx, calls):
         if oh < 0:
             dnu = bool(re.search(r'not use', r['desc'], re.I))
             add('data', (80 if dnu else 30) + abs(oh), r, 'Sales ringing to a retired SKU' if dnu else 'Negative on-hand',
-                (f"This SKU is marked do-not-use but is still being sold (last sale {r['last_sale']}); it now shows {oh} on hand." if dnu
-                 else f"System shows {oh} on hand while it's still selling (last sale {r['last_sale']})."),
+                (f"This SKU is marked do-not-use but is still being sold (last sale {long_date(r['last_sale'])}); it now shows {oh} on hand." if dnu
+                 else f"System shows {oh} on hand while it's still selling (last sale {long_date(r['last_sale'])})."),
                 ('Find the SKU staff should be using, re-ring or adjust, and deactivate this one in the POS.' if dnu
                  else 'A receipt was never entered or sales are ringing to the wrong SKU. Fix before the next count.'), dict(oh=oh))
             continue
@@ -534,11 +557,9 @@ def build_insights(ctx, calls):
             continue
         days = (as_of - ls).days if ls else 9999
         if days > 365 and val >= 400:
-            restock = lr and ls and (lr - ls).days > 180
-            add('aged', val / 100, r, 'No sale in over a year' + (' — but restocked' if restock else ''),
-                f"{oh} on hand, ${val:,.0f} at cost. Last sold {r['last_sale'] or 'never'}" + (f"; received again {r['last_rec']}." if restock else '.'),
-                ('Stock was added after it stopped selling — check whether that receipt was an error or a return to vendor.' if restock else
-                 _aged_action(role, days)),
+            title, detail, action, new_on_old = aged_text(oh, val, r['last_sale'], r['last_rec'], as_of, role, days)
+            # New stock on an old SKU isn't stuck money yet: rank it below the real not-selling items.
+            add('aged', val / (400 if new_on_old else 100), r, title, detail, action,
                 dict(oh=oh, value=round(val), daysSinceSale=days if days < 9000 else None))
             continue
         if wos is not None and wos > 52 and val >= 750 and days <= 365 and role != 'demo':

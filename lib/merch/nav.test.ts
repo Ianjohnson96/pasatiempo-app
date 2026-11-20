@@ -30,15 +30,20 @@ describe("merchandise navigation", () => {
     expect(N.parseGo("overview:480")).toEqual({ tab: "overview", key: "480" });
     expect(N.parseGo("brands")).toEqual({ tab: "brands", key: null });
   });
-  it("loads in build order without throwing, and a saved 'summary' opens Today", () => {
+  it("loads in build order without throwing, and opens the page in the address (#id; old ids routed; none = Today)", () => {
     const dir = path.join(process.cwd(), "merchandise/app/src");
     const files = readdirSync(dir).filter((f) => f.endsWith(".js")).sort();
     expect(files.indexOf("05-nav.js")).toBeLessThan(files.indexOf("10-core.js"));
     const code = files.filter((f) => f <= "10-core.js").map((f) => readFileSync(path.join(dir, f), "utf8")).join("\n");
-    const ctx = { window: {}, __FALLBACK__: { plan: {}, inventory: {}, insights: {} }, localStorage: { getItem: (k: string) => (k === "ob.tab2" ? "summary" : null), setItem() {} } };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const out: any = vm.runInNewContext(code + ";({TAB})", ctx);
-    expect(out.TAB).toBe("today");
+    const tabFor = (hash: string) => {
+      const ctx = { window: {}, location: { hash }, __FALLBACK__: { plan: {}, inventory: {}, insights: {} }, localStorage: { getItem: () => null, setItem() {} } };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (vm.runInNewContext(code + ";({TAB})", ctx) as any).TAB;
+    };
+    expect(tabFor("#orders")).toBe("orders");
+    expect(tabFor("#summary")).toBe("today");
+    expect(tabFor("#reports")).toBe("monthend");
+    expect(tabFor("")).toBe("today");
   });
 });
 

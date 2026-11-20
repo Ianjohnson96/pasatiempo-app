@@ -69,7 +69,7 @@ function decisionHtml(d, k){
   return `<li class="item ${d.sev}"><div class="stripe"></div><div class="body">
     <div class="t"><span class="num" style="color:var(--muted);margin-right:6px">${k + 1}.</span><span class="kind order">${DECIDE[d.verb]}</span>${esc(d.title)} <span class="num" style="color:var(--muted);font-weight:400">· ${moneyK(d.usd)}</span></div>
     ${d.sku ? `<div class="d"><span class="num">${esc(d.sku)}</span> · ${esc(d.desc)}</div>` : ''}
-    <div class="d">${esc(d.detail)}</div><div class="a"><b>Do:</b> ${esc(d.action)}</div>
+    <div class="d">${esc(posDates(d.detail))}</div><div class="a"><b>Do:</b> ${esc(d.action)}</div>
   </div><div class="side">${go}${btns}</div></li>`;
 }
 
@@ -83,27 +83,26 @@ function renderMonths(){
     : `Showing everything through the end of ${monthFull(s)}: room to receive by then, and orders arriving by then.`;
 }
 /* ---------- sidebar ----------
-   The pages grouped by job (NAV, 05-nav.js), each with a live count where one helps: red when something is urgent,
-   green for the open order book. Under 900px the same list folds into the Menu button (shell.html). */
-const NAV_NEW = new Set(['receiving', 'seasons']);
+   The pages grouped by job (NAV, 05-nav.js). A page gets a count only when something on it needs you, so a badge
+   always means "look here": late or past-cancel orders, things in the store room or late, the urgent items in To do,
+   checklists due, SKUs to sort. Under 900px the same list folds into the Menu button (shell.html). */
 function sideBadges(S){
   const b = {};
   if (!S) return b;
   // One count failing (a page's data still loading) must not take the whole sidebar with it.
   const put = (id, f) => { try { const v = f(); if (v) b[id] = v; } catch (e){ console.error('Sidebar count for ' + id + ' failed', e); } };
-  put('today', () => { const d = topDecisions(S); return d.length ? [d.length, d.some(x => x.sev === 'crit') ? 'hot' : ''] : null; });
-  put('orders', () => { const n = POS.filter(isOpen).length; return n ? [n, 'ok'] : null; });
+  put('orders', () => { const n = POS.filter(p => isOpen(p) && (rowFlag(p) === 'flag-crit' || (p.deliveryMonth && p.deliveryMonth < THIS_MONTH))).length; return n ? [n, 'hot'] : null; });
   put('receiving', () => {
     let n = 0, late = false;
     for (const p of POS){ const st = rcvOf(p); if (st === 'arrived' || st === 'late'){ n++; if (st === 'late') late = true; } }
     return n ? [n, late ? 'hot' : ''] : null;
   });
-  put('attention', () => { const a = openAttention(S); return a.length ? [a.length, a.some(i => i.sev === 'crit') ? 'hot' : ''] : null; });
+  put('attention', () => { const n = openAttention(S).filter(i => i.sev === 'crit').length; return n ? [n, 'hot'] : null; });
   put('monthend', () => {
-    const a = RPT ? rptAlerts() : [], left = a.reduce((n, x) => n + x.left, 0);
+    const a = RPT ? rptAlerts() : [];
     const due = BASE ? nextRefreshMonth() : null, late = !!due && todayISO > due + '-' + pad(new Date(+due.slice(0,4), +due.slice(5,7), 0).getDate());
     const hot = late || a.some(x => x.status === 'overdue');
-    return left ? [left, hot ? 'hot' : ''] : late ? ['!', 'hot'] : null;
+    return a.length ? [a.length, hot ? 'hot' : ''] : late ? ['!', 'hot'] : null;
   });
   put('scorecard', () => { const n = ssUnsorted().length + ssPlace().length; return n ? [n, ''] : null; });
   return b;
@@ -112,7 +111,7 @@ function renderSide(S){
   const b = sideBadges(S);
   const item = ([id, label]) => {
     const [c, tone] = b[id] || [];
-    const tail = c != null ? `<span class="sb ${tone || ''}">${c}</span>` : NAV_NEW.has(id) ? '<span class="snew">new</span>' : '';
+    const tail = c != null ? `<span class="sb ${tone || ''}">${c}</span>` : '';
     const tip = id === 'vendors' ? ' title="Vendor contacts, terms and lead times"' : '';
     return `<button type="button" class="sitem" data-tab="${id}"${TAB === id ? ' aria-current="page"' : ''}${tip}><span class="sl">${esc(label)}</span>${tail}</button>`;
   };
@@ -169,7 +168,7 @@ function budgetTiles(S){
   const meter = `<div class="meter"><i style="width:${S.room > 0 ? Math.min(100, S.commit / S.room * 100) : (S.commit ? 100 : 0)}%;background:${S.commit > S.room ? 'var(--brick)' : 'var(--cypress)'}"></i></div>`;
   return `<section class="tiles" aria-label="The budget at a glance">
     ${anaTile(s === 'season' ? PLAN.fy + ' budget' : `Room through ${monthShort(s)}`, money(S.room), 'at cost', '', s === 'season' ? `What the plan lets you receive from ${periodTxt(PLAN)}.` : `What the plan lets you receive from ${dateLabel(PLAN.start)} to the end of ${monthFull(s)}.`)}
-    ${anaTile('Committed', money(S.commit), `${nOpen} open orders · ${money(S.open)} on order${S.later ? ` + ${money(S.later)} after ${monthShort(LAST())} ${LAST().slice(0,4)}` : ''}`, meter, 'Orders arriving in this period, plus anything already received.')}
+    ${anaTile(s === 'season' ? 'Committed' : `Committed through ${monthShort(s)}`, money(S.commit), `${nOpen} open orders · ${money(S.open)} on order${S.later ? ` + ${money(S.later)} after ${monthShort(LAST())} ${LAST().slice(0,4)}` : ''}`, meter, s === 'season' ? 'Orders arriving in this period, plus anything already received.' : `Orders arriving by the end of ${monthFull(s)}, plus anything already received. Open orders due later don't count until their month.`)}
     ${anaTile('Left to buy', `<span class="${S.left < 0 ? 'neg' : ''}">${money(S.left)}</span>`, `${withRoom} of ${cats.length} categories have room`, '', S.left < 0 ? 'Negative means more is due in than the plan allows by then.' : 'Room minus committed. Spend it where the category table shows room.')}
     ${anaTile('On hand', money(invTot), `${int(invU)} units · ${dateLabel(INV.asOf)}`, '', `Stock on the shelf at cost, from the SKU Analysis. ${S.receivedSince ? money(S.receivedSince) + ' received since.' : 'Updated every month-end.'}`)}
   </section>`;
@@ -204,14 +203,14 @@ function renderOverview(S){
   if (BV === 'months') return renderOTB('grid');
   if (BV === 'worksheet') return renderOTB('worksheet');
   const s = selMonth();
-  $('#pane').innerHTML = `<div class="astack">${budgetTiles(S)}<div class="grid">
+  // The table takes the full width (its Left column was cut off beside the chart); the room chart sits under it.
+  $('#pane').innerHTML = `<div class="astack">${budgetTiles(S)}<div class="stack">
     <section class="panel"><header><h2>Budget by category</h2><span class="lab">Committed / room ${s === 'season' ? 'for ' + PLAN.fy : 'through ' + monthShort(S.m)}</span></header>
       <div class="tbl"><table class="mini rt bcat" style="min-width:640px"><thead><tr><th>Category</th><th>Role</th><th style="width:34%">Committed / room</th><th class="r">Left</th><th class="r">Weeks of supply</th></tr></thead>
       <tbody class="click">${catList().map(c => catRow(c, S)).join('')}</tbody></table></div>
       <div class="note">Click a category to see how its budget was worked out, month by month, and to change it. Weeks of supply is the stock on hand at this year's forecast pace. Budgets come from the forecast on the Forecast page, with data through ${dateLabel(PLAN.asOf)}.${PLAN.current ? '' : ' Next year starts from the stock this year is expected to end with.'}</div></section>
-    <div class="stack">
-      <section class="panel"><header><h2>Receiving room by month</h2><span class="lab">Cumulative, all categories</span></header>${roomChart(S)}</section>
-    </div></div></div>`;
+    <section class="panel roomwide"><header><h2>Receiving room by month</h2><span class="lab">Cumulative, all categories</span></header>${roomChart(S)}</section>
+    </div></div>`;
 }
 /* Cumulative receiving room and committed deliveries, all budgeted categories, month by month. */
 function roomSeries(S){

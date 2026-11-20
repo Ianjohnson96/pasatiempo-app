@@ -183,3 +183,8 @@ function seasonBuys(rows, season) {
   out.byBrand = [...brands.values()].sort((x, y) => y.committed - x.committed || x.brand.localeCompare(y.brand));
   return out;
 }
+
+/** POS-style dates in the SKU Analysis text ("Nov06/26") written the way the program writes dates ("Nov 6, 2026"). */
+function posDates(t) {
+  return String(t == null ? "" : t).replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(\d{1,2})\/(\d{2})\b/g, (_, m, d, y) => `${m} ${+d}, 20${y}`);
+}

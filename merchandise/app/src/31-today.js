@@ -31,14 +31,17 @@ function todayTiles(a, R){
       sp ? chSpark(sp.pr.slice(-12).map(p => p.spr), {w: 160, h: 30}) : '', 'Retail sales ÷ rounds played, by month.', 'trends')}
   </section>`;
 }
-// Checklists on the reporting calendar that are due or overdue (78-reports.js). Shown here instead of the due bar.
+// Checklists on the reporting calendar that are due or overdue (78-reports.js): one line, so they don't push the
+// shop's numbers off the first screen. The list itself is on Upload & close.
 function todayChecklists(){
   const al = rptAlerts(); if (!al.length) return '';
-  const late = al.some(x => x.status === 'overdue');
+  const late = al.filter(x => x.status === 'overdue').length;
   const sku = al.some(x => x.p.cadence === 'monthly' && x.p.due === RPT.today && !((CHECKS[x.p.key] || {}).items || {}).sku);
-  return `<section class="panel"><header><h2>${late ? 'Overdue' : 'Due now'}</h2><span style="display:flex;gap:8px;flex-wrap:wrap">${upNeeded(al) ? '<button class="btn sm primary" type="button" data-tab="monthend">Upload reports</button>' : ''}<button class="btn sm" type="button" data-tab="monthend">Open the checklists</button></span></header>
-    <ul class="items">${al.map(x => `<li class="item ${x.status === 'overdue' ? 'crit' : 'warn'}"><div class="stripe"></div><div class="body"><div class="t">${esc(x.p.label)} <span class="rstat ${x.status}">${esc(rptWhen(x))}</span></div><div class="d">${x.left} of ${x.p.items.length} still to tick off</div></div><div class="side"></div></li>`).join('')}</ul>
-    ${sku ? '<div class="note"><b>Run the SKU Analysis today:</b> on-hand can\'t be recreated later.</div>' : ''}</section>`;
+  const head = late ? `${late} checklist${late === 1 ? '' : 's'} overdue` + (al.length > late ? `, ${al.length - late} due` : '') : `${al.length} checklist${al.length === 1 ? '' : 's'} due`;
+  return `<section class="chkline ${late ? 'late' : ''}" aria-label="Checklists"><b>${head}</b>
+    <span class="names">${al.map(x => `${esc(x.p.label)} (${x.left} left)`).join(' · ')}</span>
+    <span style="display:flex;gap:8px;flex-wrap:wrap">${upNeeded(al) ? '<button class="btn sm primary" type="button" data-tab="monthend">Upload reports</button>' : ''}<button class="btn sm" type="button" data-tab="monthend">Open the checklists</button></span>
+    ${sku ? '<span style="flex-basis:100%"><b>Run the SKU Analysis today:</b> on-hand cannot be recreated later.</span>' : ''}</section>`;
 }
 // Open orders that are late or due this month (77-receiving.js rcvOf), late first.
 function todayDue(){
