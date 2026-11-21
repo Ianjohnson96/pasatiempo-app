@@ -394,6 +394,9 @@ body:has(.mci){margin:0;}
 .mci-page img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:var(--focus);
   animation:mci-push var(--hold) linear both;}
 @keyframes mci-push{from{transform:scale(1.1);}to{transform:scale(1.02);}}
+/* A flyover over its first frame: the film moves on its own, so no zoom. */
+.mci-page-video{position:absolute;inset:0;z-index:1;width:100%;height:100%;object-fit:cover;object-position:var(--focus);pointer-events:none;}
+@media (max-aspect-ratio:4/5){.mci-page-video{object-position:var(--focus-m,var(--focus));}}
 /* 1929: a warm silver print. */
 .mci-page.era-archive img{filter:grayscale(1) sepia(.3) contrast(1.12) brightness(.95);}
 

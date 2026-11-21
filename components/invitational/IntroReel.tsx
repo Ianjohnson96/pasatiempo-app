@@ -74,6 +74,9 @@ interface Frame {
   /** On a tall (phone) screen only: a slow pan across the photograph instead of
    *  the zoom — from and to, as a shift in % of its width. */
   phonePan?: [from: number, to: number];
+  /** A short film played over the photograph (src is its first frame, shown
+   *  until it plays). Muted; it moves on its own. */
+  video?: string;
 }
 
 const FRAMES: Frame[] = [
@@ -415,47 +418,70 @@ const WORDMARK = "/invitational/img/wordmark-pasatiempo.svg";
 
 // ---- The scored dissolve to "Somewhere Only We Know" -------------------------
 // The same look as the scored dissolve, cut to Keane's "Somewhere Only We Know"
-// (audio/intro-somewhere-only-we-know.mp3, 41 s): the song's opening piano,
-// 0:00.4–0:11.6, then straight into the last chorus at 3:21.4 — the same chords
-// on either side, so the beat carries through the join — and on to the song's
-// own ending. The music drops away at 3:39 and the final phrase lands at
-// 3:40.2: the logo rises on it, and the last chord rings out under the title.
+// (audio/intro-somewhere-only-we-know.mp3, 41 s): two bars of the song's
+// opening piano, 0:00.4–0:06.1, then straight into the last chorus at 3:15.8 —
+// the intro's own next chord, so the beat carries through the join — and on
+// to the song's ending. The music drops away at 3:39 and the final phrase
+// lands at 3:40.2: the logo rises on it, and the last chord rings out under
+// the title.
 //
-// In the edit: 1929 runs over the piano, one photograph a bar (0.1, 2.9, 5.7,
-// 8.5 s); colour arrives on the join (11.2 s) as the band comes in, then a
-// photograph a bar (14.0, 16.8, 19.6, 22.4, 25.2 s) — the players, and the
-// whole field as the music softens — and the two chairs looking out to the
-// bay under the title (30.1 s). Each dissolve starts 0.4 s ahead of its bar.
-//   bar:   0.1 2.9 5.7 8.5 | 11.2 14.0 16.8 19.6 22.4 25.2 28.0 | title 30.1
+// In the edit: 1929 over the piano (0.1, 2.9, 4.3 s); colour arrives on the
+// join (5.6 s) with the drone over the 4th, then a photograph or a flyover a
+// bar (8.4, 11.2, 13.9, 16.7, 19.5, 22.3, 25.1 s) — last year's champion in
+// three of them, then the signed champion flags and the whole field as the
+// music softens — and the club's clock under the title (30.0 s). Each dissolve
+// starts 0.4 s ahead of its bar.
+//
+// The flyovers are pieces of the drone films used further down the page
+// (video/hole-*-approach.mp4), 7.9 s of each played at 1.75× speed
+// (video/intro/hole-*-flyover.mp4, 4.5 s; the .webp is the first frame).
+//   bar:   0.1 2.9 4.3 | 5.6 8.4 11.2 13.9 16.7 19.5 22.3 25.1 27.9 | title 30.0
 const SONG_MUSIC = "/invitational/audio/intro-somewhere-only-we-know.mp3";
-const SONG_CUES = [300, 2460, 5260, 8060, 10840, 13630, 16420, 19210, 22010, 24770, 27570];
+const SONG_CUES = [300, 2460, 3860, 5180, 7960, 10750, 13540, 16330, 19120, 21920, 24690, 27480];
 const SONG_TITLE_AT = 29950;
 const SONG_EXIT_AT = 37100; // the title holds about 7 s, as the last chord rings
+const FLY = "/invitational/video/intro/";
+/** A flyover: the film moves on its own, so no zoom on top of it. */
+const flyover = (hole: number, focus: string, phoneFocus: string): Omit<Frame, "hold"> => ({
+  src: FLY + `hole-${hole}-flyover.webp`,
+  video: FLY + `hole-${hole}-flyover.mp4`,
+  era: "today",
+  focus,
+  phoneFocus,
+  move: [1, 0, 0, 1, 0, 0],
+});
 const SONG: Frame[] = scored(
   [
-    // 1929, over the piano: the crowd at the tee, the bay beyond.
+    // 1929, over the piano: the crowd at the tee, the Doctor, the foursome.
     { src: SA("1929-tee-shot-bay.webp"), era: "archive", focus: "center 70%", phoneFocus: "62% 80%" },
-    { src: SA("1929-opening-foursome.webp"), era: "archive", focus: "center 15%" },
     { src: SC + "mackenzie.webp", era: "archive", focus: "53% 18%" },
-    { src: SA("1929-gallery-oak.webp"), era: "archive", focus: "center 60%" },
-    // Colour, as the band comes in: the course from the air at dawn.
-    { src: SC + "today-aerial-dawn.webp", era: "today", focus: "center 50%", phoneFocus: "45% 50%" },
-    // A tee shot into the low sun, the field watching.
-    { src: SC + "event-sunset-tee-shot.webp", era: "today", focus: "53% 55%", phoneFocus: "54% 55%" },
-    // An iron through the turf in the evening haze.
+    { src: SA("1929-opening-foursome.webp"), era: "archive", focus: "center 15%", phoneFocus: "35% 20%" },
+    // Colour, as the band comes in: low over the bunkers of the 4th.
+    flyover(4, "center 60%", "45% 60%"),
+    // Last year's champion: an iron through the turf in the evening haze...
     { src: SC + "event-iron-impact.webp", era: "today", focus: "55% 45%", phoneFocus: "52% 50%" },
-    // A handshake on the green.
+    // ...a handshake on the green...
     { src: SC + "event-handshake-green.webp", era: "today", focus: "42% 40%", phoneFocus: "43% 45%" },
-    // A laugh on the tee in the golden light.
+    // Over the 8th, under the cypresses.
+    flyover(8, "center 55%", "40% 55%"),
+    // ...and a laugh on the tee in the golden light.
     { src: SC + "event-laughing-group.webp", era: "today", focus: "62% 35%", phoneFocus: "62% 40%" },
+    // The 11th, across the barranca.
+    flyover(11, "center 55%", "40% 55%"),
+    // The champion's flags, signed by the field.
+    { src: SC + "event-champion-flags.webp", era: "today", focus: "center 30%", phoneFocus: "50% 70%" },
     // The whole field together, as the music falls away (on a phone, zoomed
     // out so the line of players shows end to end).
     {
       src: SC + "event-field-photo.webp", era: "today", focus: "center 55%", move: [1.08, 0, 0, 1.01, 0, 0],
       phoneWide: { h: 0.5, ar: 1.5, fx: 0.5, fy: 0.55, tx: 0.5, ty: 0.42 },
     },
-    // Under the title: two chairs looking out over the course to the bay.
-    { src: SC + "today-chairs-bay.webp", era: "today", focus: "center 45%", phoneFocus: "50% 40%" },
+    // Under the title: the club's clock, est. 1929, at dusk (on a phone, the
+    // clock face on the upper-left third, clear of the title below it).
+    {
+      src: SC + "today-clock-1929.webp", era: "today", focus: "18% center",
+      phoneWide: { h: 0.7, ar: 1.5, fx: 0.235, fy: 0.31, tx: 1 / 3, ty: 0.3 },
+    },
   ] as Omit<Frame, "hold">[],
   SONG_CUES,
   SONG_TITLE_AT,
@@ -735,6 +761,7 @@ export default function IntroReel({
     const cued = !!VARIANTS[v].cues;
     const first = cued ? [MARK, WORDMARK, ...VARIANTS[v].frames.slice(0, 3).map((f) => f.src)] : [];
     if (cued) void preload([...new Set(srcs)], 60000);
+    for (const f of VARIANTS[v].frames) if (f.video) void fetch(f.video).catch(() => undefined);
     Promise.all([
       cued ? preloadDecoded(first, 12000) : preload([LOGO, ...new Set(srcs)], 3000),
       Promise.race([audioReady, new Promise((r) => setTimeout(r, cued ? 8000 : 3000))]),
@@ -1136,6 +1163,9 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
           className={"mci-page-fill" + (f.fit ? "" : " is-phone")}
           style={{ backgroundImage: `url(${f.src})` }}
         />
+      )}
+      {f.video && (
+        <video className="mci-page-video" src={f.video} muted autoPlay playsInline preload="auto" aria-hidden />
       )}
       {f.trio ? (
         f.trio.map((p) => (
