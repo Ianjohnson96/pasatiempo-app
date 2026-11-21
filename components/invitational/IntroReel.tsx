@@ -455,7 +455,12 @@ const SONG: Frame[] = scored(
     // 1929, over the piano: the crowd at the tee, the Doctor, the foursome.
     { src: SA("1929-tee-shot-bay.webp"), era: "archive", focus: "center 70%", phoneFocus: "62% 80%" },
     { src: SC + "mackenzie.webp", era: "archive", focus: "53% 18%" },
-    { src: SA("1929-opening-foursome.webp"), era: "archive", focus: "center 15%", phoneFocus: "35% 20%" },
+    // (On a phone, zoomed out to the middle two of the four, Hollins and the
+    // man in white beside her.)
+    {
+      src: SA("1929-opening-foursome.webp"), era: "archive", focus: "center 15%",
+      phoneWide: { h: 0.58, ar: 1800 / 1169, fx: 0.55, fy: 0.35, tx: 0.5, ty: 0.45 },
+    },
     // Colour, as the band comes in: low over the bunkers of the 4th.
     flyover(4, "center 60%", "45% 60%"),
     // Last year's champion, an iron through the turf in the evening haze.
@@ -470,10 +475,11 @@ const SONG: Frame[] = scored(
     // The champion again, sharing a laugh on the tee in the golden light.
     { src: SC + "event-laughing-group.webp", era: "today", focus: "62% 35%", phoneFocus: "62% 40%" },
     // The whole field together, as the music falls away (on a phone, zoomed
-    // out so the line of players shows end to end).
+    // out so the line of players, 6–91% of the photograph's width, shows end
+    // to end).
     {
       src: SC + "event-field-photo.webp", era: "today", focus: "center 55%", move: [1.08, 0, 0, 1.01, 0, 0],
-      phoneWide: { h: 0.5, ar: 1.5, fx: 0.5, fy: 0.55, tx: 0.5, ty: 0.42 },
+      phoneWide: { h: 0.34, ar: 1.5, fx: 0.485, fy: 0.55, tx: 0.5, ty: 0.45 },
     },
     // Under the title: the club's clock, est. 1929, at dusk (on a phone, the
     // clock face on the upper-left third, clear of the title below it).
