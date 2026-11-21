@@ -418,28 +418,28 @@ const WORDMARK = "/invitational/img/wordmark-pasatiempo.svg";
 
 // ---- The scored dissolve to "Somewhere Only We Know" -------------------------
 // The same look as the scored dissolve, cut to Keane's "Somewhere Only We Know"
-// (audio/intro-somewhere-only-we-know.mp3, 41 s): two bars of the song's
-// opening piano, 0:00.4–0:06.1, then straight into the last chorus at 3:15.8 —
-// the intro's own next chord, so the beat carries through the join — and on
-// to the song's ending. The music drops away at 3:39 and the final phrase
+// (audio/intro-somewhere-only-we-know.mp3, 36 s): the song's opening piano,
+// shortened to two bars — its first bar (0:00.4) spliced onto its fourth
+// (0:08.9) — then straight on into the last chorus at 3:21.4, the chord the
+// intro would have gone to next, so the beat carries through both joins; and
+// on to the song's ending. The music drops away at 3:39 and the final phrase
 // lands at 3:40.2: the logo rises on it, and the last chord rings out under
 // the title.
 //
-// In the edit: 1929 over the piano (0.1, 2.9, 4.3 s); colour arrives on the
-// join (5.6 s) with the drone over the 4th, then a photograph or a flyover a
-// bar (8.4, 11.2, 13.9, 16.7, 19.5, 22.3, 25.1 s) — last year's champion in
-// three of them, then the signed champion flags and the whole field as the
-// music softens — and the club's clock under the title (30.0 s). Each dissolve
-// starts 0.4 s ahead of its bar.
+// In the edit: 1929 over the piano (0.1, 2.9, 4.3 s); colour arrives as the
+// band comes in (5.6 s) with the drone over the 4th, then a photograph or a
+// flyover a bar (8.4, 11.2, 14.0, 16.8 s) — last year's champion among them —
+// the whole field as the music softens (19.6 s), and the club's clock under
+// the title (22.4 s; title 24.5 s). Each dissolve starts 0.4 s ahead of its bar.
 //
 // The flyovers are pieces of the drone films used further down the page
 // (video/hole-*-approach.mp4), 7.9 s of each played at 1.75× speed
 // (video/intro/hole-*-flyover.mp4, 4.5 s; the .webp is the first frame).
-//   bar:   0.1 2.9 4.3 | 5.6 8.4 11.2 13.9 16.7 19.5 22.3 25.1 27.9 | title 30.0
+//   bar:   0.1 2.9 4.3 | 5.6 8.4 11.2 14.0 16.8 19.6 22.4 | title 24.5
 const SONG_MUSIC = "/invitational/audio/intro-somewhere-only-we-know.mp3";
-const SONG_CUES = [300, 2460, 3860, 5180, 7960, 10750, 13540, 16330, 19120, 21920, 24690, 27480];
-const SONG_TITLE_AT = 29950;
-const SONG_EXIT_AT = 37100; // the title holds about 7 s, as the last chord rings
+const SONG_CUES = [300, 2460, 3850, 5240, 8030, 10820, 13610, 16410, 19170, 21970];
+const SONG_TITLE_AT = 24350;
+const SONG_EXIT_AT = 31500; // the title holds about 7 s, as the last chord rings
 const FLY = "/invitational/video/intro/";
 /** A flyover: the film moves on its own, so no zoom on top of it. */
 const flyover = (hole: number, focus: string, phoneFocus: string): Omit<Frame, "hold"> => ({
@@ -458,18 +458,17 @@ const SONG: Frame[] = scored(
     { src: SA("1929-opening-foursome.webp"), era: "archive", focus: "center 15%", phoneFocus: "35% 20%" },
     // Colour, as the band comes in: low over the bunkers of the 4th.
     flyover(4, "center 60%", "45% 60%"),
-    // Last year's champion: an iron through the turf in the evening haze...
+    // Last year's champion, an iron through the turf in the evening haze.
     { src: SC + "event-iron-impact.webp", era: "today", focus: "55% 45%", phoneFocus: "52% 50%" },
-    // ...a handshake on the green...
-    { src: SC + "event-handshake-green.webp", era: "today", focus: "42% 40%", phoneFocus: "43% 45%" },
+    // A high five in the sun (on a phone, a tall one on the green instead).
+    {
+      src: SC + "event-high-five-sweater.webp", era: "today", focus: "55% 30%",
+      phoneSrc: SC + "event-high-five-green.webp", phoneFocus: "50% 20%",
+    },
     // Over the 8th, under the cypresses.
     flyover(8, "center 55%", "40% 55%"),
-    // ...and a laugh on the tee in the golden light.
+    // The champion again, sharing a laugh on the tee in the golden light.
     { src: SC + "event-laughing-group.webp", era: "today", focus: "62% 35%", phoneFocus: "62% 40%" },
-    // The 11th, across the barranca.
-    flyover(11, "center 55%", "40% 55%"),
-    // The champion's flags, signed by the field.
-    { src: SC + "event-champion-flags.webp", era: "today", focus: "center 30%", phoneFocus: "50% 70%" },
     // The whole field together, as the music falls away (on a phone, zoomed
     // out so the line of players shows end to end).
     {
