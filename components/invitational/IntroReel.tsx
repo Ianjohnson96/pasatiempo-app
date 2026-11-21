@@ -347,7 +347,18 @@ const SC = "/invitational/img/score/";
 const SA = (f: string) => SC + "archive-" + f;
 /** Every photograph eases in, about 6%, toward its subject (the focus point). */
 const ZOOM: Frame["move"] = [1, 0, 0, 1.06, 0, 0];
-const SCORE: Frame[] = (
+/** A scored cut's frames: each eases in toward its subject and holds until the
+ *  next cue. The last photograph stays on through the title, so its zoom runs
+ *  on (a little further, at the same pace) rather than restarting. */
+function scored(fs: Omit<Frame, "hold">[], cues: number[], titleAt: number, exitAt: number): Frame[] {
+  return fs.map((f, k, all) => ({
+    ...f,
+    move: k === all.length - 1 ? ([1, 0, 0, 1.13, 0, 0] as Frame["move"]) : (f.move ?? ZOOM),
+    zoomMs: k === all.length - 1 ? exitAt - cues[k] + 2200 : undefined,
+    hold: (k + 1 < cues.length ? cues[k + 1] : titleAt) - cues[k],
+  }));
+}
+const SCORE: Frame[] = scored(
   [
     // 1929. The opening establishing shot (on a phone, framed on the golfer on
     // the tee and the crowd).
@@ -392,19 +403,64 @@ const SCORE: Frame[] = (
       src: SC + "today-clock-1929.webp", era: "today", focus: "18% center",
       phoneWide: { h: 0.7, ar: 1.5, fx: 0.235, fy: 0.31, tx: 1 / 3, ty: 0.3 },
     },
-  ] as Omit<Frame, "hold">[]
-).map((f, k, all) => ({
-  ...f,
-  // The last photograph stays on through the title, so its zoom runs on
-  // (a little further, at the same pace) rather than restarting.
-  move: k === all.length - 1 ? ([1, 0, 0, 1.13, 0, 0] as Frame["move"]) : (f.move ?? ZOOM),
-  zoomMs: k === all.length - 1 ? 9600 : undefined,
-  hold: (k + 1 < SCORE_CUES.length ? SCORE_CUES[k + 1] : SCORE_TITLE_AT) - SCORE_CUES[k],
-}));
+  ] as Omit<Frame, "hold">[],
+  SCORE_CUES,
+  SCORE_TITLE_AT,
+  SCORE_EXIT_AT,
+);
 /** The closing title: the club's 1929 logo (the version for dark backgrounds,
  *  public/brand), and its name in the logo's own script. */
 const MARK = "/brand/pasatiempo-logo-1929-reverse.png";
 const WORDMARK = "/invitational/img/wordmark-pasatiempo.svg";
+
+// ---- The scored dissolve to "Somewhere Only We Know" -------------------------
+// The same look as the scored dissolve, cut to Keane's "Somewhere Only We Know"
+// (audio/intro-somewhere-only-we-know.mp3, 41 s): the song's opening piano,
+// 0:00.4–0:11.6, then straight into the last chorus at 3:21.4 — the same chords
+// on either side, so the beat carries through the join — and on to the song's
+// own ending. The music drops away at 3:39 and the final phrase lands at
+// 3:40.2: the logo rises on it, and the last chord rings out under the title.
+//
+// In the edit: 1929 runs over the piano, one photograph a bar (0.1, 2.9, 5.7,
+// 8.5 s); colour arrives on the join (11.2 s) as the band comes in, then a
+// photograph a bar (14.0, 16.8, 19.6, 22.4, 25.2 s) — the players, and the
+// whole field as the music softens — and the two chairs looking out to the
+// bay under the title (30.1 s). Each dissolve starts 0.4 s ahead of its bar.
+//   bar:   0.1 2.9 5.7 8.5 | 11.2 14.0 16.8 19.6 22.4 25.2 28.0 | title 30.1
+const SONG_MUSIC = "/invitational/audio/intro-somewhere-only-we-know.mp3";
+const SONG_CUES = [300, 2460, 5260, 8060, 10840, 13630, 16420, 19210, 22010, 24770, 27570];
+const SONG_TITLE_AT = 29950;
+const SONG_EXIT_AT = 37100; // the title holds about 7 s, as the last chord rings
+const SONG: Frame[] = scored(
+  [
+    // 1929, over the piano: the crowd at the tee, the bay beyond.
+    { src: SA("1929-tee-shot-bay.webp"), era: "archive", focus: "center 70%", phoneFocus: "62% 80%" },
+    { src: SA("1929-opening-foursome.webp"), era: "archive", focus: "center 15%" },
+    { src: SC + "mackenzie.webp", era: "archive", focus: "53% 18%" },
+    { src: SA("1929-gallery-oak.webp"), era: "archive", focus: "center 60%" },
+    // Colour, as the band comes in: the course from the air at dawn.
+    { src: SC + "today-aerial-dawn.webp", era: "today", focus: "center 50%", phoneFocus: "45% 50%" },
+    // A tee shot into the low sun, the field watching.
+    { src: SC + "event-sunset-tee-shot.webp", era: "today", focus: "53% 55%", phoneFocus: "54% 55%" },
+    // An iron through the turf in the evening haze.
+    { src: SC + "event-iron-impact.webp", era: "today", focus: "55% 45%", phoneFocus: "52% 50%" },
+    // A handshake on the green.
+    { src: SC + "event-handshake-green.webp", era: "today", focus: "42% 40%", phoneFocus: "43% 45%" },
+    // A laugh on the tee in the golden light.
+    { src: SC + "event-laughing-group.webp", era: "today", focus: "62% 35%", phoneFocus: "62% 40%" },
+    // The whole field together, as the music falls away (on a phone, zoomed
+    // out so the line of players shows end to end).
+    {
+      src: SC + "event-field-photo.webp", era: "today", focus: "center 55%", move: [1.08, 0, 0, 1.01, 0, 0],
+      phoneWide: { h: 0.5, ar: 1.5, fx: 0.5, fy: 0.55, tx: 0.5, ty: 0.42 },
+    },
+    // Under the title: two chairs looking out over the course to the bay.
+    { src: SC + "today-chairs-bay.webp", era: "today", focus: "center 45%", phoneFocus: "50% 40%" },
+  ] as Omit<Frame, "hold">[],
+  SONG_CUES,
+  SONG_TITLE_AT,
+  SONG_EXIT_AT,
+);
 
 interface ReelLook {
   /** How far the camera pulls back between frames (1 = not at all). */
@@ -415,7 +471,7 @@ interface ReelLook {
 
 type Variant =
   | "flip" | "dissolve" | "wipe" | "letters" | "tight" | "focus" | "iris" | "leak" | "panels"
-  | "reel" | "reel-wide" | "whip" | "whip-wide" | "pan" | "pan-step" | "film" | "score";
+  | "reel" | "reel-wide" | "whip" | "whip-wide" | "pan" | "pan-step" | "film" | "score" | "somewhere";
 interface Cut {
   frames: Frame[];
   /** How long PASATIEMPO holds, in ms. */
@@ -436,6 +492,8 @@ interface Cut {
   /** Cut to the music: when each frame starts, the title rises and the reel
    *  lifts, in ms from the first beat of black — kept to the music's own clock. */
   cues?: { frames: number[]; title: number; exit: number };
+  /** The scored dissolve's look, and its title: the 1929 logo and the wordmark. */
+  crest?: boolean;
 }
 const VARIANTS: Record<Variant, Cut> = {
   flip: { frames: FRAMES, titleMs: TITLE_MS },
@@ -470,6 +528,17 @@ const VARIANTS: Record<Variant, Cut> = {
     fast: true,
     music: MUSIC,
     cues: { frames: SCORE_CUES, title: SCORE_TITLE_AT, exit: SCORE_EXIT_AT },
+    crest: true,
+  },
+  somewhere: {
+    frames: SONG,
+    titleMs: SONG_EXIT_AT - SONG_TITLE_AT,
+    leadMs: SONG_CUES[0],
+    cine: true,
+    fast: true,
+    music: SONG_MUSIC,
+    cues: { frames: SONG_CUES, title: SONG_TITLE_AT, exit: SONG_EXIT_AT },
+    crest: true,
   },
 };
 /** The intro visitors get. The others play with ?intro=<name>. */
@@ -646,7 +715,7 @@ export default function IntroReel({
             ...(VARIANTS[v].reel?.whip ? WHIP_PAST.map((f) => f.src) : []),
             ...(VARIANTS[v].pan ? (VARIANTS[v].pan.tail ?? PAN_TAIL).map((f) => f.src) : []),
             SETTLE_ON,
-            ...(v === "score" ? [MARK, WORDMARK] : []),
+            ...(VARIANTS[v].crest ? [MARK, WORDMARK] : []),
           ];
     // The soundtrack loads alongside the photographs (it never holds them up long).
     const src = VARIANTS[v].music;
@@ -837,6 +906,7 @@ export default function IntroReel({
     <div
       className={
         "mci-intro is-" + phase + " era-" + era + " var-" + variant +
+        (cut.crest && variant !== "score" ? " var-score" : "") +
         (calm ? " is-calm" : "") + (cut.cine ? " is-cine" : "") + (cut.fast ? " is-fast" : "") +
         (cut.reel ? " is-film" : "") + (cut.pan ? " is-pan" : "") +
         (solid ? " is-solid" : "") + (quick ? " is-quick" : "")
@@ -931,7 +1001,7 @@ export default function IntroReel({
         </div>
       )}
 
-      {inTitle && variant === "score" && (
+      {inTitle && cut.crest && (
         <div className="mci-reel-title mci-st">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="mci-st-mark" src={MARK} alt={`Pasatiempo Golf Club, ${FOUNDED}`} />
@@ -941,7 +1011,7 @@ export default function IntroReel({
           <div className="mci-st-sub">{`The ${EVENT.name} · ${EVENT.year}`}</div>
         </div>
       )}
-      {inTitle && variant !== "score" && (
+      {inTitle && !cut.crest && (
         <div className="mci-reel-title">
           <div className="mci-reel-title-crest">
             <Medal size={110} />
