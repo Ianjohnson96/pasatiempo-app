@@ -441,7 +441,9 @@ const SONG_CUES = [300, 2460, 3850, 5240, 8030, 10820, 13610, 16410, 19170, 2197
 const SONG_TITLE_AT = 24350;
 const SONG_EXIT_AT = 31500; // the title holds about 7 s, as the last chord rings
 const FLY = "/invitational/video/intro/";
-/** A flyover: the film moves on its own, so no zoom on top of it. */
+/** A flyover: the film moves on its own, so no zoom on top of it. On a phone
+ *  the crop is centred on the green (about 50% across the 4th's film, 53%
+ *  across the 8th's). */
 const flyover = (hole: number, focus: string, phoneFocus: string): Omit<Frame, "hold"> => ({
   src: FLY + `hole-${hole}-flyover.webp`,
   video: FLY + `hole-${hole}-flyover.mp4`,
@@ -452,17 +454,13 @@ const flyover = (hole: number, focus: string, phoneFocus: string): Omit<Frame, "
 });
 const SONG: Frame[] = scored(
   [
-    // 1929, over the piano: the crowd at the tee, the Doctor, the foursome.
+    // 1929, over the piano: the crowd at the tee, the Doctor, a gallery on the course.
     { src: SA("1929-tee-shot-bay.webp"), era: "archive", focus: "center 70%", phoneFocus: "62% 80%" },
     { src: SC + "mackenzie.webp", era: "archive", focus: "53% 18%" },
-    // (On a phone, zoomed out to the middle two of the four, Hollins and the
-    // man in white beside her.)
-    {
-      src: SA("1929-opening-foursome.webp"), era: "archive", focus: "center 15%",
-      phoneWide: { h: 0.58, ar: 1800 / 1169, fx: 0.55, fy: 0.35, tx: 0.5, ty: 0.45 },
-    },
+    // The gallery round one of MacKenzie's greens, below the oak.
+    { src: SA("1929-gallery-oak.webp"), era: "archive", focus: "center 60%", phoneFocus: "55% 60%" },
     // Colour, as the band comes in: low over the bunkers of the 4th.
-    flyover(4, "center 60%", "45% 60%"),
+    flyover(4, "center 60%", "50% 60%"),
     // Last year's champion, an iron through the turf in the evening haze.
     { src: SC + "event-iron-impact.webp", era: "today", focus: "55% 45%", phoneFocus: "52% 50%" },
     // A high five in the sun (on a phone, a tall one on the green instead).
@@ -471,7 +469,7 @@ const SONG: Frame[] = scored(
       phoneSrc: SC + "event-high-five-green.webp", phoneFocus: "50% 20%",
     },
     // Over the 8th, under the cypresses.
-    flyover(8, "center 55%", "40% 55%"),
+    flyover(8, "center 55%", "54% 55%"),
     // The champion again, sharing a laugh on the tee in the golden light.
     { src: SC + "event-laughing-group.webp", era: "today", focus: "62% 35%", phoneFocus: "62% 40%" },
     // The whole field together, as the music falls away (on a phone, zoomed
