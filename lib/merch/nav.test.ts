@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 // merchandise/app/src/05-nav.js is plain browser JS joined into the page; it uses no page globals.
 const src = readFileSync(path.join(process.cwd(), "merchandise/app/src/05-nav.js"), "utf8");
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const N: any = vm.runInNewContext(src + ";({NAV,VIEWS,TAB_ALIAS,resolveTab,pageLabel,pageGroup,navParent,parseGo})");
+const N: any = vm.runInNewContext(src + ";({NAV,VIEWS,TAB_ALIAS,resolveTab,pageLabel,pageGroup,navParent,sideTarget,parseGo})");
 
 describe("merchandise navigation", () => {
   it("routes old page ids to the new pages", () => {
@@ -37,7 +37,11 @@ describe("merchandise navigation", () => {
     expect(N.pageLabel("today")).toBe("Home");
     expect(N.pageGroup("receiving")).toBe("buy");
     expect(N.pageGroup("inventory")).toBe("close");
-    expect(N.VIEWS.orders.map((v: string[]) => v[0])).toEqual(["orders", "receiving", "vendors"]);
+    expect(N.VIEWS.orders.map((v: string[]) => v[0])).toEqual(["receiving", "orders", "vendors"]);
+    // the sidebar entry opens on Receiving; #orders still opens the Orders view
+    expect(N.sideTarget("orders")).toBe("receiving");
+    expect(N.sideTarget("budget")).toBe("budget");
+    expect(N.resolveTab("orders")).toBe("orders");
     expect(N.VIEWS.settings.map((v: string[]) => v[1])).toEqual(["Guidelines", "Forecast"]);
   });
   it("parses data-go", () => {

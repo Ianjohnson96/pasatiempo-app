@@ -11,7 +11,7 @@ const HOME_PAGE = ['home', 'Home'];
 const FOOT_PAGES = [['settings', 'Settings']];
 // The views inside a sidebar page: [page id, label]. The first is where the sidebar entry opens.
 const VIEWS = {
-  orders: [['orders', 'Orders'], ['receiving', 'Receiving'], ['vendors', 'Vendors']],
+  orders: [['receiving', 'Receiving'], ['orders', 'Orders'], ['vendors', 'Vendors']],
   monthend: [['monthend', 'Upload & close'], ['inventory', 'Stock & counts']],
   settings: [['guidelines', 'Guidelines'], ['forecast', 'Forecast']]
 };
@@ -28,6 +28,8 @@ function resolveTab(id){
   if (Object.prototype.hasOwnProperty.call(TAB_ALIAS, id)) return TAB_ALIAS[id];
   return NAV_IDS.indexOf(id) >= 0 ? id : 'today';
 }
+/** The page a sidebar entry opens: its first view, else itself (Orders & receiving opens on Receiving). */
+const sideTarget = id => VIEWS[id] ? VIEWS[id][0][0] : id;
 /** The sidebar entry a page id belongs to: itself for a sidebar page, else the page holding it as a view. */
 function navParent(id){
   if (PAGE_PARENT[id]) return PAGE_PARENT[id];

@@ -155,12 +155,11 @@ function rcvRows(){
 const rcvBtns = p => !canAct() ? '' : !logLive() ? `<button class="btn sm" type="button" data-invin="${esc(p.id)}">Invoice in</button>`
   : isAdmin ? `<button class="btn ghost sm" type="button" data-invin="${esc(p.id)}" title="Mark it arrived by hand: for a shipment the receiving log doesn't show yet">Override</button>` : '';
 function rcvTable(rows, kind){
-  const head = kind === 'arrived' ? '<th>Order</th><th class="r">Days waiting</th><th class="r">Arrived</th><th>Invoice</th><th></th>' : '<th>Order</th><th>Expected</th><th class="r">Still to come</th><th></th>';
+  const head = kind === 'arrived' ? '<th>Order</th><th class="r">Days waiting</th><th class="r">Arrived</th><th>Trail</th><th></th>' : '<th>Order</th><th>Expected</th><th class="r">Still to come</th><th></th>';
   return `<div class="tbl"><table class="mini rt" style="min-width:0"><thead><tr>${head}</tr></thead><tbody class="click">${rows.map(({p, inv, arrived, days}) => {
     const first = `<td class="wrapv"><b>PO ${esc(p.poNumber)}</b> · ${esc(vendorName(p))}</td>`;
     if (kind === 'arrived'){
-      const refs = (inv || []).map(e => e.invoice).filter(Boolean).map(esc).join(', ');
-      return `<tr data-po="${esc(p.id)}" tabindex="0">${first}<td data-l="Days waiting" class="r num">${days}</td><td data-l="Arrived" class="r num">${money(arrived)}</td><td data-l="Invoice">${refs || '—'}</td>
+      return `<tr data-po="${esc(p.id)}" tabindex="0">${first}<td data-l="Days waiting" class="r num">${days}</td><td data-l="Arrived" class="r num">${money(arrived)}</td><td data-l="Trail" style="font-size:12.5px">${rcvTrail(p, inv)}</td>
         <td class="r">${canAct() ? `<button class="btn ghost sm" type="button" data-invclear="${esc(p.id)}" title="Take it off this list. It doesn't change what the POS or the budget say.">Clear</button>` : ''}</td></tr>`;
     }
     return `<tr data-po="${esc(p.id)}" tabindex="0">${first}<td data-l="Expected">${monthLabel(p.deliveryMonth)}</td><td data-l="Still to come" class="r num">${money(onOrder(p))}</td><td class="r">${rcvBtns(p)}</td></tr>`;
@@ -181,7 +180,42 @@ function rcvChart(rows){
     ${chLegend(series)}${chStack({labels, series, fmt: moneyK, label: 'Receiving backlog at cost, by vendor', go: i => 'orders:' + vs[i].key})}
     ${anaNumbers(['Vendor', 'In the store room', 'Late', 'Total'], vs.map(v => [v.name, money(v.store), money(v.late), money(v.store + v.late)]))}</section>`;
 }
+/* The receiving log's part of the page: where the copy stands, rows to match, rows not from an order, and matches
+   whose row has changed in the log. */
+const ago = iso => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : dateLabel(iso.slice(0, 10)); };
+function logStatusHtml(){
+  if (!RLOG) return `<div class="warnbox info"><b>The receiving log isn't connected yet.</b> Once it is, every row the accounting team adds shows up here to match against an order. Setup: docs/merch-receiving-log-setup.md (the owner, once).</div>`;
+  const probs = (RLOG.problems || []).length;
+  return `<div class="note">${RLOG.error ? `<span class="neg"><b>${esc(RLOG.error)}</b></span>` : `Receiving log read ${esc(ago(RLOG.readAt || RLOG.at))}, rows from ${esc(dateLabel(RLOG.since))} on.`}
+    ${probs ? ` <details style="display:inline"><summary>${probs} row${probs === 1 ? '' : 's'} couldn't be read</summary><ul>${RLOG.problems.map(p => `<li>${esc(p)}</li>`).join('')}</ul></details>` : ''}</div>`;
+}
+const logRowCells = r => `<td data-l="Date">${dateLabel(r.date)}</td><td class="wrapv">${esc(r.desc)}${r.special ? ' <span class="pill">special order</span>' : ''}</td><td data-l="Invoice">${esc(r.invoice || '—')}</td><td data-l="Amount" class="r num ${r.amount < 0 ? 'neg' : ''}">${money(r.amount)}</td>`;
+const poLabel = p => `PO ${esc(p.poNumber || p.id)} · ${esc(vendorName(p))} · due ${monthLabel(p.deliveryMonth)} · ${money(Math.max(onOrder(p) - storeRoomOf(p), 0))} open`;
+function logMatchHtml(q){
+  if (!RLOG) return '';
+  const act = canAct(), who = id => id ? `<span class="person" data-uid="${esc(id)}"></span>` : '';
+  const toMatch = q.toMatch.length ? `<div class="tbl"><table class="mini rt" style="min-width:0"><thead><tr><th>Date</th><th>From the log</th><th>Invoice</th><th class="r">Amount</th><th>Order</th></tr></thead><tbody>${q.toMatch.map(({row, cands}) =>
+    `<tr>${logRowCells(row)}<td data-l="Order">${poLabel(cands[0])}${act ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn primary sm" type="button" data-logok="${esc(row.key)}|${esc(cands[0].id)}">Confirm</button>${cands.slice(1).map(p => `<button class="btn sm" type="button" data-logok="${esc(row.key)}|${esc(p.id)}" title="${poLabel(p)}">Pick PO ${esc(p.poNumber || p.id)}</button>`).join('')}<button class="btn ghost sm" type="button" data-lognot="${esc(row.key)}">Not an order</button></div>` : ''}</td></tr>`).join('')}</tbody></table></div>`
+    : '<div class="note">Nothing to match: every row in the log is matched or isn\'t from an order.</div>';
+  const changed = q.changed.length ? `<section class="panel"><header><h2>Changed in the log</h2><span class="lab">${q.changed.length}</span></header><div class="note">These rows were matched, then changed or removed in the receiving log. Check the order and undo the match if it no longer applies.</div>
+    <ul class="items">${q.changed.map(c => { const p = POS.find(x => x.id === c.po); return `<li class="item warn"><div class="stripe"></div><div class="body"><div class="t">${p ? poLabel(p) : esc(c.po)}</div></div>${act ? `<button class="btn sm" type="button" data-logundo="${esc(c.key)}">Undo the match</button>` : ''}</li>`; }).join('')}</ul></section>` : '';
+  const not = q.notOrder.length ? `<details class="panel" style="padding:12px 16px"><summary><b>Not from an order</b> · ${q.notOrder.length} row${q.notOrder.length === 1 ? '' : 's'}: reorders, special orders and anything else not in the order book. Nothing to do.</summary>
+    <div class="tbl"><table class="mini rt" style="min-width:0"><tbody>${q.notOrder.map(({row, why}) => { const d = LOGMATCH[row.key];
+      return `<tr>${logRowCells(row)}<td>${why === 'marked' ? `marked by ${who(d && d.by)}${act ? ` <button class="btn ghost sm" type="button" data-logundo="${esc(row.key)}">Undo</button>` : ''}` : '<span class="faint">no open order matches</span>'}</td></tr>`; }).join('')}</tbody></table></div></details>` : '';
+  const matched = q.matched.length ? `<details class="panel" style="padding:12px 16px"><summary><b>Matched</b> · ${q.matched.length} row${q.matched.length === 1 ? '' : 's'}</summary>
+    <div class="tbl"><table class="mini rt" style="min-width:0"><tbody>${q.matched.map(({row, po}) => { const p = POS.find(x => x.id === po), d = LOGMATCH[row.key];
+      return `<tr>${logRowCells(row)}<td>${p ? `PO ${esc(p.poNumber || p.id)} · ${esc(vendorName(p))}` : esc(po)} · ${who(d && d.by)}${act ? ` <button class="btn ghost sm" type="button" data-logundo="${esc(row.key)}">Undo</button>` : ''}</td></tr>`; }).join('')}</tbody></table></div></details>` : '';
+  return `<section class="panel"><header><h2>Match from the receiving log</h2><span class="lab">${q.toMatch.length} to match</span></header>
+    <div class="note" style="padding-bottom:4px">Each row is what the accounting team logged. The app suggests the order it most likely belongs to: same vendor, due within a month, enough still open. Confirm marks the order arrived (it stays committed in the budget until Jonas records it).</div>${toMatch}</section>${changed}${not}${matched}`;
+}
+/* An order's trail: placed, arrived (from the log or by hand), in Jonas. */
+function rcvTrail(p, inv){
+  const first = (inv || []).map(e => e.date).sort()[0], refs = (inv || []).map(e => e.invoice).filter(Boolean);
+  return `<span class="faint">Placed ${p.orderDate ? dateLabel(p.orderDate) : '—'} → </span>Arrived ${first ? dateLabel(first) : '—'}${refs.length ? ` (inv ${refs.map(esc).join(', ')})` : ''}<span class="faint"> → In Jonas at the next upload</span>`;
+}
 function renderReceiving(S){
+  pokeReceivingLog();
+  const q = receivingQueue();
   const rows = rcvRows(), by = st => rows.filter(r => r.st === st);
   const arr = by('arrived').sort((a, b) => b.days - a.days || String(a.p.poNumber).localeCompare(String(b.p.poNumber)));
   const late = by('late').sort((a, b) => String(a.p.deliveryMonth).localeCompare(String(b.p.deliveryMonth)) || onOrder(b.p) - onOrder(a.p));
@@ -196,11 +230,13 @@ function renderReceiving(S){
       ${todayTile('Oldest wait', arr.length ? oldest + (oldest === 1 ? ' day' : ' days') : '—', arr.length ? 'since the first invoice came in' : '')}
       ${todayTile('Late orders', String(late.length), late.length ? `${moneyK(lateCost)} past the delivery month` : 'none past their delivery month')}
     </section>
+    ${logStatusHtml()}
+    ${logMatchHtml(q)}
     ${rcvChart(rows)}
     ${sec('In the store room, not in the POS', 'Oldest first. Arrived is what the invoices add up to. Clear takes an order off this list once it is in the POS; it changes no figures. Open an order to change what was received.', arr, 'arrived', 'Nothing is waiting. Use Invoice in on an order (or on the Late and Due lists below) when its goods arrive.')}
     ${sec('Late', 'Open orders past their delivery month with nothing arrived.', late, 'open', 'No late orders.')}
     ${sec('Due this month', `Open orders due in ${monthFull(THIS_MONTH)} with nothing arrived.`, due, 'open', 'Nothing else is due this month.')}
-    <div class="note">The receiving log will fill this page in by itself once it is linked. Until then, mark orders by hand with Invoice in. Arrived goods stay committed in the budget until month-end records them as received.</div></div>`;
+    <div class="note">${logLive() ? 'Arrivals come from the receiving log: match each row above.' : 'Until the receiving log is connected, mark orders by hand with Invoice in.'} Arrived goods stay committed in the budget until month-end records them as received.</div></div>`;
 }
 /* The Invoice in dialog: date (today), optional amount, optional invoice #, note. Blank amount = the whole open balance. */
 function openInvoiceIn(poId){

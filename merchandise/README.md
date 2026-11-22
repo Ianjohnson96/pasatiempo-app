@@ -154,7 +154,15 @@ Boxes go to the store room, the invoice goes to Chris or CJ, and the goods are r
 - Month-end matching (see Deliveries) still records the deliveries from the POS. When it does, the order's `received` rises and the store-room figure falls by the same amount.
 - Orders are marked late when the delivery month has passed and nothing is waiting in the store room.
 
-The receiving log, an Excel spreadsheet, will later write the same `invoicesIn` entries with `source: 'log'`, so nothing on this page needs to change when it is linked.
+### The receiving log
+
+The people who pay invoices keep a Google Sheet, the receiving log: one tab per year (`REC. DATE | ITEM DECRIPTION | INVOICE # | PRICE`, the date written only on each day's first row) and a Credits tab. The program reads it, read-only, with a Google service account (`lib/merch/google.ts`; the key is `GOOGLE_SERVICE_ACCOUNT_JSON`, the sheet `MERCH_LOG_SHEET_ID`, defaulting to the shop's). It never writes to the sheet. Setup: `docs/merch-receiving-log-setup.md`.
+
+- **Reading.** `refreshReceivingLog` (`lib/merch/receiving-log-server.ts`) reads every tab laid out like the log (found by its headers, so a new year's tab is picked up), parses it (`lib/merch/receiving-log.ts`) and stores `receivinglog/current`: the rows dated on or after `since` (the day it was first read), the vendor word list, unreadable rows as `problems` (a missing price, a date that can't be read, a date far behind the rows above it, such as a mistyped year), and `error`, one plain line when the read fails (the rows from the last good read are kept). It runs when someone opens Orders & receiving (`POST /merch/api/receiving-log`, at most every two minutes) and every morning from the cron. Nobody writes `receivinglog` through the page, the owner included.
+- **Matching.** Each row's vendor comes from its description: the word list (`VENDOR_WORDS_DEFAULT`, e.g. `FJ` is FootJoy, `H&B` Holderness & Bourne, plus `guidelines/current.vendorWords`) and every vendor's own name. The page suggests open orders of that vendor due within a month of the row's date with enough still open (`logCandidates`, `logQueue` in `app/src/18-ops.js`). A row with no candidate is filed under **Not from an order** with no click (reorders and special orders mostly); nothing is ever checked off automatically.
+- **Confirming.** Confirm (or Pick another order) adds an `invoicesIn` entry `{source: 'log', logKey, invoice, amount, date}` to the order, dated with the row's date, and keeps the call in `logmatch/{row key}`; a second confirm of the same row replaces its entry, and a hand entry with the same invoice number is replaced, not added to. **Not an order** files a row by hand. **Undo** takes either back. Anyone who can enter orders can do all of these.
+- **Changed in the log.** A matched row that is edited or removed in the sheet shows under Changed in the log, for a person to check and undo.
+- Once the log is read, staff no longer see **Invoice in**; the owner keeps it as **Override** for a shipment the log hasn't caught up with. The budget is untouched either way.
 
 ## Season buys
 

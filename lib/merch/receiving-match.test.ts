@@ -62,4 +62,34 @@ describe("matching receiving log rows on the page", () => {
     R(`isAdmin = false; RLOG = null`);
     expect(R(`rcvBtns(POS[0])`)).toMatch(/Invoice in/);
   });
+  it("Home, the verdict and the sidebar count log rows to match", () => {
+    const R = page();
+    expect((R(`homeLines(stats())`) as { arriving: string }).arriving).toMatch(/1 log row to match/);
+    expect((R(`PAGE_VERDICT.receiving(stats())`) as { text: string }).text).toMatch(/1 log row to match/);
+    const n = R(`sideCount(sideBadges(stats()), 'orders')[0]`) as number;
+    const orders = R(`POS.filter(p => isOpen(p) && (rowFlag(p) === 'flag-crit' || (p.deliveryMonth && p.deliveryMonth < THIS_MONTH) || ['arrived', 'late'].includes(rcvOf(p)))).length`) as number;
+    expect(n).toBe(orders + 1);
+  });
+  it("the Receiving view lists rows to match with Confirm, and rows not from an order", () => {
+    const R = page();
+    const html = R(`(renderReceiving(stats()), document.__html)`) as string;
+    expect(html).toMatch(/Match from the receiving log/);
+    expect(html).toMatch(/data-logok="r-fj\|fj-dec"/);
+    expect(html).toMatch(/Not from an order/);
+    expect(html).toMatch(/Hats Melin Mens Stock/);
+  });
+  it("without the log connected the page says so and still shows the order lists", () => {
+    const R = page();
+    R(`RLOG = null`);
+    const html = R(`(renderReceiving(stats()), document.__html)`) as string;
+    expect(html).toMatch(/isn't connected yet/);
+    expect(html).toMatch(/Late/);
+    R(`RLOG = {error: "The app can't open the receiving log. Share it with x@y as Viewer.", rows: [], readAt: null}`);
+    expect(R(`(renderReceiving(stats()), document.__html)`) as string).toMatch(/Share it with x@y as Viewer/);
+  });
+  it("a viewer sees the rows but no buttons", () => {
+    const R = page();
+    R(`readOnly = true`);
+    expect(R(`(renderReceiving(stats()), document.__html)`) as string).not.toMatch(/data-logok|data-lognot|data-logundo/);
+  });
 });

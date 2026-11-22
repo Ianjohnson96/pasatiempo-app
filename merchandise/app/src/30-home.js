@@ -107,6 +107,7 @@ function sideBadges(S){
       const st = rcvOf(p), bad = rowFlag(p) === 'flag-crit' || (p.deliveryMonth && p.deliveryMonth < THIS_MONTH) || st === 'late';
       if (bad || st === 'arrived'){ n++; if (bad) hot = true; }
     }
+    n += receivingQueue().toMatch.length;   // receiving log rows waiting for a person to match
     return n ? [n, hot ? 'hot' : ''] : null;
   });
   put('attention', () => { const n = openAttention(S).filter(i => i.sev === 'crit').length; return n ? [n, 'hot'] : null; });
@@ -138,7 +139,7 @@ function renderSide(S){
   const item = ([id, label]) => {
     const [c, tone] = sideCount(b, id) || [];
     const tail = c != null ? `<span class="sb ${tone || ''}">${c}</span>` : '';
-    return `<button type="button" class="sitem" data-tab="${id}"${cur === id ? ' aria-current="page"' : ''}><span class="sl">${esc(label)}</span>${tail}</button>`;
+    return `<button type="button" class="sitem" data-tab="${sideTarget(id)}"${cur === id ? ' aria-current="page"' : ''}><span class="sl">${esc(label)}</span>${tail}</button>`;
   };
   $('#sideNav').innerHTML = `<div class="sgroup">${item(HOME_PAGE)}</div>` + NAV.map(g => `<div class="sgroup" role="group" aria-label="${esc(g.label)}"><div class="sglab" aria-hidden="true">${esc(g.label)}</div>${g.pages.map(item).join('')}</div>`).join('');
   const foot = $('#sideFootNav'); if (foot) foot.innerHTML = FOOT_PAGES.map(item).join('');

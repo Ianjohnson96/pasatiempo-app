@@ -31,7 +31,8 @@ const PAGE_VERDICT = {
     if (!S) return null;
     let arrived = 0, n = 0;
     for (const p of POS){ if (rcvOf(p) === 'arrived'){ n++; arrived += storeRoomOf(p); } }
-    const late = POS.filter(p => isOpen(p) && rcvOf(p) === 'late').length;
+    const late = POS.filter(p => isOpen(p) && rcvOf(p) === 'late').length, toMatch = receivingQueue().toMatch.length;
+    if (toMatch) return vd('watch', `${vdPlural(toMatch, 'log row')} to match${n ? `; ${vdPlural(n, 'order')} (${money(arrived)}) arrived but not in Jonas yet` : ''}${late ? `; ${late} late` : ''}.`);
     if (n) return vd('watch', `${vdPlural(n, 'order')} (${money(arrived)}) arrived but not in Jonas yet${late ? `; ${late} late` : ''}.`);
     return late ? vd('act', `${vdPlural(late, 'order')} late; nothing waiting to go into Jonas.`) : vd('ok', 'Nothing waiting to go into Jonas, and nothing late.');
   },

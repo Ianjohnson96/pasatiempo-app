@@ -48,11 +48,12 @@ function homeLines(S){
   const R = todayRoom(), buy = withPlan('cur', () => PAGE_VERDICT.overview(stats()));
   let due = 0, late = 0, inRoom = 0, roomV = 0;
   for (const p of POS){ const st = rcvOf(p); if (st === 'due') due++; else if (st === 'late') late++; else if (st === 'arrived'){ inRoom++; roomV += storeRoomOf(p); } }
-  const arr = [due ? `${due} order${due === 1 ? '' : 's'} due this month` : 'nothing due this month', late ? `${late} late` : '', inRoom ? `${inRoom} in the store room (${money(roomV)}), not in Jonas yet` : ''].filter(Boolean);
+  const toMatch = receivingQueue().toMatch.length;
+  const arr = [toMatch ? `${toMatch} log row${toMatch === 1 ? '' : 's'} to match` : '', due ? `${due} order${due === 1 ? '' : 's'} due this month` : 'nothing due this month', late ? `${late} late` : '', inRoom ? `${inRoom} in the store room (${money(roomV)}), not in Jonas yet` : ''].filter(Boolean);
   const a = anaNow(), s = a && a.shop;
   const selling = s ? `${moneyK(s.t12)} sold in the last 12 months${s.growth == null ? '' : `, ${s.growth >= 0 ? 'up' : 'down'} ${Math.abs(Math.round(s.growth * 100))}% on a year earlier`}; margin ${aPct(s.gm)}${grade('gm', s.gm, SHOPSEG) === 'bad' ? ', below the guideline' : ''}.`
     : 'Sales show after the next month-end upload.';
-  return {buy: buy ? buy.text : `${moneyK(R.year)} left to buy in ${R.fy}.`, buyTone: buy ? buy.tone : 'ok', arriving: (s => s[0].toUpperCase() + s.slice(1))(arr.join(' · ')) + '.', arrivingTone: late ? 'act' : inRoom ? 'watch' : 'ok', selling, sellingTone: s && s.growth != null && s.growth < 0 ? 'watch' : 'ok'};
+  return {buy: buy ? buy.text : `${moneyK(R.year)} left to buy in ${R.fy}.`, buyTone: buy ? buy.tone : 'ok', arriving: (s => s[0].toUpperCase() + s.slice(1))(arr.join(' · ')) + '.', arrivingTone: late ? 'act' : inRoom || toMatch ? 'watch' : 'ok', selling, sellingTone: s && s.growth != null && s.growth < 0 ? 'watch' : 'ok'};
 }
 function renderToday(S){
   const a = anaNow(), L = homeLines(S), d = topDecisions(S, 5);
