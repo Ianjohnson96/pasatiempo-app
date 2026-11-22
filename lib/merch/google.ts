@@ -35,6 +35,8 @@ export const googleClientEmail = (): string | null => key()?.client_email ?? nul
 
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
 const cache = new Map<string, { token: string; until: number }>();
+// Google gets 15 seconds an answer: a hung request must never hold up the daily cron's reminder email.
+const TIMEOUT_MS = 15000;
 
 /** An access token for `scope`, cached until a minute before it expires. */
 export async function serviceToken(scope: string, fetchImpl: typeof fetch = fetch): Promise<string> {
@@ -47,6 +49,7 @@ export async function serviceToken(scope: string, fetchImpl: typeof fetch = fetc
   const sig = createSign("RSA-SHA256").update(unsigned).sign(k.private_key).toString("base64url");
   const res = await fetchImpl(TOKEN_URL, {
     method: "POST",
+    signal: AbortSignal.timeout(TIMEOUT_MS),
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: unsigned + "." + sig }).toString(),
   });
@@ -57,11 +60,12 @@ export async function serviceToken(scope: string, fetchImpl: typeof fetch = fetc
   return j.access_token;
 }
 
-/** Every tab of a spreadsheet with its first five columns, as the sheet shows them. Read-only (GET requests only). */
+/** Every tab of a spreadsheet (columns A to Z, so an inserted column doesn't push one out), as the sheet shows them.
+    Read-only (GET requests only). */
 export async function readSheetTabs(id: string, fetchImpl: typeof fetch = fetch): Promise<{ title: string; values: string[][] }[]> {
   const token = await serviceToken(SHEETS_READONLY, fetchImpl);
   const get = async (url: string) => {
-    const res = await fetchImpl(url, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetchImpl(url, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (!res.ok) throw new GoogleError(`Google answered ${res.status}.`, res.status);
     return res.json();
   };
@@ -69,7 +73,7 @@ export async function readSheetTabs(id: string, fetchImpl: typeof fetch = fetch)
   const titles = (meta.sheets ?? []).map((s) => s.properties?.title ?? "").filter(Boolean);
   if (!titles.length) return [];
   const q = new URLSearchParams({ valueRenderOption: "FORMATTED_VALUE", majorDimension: "ROWS" });
-  for (const t of titles) q.append("ranges", `'${t.replace(/'/g, "''")}'!A1:E`);
+  for (const t of titles) q.append("ranges", `'${t.replace(/'/g, "''")}'!A1:Z`);
   const vals = (await get(`${SHEETS}/${encodeURIComponent(id)}/values:batchGet?${q}`)) as { valueRanges?: { values?: string[][] }[] };
   return titles.map((title, i) => ({ title, values: (vals.valueRanges?.[i]?.values ?? []).map((r) => r.map((c) => String(c ?? ""))) }));
 }

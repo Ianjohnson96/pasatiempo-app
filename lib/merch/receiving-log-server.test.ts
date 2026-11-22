@@ -64,4 +64,31 @@ describe("refreshing the receiving log", () => {
     expect(r.error).toMatch(/isn't connected yet/);
     expect((db.docs["receivinglog/current"] as { error: string }).error).toMatch(/isn't connected yet/);
   });
+  it("a heading renamed in every tab keeps the previous rows and says what to fix", async () => {
+    const prev = [{ key: "k", date: "2026-11-20" }];
+    const db = memStore({ "receivinglog/current": { since: "2026-01-01", at: "2026-11-01T00:00:00Z", rows: prev } });
+    const broken = (async (url: string) => {
+      if (String(url).includes("oauth2")) return new Response(JSON.stringify({ access_token: "t", expires_in: 3600 }));
+      if (String(url).includes("values:batchGet")) return new Response(JSON.stringify({ valueRanges: [{ values: [["REC. DATE", "ITEM DECRIPTION", "INVOICE #", "AMOUNT"]] }] }));
+      return new Response(JSON.stringify({ sheets: [{ properties: { title: "SHEET 4" } }] }));
+    }) as unknown as typeof fetch;
+    const r = await refreshReceivingLog({ db, fetchImpl: broken, now: NOW });
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/No tab in the receiving log has the columns/);
+    expect((db.docs["receivinglog/current"] as { rows: unknown[] }).rows).toEqual(prev);
+  });
+  it("doesn't rewrite the copy when nothing changed (so open pages don't reload it)", async () => {
+    const db = memStore();
+    await refreshReceivingLog({ db, fetchImpl: google(), now: NOW });
+    let writes = 0; const put = db.put; db.put = async (p, d) => { writes++; return put(p, d); };
+    await refreshReceivingLog({ db, fetchImpl: google(), now: new Date(NOW.getTime() + 5 * 60000) });
+    expect(writes).toBe(0);
+  });
+  it("gives up on Google after a time limit instead of hanging", async () => {
+    const signals: (AbortSignal | undefined)[] = [];
+    const f = (async (url: string, init?: RequestInit) => { signals.push(init?.signal ?? undefined); return google()(url, init); }) as unknown as typeof fetch;
+    await refreshReceivingLog({ db: memStore(), fetchImpl: f, now: NOW, force: true });
+    expect(signals.length).toBeGreaterThan(1);
+    expect(signals.every((s) => s instanceof AbortSignal)).toBe(true);
+  });
 });

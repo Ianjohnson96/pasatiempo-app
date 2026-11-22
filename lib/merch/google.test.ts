@@ -39,7 +39,7 @@ describe("Google service account", () => {
     const ok = (async (url: string) => {
       seen.push(String(url));
       if (String(url).includes("oauth2")) return new Response(JSON.stringify({ access_token: "t", expires_in: 3600 }));
-      if (String(url).includes("values:batchGet")) return new Response(JSON.stringify({ valueRanges: [{ values: [["REC. DATE"]] }, {}] }));
+      if (String(url).includes("values:batchGet")) { expect(String(url)).toContain("A1%3AZ"); return new Response(JSON.stringify({ valueRanges: [{ values: [["REC. DATE"]] }, {}] })); }
       return new Response(JSON.stringify({ sheets: [{ properties: { title: "SHEET 4" } }, { properties: { title: "Credits" } }] }));
     }) as unknown as typeof fetch;
     const tabs = await readSheetTabs("sheet1", ok);

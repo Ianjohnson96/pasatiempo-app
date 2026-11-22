@@ -35,9 +35,12 @@ export function supabaseLogStore(): LogStore {
 
 const time = (iso: string) => new Date(iso).toLocaleString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
+class LayoutError extends Error {}
+
 /** The plain line the page shows for a failed read. */
 function failure(e: unknown, previousAt: string | null): string {
   if (!googleConfigured()) return "The receiving log isn't connected yet. See the setup steps.";
+  if (e instanceof LayoutError) return "No tab in the receiving log has the columns REC. DATE, ITEM DESCRIPTION, INVOICE # and PRICE. Was a heading renamed? Showing the rows from the last good read.";
   const status = e instanceof GoogleError ? e.status : 0;
   if (status === 403 || status === 404) return `The app can't open the receiving log. Share it with ${googleClientEmail()} as Viewer.`;
   return previousAt ? `Google didn't answer; showing the log as of ${time(previousAt)}.` : "Google didn't answer; the receiving log will be read again shortly.";
@@ -56,7 +59,12 @@ export async function refreshReceivingLog(opts: { force?: boolean; fetchImpl?: t
   try {
     if (!googleConfigured()) throw new GoogleError("not configured", 0);
     const tabs = await readSheetTabs(SHEET_ID(), opts.fetchImpl);
-    const { rows, problems } = parseLog(tabs, { since, words });
+    const { rows, problems, tabsRead } = parseLog(tabs, { since, words, today: pacificToday(now) });
+    if (!tabsRead) throw new LayoutError();
+    // Unchanged since the last read (and that read under an hour old): leave the copy alone, so open pages don't
+    // download it again and redraw for nothing.
+    const same = prev && !prev.error && JSON.stringify([prev.rows, prev.problems, prev.words]) === JSON.stringify([rows, problems, words]);
+    if (same && typeof prev.readAt === "string" && now.getTime() - Date.parse(prev.readAt) < 60 * 60 * 1000) return { ok: true, rows: rows.length };
     await db.put(LOG_DOC, { at: now.toISOString(), since, sheet: SHEET_ID(), words, rows, problems, error: null, readAt: now.toISOString() });
     return { ok: true, rows: rows.length };
   } catch (e) {

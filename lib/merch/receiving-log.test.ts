@@ -53,4 +53,23 @@ describe("reading the receiving log", () => {
     expect(rows.find((r) => r.invoice === "9000724742")!.special).toBe(true);
     expect(rows.find((r) => r.invoice === "211")!.special).toBe(false);
   });
+  it("renaming a tab keeps every row's key", () => {
+    const a = read("2026-01-01").rows;
+    const renamed = JSON.parse(JSON.stringify(fx.tabs));
+    renamed[1].title = "SHEET 4 1/1-12/31/2026";
+    const b = read("2026-01-01", renamed).rows;
+    expect(b.map((r) => r.key)).toEqual(a.map((r) => r.key));
+  });
+  it("a date typed well after today is a problem and doesn't hide the rows after it", () => {
+    const tabs = [{ title: "SHEET 4", values: [fx.tabs[1].values[0], ["3/2/2026", "Hats Imperial Mens Stock", "1", "$10.00"], ["11/3/2026", "Hats Imperial Mens Stock", "2", "$20.00"], ["3/4/2026", "Hats Imperial Mens Stock", "3", "$30.00"]] }];
+    const { rows, problems } = parseLog(tabs, { since: "2026-01-01", words: VENDOR_WORDS_DEFAULT, today: "2026-03-05" });
+    expect(rows.map((r) => r.invoice)).toEqual(["1", "3"]);
+    expect(problems.some((p) => /row 3: the date 11\/3\/2026 looks wrong/.test(p))).toBe(true);
+  });
+  it("says how many tabs had the log's layout, so a renamed heading can be reported", () => {
+    expect(parseLog(fx.tabs, { since: "2026-01-01", words: VENDOR_WORDS_DEFAULT }).tabsRead).toBe(4);
+    const broken = JSON.parse(JSON.stringify(fx.tabs));
+    for (const tb of broken) if (tb.values[0]) tb.values[0] = tb.values[0].map((h: string) => (h === "PRICE" ? "AMOUNT" : h));
+    expect(parseLog(broken, { since: "2026-01-01", words: VENDOR_WORDS_DEFAULT }).tabsRead).toBe(0);
+  });
 });

@@ -92,4 +92,27 @@ describe("matching receiving log rows on the page", () => {
     R(`readOnly = true`);
     expect(R(`(renderReceiving(stats()), document.__html)`) as string).not.toMatch(/data-logok|data-lognot|data-logundo/);
   });
+  it("two quick confirms on one order both land", async () => {
+    const R = page();
+    R(`RLOG = {...RLOG, rows: RLOG.rows.concat([{...RLOG.rows[0], key: 'r-fj2', invoice: '9000505441', amount: 299.39}])}`);
+    await R(`Promise.all([confirmLogRow('r-fj', 'fj-dec'), confirmLogRow('r-fj2', 'fj-dec')])`);
+    expect(R(`POS.find(p => p.id === 'fj-dec').invoicesIn.map(e => e.logKey).sort()`)).toEqual(["r-fj", "r-fj2"]);
+  });
+  it("a hand entry with no invoice number is replaced on confirm when the person agrees, and comes back on undo", async () => {
+    const R = page();
+    R(`globalThis.confirm = () => true; const p = POS.find(x => x.id === 'fj-dec'); p.invoicesIn = [{date: '2026-11-17', source: 'hand', at: '2026-11-17T15:00:00Z', rcvd: 0}]`);
+    await R(`confirmLogRow('r-fj', 'fj-dec')`);
+    expect(R(`POS.find(p => p.id === 'fj-dec').invoicesIn.map(e => e.source)`)).toEqual(["log"]);
+    await R(`undoLogRow('r-fj')`);
+    expect(R(`POS.find(p => p.id === 'fj-dec').invoicesIn.map(e => e.source)`)).toEqual(["hand"]);
+  });
+  it("the order dialog's Invoice in follows the same rule as the lists", () => {
+    const R = page();
+    R(`isAdmin = false`);
+    expect(R(`invoiceInAllowed()`)).toBe(false);
+    R(`isAdmin = true`);
+    expect(R(`invoiceInAllowed()`)).toBe(true);
+    R(`isAdmin = false; RLOG = null`);
+    expect(R(`invoiceInAllowed()`)).toBe(true);
+  });
 });

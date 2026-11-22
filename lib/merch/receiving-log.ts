@@ -57,10 +57,10 @@ export function brandOf(desc: string, words: Record<string, string[]>): string |
   return best ? best[0] : null;
 }
 
-/** A row's identity: the tab, invoice, amount to the cent, description and a counter for exact repeats, never the
-    row's position (rows get inserted). */
-export function rowKey(tab: string, invoice: string, amount: number, desc: string, n: number): string {
-  return createHash("sha1").update([tab, invoice, Math.round(amount * 100), desc.toLowerCase(), n].join("\u0001")).digest("hex").slice(0, 16);
+/** A row's identity: credit or not, its date, invoice, amount to the cent, description and a counter for exact
+    repeats. Never the row's position (rows get inserted) or its tab's name (a tab can be renamed). */
+export function rowKey(kind: "row" | "credit", date: string, invoice: string, amount: number, desc: string, n: number): string {
+  return createHash("sha1").update([kind, date, invoice, Math.round(amount * 100), desc.toLowerCase(), n].join("\u0001")).digest("hex").slice(0, 16);
 }
 
 /** M/D/YYYY or M/D/YY (or YYYY-MM-DD) → YYYY-MM-DD; null if unreadable. */
@@ -100,12 +100,14 @@ function columns(header: string[]): { date: number; desc: number; invoice: numbe
 /** The log's rows dated on or after `since`, from every tab laid out like it (found by headers, not tab names), with
     the Credits tab's as credits. A row with a description but no readable date or price is listed in `problems`;
     the rest are still read. */
-export function parseLog(tabs: SheetTab[], opts: { since: string; words: Record<string, string[]> }): { rows: LogRow[]; problems: string[] } {
+export function parseLog(tabs: SheetTab[], opts: { since: string; words: Record<string, string[]>; today?: string }): { rows: LogRow[]; problems: string[]; tabsRead: number } {
   const rows: LogRow[] = [], problems: string[] = [];
+  let tabsRead = 0;
   for (const tab of tabs) {
     const values = tab.values || [];
     const cols = values.length ? columns(values[0]) : null;
     if (!cols) continue;
+    tabsRead++;
     const credit = /credit/i.test(tab.title);
     const seen = new Map<string, number>();
     let date: string | null = null, shown = "", latest = "";
@@ -125,15 +127,18 @@ export function parseLog(tabs: SheetTab[], opts: { since: string; words: Record<
       // A date well behind the rows above it is a typo (the 2026 tab has a 2/26/2025 among February 2026 rows): say so
       // rather than let it fall before `since` and vanish.
       if (latest && daysBetween(date, latest) > 60) { problems.push(`${where}: the date ${shown} looks wrong (well before the rows above it)`); return; }
+      // ...and one well after today (a month and day swapped, 11/3 for 3/11): a problem, and it doesn't move `latest`,
+      // so the rows after it still read.
+      if (opts.today && daysBetween(opts.today, date) > 31) { problems.push(`${where}: the date ${shown} looks wrong (after today)`); return; }
       if (date > latest) latest = date;
       if (date < opts.since) return;
       const amount = credit ? -Math.abs(price) : price;
-      const base = [invoice, Math.round(amount * 100), desc.toLowerCase()].join("|");
+      const base = [date, invoice, Math.round(amount * 100), desc.toLowerCase()].join("|");
       const n = seen.get(base) ?? 0;
       seen.set(base, n + 1);
-      rows.push({ key: rowKey(tab.title, invoice, amount, desc, n), tab: tab.title, date, desc, invoice, amount, credit,
+      rows.push({ key: rowKey(credit ? "credit" : "row", date, invoice, amount, desc, n), tab: tab.title, date, desc, invoice, amount, credit,
         brand: brandOf(desc, opts.words), special: /\([^)]+\)/.test(desc) });
     });
   }
-  return { rows, problems };
+  return { rows, problems, tabsRead };
 }

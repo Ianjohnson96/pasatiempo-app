@@ -70,37 +70,65 @@ function logWords(){
   for (const v of VENDORS){ const n = String(v.name || '').toLowerCase().trim(); if (n && !vendorKeyFor(n, w)) w[n] = [n]; }
   return w;
 }
+/* Worked out once per change, not once per caller: the sidebar, Home, the verdict and the page all ask on each redraw.
+   A new copy of the log, of the calls, of the orders or vendors (each snapshot is a new array), or a log action, makes
+   it fresh. */
+let LOGQ = null, LOGQ_GEN = 0;
 function receivingQueue(){
+  const key = [RLOG, LOGMATCH, POS, VENDORS, LOGQ_GEN];
+  if (LOGQ && LOGQ.key.every((x, i) => x === key[i])) return LOGQ.q;
   const words = logWords();
   const rows = ((RLOG && RLOG.rows) || []).map(r => ({...r, brand: vendorKeyFor(r.desc, words)}));
-  return logQueue(rows, POS, LOGMATCH, p => vendorKeyFor(vendorName(p), words), p => Math.max(onOrder(p) - storeRoomOf(p), 0));
+  const q = logQueue(rows, POS, LOGMATCH, p => vendorKeyFor(vendorName(p), words), p => Math.max(onOrder(p) - storeRoomOf(p), 0));
+  LOGQ = {key, q};
+  return q;
 }
+/** Whether this person may mark an order arrived by hand: before the receiving log is read, or as the owner's override. */
+const invoiceInAllowed = () => canAct() && (!logLive() || isAdmin);
 const logRow = key => ((RLOG && RLOG.rows) || []).find(r => r.key === key);
 async function putOrder(p, invoicesIn){
   const body = {...p, invoicesIn, updatedBy: myId, updatedAt: new Date().toISOString()};
   delete body.id; delete body.vendor;
   return write('pos/' + p.id, body);
 }
-/** Confirm a log row against an order: the order gets the row's invoice entry, and the call is kept. */
-async function confirmLogRow(key, poId){
-  const row = logRow(key), p = POS.find(x => x.id === poId); if (!row || !p || !canAct()) return false;
-  if (!(await putOrder(p, withLogEntry(p.invoicesIn, logEntry(row, p, myId))))) return false;
-  const ok = await write('logmatch/' + key, {state: 'matched', po: poId, amount: row.amount, date: row.date, invoice: row.invoice, by: myId, at: new Date().toISOString()});
-  if (ok) toast(`PO ${p.poNumber || poId}: ${money(row.amount)} arrived (invoice ${row.invoice || 'without a number'})`);
-  return ok;
+/* Log actions run one at a time on this page, so a quick run of Confirms on one order never races itself. */
+let logChain = Promise.resolve();
+const logAction = f => (logChain = logChain.then(f, f).then(r => { LOGQ_GEN++; return r; }));
+/** Confirm a log row against an order: the order gets the row's invoice entry (replacing a hand entry for the same
+    invoice number, and, if the person agrees, hand entries with no number), and the call is kept with what it replaced
+    so Undo can put it back. */
+function confirmLogRow(key, poId){
+  return logAction(async () => {
+    const row = logRow(key), p = POS.find(x => x.id === poId); if (!row || !p || !canAct()) return false;
+    const blank = (p.invoicesIn || []).filter(e => e && e.source === 'hand' && !String(e.invoice || '').trim());
+    const swap = blank.length && confirm(`PO ${p.poNumber || poId} was marked arrived by hand without an invoice number (${blank.map(e => dateLabel(e.date) + (e.amount != null ? ' ' + money(e.amount) : '')).join(', ')}). Replace that with this row from the receiving log?`);
+    const kept = swap ? (p.invoicesIn || []).filter(e => !blank.includes(e)) : (p.invoicesIn || []);
+    const next = withLogEntry(kept, logEntry(row, p, myId)), replaced = (p.invoicesIn || []).filter(e => !next.includes(e) && e.logKey !== key);
+    if (!(await putOrder(p, next))) return false;
+    const ok = await write('logmatch/' + key, {state: 'matched', po: poId, amount: row.amount, date: row.date, invoice: row.invoice, by: myId, at: new Date().toISOString(), ...(replaced.length ? {replaced} : {})});
+    if (ok) toast(`PO ${p.poNumber || poId}: ${money(row.amount)} arrived (invoice ${row.invoice || 'without a number'})`);
+    return ok;
+  });
 }
-async function markNotOrder(key){
-  if (!logRow(key) || !canAct()) return false;
-  return write('logmatch/' + key, {state: 'notorder', by: myId, at: new Date().toISOString()});
+function markNotOrder(key){
+  return logAction(async () => {
+    if (!logRow(key) || !canAct()) return false;
+    return write('logmatch/' + key, {state: 'notorder', by: myId, at: new Date().toISOString()});
+  });
 }
-/** Take back a call on a row: a match comes off its order; the row goes back to the list. */
-async function undoLogRow(key){
-  const d = LOGMATCH[key]; if (!d || !canAct()) return false;
-  if (d.state === 'matched'){
-    const p = POS.find(x => x.id === d.po);
-    if (p && !(await putOrder(p, withoutLogEntry(p.invoicesIn, key)))) return false;
-  }
-  return write('logmatch/' + key, null);
+/** Take back a call on a row: its entry comes off the order (or orders) carrying it, any hand entry it replaced comes
+    back, and the row returns to the list. */
+function undoLogRow(key, onlyPo){
+  return logAction(async () => {
+    if (!canAct()) return false;
+    const d = LOGMATCH[key];
+    for (const p of POS.filter(x => (x.invoicesIn || []).some(e => e && e.logKey === key) && (!onlyPo || x.id === onlyPo))){
+      const back = d && d.state === 'matched' && d.po === p.id ? (d.replaced || []) : [];
+      if (!(await putOrder(p, withoutLogEntry(p.invoicesIn, key).concat(back)))) return false;
+    }
+    if (onlyPo && POS.some(x => (x.invoicesIn || []).some(e => e && e.logKey === key))) return true;   // still on another order
+    return d ? write('logmatch/' + key, null) : true;
+  });
 }
 /* Opening Orders & receiving asks the server to read the log again (it reads at most every two minutes); the copy
    arrives with the next poll. */
@@ -116,7 +144,7 @@ document.addEventListener('click', async e => {
   b.disabled = true;
   if (b.dataset.logok){ const [key, po] = b.dataset.logok.split('|'); await confirmLogRow(key, po); }
   else if (b.dataset.lognot) await markNotOrder(b.dataset.lognot);
-  else await undoLogRow(b.dataset.logundo);
+  else { const [key, po] = b.dataset.logundo.split('|'); await undoLogRow(key, po || null); }
   b.disabled = false;
 });
 
@@ -152,8 +180,8 @@ function rcvRows(){
 }
 // Once the receiving log is read, arrivals come from it: staff no longer mark them by hand; the owner keeps the
 // button as an override for a shipment the log hasn't caught up with.
-const rcvBtns = p => !canAct() ? '' : !logLive() ? `<button class="btn sm" type="button" data-invin="${esc(p.id)}">Invoice in</button>`
-  : isAdmin ? `<button class="btn ghost sm" type="button" data-invin="${esc(p.id)}" title="Mark it arrived by hand: for a shipment the receiving log doesn't show yet">Override</button>` : '';
+const rcvBtns = p => !invoiceInAllowed() ? '' : !logLive() ? `<button class="btn sm" type="button" data-invin="${esc(p.id)}">Invoice in</button>`
+  : `<button class="btn ghost sm" type="button" data-invin="${esc(p.id)}" title="Mark it arrived by hand: for a shipment the receiving log doesn't show yet">Override</button>`;
 function rcvTable(rows, kind){
   const head = kind === 'arrived' ? '<th>Order</th><th class="r">Days waiting</th><th class="r">Arrived</th><th>Trail</th><th></th>' : '<th>Order</th><th>Expected</th><th class="r">Still to come</th><th></th>';
   return `<div class="tbl"><table class="mini rt" style="min-width:0"><thead><tr>${head}</tr></thead><tbody class="click">${rows.map(({p, inv, arrived, days}) => {
@@ -197,8 +225,11 @@ function logMatchHtml(q){
   const toMatch = q.toMatch.length ? `<div class="tbl"><table class="mini rt" style="min-width:0"><thead><tr><th>Date</th><th>From the log</th><th>Invoice</th><th class="r">Amount</th><th>Order</th></tr></thead><tbody>${q.toMatch.map(({row, cands}) =>
     `<tr>${logRowCells(row)}<td data-l="Order">${poLabel(cands[0])}${act ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn primary sm" type="button" data-logok="${esc(row.key)}|${esc(cands[0].id)}">Confirm</button>${cands.slice(1).map(p => `<button class="btn sm" type="button" data-logok="${esc(row.key)}|${esc(p.id)}" title="${poLabel(p)}">Pick PO ${esc(p.poNumber || p.id)}</button>`).join('')}<button class="btn ghost sm" type="button" data-lognot="${esc(row.key)}">Not an order</button></div>` : ''}</td></tr>`).join('')}</tbody></table></div>`
     : '<div class="note">Nothing to match: every row in the log is matched or isn\'t from an order.</div>';
-  const changed = q.changed.length ? `<section class="panel"><header><h2>Changed in the log</h2><span class="lab">${q.changed.length}</span></header><div class="note">These rows were matched, then changed or removed in the receiving log. Check the order and undo the match if it no longer applies.</div>
-    <ul class="items">${q.changed.map(c => { const p = POS.find(x => x.id === c.po); return `<li class="item warn"><div class="stripe"></div><div class="body"><div class="t">${p ? poLabel(p) : esc(c.po)}</div></div>${act ? `<button class="btn sm" type="button" data-logundo="${esc(c.key)}">Undo the match</button>` : ''}</li>`; }).join('')}</ul></section>` : '';
+  const was = (key, poId) => { const p = POS.find(x => x.id === poId), e = p && (p.invoicesIn || []).find(x => x && x.logKey === key), d = LOGMATCH[key] || {};
+    const src = e || d; return `${p ? `PO ${esc(p.poNumber || p.id)} · ${esc(vendorName(p))}` : esc(poId)}: ${src.date ? dateLabel(src.date) : ''}${src.invoice ? ` · invoice ${esc(src.invoice)}` : ''}${src.amount != null ? ` · ${money(src.amount)}` : ''}`; };
+  const fixes = q.changed.map(c => ({...c, why: 'changed or removed in the log'})).concat(q.twice.flatMap(t => t.pos.map(po => ({key: t.key, po, why: 'matched to more than one order'}))));
+  const changed = fixes.length ? `<section class="panel"><header><h2>Check these matches</h2><span class="lab">${fixes.length}</span></header><div class="note">A matched row that was changed or removed in the receiving log, or one matched to two orders. Undo the match that no longer applies, then match the corrected row.</div>
+    <ul class="items">${fixes.map(c => `<li class="item warn"><div class="stripe"></div><div class="body"><div class="t">${was(c.key, c.po)}</div><div class="d">${c.why}</div></div>${act ? `<button class="btn sm" type="button" data-logundo="${esc(c.key)}|${esc(c.po)}">Undo this match</button>` : ''}</li>`).join('')}</ul></section>` : '';
   const not = q.notOrder.length ? `<details class="panel" style="padding:12px 16px"><summary><b>Not from an order</b> · ${q.notOrder.length} row${q.notOrder.length === 1 ? '' : 's'}: reorders, special orders and anything else not in the order book. Nothing to do.</summary>
     <div class="tbl"><table class="mini rt" style="min-width:0"><tbody>${q.notOrder.map(({row, why}) => { const d = LOGMATCH[row.key];
       return `<tr>${logRowCells(row)}<td>${why === 'marked' ? `marked by ${who(d && d.by)}${act ? ` <button class="btn ghost sm" type="button" data-logundo="${esc(row.key)}">Undo</button>` : ''}` : '<span class="faint">no open order matches</span>'}</td></tr>`; }).join('')}</tbody></table></div></details>` : '';

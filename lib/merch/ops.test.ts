@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 // merchandise/app/src/18-ops.js is plain browser JS joined into the page. It is pure, so it runs here as it is.
 const src = readFileSync(path.join(process.cwd(), "merchandise/app/src/18-ops.js"), "utf8");
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots, makeInvoiceEntry, liveInvoices, storeRoomValue, seasonMonths, seasonList, seasonBuys, orderDateISO, posDates, logCandidates, logQueue, vendorKeyFor, logEntry, withLogEntry, withoutLogEntry})");
+const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots, makeInvoiceEntry, liveInvoices, storeRoomValue, seasonMonths, seasonList, seasonBuys, orderDateISO, posDates, logCandidates, logQueue, vendorKeyFor, logEntry, withLogEntry, withoutLogEntry, mergeInvoices})");
 
 describe("arrivedValue", () => {
   it("sums amounts, counts an amountless entry as the whole order, caps and floors", () => {
@@ -317,5 +317,43 @@ describe("receiving log entries on an order", () => {
     const e = O.logEntry({ ...ROW, date: "2026-12-01" }, PO, "ian");
     expect(O.liveInvoices([e], "2026-12-15T00:00:00Z").entries).toEqual([]);
     expect(O.liveInvoices([O.logEntry(ROW, PO, "ian")], "2026-12-15T00:00:00Z").entries.length).toBe(1);
+  });
+});
+
+describe("receiving log review fixes", () => {
+  const WORDS = { footjoy: ["fj", "footjoy"] };
+  const vk = (p: { vendor: string }) => O.vendorKeyFor(p.vendor, WORDS);
+  const openOf = (p: { open: number }) => p.open;
+  const row = (key: string, date: string, amount: number) => ({ key, brand: "footjoy", date, amount, credit: false, desc: "FJ", invoice: key, tab: "T", special: false });
+  it("two people's entries on one order both survive a save conflict", () => {
+    const a = { logKey: "r1", date: "2027-01-02", amount: 100, at: "2027-01-02T00:00:00Z" };
+    const b = { logKey: "r2", date: "2027-01-03", amount: 200, at: "2027-01-03T00:00:00Z" };
+    const h = { source: "hand", date: "2027-01-01", at: "2027-01-01T09:00:00Z" };
+    expect(O.mergeInvoices([h], [h, a], [h, b]).map((e: { logKey?: string; source?: string }) => e.logKey || e.source)).toEqual(["hand", "r2", "r1"]);
+    // an entry we removed (undo) stays removed; one they removed stays removed
+    expect(O.mergeInvoices([h, a], [h], [h, a, b]).map((e: { logKey?: string; source?: string }) => e.logKey || e.source)).toEqual(["hand", "r2"]);
+  });
+  it("a row is matched when an order carries its entry, even if the call wasn't saved", () => {
+    const orders = [{ id: "fj1", vendor: "FootJoy", status: "open", deliveryMonth: "2027-01", open: 900, invoicesIn: [{ logKey: "r1" }] }];
+    const q = O.logQueue([row("r1", "2027-01-05", 100)], orders, {}, vk, openOf);
+    expect(q.matched.map((x: { po: string }) => x.po)).toEqual(["fj1"]);
+  });
+  it("a row carried by two orders is flagged", () => {
+    const orders = [{ id: "fj1", vendor: "FootJoy", status: "open", deliveryMonth: "2027-01", open: 900, invoicesIn: [{ logKey: "r1" }] },
+                    { id: "fj2", vendor: "FootJoy", status: "open", deliveryMonth: "2027-01", open: 900, invoicesIn: [{ logKey: "r1" }] }];
+    const q = O.logQueue([row("r1", "2027-01-05", 100)], orders, {}, vk, openOf);
+    expect(q.twice).toEqual([{ key: "r1", pos: ["fj1", "fj2"] }]);
+  });
+  it("a late order is a candidate however late it is", () => {
+    const orders = [{ id: "late", vendor: "FootJoy", status: "open", deliveryMonth: "2026-09", open: 900 }];
+    expect(O.logCandidates(row("r1", "2027-01-05", 100), orders, vk, openOf).map((p: { id: string }) => p.id)).toEqual(["late"]);
+  });
+  it("matching stays fast with a season of rows", () => {
+    const orders = Array.from({ length: 300 }, (_, i) => ({ id: "o" + i, vendor: ["FootJoy", "Peter Millar", "Imperial", "Adidas"][i % 4], status: "open", deliveryMonth: "2027-0" + (1 + (i % 8)), open: 5000 }));
+    const rows = Array.from({ length: 600 }, (_, i) => ({ ...row("r" + i, "2027-0" + (1 + (i % 8)) + "-10", 9000), desc: "Shirts FJ Mens Stock" }));
+    const words = { footjoy: ["fj"], "peter millar": ["peter millar"], imperial: ["imperial"], adidas: ["adidas"] };
+    const t0 = Date.now();
+    O.logQueue(rows, orders, {}, (p: { vendor: string }) => O.vendorKeyFor(p.vendor, words), openOf);
+    expect(Date.now() - t0).toBeLessThan(300);
   });
 });
