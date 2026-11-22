@@ -5,7 +5,8 @@ import vm from "node:vm";
 // The whole Merchandise page (merchandise/app/src, every file but 90-io.js, which talks to the database and the DOM's
 // events) in a vm, with a stubbed DOM and a fixed "today", loaded with the documents a test gives. Returns an
 // evaluator: R(expr) runs expr in the page's scope.
-//   docs: {base, assort, inv, guide, pos, today}  (all optional; no base = before the first upload)
+//   docs: {base, assort, inv, guide, pos, today, storage}  (all optional; no base = before the first upload;
+//   storage = what this browser had saved, e.g. {'ob.month': '2026-12'})
 // The #pane stub keeps the last HTML a page rendered in document.__html.
 
 const DIR = path.join(process.cwd(), "merchandise/app/src");
@@ -19,7 +20,7 @@ const __pane = __el(); __pane.__pane = true;
 const document = {__html: '', addEventListener(){}, querySelector(s){ return s === '#pane' ? __pane : null; }, querySelectorAll(){ return []; },
   createElement(){ return __el(); }, body: __el(), documentElement: __el(), hidden: false};
 const window = {addEventListener(){}, scrollY: 0, scrollTo(){}};
-const localStorage = {getItem: () => null, setItem(){}};
+const localStorage = {getItem: k => (__docs.storage || {})[k] ?? null, setItem(){}};
 const location = {hash: ''}; const history = {pushState(){}, replaceState(){}};
 const navigator = {}; function matchMedia(){ return {matches: false}; }
 function addEventListener(){} function setInterval(){} function setTimeout(){} function requestAnimationFrame(){}
@@ -27,7 +28,7 @@ class MutationObserver { observe(){} } class ResizeObserver { observe(){} } clas
 `;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Docs = { base?: any; assort?: any; inv?: any; guide?: any; pos?: any[]; today?: string };
+type Docs = { base?: any; assort?: any; inv?: any; guide?: any; pos?: any[]; today?: string; storage?: Record<string, string> };
 
 export function loadPage(docs: Docs = {}): (expr: string) => unknown {
   const today = docs.today || "2026-11-22";

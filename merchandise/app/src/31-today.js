@@ -44,9 +44,10 @@ function todayDue(){
     upload. Each is plain text; the page links each to its page. */
 function homeLines(S){
   if (!S || !BASE || !PLANS.cur) return null;
-  const R = todayRoom(), buy = PAGE_VERDICT.overview(S);
+  // Home always describes this fiscal year, whichever year the Budget page is showing
+  const R = todayRoom(), buy = withPlan('cur', () => PAGE_VERDICT.overview(stats()));
   let due = 0, late = 0, inRoom = 0, roomV = 0;
-  for (const p of POS){ const st = rcvOf(p); if (st === 'due') due++; else if (st === 'late') late++; else if (st === 'arrived'){ inRoom++; roomV += storeRoomValue(p); } }
+  for (const p of POS){ const st = rcvOf(p); if (st === 'due') due++; else if (st === 'late') late++; else if (st === 'arrived'){ inRoom++; roomV += storeRoomOf(p); } }
   const arr = [due ? `${due} order${due === 1 ? '' : 's'} due this month` : 'nothing due this month', late ? `${late} late` : '', inRoom ? `${inRoom} in the store room (${money(roomV)}), not in Jonas yet` : ''].filter(Boolean);
   const a = anaNow(), s = a && a.shop;
   const selling = s ? `${moneyK(s.t12)} sold in the last 12 months${s.growth == null ? '' : `, ${s.growth >= 0 ? 'up' : 'down'} ${Math.abs(Math.round(s.growth * 100))}% on a year earlier`}; margin ${aPct(s.gm)}${grade('gm', s.gm, SHOPSEG) === 'bad' ? ', below the guideline' : ''}.`

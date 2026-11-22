@@ -365,6 +365,33 @@
    "orderDate": "2026-10-15",
    "cost": 3000,
    "lines": []
+  },
+  {
+   "id": "po-arrived",
+   "status": "open",
+   "cat": "620",
+   "deliveryMonth": "2026-12",
+   "orderDate": "2026-09-20",
+   "cost": 1600,
+   "lines": [],
+   "invoicesIn": [
+    {
+     "date": "2026-11-10",
+     "amount": 800,
+     "at": "2026-11-10T18:00:00Z",
+     "by": "staff@example.com",
+     "source": "hand"
+    }
+   ]
+  },
+  {
+   "id": "po-due",
+   "status": "open",
+   "cat": "200",
+   "deliveryMonth": "2026-11",
+   "orderDate": "2026-10-01",
+   "cost": 900,
+   "lines": []
   }
  ]
 }

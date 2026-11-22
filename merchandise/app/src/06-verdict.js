@@ -5,16 +5,19 @@
    They read page globals only when called, so this file loads before the rest. Rendered by renderSide (30-home.js). */
 const vd = (tone, text) => ({tone, text});
 const vdPlural = (n, one, many) => `${n} ${n === 1 ? one : many || one + 's'}`;
+/* dollars of an order waiting in the store room: its live invoice entries, as Receiving counts them (77-receiving.js) */
+const storeRoomOf = p => { const L = rcvLive(p); return storeRoomValue(L.entries, poTotal(p), num(p.received)); };
 const PAGE_VERDICT = {
   // Home's own three lines (homeLines, 31-today.js) are its verdict; a header line would repeat the first.
   today: () => null,
+  // The year the page shows (PLAN: this year or next); its whole-year Left to buy whatever month is picked.
   overview(S){
-    if (!S || !BASE || !PLANS.cur) return null;
-    const left = leftToBuyWith(assumptions());
-    const room = otbCats().map(c => [c, seasonBudget(c) - S.cm(c, LAST())]).sort((a, b) => b[1] - a[1])[0];
-    const big = room && room[1] > 0.5 ? ` Most room: ${PLANS.cur.cats[room[0]].name} ${money(room[1])}.` : '';
-    return left < -0.5 ? vd('act', `${PLANS.cur.fy} is ${money(-left)} over budget after what's committed.${big}`)
-      : vd('ok', `You can still buy ${money(left)} in ${PLANS.cur.fy}.${big}`);
+    if (!S || !BASE || !PLAN || !PLAN.cats) return null;
+    const cats = otbCats(), left = sum(cats, c => seasonBudget(c) - S.cm(c, LAST()));
+    const room = cats.map(c => [c, seasonBudget(c) - S.cm(c, LAST())]).sort((a, b) => b[1] - a[1])[0];
+    const big = room && room[1] > 0.5 ? ` Most room: ${PLAN.cats[room[0]].name} ${money(room[1])}.` : '';
+    return left < -0.5 ? vd('act', `${PLAN.fy} is ${money(-left)} over budget after what's committed.${big}`)
+      : vd('ok', `You can still buy ${money(left)} in ${PLAN.fy}.${big}`);
   },
   orders(S){
     if (!S) return null;
@@ -27,7 +30,7 @@ const PAGE_VERDICT = {
   receiving(S){
     if (!S) return null;
     let arrived = 0, n = 0;
-    for (const p of POS){ if (rcvOf(p) === 'arrived'){ n++; arrived += storeRoomValue(p); } }
+    for (const p of POS){ if (rcvOf(p) === 'arrived'){ n++; arrived += storeRoomOf(p); } }
     const late = POS.filter(p => isOpen(p) && rcvOf(p) === 'late').length;
     if (n) return vd('watch', `${vdPlural(n, 'order')} (${money(arrived)}) arrived but not in Jonas yet${late ? `; ${late} late` : ''}.`);
     return late ? vd('act', `${vdPlural(late, 'order')} late; nothing waiting to go into Jonas.`) : vd('ok', 'Nothing waiting to go into Jonas, and nothing late.');

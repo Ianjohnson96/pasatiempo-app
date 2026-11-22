@@ -17,7 +17,7 @@ function anaNow(){
   if (ANA && BASE && ENG) for (const c of ANA.cats){
     if (c.wksLY === undefined){ c.wksLY = c.wks; c.cogsWkLY = c.cogsWk; }
     const f = fwdWeeklyCost(c.cat);
-    c.cogsWk = f > 0 ? f : c.cogsWkLY;
+    c.cogsWk = f > 0 ? f : null;   // no forecast ahead: no weeks, and no weeks target in dollars (stuckMoney)
     c.wks = f > 0 ? c.oh / f : null;
   }
   return ANA;

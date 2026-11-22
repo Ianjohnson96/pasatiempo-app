@@ -211,7 +211,7 @@ function seasonality(ana){
 }
 
 // Stock needed for the top of the category role's weeks range at the last year's pace (16 weeks for apparel); none for the demo fleet.
-const targetWks = M => { const r = roleOf(M.cat); return r.wks ? M.cogsWk * r.wks[1] : null; };
+const targetWks = M => { const r = roleOf(M.cat); return r.wks && M.cogsWk != null ? M.cogsWk * r.wks[1] : null; };
 /** Stock over target, aged stock, markdown candidates and lines to reorder. Subcategory level. */
 function stuckMoney(ana){
   const subs = ana.cats.flatMap(c => c.subs);

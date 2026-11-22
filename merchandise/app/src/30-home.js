@@ -99,11 +99,15 @@ function sideBadges(S){
   if (!S) return b;
   // One count failing (a page's data still loading) must not take the whole sidebar with it.
   const put = (id, f) => { try { const v = f(); if (v) b[id] = v; } catch (e){ console.error('Sidebar count for ' + id + ' failed', e); } };
-  put('orders', () => { const n = POS.filter(p => isOpen(p) && (rowFlag(p) === 'flag-crit' || (p.deliveryMonth && p.deliveryMonth < THIS_MONTH))).length; return n ? [n, 'hot'] : null; });
-  put('receiving', () => {
-    let n = 0, late = false;
-    for (const p of POS){ const st = rcvOf(p); if (st === 'arrived' || st === 'late'){ n++; if (st === 'late') late = true; } }
-    return n ? [n, late ? 'hot' : ''] : null;
+  // Orders & receiving: each open order that needs a look counts once (a problem, past its month, or in the store room).
+  put('orders', () => {
+    let n = 0, hot = false;
+    for (const p of POS){
+      if (!isOpen(p)) continue;
+      const st = rcvOf(p), bad = rowFlag(p) === 'flag-crit' || (p.deliveryMonth && p.deliveryMonth < THIS_MONTH) || st === 'late';
+      if (bad || st === 'arrived'){ n++; if (bad) hot = true; }
+    }
+    return n ? [n, hot ? 'hot' : ''] : null;
   });
   put('attention', () => { const n = openAttention(S).filter(i => i.sev === 'crit').length; return n ? [n, 'hot'] : null; });
   put('monthend', () => {
