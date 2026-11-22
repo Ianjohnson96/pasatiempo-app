@@ -120,6 +120,8 @@ describe("mix and suggestions", () => {
   it("suggested total is cost of sales over the turns target", () => {
     expect(X.suggestedTotal([{ cat: "480", t12: 1000, gm: 0.4 }, { cat: "640", t12: 5000, gm: 0.1 }], 2.5)).toBe(240);
     expect(X.suggestedTotal([], 2.5)).toBe(0);
+    // special orders need no shelf stock: only the shelf part of sales counts, as in the budget
+    expect(X.suggestedTotal([{ cat: "200", t12: 1000, so: 600, gm: 0.2 }], 2)).toBe(160);
   });
 
   const onHand = { fashion: 223463, impulse: 299966, hardgoods: 111568, consumable: 40230, demo: 10125 };

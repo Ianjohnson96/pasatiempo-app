@@ -148,8 +148,10 @@ function seasonMonths(season, firsts = SEASON_FIRSTS) {
  * before the season began is "prebooked", one placed during or after it a "reorder" (isPrebook).
  * seasonList: the seasons that have orders, current first, then coming, then past (latest first).
  */
-function seasonList(rows, thisMonth) {
+// keep: months whose seasons are listed even with nothing on order (the season under way, whose room still counts).
+function seasonList(rows, thisMonth, keep = []) {
   const m = new Map();
+  for (const k of keep) { const s = seasonOf(k); if (s) m.set(s.key + s.year, s); }
   for (const r of rows) {
     if (r.cat === "640" || !(Number(r.amount) > 0)) continue;
     const s = seasonOf(r.month);

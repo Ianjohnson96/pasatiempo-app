@@ -250,18 +250,19 @@ let GW = {};
 const gdWosNow = c => assumptions().wos[c];
 function gdBudget(){
   if (!BASE) return gdCard('Target weeks of supply', '', '<div class="empty"><p>The budget loads after the first month-end upload.</p></div>');
-  const owner = gdOwner(), sug = (BASE.defaults || {}).wos || {};
+  const owner = gdOwner(), sug = (BASE.defaults || {}).wos || {}, PC = PLANS.cur || {}, linked = !!mixLinkTxt(PC);
   const codes = BASE.order.filter(c => !(BASE.exclude || ['640']).includes(c));
   const rows = codes.map(c => {
     const v = c in GW ? GW[c] : gdWosNow(c), changed = v !== sug[c], wk = wksNow(c, num(BASE.cats[c].onHand));
-    const input = owner ? `<input class="gd-in num" data-gdwos="${c}" inputmode="decimal" value="${v}" aria-label="Target weeks for ${esc(BASE.cats[c].name)}"><span class="gd-u">wks</span>` : `<span class="num">${v} wks</span>`;
+    const eff = linked ? `<div class="faint" style="flex-basis:100%;font-size:12px;margin-top:2px" title="The weeks the budget uses: your weeks × ${PC.scale.toFixed(2)}">${wosNum(v * PC.scale)} wks in the budget</div>` : '';
+    const input = (owner ? `<input class="gd-in num" data-gdwos="${c}" inputmode="decimal" value="${v}" aria-label="Target weeks for ${esc(BASE.cats[c].name)}"><span class="gd-u">wks</span>` : `<span class="num">${v} wks</span>`) + eff;
     return `<div class="gd-row${changed ? ' changed' : ''}${c in GW ? ' pending' : ''}"><div class="gd-what"><b>${c} ${esc(BASE.cats[c].name)}</b><span>On hand ${money(num(BASE.cats[c].onHand))}</span></div>
       <div class="gd-sug"><b class="num">${sug[c] == null ? '—' : sug[c] + ' wks'}</b><span>program default</span></div>
       <div class="gd-now num">${wk == null ? '—' : Math.round(wk) + ' wks'}</div><div class="gd-val">${input}</div>
       <div>${owner && changed ? `<button type="button" class="btn ghost sm" data-gdwosreset="${c}">Reset to ${sug[c]}</button>` : ''}</div></div>`;
   }).join('');
   return gdCard('Target weeks of supply', 'How much stock the budget plans to end each month with. Changing it moves open-to-buy.', gdHead('Category', 'Suggested', 'Weeks now', 'Pasatiempo') + rows
-    + '<div class="note">Nothing changes in the budget until you look at the effect and press Save to the budget.</div>') + gdBudgetPreview();
+    + `<div class="note">${linked ? esc(mixLinkTxt(PC)) + ' With the total fixed, changing one category\'s weeks moves budget between categories rather than adding to it. ' : ''}Nothing changes in the budget until you look at the effect and press Save to the budget.</div>`) + gdBudgetPreview();
 }
 /** Left to buy by month, now and with the unsaved weeks: the Budget page's figure (budget less committed) plus the
     change in the plan the engine gives. */

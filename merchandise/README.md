@@ -93,6 +93,7 @@ Fiscal year: May 1 – Apr 30. Sales are at retail. Stock and budgets are at cos
 - **Shelf sales** = sales less special orders. Budgets count shelf sales and shelf stock only (see Special orders below).
 - **Cost of sales** = shelf sales × (1 − realized margin from the cost & margin report).
 - **Target end-of-month stock** = target weeks × (next four months' cost of shelf sales) ÷ 17.3. Opening stock is on hand less special-order stock.
+- **Linked to the mix total.** While the owner has a total stock to plan for saved (Guidelines → Merchandise mix, `guidelines/current` `mix.total`), every budgeted category's target weeks are multiplied by one factor so that target month-end stock, averaged over the first 12 months the engine plans, equals that total (`mixScale` in `20-engine.js`, `mix_scale` in `engine.py`). Turns are a year's cost of sales over average stock and the suggested total is that cost over the turns target, so the budget and the mix then agree. Typed weeks set how the total splits between categories. With no total saved the factor is 1. Unsaved edits don't move the budget; the month-end upload sends the saved total (`config.mix_total`), and Update brands reads it from `guidelines/current`.
 - **OTB for a month** = target EOM − opening stock + cost of sales. In the current month, cost of sales covers only the part not yet sold.
 - **Next year's opening stock** = this year's April target + carry. Carry = max(this year's budget with changes, committed, 0) − this year's plan budget.
 - Special Orders (640) count in sales but never get a budget.
@@ -162,7 +163,7 @@ The receiving log, an Excel spreadsheet, will later write the same `invoicesIn` 
 
 - **Committed** is the cost of what is on order for delivery in the season plus goods already received. It comes from the same ledger as the Budget page, and a received delivery counts in the month it arrived.
 - **Prebooked** is an order placed before the season began. **Reorders** are orders placed during or after the season. **Order date unknown** is an order whose order date the program cannot read; open it on Orders and fix it.
-- **Held back** is the Budget page's Month by month grid's Left to buy summed over the season's months, so it matches that page. If the season runs past the end of the budget, only the months inside it count, and the page says so.
+- **Held back** is the Budget page's Month by month grid's Left to buy summed over the season's months, so it matches that page. The season under way is always listed, even with nothing on order, so the seasons' held back adds up to the year's Left to buy. If the season runs past the end of the budget, only the months inside it count, and the page says so.
 - Special Orders (640) are left out. Anything outside the budget categories shows on an Other row.
 - A chart shows committed by month (prebooked, reorders, unknown), with tables by category and by brand. Clicking a month opens that month on Budget & open-to-buy.
 
@@ -179,9 +180,11 @@ it misses) and **Pasatiempo** (the owner's value). Only the owner changes them; 
 - **Budget inputs** — target weeks of supply per category. An edit shows Left to buy by month now and with the change
   (the budget engine run twice, `wosPreview` in `19-guides.js`); **Save to the budget** writes only the changed
   categories into `plan/assumptions.wos`, the same document the Forecast page saves growth to.
-- **Merchandise mix** — a total stock to plan for (typed, the suggested cost of 12-month sales ÷ the turns target, or
-  today's on hand) and each role's target range in percent; each role shows its dollars short or over. A role out of
-  range adds a To do item.
+- **Merchandise mix** — a total stock to plan for (typed, the suggested cost of 12-month shelf sales ÷ the turns target,
+  or today's shelf stock) and each role's target range in percent; each role shows its dollars short or over. A role out
+  of range adds a To do item. Stock here is shelf stock at cost, as the budget counts it (special orders left out). A
+  saved total links the budget to it (see The model): the tab shows the factor on target weeks, the average target
+  stock and the year's Left to buy, and Budget inputs shows each category's weeks as the budget uses them.
 - **Seasons & discount** — the season months (saved as one set, in calendar order from January) and the member discount.
 - **Change history** — who changed what and why (newest 200).
 

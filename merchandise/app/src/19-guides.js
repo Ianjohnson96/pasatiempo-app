@@ -35,11 +35,13 @@ function suggestedRanges(shares){
   return out;
 }
 
-/** Stock the last 12 months' sales support: their cost (t12 × (1 − margin)) divided by the turns target. */
+/** Shelf stock the last 12 months' sales support: the cost of their shelf part ((t12 − special orders) × (1 − margin))
+    divided by the turns target. Special orders are bought when a customer orders, so, as in the budget, they need no
+    shelf stock. */
 function suggestedTotal(rows, turnsMid){
   if (!(turnsMid > 0)) return 0;
   let cost = 0;
-  for (const r of rows || []) if (r && r.cat && r.cat !== '640') cost += Math.max(0, Number(r.t12) || 0) * (1 - (Number(r.gm) || 0));
+  for (const r of rows || []) if (r && r.cat && r.cat !== '640') cost += Math.max(0, (Number(r.t12) || 0) - (Number(r.so) || 0)) * (1 - (Number(r.gm) || 0));
   return Math.round(cost / turnsMid);
 }
 

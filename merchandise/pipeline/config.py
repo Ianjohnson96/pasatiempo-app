@@ -39,6 +39,12 @@ def guided(g):
             md = float(v)
     return role_of, md
 
+def mix_total(g):
+    """The owner's saved total stock to plan for (guidelines/current mix.total), which links the budget's target weeks
+    (engine.mix_scale); None when none is saved or it isn't a positive amount."""
+    t = ((g or {}).get('mix') or {}).get('total') if isinstance(g, dict) else None
+    return float(t) if isinstance(t, (int, float)) and not isinstance(t, bool) and 0 < t <= 1e9 else None
+
 # Target weeks of supply at cost for end-of-month inventory.
 TARGET_WOS = {'620': 14, '440': 13, '480': 10, '490': 11, '400': 10, '200': 14, '500': 12, '470': 12, '160': 14,
               '640': 10, '320': 13, '350': 14, '300': 14, '660': 10, '220': 10, '430': 12}

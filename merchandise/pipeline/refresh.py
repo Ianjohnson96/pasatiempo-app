@@ -22,7 +22,7 @@ import exports
 import model
 import parse
 import receipts
-from config import CATS, OTB_EXCLUDE, REPLENISH, guided
+from config import CATS, OTB_EXCLUDE, REPLENISH, guided, mix_total
 from extract import SHEETS, detect_kind, is_sheet, pdf_text, rows_text, sheet_rows
 
 # plan/assumptions keys the refresh reads: growth by fiscal year (or the older g27/g27cat/g28) and target weeks
@@ -212,7 +212,8 @@ def rebuild_brands(docs):
     ctx = model.rebuild_ctx(docs)
     model.special_budget(ctx)
     base = ctx['base']
-    calls, _ = category_calls(base, {k: v for k, v in (docs.get('plan/assumptions') or {}).items() if k in ASSUME_KEYS})
+    calls, _ = category_calls(base, {k: v for k, v in (docs.get('plan/assumptions') or {}).items() if k in ASSUME_KEYS},
+                              mix_total(docs.get('guidelines/current')))
     for c, k in calls.items():
         base['cats'][c]['call'] = k
     brands, bskus, assort = model.build_brands(ctx), model.brand_skus(ctx), model.build_subcats(ctx)
@@ -262,8 +263,9 @@ def warnings(reports, prior, summary):
     return out
 
 
-def category_calls(base, a=None):
-    r = engine.run(base, a)
+def category_calls(base, a=None, mix=None):
+    """mix: the saved total stock to plan for (config.mix_total), which the budget's target weeks are linked to."""
+    r = engine.run(base, a, None, mix)
     calls = {}
     for c, v in base['cats'].items():
         if c in OTB_EXCLUDE:
@@ -274,28 +276,28 @@ def category_calls(base, a=None):
         calls[c] = 'stop' if otb < 0 else 'replenish' if c in REPLENISH or otb < cogs * 0.1 else 'buy'
     # an overbought category carries its excess into next year (orders beyond budget are added in the app)
     carry = {c: max(-engine.totals(r, [c], r['m27']), 0) for c in base['cats'] if c not in OTB_EXCLUDE}
-    return calls, engine.run(base, a, carry)
+    return calls, engine.run(base, a, carry, mix)
 
 
 def build_bundle(reports, prior=None, notes=None, guidelines=None):
     """Run the month-end refresh. Returns (docs, bundle, summary): docs by file name, the data file the
     club app loads (More -> Load month-end data), and the headline numbers. guidelines: the owner's saved role map
-    and member discount (config.guided), used for this run only."""
+    and member discount (config.guided) and mix total (config.mix_total), used for this run only."""
     model.use_guidelines(*guided(guidelines))
     try:
-        return _build_bundle(reports, prior, notes)
+        return _build_bundle(reports, prior, notes, mix_total(guidelines))
     finally:
         model.use_guidelines(*guided(None))
 
 
-def _build_bundle(reports, prior=None, notes=None):
+def _build_bundle(reports, prior=None, notes=None, mix=None):
     if not reports.get('sku_analysis'):
         raise ValueError('No SKU Analysis among the reports. It is needed for on-hand stock and unit sales.')
     notes = notes or []
     built = model.build(reports, prior)
     base = built['base']
     assume = (prior or {}).get('assumptions')
-    calls, r = category_calls(base, assume)
+    calls, r = category_calls(base, assume, mix)
     for c, k in calls.items():
         base['cats'][c]['call'] = k
     insights = model.build_insights(built['ctx'], calls)
