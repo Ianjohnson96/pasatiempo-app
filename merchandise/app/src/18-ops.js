@@ -234,3 +234,17 @@ function logQueue(rows, orders, decisions, vendorKeyOf, openOf) {
   for (const [key, d] of Object.entries(decisions || {})) if (d && d.state === 'matched' && !have.has(key)) out.changed.push({key, po: d.po});
   return out;
 }
+
+/** The invoice entry a confirmed log row puts on its order. `at` is the row's own date, so a row dated before the
+    order was cleared from the store-room list stays cleared (liveInvoices). */
+function logEntry(row, po, by) {
+  return {date: row.date, amount: row.amount, invoice: row.invoice, note: row.desc, source: 'log', logKey: row.key, by,
+    at: row.date + 'T00:00:00Z', rcvd: Math.max(0, Number(po && po.received) || 0)};
+}
+/** An order's entries with this log row's: one entry per row (a second confirm replaces it), and a hand entry for the
+    same invoice number is replaced rather than counted twice. */
+function withLogEntry(invoicesIn, entry) {
+  const inv = String(entry.invoice || '').trim();
+  return (invoicesIn || []).filter(e => e && e.logKey !== entry.logKey && !(e.source === 'hand' && inv && String(e.invoice || '').trim() === inv)).concat([entry]);
+}
+const withoutLogEntry = (invoicesIn, logKey) => (invoicesIn || []).filter(e => e && e.logKey !== logKey);

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 // merchandise/app/src/18-ops.js is plain browser JS joined into the page. It is pure, so it runs here as it is.
 const src = readFileSync(path.join(process.cwd(), "merchandise/app/src/18-ops.js"), "utf8");
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots, makeInvoiceEntry, liveInvoices, storeRoomValue, seasonMonths, seasonList, seasonBuys, orderDateISO, posDates, logCandidates, logQueue, vendorKeyFor})");
+const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots, makeInvoiceEntry, liveInvoices, storeRoomValue, seasonMonths, seasonList, seasonBuys, orderDateISO, posDates, logCandidates, logQueue, vendorKeyFor, logEntry, withLogEntry, withoutLogEntry})");
 
 describe("arrivedValue", () => {
   it("sums amounts, counts an amountless entry as the whole order, caps and floors", () => {
@@ -297,5 +297,25 @@ describe("receiving log matching", () => {
   it("a matched row that disappears from the log shows as changed", () => {
     const q = O.logQueue(ROWS.filter((r) => r.key !== "fj1"), ORDERS, { fj1: { state: "matched", po: "fj-jan" } }, vk, openOf);
     expect(q.changed).toEqual([{ key: "fj1", po: "fj-jan" }]);
+  });
+});
+
+describe("receiving log entries on an order", () => {
+  const ROW = { key: "pm1", date: "2027-01-08", amount: 5816.78, invoice: "23095016", desc: "Shirts/Sweaters Peter Millar Mens Stock", tab: "T", credit: false, brand: "peter millar", special: false };
+  const PO = { id: "pm-jan", received: 0 };
+  it("one entry per log row, replacing a hand entry for the same invoice", () => {
+    const hand = { date: "2027-01-05", source: "hand", invoice: "23095016", at: "2027-01-05T10:00:00Z", rcvd: 0 };
+    const other = { date: "2027-01-02", source: "hand", invoice: "999", at: "2027-01-02T10:00:00Z", rcvd: 0 };
+    let es = O.withLogEntry([hand, other], O.logEntry(ROW, PO, "ian"));
+    es = O.withLogEntry(es, O.logEntry(ROW, PO, "cj"));   // a second confirm of the same row
+    expect(es.length).toBe(2);
+    expect(es.filter((e: { source: string }) => e.source === "log").length).toBe(1);
+    expect(es.find((e: { source: string }) => e.source === "log")).toMatchObject({ logKey: "pm1", amount: 5816.78, invoice: "23095016", date: "2027-01-08", by: "cj" });
+    expect(O.withoutLogEntry(es, "pm1")).toEqual([other]);
+  });
+  it("a row dated before the order was cleared stays cleared", () => {
+    const e = O.logEntry({ ...ROW, date: "2026-12-01" }, PO, "ian");
+    expect(O.liveInvoices([e], "2026-12-15T00:00:00Z").entries).toEqual([]);
+    expect(O.liveInvoices([O.logEntry(ROW, PO, "ian")], "2026-12-15T00:00:00Z").entries.length).toBe(1);
   });
 });

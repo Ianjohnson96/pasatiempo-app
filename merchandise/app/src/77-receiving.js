@@ -57,6 +57,69 @@ function rcvHTML(R){
     ${loose ? `<div class="note"><b>Arrived with no open order in the book</b> (reorders, or orders that weren't entered):<ul style="margin:4px 0 0;padding-left:18px">${loose}</ul>${R.loose.length > 8 ? `<div>…and ${R.loose.length - 8} more.</div>` : ''}</div>` : ''}
     ${A.down && A.down.value >= 25 ? `<div class="note">Stock on ${A.down.skus} SKU${A.down.skus === 1 ? '' : 's'} fell by more than it sold (${money(A.down.value)} at cost): counts, shrink or returns to vendors.</div>` : ''}`;
 }
+/* ---------- the receiving log on the page ----------
+   RLOG is receivinglog/current, the app's read-only copy of the accounting team's sheet (the server keeps it:
+   lib/merch/receiving-log-server.ts); LOGMATCH holds people's calls on its rows (logmatch/{row key}). The page
+   suggests an order for each row and a person confirms: Confirm adds a 'log' invoice entry to the order, just as
+   Invoice in does, so nothing about the budget changes. */
+let RLOG = null, LOGMATCH = {};
+const logLive = () => !!(RLOG && !RLOG.error && RLOG.readAt);
+/* The vendor words the server read the log with, plus every vendor's own name. */
+function logWords(){
+  const w = {...((RLOG && RLOG.words) || {})};
+  for (const v of VENDORS){ const n = String(v.name || '').toLowerCase().trim(); if (n && !vendorKeyFor(n, w)) w[n] = [n]; }
+  return w;
+}
+function receivingQueue(){
+  const words = logWords();
+  const rows = ((RLOG && RLOG.rows) || []).map(r => ({...r, brand: vendorKeyFor(r.desc, words)}));
+  return logQueue(rows, POS, LOGMATCH, p => vendorKeyFor(vendorName(p), words), p => Math.max(onOrder(p) - storeRoomOf(p), 0));
+}
+const logRow = key => ((RLOG && RLOG.rows) || []).find(r => r.key === key);
+async function putOrder(p, invoicesIn){
+  const body = {...p, invoicesIn, updatedBy: myId, updatedAt: new Date().toISOString()};
+  delete body.id; delete body.vendor;
+  return write('pos/' + p.id, body);
+}
+/** Confirm a log row against an order: the order gets the row's invoice entry, and the call is kept. */
+async function confirmLogRow(key, poId){
+  const row = logRow(key), p = POS.find(x => x.id === poId); if (!row || !p || !canAct()) return false;
+  if (!(await putOrder(p, withLogEntry(p.invoicesIn, logEntry(row, p, myId))))) return false;
+  const ok = await write('logmatch/' + key, {state: 'matched', po: poId, amount: row.amount, date: row.date, invoice: row.invoice, by: myId, at: new Date().toISOString()});
+  if (ok) toast(`PO ${p.poNumber || poId}: ${money(row.amount)} arrived (invoice ${row.invoice || 'without a number'})`);
+  return ok;
+}
+async function markNotOrder(key){
+  if (!logRow(key) || !canAct()) return false;
+  return write('logmatch/' + key, {state: 'notorder', by: myId, at: new Date().toISOString()});
+}
+/** Take back a call on a row: a match comes off its order; the row goes back to the list. */
+async function undoLogRow(key){
+  const d = LOGMATCH[key]; if (!d || !canAct()) return false;
+  if (d.state === 'matched'){
+    const p = POS.find(x => x.id === d.po);
+    if (p && !(await putOrder(p, withoutLogEntry(p.invoicesIn, key)))) return false;
+  }
+  return write('logmatch/' + key, null);
+}
+/* Opening Orders & receiving asks the server to read the log again (it reads at most every two minutes); the copy
+   arrives with the next poll. */
+let logPokedAt = 0;
+function pokeReceivingLog(){
+  if (!canAct() || typeof window === 'undefined' || !window.MERCH_HOST || Date.now() - logPokedAt < 120000) return;
+  logPokedAt = Date.now();
+  fetch(window.MERCH_HOST.base + '/api/receiving-log', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: '{}'}).catch(() => {});
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('[data-logok],[data-lognot],[data-logundo]');
+  if (!b) return;
+  b.disabled = true;
+  if (b.dataset.logok){ const [key, po] = b.dataset.logok.split('|'); await confirmLogRow(key, po); }
+  else if (b.dataset.lognot) await markNotOrder(b.dataset.lognot);
+  else await undoLogRow(b.dataset.logundo);
+  b.disabled = false;
+});
+
 /* Record the ticked deliveries on their orders. */
 async function applyArrivals(R){
   let ok = true;
@@ -87,7 +150,10 @@ function rcvRows(){
   }
   return rows;
 }
-const rcvBtns = p => canAct() ? `<button class="btn sm" type="button" data-invin="${esc(p.id)}">Invoice in</button>` : '';
+// Once the receiving log is read, arrivals come from it: staff no longer mark them by hand; the owner keeps the
+// button as an override for a shipment the log hasn't caught up with.
+const rcvBtns = p => !canAct() ? '' : !logLive() ? `<button class="btn sm" type="button" data-invin="${esc(p.id)}">Invoice in</button>`
+  : isAdmin ? `<button class="btn ghost sm" type="button" data-invin="${esc(p.id)}" title="Mark it arrived by hand: for a shipment the receiving log doesn't show yet">Override</button>` : '';
 function rcvTable(rows, kind){
   const head = kind === 'arrived' ? '<th>Order</th><th class="r">Days waiting</th><th class="r">Arrived</th><th>Invoice</th><th></th>' : '<th>Order</th><th>Expected</th><th class="r">Still to come</th><th></th>';
   return `<div class="tbl"><table class="mini rt" style="min-width:0"><thead><tr>${head}</tr></thead><tbody class="click">${rows.map(({p, inv, arrived, days}) => {

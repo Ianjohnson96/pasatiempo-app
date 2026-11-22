@@ -431,7 +431,9 @@ render(); applyMode();
     refreshes: () => coll('refreshes', v => REFRESHES = v, 'refreshes'),
     checks: () => coll('checklist', v => CHECKS = Object.fromEntries(v.map(x => [x.id, x])), 'checks'),
     inv: () => db.doc('inventory/current').onSnapshot(s => { if (s.exists) INV = s.data(); live(); }, onErr('inv')),
-    ins: () => db.doc('insights/current').onSnapshot(s => { if (s.exists) INS = s.data(); live(); }, onErr('ins'))
+    ins: () => db.doc('insights/current').onSnapshot(s => { if (s.exists) INS = s.data(); live(); }, onErr('ins')),
+    rlog: () => db.doc('receivinglog/current').onSnapshot(s => { RLOG = s.exists ? s.data() : null; live(); }, onErr('rlog')),
+    logmatch: () => coll('logmatch', v => LOGMATCH = Object.fromEntries(v.map(x => [x.id, x])), 'logmatch')
   };
   Object.values(subs).forEach(f => f());
 })();
