@@ -199,7 +199,7 @@ function budgetTiles(S){
   </section>`;
 }
 function catRow(c, S){
-  const m = S.m, inv = INV.cats[c.code] || {units:0, cost:0}, wks = wksNow(c.code, inv.cost);
+  const m = S.m, inv = INV.cats[c.code] || {units:0, cost:0}, wks = catWeeks(c.code, shelfCost(c.code, inv.cost));
   const first = `<td data-l="Category"><span class="code">${c.code}</span>${esc(c.name)} <span class="chip ${c.call}">${CALLTXT[c.call]}</span></td><td data-l="Role" class="crole">${esc(roleOf(c.code).name)}</td>`;
   const wk = `<td data-l="Weeks of supply" class="r num">${wks ? Math.round(wks) : '—'}</td>`;
   if (!inOTB(c.code)){

@@ -111,7 +111,7 @@ function gdRoles(){
   const catRows = cats.map(([code, c]) => {
     const path = 'roleOf.' + code, v = gdValue(path), def = gdDefault(path) || 'fashion', changed = v !== def;
     const sel = owner ? `<select class="gd-in" data-gd="${path}" data-kind="role" aria-label="Role for ${esc(c.name)}">${roles.map(r => `<option value="${r}" ${r === v ? 'selected' : ''}>${esc(ROLES_DEFAULT[r].name)}</option>`).join('')}</select>` : esc(gdFmt('role', v));
-    const wk = typeof wksNow === 'function' ? wksNow(code, num(c.onHand)) : null, rw = (ROLES_DEFAULT[v] || {}).wks && gdValue(`roles.${v}.wks`);
+    const wk = typeof catWeeks === 'function' ? catWeeks(code, shelfCost(code, c.onHand)) : null, rw = (ROLES_DEFAULT[v] || {}).wks && gdValue(`roles.${v}.wks`);
     return `<div class="gd-row${changed ? ' changed' : ''}"><div class="gd-what"><b>${code} ${esc(c.name)}</b></div>
       <div class="gd-sug"><b>${esc(gdFmt('role', def))}</b></div>
       <div class="gd-now num ${rw && wk != null && (wk < rw[2] || wk > rw[3]) ? 'neg' : ''}">${wk == null ? '—' : Math.round(wk) + ' wks'}</div>
@@ -274,7 +274,7 @@ function gdBudget(){
   const owner = gdOwner(), sug = (BASE.defaults || {}).wos || {}, PC = PLANS.cur || {}, linked = !!mixLinkTxt(PC);
   const codes = BASE.order.filter(c => !(BASE.exclude || ['640']).includes(c));
   const rows = codes.map(c => {
-    const v = c in GW ? GW[c] : gdWosNow(c), changed = v !== sug[c], wk = wksNow(c, num(BASE.cats[c].onHand));
+    const v = c in GW ? GW[c] : gdWosNow(c), changed = v !== sug[c], wk = catWeeks(c, shelfCost(c, BASE.cats[c].onHand));
     const eff = linked ? `<div class="faint" style="flex-basis:100%;font-size:12px;margin-top:2px" title="The weeks the budget uses: your weeks × ${PC.scale.toFixed(2)}">${wosNum(v * PC.scale)} wks in the budget</div>` : '';
     const input = (owner ? `<input class="gd-in num" data-gdwos="${c}" inputmode="decimal" value="${v}" aria-label="Target weeks for ${esc(BASE.cats[c].name)}"><span class="gd-u">wks</span>` : `<span class="num">${v} wks</span>`) + eff;
     return `<div class="gd-row${changed ? ' changed' : ''}${c in GW ? ' pending' : ''}"><div class="gd-what"><b>${c} ${esc(BASE.cats[c].name)}</b><span>On hand ${money(num(BASE.cats[c].onHand))}</span></div>

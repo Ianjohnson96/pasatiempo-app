@@ -11,6 +11,15 @@ function anaNow(){
     const names = Object.fromEntries(Object.entries((BASE && BASE.cats) || (PLAN && PLAN.cats) || {}).map(([k, v]) => [k, v.name]));
     ANA = analyze(ASSORT, names, Object.fromEntries(SUBCATS.map(s => [s.id, s.name])));
   }
+  // A category's weeks of supply (and the stock its role's weeks allow) use the budget's forward pace, so the Scorecard,
+  // Stuck money, Budget and Stock & counts agree; its last-year figures stay as wksLY and cogsWkLY. Subcategories keep
+  // last year's pace: they have no forecast of their own.
+  if (ANA && BASE && ENG) for (const c of ANA.cats){
+    if (c.wksLY === undefined){ c.wksLY = c.wks; c.cogsWkLY = c.cogsWk; }
+    const f = fwdWeeklyCost(c.cat);
+    c.cogsWk = f > 0 ? f : c.cogsWkLY;
+    c.wks = f > 0 ? c.oh / f : null;
+  }
   return ANA;
 }
 const aPct = v => v == null ? '—' : Math.round(v * 100) + '%';
