@@ -426,11 +426,12 @@ const WORDMARK = "/invitational/img/wordmark-pasatiempo.svg";
 // lands at 3:40.2: the logo rises on it, and the last chord rings out under
 // the title.
 //
-// In the edit: 1929 over the piano (0.1, 2.9, 4.3 s); colour arrives as the
-// band comes in (5.6 s) with the drone over the 4th, then a photograph or a
-// flyover a bar (8.4, 11.2, 14.0, 16.8 s) — last year's champion among them —
-// the whole field as the music softens (19.6 s), and the club's clock under
-// the title (22.4 s; title 24.5 s). Each dissolve starts 0.4 s ahead of its bar.
+// In the edit: the course at its quietest over the piano (0.1, 2.9, 4.3 s) —
+// all in colour, and with no year card — the drone over the 4th as the band
+// comes in (5.6 s), then a photograph or a flyover a bar (8.4, 11.2, 14.0,
+// 16.8 s) — last year's champion among them — the whole field as the music
+// softens (19.6 s), and the club's clock under the title (22.4 s; title
+// 24.5 s). Each dissolve starts 0.4 s ahead of its bar.
 //
 // The flyovers are pieces of the drone films used further down the page
 // (video/hole-*-approach.mp4), 7.9 s of each played at 1.75× speed
@@ -454,12 +455,14 @@ const flyover = (hole: number, focus: string, phoneFocus: string): Omit<Frame, "
 });
 const SONG: Frame[] = scored(
   [
-    // 1929, over the piano: the crowd at the tee, the Doctor, a gallery on the course.
-    { src: SA("1929-tee-shot-bay.webp"), era: "archive", focus: "center 70%", phoneFocus: "62% 80%" },
-    { src: SC + "mackenzie.webp", era: "archive", focus: "53% 18%" },
-    // The gallery round one of MacKenzie's greens, below the oak.
-    { src: SA("1929-gallery-oak.webp"), era: "archive", focus: "center 60%", phoneFocus: "55% 60%" },
-    // Colour, as the band comes in: low over the bunkers of the 4th.
+    // Over the piano, the course at its quietest: from the air at dawn (on a
+    // phone, framed on the green and its bunkers)...
+    { src: SC + "today-aerial-dawn.webp", era: "today", focus: "center 50%", phoneFocus: "45% 50%" },
+    // ...two chairs looking out over the course to the bay...
+    { src: SC + "today-chairs-bay.webp", era: "today", focus: "center 45%" },
+    // ...and the bridge.
+    { src: SC + "today-bridge.webp", era: "today", focus: "center 62%" },
+    // As the band comes in: low over the bunkers of the 4th.
     flyover(4, "center 60%", "50% 60%"),
     // Last year's champion, an iron through the turf in the evening haze.
     { src: SC + "event-iron-impact.webp", era: "today", focus: "55% 45%", phoneFocus: "52% 50%" },
@@ -523,6 +526,8 @@ interface Cut {
   cues?: { frames: number[]; title: number; exit: number };
   /** The scored dissolve's look, and its title: the 1929 logo and the wordmark. */
   crest?: boolean;
+  /** No year card (1929 / 2027) at the foot of the photographs. */
+  noYear?: boolean;
 }
 const VARIANTS: Record<Variant, Cut> = {
   flip: { frames: FRAMES, titleMs: TITLE_MS },
@@ -568,6 +573,7 @@ const VARIANTS: Record<Variant, Cut> = {
     music: SONG_MUSIC,
     cues: { frames: SONG_CUES, title: SONG_TITLE_AT, exit: SONG_EXIT_AT },
     crest: true,
+    noYear: true,
   },
 };
 /** The intro visitors get. The others play with ?intro=<name>. */
@@ -1021,7 +1027,7 @@ export default function IntroReel({
       )}
 
       {/* The years: 1929 over the archive, a hard cut to 2027 with the colour. */}
-      {inReel && (
+      {inReel && !cut.noYear && (
         <div
           className={"mci-reel-year" + (frame.era === "today" ? " is-now" : "")}
           key={frame.era}
