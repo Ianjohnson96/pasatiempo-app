@@ -59,9 +59,14 @@ export function topCollection(path: string): string {
 // Collections staff may change, named one by one: orders, vendors, subcategories, counts, To do states, checklist
 // ticks, brand assignments (Brands -> Assign brands) and subcategory sorting. Anything new is owner-only until it is
 // added here.
-const STAFF_WRITABLE = new Set(["pos", "vendors", "subcats", "counts", "istate", "checklist", "brandmap", "submap"]);
+// logmatch/{log row key}: a person's call on a receiving log row (matched to an order, or not an order).
+const STAFF_WRITABLE = new Set(["pos", "vendors", "subcats", "counts", "istate", "checklist", "brandmap", "submap", "logmatch"]);
+// Written only by the server: receivinglog/current is the app's read-only copy of the receiving log
+// (lib/merch/receiving-log-server.ts); nobody changes it through the page, the owner included.
+const SERVER_ONLY = new Set(["receivinglog"]);
 
 export function canWrite(role: MerchRole, path: string): boolean {
+  if (SERVER_ONLY.has(topCollection(path))) return false;
   if (role === "owner") return true;
   const c = topCollection(path);
   if (role === "staff") return STAFF_WRITABLE.has(c) && !OWNER_ONLY.has(c);
@@ -83,6 +88,15 @@ export function docProblem(path: string, data: unknown): string | null {
   if (data === null) return null;
   const d = data as Record<string, unknown>;
   switch (topCollection(path)) {
+    case "logmatch": {
+      if (d.state !== "matched" && d.state !== "notorder") return "state must be matched or notorder";
+      if (d.state === "matched") {
+        if (typeof d.po !== "string" || !d.po) return "a match needs the order it belongs to";
+        if (d.amount == null || !isNum(d.amount)) return "amount must be a number";
+        if (typeof d.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(d.date)) return "date must be YYYY-MM-DD";
+      }
+      return null;
+    }
     case "pos": {
       if (d.status != null && !ORDER_STATUS.has(String(d.status))) return "unknown order status";
       for (const k of ["cost", "units", "received"]) if (!isNum(d[k])) return `${k} must be a number`;

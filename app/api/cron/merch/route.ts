@@ -4,6 +4,7 @@ import { logActivity } from "@/lib/hub/log";
 import { mailConfigured, sendMail } from "@/lib/mail";
 import { loadTicks, merchPeople, reminderEmail } from "@/lib/merch/reminders";
 import { openPeriods, pacificToday, remindersFor } from "@/lib/merch/schedule";
+import { refreshReceivingLog } from "@/lib/merch/receiving-log-server";
 
 // The Pro Shop's report reminder, run each morning by Vercel Cron (vercel.json).
 // On a reminder day (lib/merch/schedule.ts) everyone with the Merchandise
@@ -30,6 +31,10 @@ function siteUrl(): string {
 export async function GET(request: NextRequest) {
   if (!authorised(request)) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
   const today = pacificToday();
+  // The receiving log is read once a day even if nobody opens Orders & receiving; a failure is recorded on the copy
+  // and never stops the reminder.
+  const log = await refreshReceivingLog({ force: true }).catch((e) => ({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+  if (!log.ok) console.error("merch cron: receiving log", log.error);
   try {
     const periods = openPeriods(today).filter((p) => p.remind.includes(today));
     if (!periods.length) return NextResponse.json({ today, sent: 0, reason: "not a reminder day" });
