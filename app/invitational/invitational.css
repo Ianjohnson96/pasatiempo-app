@@ -732,6 +732,8 @@ body:has(.mci){margin:0;}
    photograph, so nothing ever stops on screen. Long, soft dissolves. */
 .mci-intro.var-score .mci-bars{display:none;}
 .mci-intro.var-score .mci-page{animation:mci-xfade 1.35s cubic-bezier(.45,0,.35,1) both;}
+/* "Somewhere Only We Know": quicker cuts, so quicker dissolves (a photograph can set its own, --xfade). */
+.mci-intro.var-somewhere .mci-page{animation-duration:var(--xfade,.6s);}
 .mci-intro.var-score .mci-page img{transform-origin:var(--focus);animation-duration:var(--zoom,4.4s);animation-timing-function:linear;}
 /* The last photograph stays on under the title (dimmed by the title's scrim)
    and fades away first as the intro lifts. */
