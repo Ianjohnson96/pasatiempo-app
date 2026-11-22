@@ -71,7 +71,8 @@ const LAST = () => PLAN.window.to;
 const catList = () => PLAN.order.map(code => ({code, ...PLAN.cats[code]}));
 const CAT = code => PLAN.cats[code] || {name: code, call: 'buy'};
 const inOTB = code => code !== '640' && PLAN.cats[code] && PLAN.cats[code].plan != null;
-function selMonth(){ const w = WIN(); if (SEL === 'season') return 'season'; if (SEL && w.includes(SEL)) return SEL; return w.includes(THIS_MONTH) ? THIS_MONTH : 'season'; }
+// The Budget page opens on the whole plan year; a month someone picked (SEL) stays picked.
+function selMonth(){ const w = WIN(); if (SEL && w.includes(SEL)) return SEL; return 'season'; }
 const through = () => { const s = selMonth(); return s === 'season' ? LAST() : s; };
 
 /* ---------- order arithmetic ---------- */
