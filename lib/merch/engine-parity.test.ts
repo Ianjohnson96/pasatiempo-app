@@ -20,9 +20,9 @@ const ctx = vm.createContext({});
 vm.runInContext(helpers + src("app/src/20-engine.js"), ctx);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const run = (carry?: Record<string, number>): any =>
+const run = (carry?: Record<string, number>, mixTotal?: number): any =>
   vm.runInContext(`BASE = ${JSON.stringify(fx.base)}; SAVED = null; WHATIF = null;
-    (() => { const a = assumptions(), E = runEngine(BASE, a, ${JSON.stringify(carry || {})});
+    (() => { const a = {...assumptions(), mixTotal: ${mixTotal ?? null}}, E = runEngine(BASE, a, ${JSON.stringify(carry || {})});
       const tot = (c, ms) => E.cats[c].filter(r => ms.includes(r.m)).reduce((t, r) => t + r.otb, 0);
       return Object.fromEntries(Object.keys(BASE.cats).map(c => [c, {cur: tot(c, E.m27), next: tot(c, E.m28)}])); })()`, ctx);
 
@@ -38,5 +38,20 @@ describe("forecast engine parity with pipeline/engine.py", () => {
   it("carries stock above plan into next year the same way", () => {
     const got = run(fx.carry);
     for (const c of Object.keys(fx.expected.nextWithCarry)) expect(got[c].next).toBeCloseTo(fx.expected.nextWithCarry[c], 2);
+  });
+
+  it("links target stock to the mix total the same way", () => {
+    const got = run(fx.carry, fx.mixTotal);
+    for (const c of Object.keys(fx.expected.curWithMix)) {
+      expect(got[c].cur).toBeCloseTo(fx.expected.curWithMix[c], 2);
+      expect(got[c].next).toBeCloseTo(fx.expected.nextWithMix[c], 2);
+    }
+  });
+
+  it("with no mix total saved the budget is as before", () => {
+    // no GUIDE in this context: assumptions() has no total, and the factor is 1
+    expect(vm.runInContext(`BASE = ${JSON.stringify(fx.base)}; assumptions().mixTotal`, ctx)).toBeNull();
+    const got = run(), none = run(undefined, 0);
+    for (const c of Object.keys(got)) expect(none[c].cur).toBeCloseTo(got[c].cur, 6);
   });
 });

@@ -35,12 +35,30 @@ function suggestedRanges(shares){
   return out;
 }
 
-/** Stock the last 12 months' sales support: their cost (t12 × (1 − margin)) divided by the turns target. */
-function suggestedTotal(rows, turnsMid){
-  if (!(turnsMid > 0)) return 0;
-  let cost = 0;
-  for (const r of rows || []) if (r && r.cat && r.cat !== '640') cost += Math.max(0, Number(r.t12) || 0) * (1 - (Number(r.gm) || 0));
-  return Math.round(cost / turnsMid);
+/** A category's turns target (bench from guideValues): balls and gloves the fast target, the rest their segment's, as
+    the Scorecard grades them. */
+function turnsFor(bench, cat){ const t = (bench || BENCH).turns; return FAST_TURN.has(cat) ? t.fast : t[SEGOF(cat)]; }
+
+/** Shelf stock the last 12 months' sales support: each category's cost of shelf sales ((t12 − special orders) ×
+    (1 − margin)) divided by its turns target. `turns` is one number for every category, or cat => turns. Special orders
+    are bought when a customer orders, so, as in the budget, they need no shelf stock. Mirrors config.suggested_total. */
+function suggestedTotal(rows, turns){
+  const tf = typeof turns === 'function' ? turns : () => turns;
+  let stock = 0;
+  for (const r of rows || []){
+    if (!r || !r.cat || r.cat === '640') continue;
+    const t = Number(tf(r.cat));
+    if (t > 0) stock += Math.max(0, (Number(r.t12) || 0) - (Number(r.so) || 0)) * (1 - (Number(r.gm) || 0)) / t;
+  }
+  return Math.round(stock);
+}
+
+/** The total stock the budget is linked to under a guidelines document: the suggested total, from these assort rows
+    and the document's turns targets, while it follows the suggestion; else the typed total; null for none. */
+function mixTotalOf(doc, rows){
+  const v = guideValues(doc), m = v.mix;
+  if (m.follow === 'suggested'){ const s = suggestedTotal(rows, c => turnsFor(v.bench, c)); return s > 0 ? s : m.total; }
+  return m.total;
 }
 
 /** One row per role, in MIX_ROLES order: on hand, share of stock and of sales, the target range in % and dollars at

@@ -52,6 +52,8 @@ describe("merch access rules", () => {
     expect(docProblem('guidelines/current', { memberDiscount: 2 })).toMatch(/memberDiscount/);
     expect(docProblem('guidelines/current', { roles: { fashion: { wks: [16, 12, 8, 24] } } })).toMatch(/weeks/);
     expect(docProblem('guidelines/current', { mix: { total: -1 } })).toMatch(/total/);
+    expect(docProblem('guidelines/current', { mix: { follow: 'onhand' } })).toMatch(/follow/);
+    expect(docProblem('guidelines/current', { mix: { total: 632720, follow: 'suggested' } })).toBeNull();
     expect(docProblem('guidelines/current', { mix: { ranges: { fashion: [50, 40] } } })).toMatch(/range/);
     expect(docProblem('guidelines/current', { seasons: { spring: 1, summer: 9, fall: 8, holiday: 11 } })).toMatch(/season/);
     expect(docProblem('guidelines/current', { history: 'x' })).toMatch(/history/);

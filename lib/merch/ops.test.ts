@@ -217,6 +217,8 @@ describe("season buys", () => {
     const rs = ["2026-03", "2026-08", "2026-11", "2027-02", "2027-06"].map((month) => ({ month, cat: "400", amount: 1 }));
     expect(O.seasonList(rs, "2026-11").map((s: { label: string }) => s.label)).toEqual(["Holiday 2026", "Spring 2027", "Summer 2027", "Fall 2026", "Spring 2026"]);
     expect(O.seasonList([{ month: "2026-11", cat: "640", amount: 5 }], "2026-11")).toEqual([]);
+    // the season under way is listed with nothing on order, so its room isn't left off the page
+    expect(O.seasonList([{ month: "2027-02", cat: "400", amount: 1 }], "2026-11", ["2026-11"]).map((s: { label: string }) => s.label)).toEqual(["Holiday 2026", "Spring 2027"]);
   });
 });
 
