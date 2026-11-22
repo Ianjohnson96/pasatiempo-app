@@ -28,6 +28,21 @@ function salesShareByRole(rows){
   return by;
 }
 
+/** Stock for the mix, counted the way the Budget counts it: shelf stock at cost, by role — each category's on hand less
+    the special orders filed in it (soOnHand), with Special Orders (640) left out. Also what that leaves out, so the page
+    can tie it back to Stock & counts: all = every category, so640 = Special Orders, soIn = special orders elsewhere. */
+function mixStock(cats){
+  const out = {oh: {}, onHand: 0, all: 0, so640: 0, soIn: 0};
+  for (const [c, v] of Object.entries(cats || {})){
+    const oh = Math.max(0, Number(v && v.onHand) || 0);
+    out.all += oh;
+    if (c === '640'){ out.so640 += oh; continue; }
+    const so = Math.min(oh, Math.max(0, Number(v.soOnHand) || 0)), shelf = oh - so, r = roleKey(c);
+    out.soIn += so; out.onHand += shelf; out.oh[r] = (out.oh[r] || 0) + shelf;
+  }
+  return out;
+}
+
 /** {role: [lo, hi]} in whole percentage points: sales share ± 5, floored at 0. */
 function suggestedRanges(shares){
   const out = {};

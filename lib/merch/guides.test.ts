@@ -92,7 +92,7 @@ describe("applyGuides", () => {
 // 19-guides.js: merchandise mix and suggested values (pure).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const X: any = vm.runInNewContext(read("17-metrics.js") + "\n" + read("19-guides.js")
-  + ";({parseMoney, salesShareByRole, suggestedRanges, suggestedTotal, mixRows, rangeSum})");
+  + ";({parseMoney, salesShareByRole, suggestedRanges, suggestedTotal, mixRows, rangeSum, mixStock})");
 
 describe("mix and suggestions", () => {
   it("parseMoney", () => {
@@ -203,5 +203,30 @@ describe("seasons and mix after the final review", () => {
   it("no sales data, no suggested mix ranges", () => {
     expect(S.salesShareByRole([])).toBeNull();
     expect(S.suggestedRanges(S.salesShareByRole([]))).toEqual({});
+  });
+});
+
+describe("mixStock", () => {
+  it("counts shelf stock like the Budget and ties back to Stock & counts", () => {
+    const cats = {
+      "480": { onHand: 100000, soOnHand: 4000 },   // fashion, with customer orders filed in it
+      "620": { onHand: 50000 },                   // no special orders
+      "640": { onHand: 9000, soOnHand: 9000 },    // Special Orders: never in the mix
+    };
+    const s = X.mixStock(cats);
+    expect(s.all).toBe(159000);                   // what Stock & counts shows
+    expect(s.so640).toBe(9000);
+    expect(s.soIn).toBe(4000);
+    expect(s.onHand).toBe(146000);                // shelf stock: 159,000 - 9,000 - 4,000
+    expect(s.oh[G.roleKey("480")]).toBe(96000);
+    expect(Object.values(s.oh).reduce((t: number, x) => t + (x as number), 0)).toBe(146000);
+  });
+  it("never goes below zero when special orders exceed what is on hand", () => {
+    const s = X.mixStock({ "480": { onHand: 100, soOnHand: 250 } });
+    expect(s.onHand).toBe(0);
+    expect(s.soIn).toBe(100);
+  });
+  it("handles no data", () => {
+    expect(X.mixStock(null)).toEqual({ oh: {}, onHand: 0, all: 0, so640: 0, soIn: 0 });
   });
 });
