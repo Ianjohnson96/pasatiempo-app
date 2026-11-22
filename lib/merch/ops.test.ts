@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 // merchandise/app/src/18-ops.js is plain browser JS joined into the page. It is pure, so it runs here as it is.
 const src = readFileSync(path.join(process.cwd(), "merchandise/app/src/18-ops.js"), "utf8");
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots, makeInvoiceEntry, liveInvoices, storeRoomValue, seasonMonths, seasonList, seasonBuys, orderDateISO, posDates})");
+const O: any = vm.runInNewContext(src + ";({arrivedValue, rcvState, daysWaiting, seasonOf, isPrebook, slotMonth, deliverySlots, makeInvoiceEntry, liveInvoices, storeRoomValue, seasonMonths, seasonList, seasonBuys, orderDateISO, posDates, logCandidates, logQueue, vendorKeyFor})");
 
 describe("arrivedValue", () => {
   it("sums amounts, counts an amountless entry as the whole order, caps and floors", () => {
@@ -252,5 +252,50 @@ describe("posDates", () => {
     expect(O.posDates("System shows -1 on hand (last sale Nov06/26).")).toBe("System shows -1 on hand (last sale Nov 6, 2026).");
     expect(O.posDates("Shirt 3/4 sleeve, Nov 2026")).toBe("Shirt 3/4 sleeve, Nov 2026");
     expect(O.posDates(null)).toBe("");
+  });
+});
+
+describe("receiving log matching", () => {
+  const WORDS = { footjoy: ["fj", "footjoy"], "peter millar": ["peter millar"] };
+  const ORDERS = [
+    { id: "fj-jan", vendor: "FootJoy", status: "open", deliveryMonth: "2027-01", open: 1200 },
+    { id: "fj-feb", vendor: "FootJoy", status: "open", deliveryMonth: "2027-02", open: 3000 },
+    { id: "fj-apr", vendor: "FootJoy", status: "open", deliveryMonth: "2027-04", open: 5000 },
+    { id: "fj-small", vendor: "FootJoy", status: "open", deliveryMonth: "2027-01", open: 500 },
+    { id: "fj-done", vendor: "FootJoy", status: "received", deliveryMonth: "2027-01", open: 0 },
+    { id: "pm-jan", vendor: "Peter Millar Inc.", status: "partial", deliveryMonth: "2027-01", open: 6000 },
+  ];
+  const vk = (p: { vendor: string }) => O.vendorKeyFor(p.vendor, WORDS);
+  const openOf = (p: { open: number }) => p.open;
+  const row = (key: string, brand: string | null, date: string, amount: number, credit = false) => ({ key, brand, date, amount, credit, desc: "", invoice: "", tab: "T", special: false });
+  const ROWS = [row("fj1", "footjoy", "2027-01-08", 1000), row("melin", null, "2027-01-08", 400), row("pm1", "peter millar", "2027-02-02", 5800)];
+
+  it("knows a vendor by its name or its words", () => {
+    expect(O.vendorKeyFor("FootJoy", WORDS)).toBe("footjoy");
+    expect(O.vendorKeyFor("Peter Millar Inc.", WORDS)).toBe("peter millar");
+    expect(O.vendorKeyFor("Melin", WORDS)).toBeNull();
+  });
+  it("suggests the open order of the same brand, month and enough balance, nearest month first", () => {
+    const c = O.logCandidates(ROWS[0], ORDERS, vk, openOf);
+    expect(c.map((p: { id: string }) => p.id)).toEqual(["fj-jan", "fj-feb"]);   // Apr too far; $500 too small; received is done
+  });
+  it("a credit can go against a received order of the same brand", () => {
+    const c = O.logCandidates(row("cr", "footjoy", "2027-01-20", -48, true), ORDERS, vk, openOf);
+    expect(c.map((p: { id: string }) => p.id)).toContain("fj-done");
+  });
+  it("rows with no candidate are filed as not from an order without a click", () => {
+    const q = O.logQueue(ROWS, ORDERS, {}, vk, openOf);
+    expect(q.notOrder.find((x: { row: { key: string } }) => x.row.key === "melin")?.why).toBe("none");
+    expect(q.toMatch.map((x: { row: { key: string } }) => x.row.key)).toEqual(["fj1", "pm1"]);
+  });
+  it("people's calls win: matched and marked rows leave the match list", () => {
+    const q = O.logQueue(ROWS, ORDERS, { fj1: { state: "matched", po: "fj-jan" }, pm1: { state: "notorder" } }, vk, openOf);
+    expect(q.toMatch).toEqual([]);
+    expect(q.matched.map((x: { row: { key: string }; po: string }) => [x.row.key, x.po])).toEqual([["fj1", "fj-jan"]]);
+    expect(q.notOrder.find((x: { row: { key: string } }) => x.row.key === "pm1")?.why).toBe("marked");
+  });
+  it("a matched row that disappears from the log shows as changed", () => {
+    const q = O.logQueue(ROWS.filter((r) => r.key !== "fj1"), ORDERS, { fj1: { state: "matched", po: "fj-jan" } }, vk, openOf);
+    expect(q.changed).toEqual([{ key: "fj1", po: "fj-jan" }]);
   });
 });

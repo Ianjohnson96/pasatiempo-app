@@ -190,3 +190,47 @@ function seasonBuys(rows, season) {
 function posDates(t) {
   return String(t == null ? "" : t).replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(\d{1,2})\/(\d{2})\b/g, (_, m, d, y) => `${m} ${+d}, 20${y}`);
 }
+
+/* ---------- receiving log matching (pure) ----------
+   Rows come from receivinglog/current (lib/merch/receiving-log.ts parses the sheet on the server). The page suggests
+   which order a row belongs to; a person confirms. vendorKeyOf(po) gives an order's vendor key; openOf(po) what is
+   still open on it. Spec: docs/superpowers/specs/2026-11-22-merch-phase2-design.md, stage 2. */
+const logWordRe = w => new RegExp('(^|[^a-z0-9])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-z0-9])');
+/** The vendor key a vendor's name belongs to: the key itself or one of its words, as a whole word; longest wins. */
+function vendorKeyFor(name, words) {
+  const n = ' ' + String(name || '').toLowerCase() + ' ';
+  let best = null, len = 0;
+  for (const k of Object.keys(words || {})) for (const w of [k].concat(words[k] || [])) {
+    const x = String(w).toLowerCase().trim();
+    if (x && x.length > len && logWordRe(x).test(n)) { best = k; len = x.length; }
+  }
+  return best;
+}
+const monthGap = (a, b) => Math.abs((+a.slice(0, 4) * 12 + +a.slice(5, 7)) - (+b.slice(0, 4) * 12 + +b.slice(5, 7)));
+/** Orders a log row could belong to: same vendor, delivery month within one month of the row's, and enough still
+    open (2% leeway); a credit can go against any order of the vendor in that window that isn't cancelled. Nearest
+    month first, then nearest amount. */
+function logCandidates(row, orders, vendorKeyOf, openOf) {
+  if (!row || !row.brand) return [];
+  const m = String(row.date).slice(0, 7);
+  return (orders || []).filter(p => {
+    if (!p || !p.deliveryMonth || vendorKeyOf(p) !== row.brand || monthGap(p.deliveryMonth, m) > 1) return false;
+    if (row.credit) return p.status !== 'cancelled';
+    return (p.status === 'open' || p.status === 'partial' || p.status === 'hold') && Number(openOf(p)) >= row.amount * 0.98;
+  }).sort((a, b) => monthGap(a.deliveryMonth, m) - monthGap(b.deliveryMonth, m) || Math.abs(openOf(a) - row.amount) - Math.abs(openOf(b) - row.amount));
+}
+/** The Receiving view's lists: rows to match (with their candidates), rows not from an order (none possible, or marked
+    by a person), rows matched, and matches whose row is no longer in the log. */
+function logQueue(rows, orders, decisions, vendorKeyOf, openOf) {
+  const out = {toMatch: [], notOrder: [], matched: [], changed: []}, have = new Set();
+  for (const row of rows || []) {
+    have.add(row.key);
+    const d = (decisions || {})[row.key];
+    if (d && d.state === 'matched') { out.matched.push({row, po: d.po}); continue; }
+    if (d && d.state === 'notorder') { out.notOrder.push({row, why: 'marked'}); continue; }
+    const cands = logCandidates(row, orders, vendorKeyOf, openOf);
+    if (cands.length) out.toMatch.push({row, cands}); else out.notOrder.push({row, why: 'none'});
+  }
+  for (const [key, d] of Object.entries(decisions || {})) if (d && d.state === 'matched' && !have.has(key)) out.changed.push({key, po: d.po});
+  return out;
+}
