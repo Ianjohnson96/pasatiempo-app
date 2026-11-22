@@ -143,6 +143,7 @@ function renderSide(S){
   $('#pageGroup').textContent = grp ? grp.label : '';
   $('#pageTitle').textContent = pageLabel(cur) || pageLabel(TAB) || 'Home'; $('#pageSub').textContent = sub;
   const vb = $('#viewBar'); if (vb){ vb.innerHTML = renderViewBar(TAB); vb.hidden = !vb.innerHTML; }
+  const pv = $('#pageVerdict'); if (pv) pv.innerHTML = verdictHtml(verdictFor(TAB, S));
   $('#pageActs').innerHTML = PAGE_ACTIONS[TAB] ? PAGE_ACTIONS[TAB]() : '';
 }
 const ANALYSIS_TABS = new Set(['today', 'scorecard', 'rounds', 'trends', 'stuck', 'inventory']);

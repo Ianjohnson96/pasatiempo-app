@@ -311,6 +311,11 @@ tr.mgrp td span{color:var(--muted);margin-left:10px;font-family:var(--mono);font
 .seg button:hover{color:var(--ink);background:var(--hover)}
 .seg button[aria-pressed="true"]{background:var(--primary);color:#fff}
 #viewBar{margin-top:10px}
+/* the page's verdict: one sentence, its colour saying what kind of news it is (green room/fine, amber waiting, red act) */
+.verdict{margin:10px 0 0;font-size:17px;line-height:1.4;font-weight:600;color:var(--ink);padding-left:12px;border-left:4px solid var(--cypress);max-width:880px}
+.verdict.watch{border-left-color:var(--ochre)}
+.verdict.act{border-left-color:var(--brick);color:var(--brick)}
+.tile .lab .tipi{margin-left:4px;vertical-align:1px}
 .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .field-inline{border:1px solid var(--rule2);background:var(--card);border-radius:8px;padding:6px 10px;min-height:34px;font-size:13px;min-width:0}
 input.field-inline{width:220px;max-width:100%}
@@ -663,6 +668,7 @@ details.fold{margin-top:18px}details.fold>summary{cursor:pointer;font-weight:600
         <div class="crumb" id="pageGroup"></div>
         <h1 id="pageTitle">Today</h1>
         <div class="sub" id="pageSub"></div>
+        <div id="pageVerdict"></div>
         <div id="viewBar" hidden></div>
       </div>
       <div class="actions">

@@ -46,6 +46,7 @@ export function loadPage(docs: Docs = {}): (expr: string) => unknown {
     INS = {asOf: '', items: []};
     POS = JSON.parse(JSON.stringify(__docs.pos || []));
     GUIDE = __docs.guide || null; applyGuides(GUIDE); SAVED = null; ADJS = {};
-    derive();`, ctx);
+    // render() derives only once there is data (or a legacy plan); before the first upload it shows a message.
+    if (BASE) derive();`, ctx);
   return (expr: string) => vm.runInContext(expr, ctx);
 }
