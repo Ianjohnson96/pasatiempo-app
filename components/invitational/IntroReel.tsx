@@ -294,7 +294,7 @@ const PAN_TAIL: Frame[] = [
   { src: IMG + "hero.webp", hold: 0, era: "today" },
 ];
 
-// ---- The film, scored (the default) ------------------------------------------
+// ---- The film, scored -------------------------------------------------------
 // The film pan, slower and never pausing, timed to the music: "A Perfect Day"
 // (Danny Cope), 0:39–0:54 then 1:11–1:22, crossfaded and faded out
 // (audio/intro-a-perfect-day.mp3, 25 s). The archive runs through the first
@@ -327,7 +327,7 @@ const FILM_TAIL: Frame[] = [
   { src: IMG + "hole-4-approach-poster.webp", hold: 0, era: "today" },
 ];
 
-// ---- The scored dissolve (the default) ---------------------------------------
+// ---- The scored dissolve (the default until November 2026; ?intro=score) -----
 // Twelve full-screen photographs, each easing slowly in (about 6%) and
 // dissolving into the next, cut to the music: "A Perfect Day" (Danny Cope),
 // 0:39–0:54.2 then 1:10.3–1:33.3 — a join placed so the song's five-second
@@ -418,7 +418,7 @@ const SCORE: Frame[] = scored(
 const MARK = "/brand/pasatiempo-logo-1929-reverse.png";
 const WORDMARK = "/invitational/img/wordmark-pasatiempo.svg";
 
-// ---- The scored dissolve to "Somewhere Only We Know" -------------------------
+// ---- The scored dissolve to "Somewhere Only We Know" (the default) -----------
 // The same look as the scored dissolve, cut to Keane's "Somewhere Only We Know"
 // (audio/intro-somewhere-only-we-know.mp3, 41 s): the song's opening piano,
 // four bars (0:00.4–0:11.6), then straight into the last chorus at 3:21.4 —
@@ -601,8 +601,11 @@ const VARIANTS: Record<Variant, Cut> = {
     noYear: true,
   },
 };
-/** The intro visitors get. The others play with ?intro=<name>. */
-const DEFAULT_VARIANT: Variant = "score";
+/** The intro visitors get. The others play with ?intro=<name>.
+ *  To go back to the previous default — the twelve-photograph scored dissolve
+ *  to "A Perfect Day", with the 1929 photographs and the year card — set this
+ *  to "score" (it still plays any time with ?intro=score). */
+const DEFAULT_VARIANT: Variant = "somewhere";
 function readVariant(): Variant {
   try {
     const v = new URLSearchParams(location.search).get("intro");
