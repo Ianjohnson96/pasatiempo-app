@@ -20,8 +20,16 @@ function orderAlerts(S){
   if (wm) out.push({id:'o-room', kind:'order', sev:'warn', title:`${money(worst)} of deliveries arrive before there is room for them`, detail:`Orders landing through ${monthLabel(wm)} run ahead of the plan's receiving room.`, action:'Ask vendors for later ship dates where you can.', usd:worst});
   return out;
 }
+/* A reorder or out-of-stock item is worth doing only while its category is open to buy by the live budget (this year's
+   call), or for balls and gloves, which never run out. The month-end reader lists them either way (buy: true), so a
+   guideline or plan change that opens or stops a category shows here at once rather than at the next upload. */
+function itemOpenToBuy(i){
+  if (!i.buy) return true;
+  const c = PLANS.cur && PLANS.cur.cats[i.cat];
+  return !c || c.call === 'buy' || c.call === 'replenish' || roleKey(i.cat) === 'consumable';
+}
 function allAttention(S){
-  const items = orderAlerts(S).concat(mixAlerts(),(INS.items || []).map(i => ({...i, sev: KIND_SEV[i.kind] || 'info'})));
+  const items = orderAlerts(S).concat(mixAlerts(),(INS.items || []).filter(itemOpenToBuy).map(i => ({...i, sev: KIND_SEV[i.kind] || 'info'})));
   return items.map(i => ({...i, state: ISTATE[i.id] || null}));
 }
 const openAttention = S => allAttention(S).filter(i => !i.state);

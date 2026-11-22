@@ -36,9 +36,24 @@ function assumptions(){
 /* The owner's saved total stock to plan for (Guidelines -> Merchandise mix), or null. While one is saved the budget is
    linked to it (mixScale). Unsaved edits on the Guidelines page don't move the budget. */
 function savedMixTotal(){
-  if (typeof GUIDE === 'undefined' || typeof guideValues !== 'function') return null;
-  const t = guideValues(GUIDE).mix.total;
+  if (typeof GUIDE === 'undefined' || typeof mixTotalOf !== 'function') return null;
+  const t = mixTotalOf(GUIDE, typeof ASSORT !== 'undefined' && ASSORT ? ASSORT.rows : null);
   return t > 0 ? t : null;
+}
+/** This plan year's left to buy (budget with its changes, less what is committed in it) under the assumptions a, for
+    previews of a change before it is saved; the Budget page's figure when a is the saved one. */
+function leftToBuyWith(a){
+  const fy = curFY(), p = planFor(runEngine(BASE, a), fy, a), used = committedIn(p), adj = ADJS[adjKey(p)] || [];
+  return sum(BASE.order.filter(c => p.cats[c].plan != null), c => p.cats[c].plan + sum(adj.filter(x => x.cat === c), x => x.amount) - num(used[c]));
+}
+/** Categories whose budget weeks (typed × the mix factor) fall outside their role's weeks-of-supply range on the
+    Guidelines page: the budget would plan stock the Scorecard and Stuck money then call too thin or too heavy. */
+function wosConflicts(P = PLANS.cur){
+  if (!P) return [];
+  return P.order.filter(c => P.cats[c].plan != null).map(c => {
+    const w = (ROLES[roleKey(c)] || {}).wks, v = num(P.cats[c].wosEff);
+    return w && (v > w[1] + 0.05 || v < w[0] - 0.05) ? {c, name: P.cats[c].name, role: ROLES[roleKey(c)].name, wks: v, lo: w[0], hi: w[1], dir: v > w[1] ? 'above' : 'below'} : null;
+  }).filter(Boolean);
 }
 /* the fiscal year being planned: the year of the first month not yet closed (plan_fy in engine.py) */
 const curFY = () => BASE ? fyOf(BASE.partial ? BASE.partial.m : addMonths(BASE.actualThrough, 1)) : fyOf(THIS_MONTH);

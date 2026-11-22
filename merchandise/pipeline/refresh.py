@@ -212,11 +212,12 @@ def rebuild_brands(docs):
     ctx = model.rebuild_ctx(docs)
     model.special_budget(ctx)
     base = ctx['base']
+    assort = model.build_subcats(ctx)
     calls, _ = category_calls(base, {k: v for k, v in (docs.get('plan/assumptions') or {}).items() if k in ASSUME_KEYS},
-                              mix_total(docs.get('guidelines/current')))
+                              mix_total(docs.get('guidelines/current'), assort['rows']))
     for c, k in calls.items():
         base['cats'][c]['call'] = k
-    brands, bskus, assort = model.build_brands(ctx), model.brand_skus(ctx), model.build_subcats(ctx)
+    brands, bskus = model.build_brands(ctx), model.brand_skus(ctx)
     brands['at'] = datetime.now(timezone.utc).isoformat(timespec='seconds')
     bundle = dict(kind='pasatiempo-merch-bundle', version=1, note='Brand scorecard, subcategories and special orders updated',
                   docs={'base/current': base, 'brands/current': brands, 'brandskus/current': bskus, 'assort/current': assort})
@@ -285,19 +286,21 @@ def build_bundle(reports, prior=None, notes=None, guidelines=None):
     and member discount (config.guided) and mix total (config.mix_total), used for this run only."""
     model.use_guidelines(*guided(guidelines))
     try:
-        return _build_bundle(reports, prior, notes, mix_total(guidelines))
+        return _build_bundle(reports, prior, notes, guidelines)
     finally:
         model.use_guidelines(*guided(None))
 
 
-def _build_bundle(reports, prior=None, notes=None, mix=None):
+def _build_bundle(reports, prior=None, notes=None, guidelines=None):
     if not reports.get('sku_analysis'):
         raise ValueError('No SKU Analysis among the reports. It is needed for on-hand stock and unit sales.')
     notes = notes or []
     built = model.build(reports, prior)
     base = built['base']
     assume = (prior or {}).get('assumptions')
-    calls, r = category_calls(base, assume, mix)
+    # the subcategory report first: a total that follows the suggestion is worked out from this month's sales
+    assort = model.build_subcats(built['ctx'])
+    calls, r = category_calls(base, assume, mix_total(guidelines, assort['rows']))
     for c, k in calls.items():
         base['cats'][c]['call'] = k
     insights = model.build_insights(built['ctx'], calls)
@@ -305,7 +308,7 @@ def _build_bundle(reports, prior=None, notes=None, mix=None):
     brands['at'] = datetime.now(timezone.utc).isoformat(timespec='seconds')  # the page compares brand edits with this
     docs = {'base': base, 'inventory': built['inventory'], 'insights': insights, 'brands': brands,
             'skusnap': receipts.snapshot(built['ctx']), 'brandskus': model.brand_skus(built['ctx']), 'brandin': model.brand_inputs(built['ctx']),
-            'assort': model.build_subcats(built['ctx'])}
+            'assort': assort}
     arrived = receipts.arrivals((prior or {}).get('skusnap'), built['ctx'])
     if arrived:
         docs['arrivals'] = arrived

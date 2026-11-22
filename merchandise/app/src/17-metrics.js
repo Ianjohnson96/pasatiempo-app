@@ -99,9 +99,11 @@ function guideValues(doc){
   const s = d.seasons, seasons = isObj(s) && s.spring === 1 && [s.summer, s.fall, s.holiday].every(Number.isInteger)
     && 1 < s.summer && s.summer < s.fall && s.fall < s.holiday && s.holiday <= 12
     ? {spring: 1, summer: s.summer, fall: s.fall, holiday: s.holiday} : {...SEASONS_DEFAULT};
-  const mix = {total: null, ranges: {}};
+  // follow: 'suggested' = the total is the suggested one, worked out again from each month-end's sales and the turns targets
+  const mix = {total: null, follow: null, ranges: {}};
   if (isObj(d.mix)){
     if (isNumIn(d.mix.total, 1, 1e9)) mix.total = d.mix.total;
+    if (d.mix.follow === 'suggested') mix.follow = 'suggested';
     if (isObj(d.mix.ranges)) for (const r in d.mix.ranges){
       const x = d.mix.ranges[r];
       if (Object.prototype.hasOwnProperty.call(ROLES_DEFAULT, r) && Array.isArray(x) && x.length === 2 && isNumIn(x[0], 0, 100) && isNumIn(x[1], 0, 100) && x[0] <= x[1]) mix.ranges[r] = [x[0], x[1]];
