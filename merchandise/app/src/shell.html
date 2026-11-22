@@ -310,6 +310,7 @@ tr.mgrp td span{color:var(--muted);margin-left:10px;font-family:var(--mono);font
 .seg button{border:none;background:transparent;padding:5px 11px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:6px}
 .seg button:hover{color:var(--ink);background:var(--hover)}
 .seg button[aria-pressed="true"]{background:var(--primary);color:#fff}
+#viewBar{margin-top:10px}
 .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .field-inline{border:1px solid var(--rule2);background:var(--card);border-radius:8px;padding:6px 10px;min-height:34px;font-size:13px;min-width:0}
 input.field-inline{width:220px;max-width:100%}
@@ -662,6 +663,7 @@ details.fold{margin-top:18px}details.fold>summary{cursor:pointer;font-weight:600
         <div class="crumb" id="pageGroup"></div>
         <h1 id="pageTitle">Today</h1>
         <div class="sub" id="pageSub"></div>
+        <div id="viewBar" hidden></div>
       </div>
       <div class="actions">
         <span class="actions" id="pageActs"></span>

@@ -115,20 +115,34 @@ function sideBadges(S){
   put('scorecard', () => { const n = ssUnsorted().length + ssPlace().length; return n ? [n, ''] : null; });
   return b;
 }
+/* A sidebar entry's count: the counts of every page it holds (Orders & receiving: late orders plus the store room;
+   Home: To do's urgent items), hot if any of them is. */
+function sideCount(b, id){
+  const parts = Object.keys(b).filter(k => navParent(k) === id).map(k => b[k]);
+  if (!parts.length) return null;
+  const nums = parts.map(p => p[0]).filter(n => typeof n === 'number');
+  return [nums.length ? nums.reduce((a, n) => a + n, 0) : parts[0][0], parts.some(p => p[1] === 'hot') ? 'hot' : ''];
+}
+/** The view switch under a page's title: the sidebar page's views, the open one pressed; '' for a page without views. */
+function renderViewBar(tab){
+  const vs = VIEWS[navParent(tab)];
+  if (!vs) return '';
+  return `<div class="seg viewbar" role="group" aria-label="${esc(pageLabel(navParent(tab)))} views">${vs.map(([id, l]) => `<button type="button" data-tab="${id}" aria-pressed="${tab === id}">${esc(l)}</button>`).join('')}</div>`;
+}
 function renderSide(S){
-  const b = sideBadges(S);
+  const b = sideBadges(S), cur = navParent(TAB);
   const item = ([id, label]) => {
-    const [c, tone] = b[id] || [];
+    const [c, tone] = sideCount(b, id) || [];
     const tail = c != null ? `<span class="sb ${tone || ''}">${c}</span>` : '';
-    const tip = id === 'vendors' ? ' title="Vendor contacts, terms and lead times"' : '';
-    return `<button type="button" class="sitem" data-tab="${id}"${TAB === id ? ' aria-current="page"' : ''}${tip}><span class="sl">${esc(label)}</span>${tail}</button>`;
+    return `<button type="button" class="sitem" data-tab="${id}"${cur === id ? ' aria-current="page"' : ''}><span class="sl">${esc(label)}</span>${tail}</button>`;
   };
-  $('#sideNav').innerHTML = NAV.map(g => `<div class="sgroup" role="group" aria-label="${esc(g.label)}"><div class="sglab" aria-hidden="true">${esc(g.label)}</div>${g.pages.map(item).join('')}</div>`).join('');
+  $('#sideNav').innerHTML = `<div class="sgroup">${item(HOME_PAGE)}</div>` + NAV.map(g => `<div class="sgroup" role="group" aria-label="${esc(g.label)}"><div class="sglab" aria-hidden="true">${esc(g.label)}</div>${g.pages.map(item).join('')}</div>`).join('');
   const foot = $('#sideFootNav'); if (foot) foot.innerHTML = FOOT_PAGES.map(item).join('');
-  const [title, sub] = TABHEAD[TAB] || [pageLabel(TAB) || 'Today', ''];
+  const [, sub] = TABHEAD[TAB] || ['', ''];
   const grp = NAV.find(g => g.key === pageGroup(TAB));
   $('#pageGroup').textContent = grp ? grp.label : '';
-  $('#pageTitle').textContent = title; $('#pageSub').textContent = sub;
+  $('#pageTitle').textContent = pageLabel(cur) || pageLabel(TAB) || 'Home'; $('#pageSub').textContent = sub;
+  const vb = $('#viewBar'); if (vb){ vb.innerHTML = renderViewBar(TAB); vb.hidden = !vb.innerHTML; }
   $('#pageActs').innerHTML = PAGE_ACTIONS[TAB] ? PAGE_ACTIONS[TAB]() : '';
 }
 const ANALYSIS_TABS = new Set(['today', 'scorecard', 'rounds', 'trends', 'stuck', 'inventory']);
@@ -137,11 +151,14 @@ const PAGE_ACTIONS = {brands: () => brandActions()};
 // Each page's title (its sidebar label) and one line saying what it is for.
 const TABHEAD = Object.fromEntries(Object.entries({
   today: "What needs you this week, and how the shop is doing.",
+  // Views of Orders & receiving, Upload & count and Settings keep their own line.
   orders: "Every purchase order, by vendor, season and month.",
   receiving: "What's arrived but isn't in the POS yet, and what's due.",
   attention: "Every order problem and item suggestion to work through.",
   vendors: "The vendors you buy from.",
   overview: "Room to buy by category and month, against what's committed.",
+  budget: "Room to buy by category and month, against what's committed.",
+  settings: "The rules the program grades and suggests by, and the forecast's assumptions.",
   seasons: "Each season's buy: prebooked, reorders and what's held back.",
   forecast: "Sales by month for this year and next.",
   guidelines: "The rules the program grades and suggests by, beside what's suggested and where the shop is now.",
