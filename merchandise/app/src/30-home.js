@@ -151,7 +151,7 @@ const ANALYSIS_TABS = new Set(['today', 'scorecard', 'rounds', 'trends', 'stuck'
 const PAGE_ACTIONS = {brands: () => brandActions()};
 // Each page's title (its sidebar label) and one line saying what it is for.
 const TABHEAD = Object.fromEntries(Object.entries({
-  today: "What needs you this week, and how the shop is doing.",
+  today: "What needs you this week, and how the shop is doing: buying, arrivals and sales.",
   // Views of Orders & receiving, Upload & count and Settings keep their own line.
   orders: "Every purchase order, by vendor, season and month.",
   receiving: "What's arrived but isn't in the POS yet, and what's due.",

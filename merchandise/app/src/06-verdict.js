@@ -6,7 +6,8 @@
 const vd = (tone, text) => ({tone, text});
 const vdPlural = (n, one, many) => `${n} ${n === 1 ? one : many || one + 's'}`;
 const PAGE_VERDICT = {
-  today: S => S && BASE ? PAGE_VERDICT.overview(S) : null,
+  // Home's own three lines (homeLines, 31-today.js) are its verdict; a header line would repeat the first.
+  today: () => null,
   overview(S){
     if (!S || !BASE || !PLANS.cur) return null;
     const left = leftToBuyWith(assumptions());
