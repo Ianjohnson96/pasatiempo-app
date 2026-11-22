@@ -510,14 +510,19 @@ def build_insights(ctx, calls):
     lbl = ' + '.join(date(2000, int(k[5:]), 1).strftime('%b') for k in last3)
     last3_lbl = f"{date(2000, int(last3[0][5:]), 1).strftime('%b')}–{date(2000, int(last3[-1][5:]), 1).strftime('%b')}"
 
-    def add(kind, pri, r, title, detail, action, metrics):
+    def add(kind, pri, r, title, detail, action, metrics, held=False):
         key = f"{kind}-{r['sku']}"
         if key in seen:
             return
         seen.add(key)
         metrics = dict(metrics, cost=round(r['cost'], 2))
-        out.append(dict(id=key, kind=kind, priority=round(pri, 2), sku=r['sku'], desc=r['desc'], cat=r['cat_no'], title=title,
-                        detail=detail, action=action, metrics=metrics))
+        item = dict(id=key, kind=kind, priority=round(pri, 2), sku=r['sku'], desc=r['desc'], cat=r['cat_no'], title=title,
+                    detail=detail, action=action, metrics=metrics)
+        if kind in ('stockout', 'reorder'):
+            item['buy'] = True     # only worth doing while the category is open to buy (the page checks its live call)
+        if held:
+            item['held'] = True    # its category was stopped at this upload
+        out.append(item)
 
     for s, r in snap.items():
         c = r['cat_no']
@@ -531,8 +536,10 @@ def build_insights(ctx, calls):
         aur = px(s) or r['cost'] * 1.8
         call = calls.get(c, 'buy')
         role = _ROLE_OF.get(c, 'fashion')
-        # Balls and gloves are never let run out, even in an overbought category.
-        may_reorder = call in ("buy", "replenish") or role == "consumable"
+        # Balls and gloves are never let run out, even in an overbought category. Reorder and out-of-stock items in a
+        # category the budget has stopped are still listed, marked held: the page shows them only while the category
+        # is open to buy by its live budget (a guideline or plan change can reopen it before the next upload).
+        held = not (call in ("buy", "replenish") or role == "consumable")
         oneoff = bool(re.search(r'\(|invitational|tournament|member.?guest|\b2[4-9]\b|ucsc|event', r['desc'], re.I))
         if oh < 0:
             dnu = bool(re.search(r'not use', r['desc'], re.I))
@@ -542,18 +549,18 @@ def build_insights(ctx, calls):
                 ('Find the SKU staff should be using, re-ring or adjust, and deactivate this one in the POS.' if dnu
                  else 'A receipt was never entered or sales are ringing to the wrong SKU. Fix before the next count.'), dict(oh=oh))
             continue
-        if oh == 0 and recent >= 12 and may_reorder and role != 'demo' and not oneoff:
+        if oh == 0 and recent >= 12 and role != 'demo' and not oneoff:
             add('stockout', recent * aur / 100, r, 'Out of stock and still in demand', f"Sold {recent} in {last3_lbl}; none on hand.",
-                'Reorder if it is a continuing item.', dict(recent=recent, oh=0, suggest=max(round(fwk * 9), 1)))
+                'Reorder if it is a continuing item.', dict(recent=recent, oh=0, suggest=max(round(fwk * 9), 1)), held)
             continue
         if oh <= 0:
             continue
         wos = oh / fwk if fwk > 0 else None
-        if wos is not None and wos < 6 and recent >= 12 and may_reorder and role != 'demo' and not oneoff:
+        if wos is not None and wos < 6 and recent >= 12 and role != 'demo' and not oneoff:
             need = max(round(fwk * 9 - oh), 1)
             add('reorder', (6 - wos) * fwk * aur / 50, r, f"About {max(round(wos), 1)} week{'s' if round(wos) != 1 else ''} of stock left",
                 f"{oh} on hand; selling about {fwk:.1f} a week over the next few months.",
-                f"Reorder now to cover the next 8–10 weeks (about {need} units).", dict(oh=oh, perWeek=round(fwk, 1), wos=round(wos, 1), suggest=need))
+                f"Reorder now to cover the next 8–10 weeks (about {need} units).", dict(oh=oh, perWeek=round(fwk, 1), wos=round(wos, 1), suggest=need), held)
             continue
         days = (as_of - ls).days if ls else 9999
         if days > 365 and val >= 400:
@@ -591,7 +598,9 @@ def build_insights(ctx, calls):
     cap = {'stockout': 15, 'reorder': 25, 'aged': 25, 'overstock': 15, 'margin': 12, 'split': 20, 'data': 13}
     final = []
     for k, n in cap.items():
-        final += sorted([o for o in out if o['kind'] == k], key=lambda o: -o['priority'])[:n]
+        # held items have their own allowance, so they never crowd out the ones the budget allows now
+        final += sorted([o for o in out if o['kind'] == k and not o.get('held')], key=lambda o: -o['priority'])[:n]
+        final += sorted([o for o in out if o['kind'] == k and o.get('held')], key=lambda o: -o['priority'])[:10]
     return dict(asOf=as_of.isoformat(), items=final)
 
 

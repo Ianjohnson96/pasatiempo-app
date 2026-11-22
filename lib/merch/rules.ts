@@ -172,6 +172,7 @@ function guidelinesProblem(d: Record<string, unknown>): string | null {
   if (d.mix != null) {
     if (!isObj(d.mix)) return "mix must be an object";
     if (d.mix.total != null && !numIn(d.mix.total, 1, 1e9)) return "mix total must be a positive amount";
+    if (d.mix.follow != null && d.mix.follow !== "suggested") return "mix follow must be 'suggested' or left out";
     if (d.mix.ranges != null) {
       if (!isObj(d.mix.ranges)) return "mix ranges must be an object";
       for (const [r, x] of Object.entries(d.mix.ranges))

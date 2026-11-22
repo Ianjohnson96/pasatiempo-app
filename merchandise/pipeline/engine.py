@@ -8,7 +8,8 @@
   shelf      sales less special orders (cats[c].so: the month's own share, else the same month's a year earlier);
              budgets are set on shelf sales and shelf stock (on hand less soOnHand)
   cost       shelf sales x (1 - realized margin)
-  target EOM weeks of supply x next four months' cost / 17.3 weeks
+  target EOM weeks of supply x next four months' cost / 17.3 weeks; with a saved mix total (Guidelines -> Merchandise mix)
+             every category's weeks are scaled by one factor so the target averages that total over the first 12 months
   OTB        target EOM - opening inventory + cost of sales for the month  (the current month counts only what is left)
 """
 from model import add_months, fy_months, fy_of
@@ -85,10 +86,23 @@ def so_share(v, k):
     return 0
 
 
-def run(base, a=None, carry=None):
+def mix_scale(total, months, target, exclude):
+    """The factor for every budgeted category's target weeks that makes the target month-end stock, averaged over the
+    first 12 months planned, equal the mix total; 1 with no total. Target stock is linear in the weeks, so it is exact.
+    Mirrors mixScale() in app/src/20-engine.js."""
+    if not (isinstance(total, (int, float)) and not isinstance(total, bool) and total > 0):
+        return 1.0
+    year = months[:12]
+    t = sum(target[c][k] for c in target if c not in exclude for k in year)
+    avg = t / len(year) if year else 0
+    return total / avg if avg > 0 else 1.0
+
+
+def run(base, a=None, carry=None, mix_total=None):
     """Monthly OTB by category from the current month through the end of next fiscal year.
     a: the saved plan (plan/assumptions, either shape) or None for the defaults.
-    carry: {cat: $} inventory above plan entering next year (committed orders beyond this year's budget)."""
+    carry: {cat: $} inventory above plan entering next year (committed orders beyond this year's budget).
+    mix_total: the owner's saved total stock to plan for (guidelines/current mix.total), which the budget is linked to."""
     a = resolve(base, a)
     carry = carry or {}
     wos = a['wos']
@@ -99,23 +113,28 @@ def run(base, a=None, carry=None):
     if part:
         share = 1 - part['actual'] / sum(S[c][part['m']] for c in S)
     months = [k for k in m27 + m28 if k >= start]
+    shelf, target = {}, {}
+    for c, v in base['cats'].items():
+        cr = 1 - v['gm']
+        sh = shelf[c] = {k: x * (1 - so_share(v, k)) for k, x in S[c].items()}
+        target[c] = {k: wos.get(c, 0) * sum(sh[add_months(k, i + 1)] for i in range(4)) / 17.3 * cr for k in months}
+    scale = mix_scale(mix_total, months, target, base.get('exclude') or ['640'])
     res = {}
     for c, v in base['cats'].items():
         cr = 1 - v['gm']
-        shelf = {k: x * (1 - so_share(v, k)) for k, x in S[c].items()}
         bom = v['onHand'] - v.get('soOnHand', 0)
         rows = []
         for k in months:
             if k == m28[0]:
                 bom += carry.get(c, 0)
             f = share if part and k == part['m'] else 1
-            sales, sh = S[c][k] * f, shelf[k] * f
+            sales, sh = S[c][k] * f, shelf[c][k] * f
             cogs = sh * cr
-            eom = wos.get(c, 0) * sum(shelf[add_months(k, i + 1)] for i in range(4)) / 17.3 * cr
+            eom = target[c][k] * scale
             rows.append(dict(m=k, sales=sales, shelf=sh, cogs=cogs, bom=bom, eom=eom, otb=eom - bom + cogs))
             bom = eom
         res[c] = rows
-    return dict(sales=S, months=months, cats=res, share=share, m27=m27, m28=m28)
+    return dict(sales=S, months=months, cats=res, share=share, m27=m27, m28=m28, scale=scale)
 
 
 def totals(r, cats, fy_months_):

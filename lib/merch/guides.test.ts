@@ -20,7 +20,7 @@ describe("guideValues", () => {
     expect(v.roles.fashion.wks).toEqual([12, 16, 8, 24]);
     expect(v.memberDiscount).toBe(0.25);
     expect(v.seasons).toEqual({ spring: 1, summer: 5, fall: 8, holiday: 11 });
-    expect(v.mix).toEqual({ total: null, ranges: {} });
+    expect(v.mix).toEqual({ total: null, follow: null, ranges: {} });
   });
 
   it("partial document", () => {
@@ -40,7 +40,7 @@ describe("guideValues", () => {
     expect(v.memberDiscount).toBe(0.25);
     expect(v.seasons.summer).toBe(5);
     expect(v.roleOf["480"]).toBe("fashion");
-    expect(v.mix).toEqual({ total: null, ranges: {} });
+    expect(v.mix).toEqual({ total: null, follow: null, ranges: {} });
   });
 
   it("keeps valid overrides", () => {
@@ -49,7 +49,7 @@ describe("guideValues", () => {
     expect(v.bench.gm.apparel).toBe(0.48);
     expect(v.bench.gm.accessories).toBe(0.4);
     expect(v.roles.impulse.wks).toEqual([10, 18, 8, 26]);
-    expect(v.mix).toEqual({ total: 700000, ranges: { fashion: [38, 48] } });
+    expect(v.mix).toEqual({ total: 700000, follow: null, ranges: { fashion: [38, 48] } });
     expect(v.seasons.summer).toBe(4);
   });
 });
@@ -92,7 +92,7 @@ describe("applyGuides", () => {
 // 19-guides.js: merchandise mix and suggested values (pure).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const X: any = vm.runInNewContext(read("17-metrics.js") + "\n" + read("19-guides.js")
-  + ";({parseMoney, salesShareByRole, suggestedRanges, suggestedTotal, mixRows, rangeSum, mixStock})");
+  + ";({parseMoney, salesShareByRole, suggestedRanges, suggestedTotal, mixRows, rangeSum, turnsFor, mixTotalOf, guideValues, mixStock})");
 
 describe("mix and suggestions", () => {
   it("parseMoney", () => {
@@ -120,6 +120,30 @@ describe("mix and suggestions", () => {
   it("suggested total is cost of sales over the turns target", () => {
     expect(X.suggestedTotal([{ cat: "480", t12: 1000, gm: 0.4 }, { cat: "640", t12: 5000, gm: 0.1 }], 2.5)).toBe(240);
     expect(X.suggestedTotal([], 2.5)).toBe(0);
+    // special orders need no shelf stock: only the shelf part of sales counts, as in the budget
+    expect(X.suggestedTotal([{ cat: "200", t12: 1000, so: 600, gm: 0.2 }], 2)).toBe(160);
+  });
+
+  // Shared with merchandise/pipeline/test_guidelines.py (config.suggested_total, config.mix_total): same rows, same answers.
+  const MIXROWS = [{ cat: "480", t12: 10000, gm: 0.5 }, { cat: "620", t12: 6000, so: 1000, gm: 0.4 }, { cat: "160", t12: 9000, gm: 0.25 },
+    { cat: "200", t12: 4000, so: 3000, gm: 0.2 }, { cat: "640", t12: 5000, gm: 0.1 }];
+  it("suggested total uses each category's own turns target", () => {
+    const v = X.guideValues(null);
+    expect(X.turnsFor(v.bench, "160")).toBe(3);
+    expect(X.turnsFor(v.bench, "620")).toBe(2);
+    // 5000/2 + 3000/2 + 6750/3 + 800/2 = 2500 + 1500 + 2250 + 400
+    expect(X.suggestedTotal(MIXROWS, (c: string) => X.turnsFor(v.bench, c))).toBe(6650);
+    const fast = X.guideValues({ bench: { turns: { accessories: 4 } } });
+    expect(X.suggestedTotal(MIXROWS, (c: string) => X.turnsFor(fast.bench, c))).toBe(5900);
+  });
+  it("the linked total: typed, or the suggestion while following it", () => {
+    expect(X.mixTotalOf(null, MIXROWS)).toBeNull();
+    expect(X.mixTotalOf({ mix: { total: 632720 } }, MIXROWS)).toBe(632720);
+    expect(X.mixTotalOf({ mix: { total: 632720, follow: "suggested" } }, MIXROWS)).toBe(6650);
+    expect(X.mixTotalOf({ mix: { total: 632720, follow: "suggested" }, bench: { turns: { accessories: 4 } } }, MIXROWS)).toBe(5900);
+    // no sales to work from: the typed total stands
+    expect(X.mixTotalOf({ mix: { total: 632720, follow: "suggested" } }, [])).toBe(632720);
+    expect(X.guideValues({ mix: { follow: "onhand" } }).mix.follow).toBeNull();
   });
 
   const onHand = { fashion: 223463, impulse: 299966, hardgoods: 111568, consumable: 40230, demo: 10125 };

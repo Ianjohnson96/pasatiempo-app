@@ -15,7 +15,7 @@ function seasonRows(){
 }
 function renderSeasons(S){
   if (!BASE || !PLANS.cur){ $('#pane').innerHTML = `<section class="panel"><div class="note">Season buys load after the first month-end refresh.</div></section>`; return; }
-  const rows = seasonRows(), list = seasonList(rows, THIS_MONTH);
+  const rows = seasonRows(), list = seasonList(rows, THIS_MONTH, planOfMonth(THIS_MONTH) ? [THIS_MONTH] : []);
   if (!list.length){ $('#pane').innerHTML = `<section class="panel"><header><h2>Season buys</h2></header><div class="empty"><p>No orders are in the book yet.</p></div></section>`; return; }
   const season = list.find(s => s.label === SB.season) || list[0]; SB.season = season.label;
   const T = seasonBuys(rows, season), months = seasonMonths(season), CM = committedMatrix();

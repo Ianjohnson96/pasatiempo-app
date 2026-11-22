@@ -206,3 +206,18 @@ if __name__ == '__main__':
         if name.startswith('test_'):
             fn()
             print('ok', name)
+
+
+def test_reorders_in_a_stopped_category_are_listed_held():
+    """A fast seller running out in a category the budget has stopped is still listed, marked held, so the page can show
+    it as soon as a guideline or plan change reopens the category; with the category open it is an ordinary item."""
+    from model import build_insights
+    units = {k: 30 for k in fy_months(2026)[3:] + ['2026-05', '2026-06']}
+    rep = sku_report('2026-06', units)
+    rep['rows'][0].update(last_rec='Jun01/26', last_sale='Jun20/26')
+    prior = dict(base=prior_base(2027, {k: 1000.0 for k in fy_months(2026)}, {}), skuhist={'meta': {'A1': ['480', 'Polo', 50.0]}})
+    b = build({'sku_analysis': [rep]}, prior)
+    stopped = [i for i in build_insights(b['ctx'], {'480': 'stop'})['items'] if i['sku'] == 'A1']
+    open_ = [i for i in build_insights(b['ctx'], {'480': 'buy'})['items'] if i['sku'] == 'A1']
+    assert [i['kind'] for i in stopped] == ['reorder'] and stopped[0]['held'] and stopped[0]['buy']
+    assert [i['kind'] for i in open_] == ['reorder'] and 'held' not in open_[0] and open_[0]['buy']

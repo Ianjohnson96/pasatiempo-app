@@ -39,6 +39,55 @@ def guided(g):
             md = float(v)
     return role_of, md
 
+# Turns targets (17-metrics.js BENCH_DEFAULT.turns): balls and gloves turn faster; the rest by Scorecard segment.
+TURNS_DEFAULT = {'apparel': 2, 'accessories': 2, 'equipment': 2, 'fast': 3}
+FAST_TURN = {'160', '320'}
+
+
+def seg_of(c):
+    return 'equipment' if c in ('160', '200', '220', '300', '320', '350') else 'accessories' if c in ('440', '620', '660') else 'apparel'
+
+
+def _num(v, lo, hi):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and lo <= v <= hi
+
+
+def turns_targets(g):
+    """The turns targets from saved Guidelines (bench.turns), the defaults where missing or invalid."""
+    t = dict(TURNS_DEFAULT)
+    s = (((g or {}).get('bench') or {}).get('turns') or {}) if isinstance(g, dict) else {}
+    for k in t:
+        if isinstance(s, dict) and _num(s.get(k), 0, 52):
+            t[k] = s[k]
+    return t
+
+
+def suggested_total(rows, turns):
+    """Shelf stock the last 12 months' sales support: each category's cost of shelf sales ((t12 - special orders) x
+    (1 - margin)) over its turns target. Mirrors suggestedTotal() in app/src/19-guides.js."""
+    stock = 0.0
+    for r in rows or []:
+        c = r.get('cat') if isinstance(r, dict) else None
+        if not c or c == '640':
+            continue
+        t = turns['fast'] if c in FAST_TURN else turns[seg_of(c)]
+        if t > 0:
+            stock += max(0.0, (r.get('t12') or 0) - (r.get('so') or 0)) * (1 - (r.get('gm') or 0)) / t
+    return int(stock + 0.5)
+
+
+def mix_total(g, rows=None):
+    """The total stock the budget's target weeks are linked to (engine.mix_scale), from saved Guidelines: the suggested
+    total from these assort rows and the saved turns targets while mix.follow is 'suggested', else mix.total; None for
+    none. Mirrors mixTotalOf() in app/src/19-guides.js."""
+    m = ((g or {}).get('mix') or {}) if isinstance(g, dict) else {}
+    m = m if isinstance(m, dict) else {}
+    typed = float(m['total']) if _num(m.get('total'), 1, 1e9) else None
+    if m.get('follow') == 'suggested':
+        s = suggested_total(rows, turns_targets(g))
+        return float(s) if s > 0 else typed
+    return typed
+
 # Target weeks of supply at cost for end-of-month inventory.
 TARGET_WOS = {'620': 14, '440': 13, '480': 10, '490': 11, '400': 10, '200': 14, '500': 12, '470': 12, '160': 14,
               '640': 10, '320': 13, '350': 14, '300': 14, '660': 10, '220': 10, '430': 12}
