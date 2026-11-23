@@ -230,7 +230,7 @@ function rcvChart(rows){
 const ago = iso => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : dateLabel(iso.slice(0, 10)); };
 function logStatusHtml(){
   const btn = canAct() && isAdmin ? ` <button class="btn sm" type="button" data-logread="1">Read the log now</button>` : '';
-  const failed = LOGPOKE && LOGPOKE.error ? `<div class="warnbox" role="alert"><b>Reading the receiving log failed${LOGPOKE.status ? ` (code ${LOGPOKE.status})` : ''}:</b> ${esc(LOGPOKE.error)}${btn}</div>` : '';
+  const failed = LOGPOKE && LOGPOKE.error ? `<div class="warnbox" role="alert"><b>Reading the receiving log failed${LOGPOKE.status && LOGPOKE.status !== 200 ? ` (code ${LOGPOKE.status})` : ''}:</b> ${esc(LOGPOKE.error)}${btn}</div>` : '';
   if (failed) return failed;
   if (!RLOG) return `<div class="warnbox info"><b>The receiving log isn't connected yet.</b> Once it is, every row the accounting team adds shows up here to match against an order. Setup: docs/merch-receiving-log-setup.md (the owner, once).${btn}</div>`;
   const probs = (RLOG.problems || []).length;
