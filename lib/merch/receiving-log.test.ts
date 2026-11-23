@@ -72,4 +72,9 @@ describe("reading the receiving log", () => {
     for (const tb of broken) if (tb.values[0]) tb.values[0] = tb.values[0].map((h: string) => (h === "PRICE" ? "AMOUNT" : h));
     expect(parseLog(broken, { since: "2026-01-01", words: VENDOR_WORDS_DEFAULT }).tabsRead).toBe(0);
   });
+  it("lists only problems in rows from the go-live date on; older rows don't matter", () => {
+    // since = Nov 1: the 2026-02-26-ish typo rows, the January rows and the earlier tabs are before it
+    const { problems } = read("2026-11-01");
+    expect(problems).toEqual(["SHEET 4 1/1-12-31/2026 row 13: no price"]);
+  });
 });
