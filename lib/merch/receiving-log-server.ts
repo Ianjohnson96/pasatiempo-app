@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { GoogleError, googleClientEmail, googleConfigured, readSheetTabs } from "./google";
+import { GoogleError, googleClientEmail, googleConfigured, googleKeyProblem, readSheetTabs } from "./google";
 import { parseLog, VENDOR_WORDS_DEFAULT } from "./receiving-log";
 import { pacificToday } from "./schedule";
 
@@ -39,7 +39,9 @@ class LayoutError extends Error {}
 
 /** The plain line the page shows for a failed read. */
 function failure(e: unknown, previousAt: string | null): string {
-  if (!googleConfigured()) return "The receiving log isn't connected yet. See the setup steps.";
+  const k = googleKeyProblem();
+  if (k === "missing") return "The receiving log isn't connected yet: this deployment has no GOOGLE_SERVICE_ACCOUNT_JSON. Add it in Vercel for Production and redeploy.";
+  if (k) return `GOOGLE_SERVICE_ACCOUNT_JSON is set but isn't a readable key file (${k === "unreadable" ? "it isn't valid JSON: paste the downloaded file's text exactly, with straight quotes" : "it has no client_email or private_key: use the JSON key file, not another file"}).`;
   if (e instanceof LayoutError) return "No tab in the receiving log has the columns REC. DATE, ITEM DESCRIPTION, INVOICE # and PRICE. Was a heading renamed? Showing the rows from the last good read.";
   const status = e instanceof GoogleError ? e.status : 0;
   if (status === 403 || status === 404) return `The app can't open the receiving log. Share it with ${googleClientEmail()} as Viewer.`;

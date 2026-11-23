@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
-import { googleConfigured, readSheetTabs, serviceToken } from "./google";
+import { googleConfigured, googleKeyProblem, readSheetTabs, serviceToken } from "./google";
 
 const { publicKey, privateKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
 const KEY = { client_email: "reader@example.iam.gserviceaccount.com", private_key: privateKey.export({ type: "pkcs8", format: "pem" }).toString() };
@@ -47,5 +47,14 @@ describe("Google service account", () => {
     expect(seen.every((u) => !/:batchUpdate|values\/.*:append|method=POST/.test(u))).toBe(true);
     const no = (async (url: string) => String(url).includes("oauth2") ? new Response(JSON.stringify({ access_token: "t", expires_in: 3600 })) : new Response("{}", { status: 403 })) as unknown as typeof fetch;
     await expect(readSheetTabs("sheet1", no)).rejects.toMatchObject({ status: 403 });
+  });
+  it("says what is wrong with the key: missing, not JSON, or not a service account key", () => {
+    expect(googleKeyProblem()).toBe("missing");
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = "{“type”: “service_account”}";   // curly quotes from a word processor
+    expect(googleKeyProblem()).toBe("unreadable");
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({ type: "service_account" });
+    expect(googleKeyProblem()).toBe("incomplete");
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify(KEY);
+    expect(googleKeyProblem()).toBeNull();
   });
 });

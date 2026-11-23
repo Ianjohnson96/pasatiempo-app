@@ -21,6 +21,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(await refreshReceivingLog({ force }));
   } catch (e) {
     console.error("receiving log route", e);
-    return NextResponse.json({ ok: false, error: "The receiving log couldn't be read right now." }, { status: 503 });
+    // The owner sees what went wrong (these messages are the app's own, never credentials); others a plain line.
+    const why = me.role === "owner" && e instanceof Error ? ` (${e.message})` : "";
+    return NextResponse.json({ ok: false, error: `The receiving log couldn't be read right now${why}.` }, { status: 503 });
   }
 }

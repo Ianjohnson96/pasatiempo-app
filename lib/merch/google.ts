@@ -31,6 +31,20 @@ function key(): Key | null {
 }
 
 export const googleConfigured = (): boolean => key() !== null;
+/** What's wrong with GOOGLE_SERVICE_ACCOUNT_JSON, or null: not set, not JSON (e.g. curly quotes from a word processor),
+    or JSON without the service account's email and private key. */
+export function googleKeyProblem(): "missing" | "unreadable" | "incomplete" | null {
+  const raw = (process.env.GOOGLE_SERVICE_ACCOUNT_JSON || "").trim();
+  if (!raw) return "missing";
+  let k: unknown;
+  try {
+    k = JSON.parse(raw);
+  } catch {
+    return "unreadable";
+  }
+  const o = k as Partial<Key> | null;
+  return o && typeof o.client_email === "string" && typeof o.private_key === "string" ? null : "incomplete";
+}
 export const googleClientEmail = (): string | null => key()?.client_email ?? null;
 
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

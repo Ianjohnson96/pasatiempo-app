@@ -131,14 +131,31 @@ function undoLogRow(key, onlyPo){
   });
 }
 /* Opening Orders & receiving asks the server to read the log again (it reads at most every two minutes); the copy
-   arrives with the next poll. */
-let logPokedAt = 0;
+   arrives with the next poll. LOGPOKE is how the last request went, so a read that fails before it can save anything
+   (the app unreachable, an error on the server) still shows on the page, with its code. The owner can read now. */
+let logPokedAt = 0, LOGPOKE = null;
+async function readLogNow(force){
+  const base = ((typeof window !== 'undefined' && window.MERCH_HOST) || {}).base || '';
+  try {
+    const r = await fetch(base + '/api/receiving-log', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({force: !!force})});
+    const text = await r.text(); let j = null; try { j = JSON.parse(text); } catch (_) {}
+    LOGPOKE = {at: Date.now(), status: r.status, rows: j && j.rows, skipped: j && j.skipped,
+      error: r.ok && j && j.ok !== false ? null : (j && j.error) || `The app answered ${r.status} when asked to read the receiving log.`};
+  } catch (_){
+    LOGPOKE = {at: Date.now(), status: 0, error: "Couldn't reach the app to read the receiving log. Check the connection and try again."};
+  }
+  LOGQ_GEN++;
+  if (typeof render === 'function') render();
+  return LOGPOKE;
+}
 function pokeReceivingLog(){
   if (!canAct() || typeof window === 'undefined' || !window.MERCH_HOST || Date.now() - logPokedAt < 120000) return;
   logPokedAt = Date.now();
-  fetch(window.MERCH_HOST.base + '/api/receiving-log', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: '{}'}).catch(() => {});
+  readLogNow(false);
 }
 document.addEventListener('click', async e => {
+  const r = e.target.closest && e.target.closest('[data-logread]');
+  if (r){ r.disabled = true; const x = await readLogNow(true); toast(x.error ? 'The receiving log could not be read: see the message on the page.' : x.skipped ? 'The receiving log was read moments ago.' : `Receiving log read: ${x.rows || 0} row${x.rows === 1 ? '' : 's'} from the go-live date on.`); return; }
   const b = e.target.closest && e.target.closest('[data-logok],[data-lognot],[data-logundo]');
   if (!b) return;
   b.disabled = true;
@@ -212,9 +229,12 @@ function rcvChart(rows){
    whose row has changed in the log. */
 const ago = iso => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : dateLabel(iso.slice(0, 10)); };
 function logStatusHtml(){
-  if (!RLOG) return `<div class="warnbox info"><b>The receiving log isn't connected yet.</b> Once it is, every row the accounting team adds shows up here to match against an order. Setup: docs/merch-receiving-log-setup.md (the owner, once).</div>`;
+  const btn = canAct() && isAdmin ? ` <button class="btn sm" type="button" data-logread="1">Read the log now</button>` : '';
+  const failed = LOGPOKE && LOGPOKE.error ? `<div class="warnbox" role="alert"><b>Reading the receiving log failed${LOGPOKE.status ? ` (code ${LOGPOKE.status})` : ''}:</b> ${esc(LOGPOKE.error)}${btn}</div>` : '';
+  if (failed) return failed;
+  if (!RLOG) return `<div class="warnbox info"><b>The receiving log isn't connected yet.</b> Once it is, every row the accounting team adds shows up here to match against an order. Setup: docs/merch-receiving-log-setup.md (the owner, once).${btn}</div>`;
   const probs = (RLOG.problems || []).length;
-  return `<div class="note">${RLOG.error ? `<span class="neg"><b>${esc(RLOG.error)}</b></span>` : `Receiving log read ${esc(ago(RLOG.readAt || RLOG.at))}, rows from ${esc(dateLabel(RLOG.since))} on.`}
+  return `<div class="note">${RLOG.error ? `<span class="neg"><b>${esc(RLOG.error)}</b></span>` : `Receiving log read ${esc(ago(RLOG.readAt || RLOG.at))}, rows from ${esc(dateLabel(RLOG.since))} on.`}${btn}
     ${probs ? ` <details style="display:inline"><summary>${probs} row${probs === 1 ? '' : 's'} couldn't be read</summary><ul>${RLOG.problems.map(p => `<li>${esc(p)}</li>`).join('')}</ul></details>` : ''}</div>`;
 }
 const logRowCells = r => `<td data-l="Date">${dateLabel(r.date)}</td><td class="wrapv">${esc(r.desc)}${r.special ? ' <span class="pill">special order</span>' : ''}</td><td data-l="Invoice">${esc(r.invoice || '—')}</td><td data-l="Amount" class="r num ${r.amount < 0 ? 'neg' : ''}">${money(r.amount)}</td>`;
