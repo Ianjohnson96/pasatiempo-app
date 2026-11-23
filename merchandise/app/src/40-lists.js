@@ -150,7 +150,7 @@ const KIND_NOTE = {
 
 /* ---------- inventory & counts tab ---------- */
 function renderInventory(S){
-  const rows = catList().map(c => { const i = INV.cats[c.code] || {units:0,cost:0,aged:0,skus:0}; const wks = wksNow(c.code, i.cost);
+  const rows = catList().map(c => { const i = INV.cats[c.code] || {units:0,cost:0,aged:0,skus:0}; const wks = catWeeks(c.code, shelfCost(c.code, i.cost));
     return {c, i, wks, tgt: c.target, gap: i.cost - (c.target || 0)}; });
   const T = rows.reduce((a,r) => ({units:a.units + r.i.units, cost:a.cost + r.i.cost, aged:a.aged + r.i.aged, skus:a.skus + r.i.skus}), {units:0,cost:0,aged:0,skus:0});
   const counts = [...COUNTS].sort((a,b) => String(b.date).localeCompare(String(a.date)));

@@ -1,0 +1,151 @@
+{
+ "note": "Made-up rows in the receiving log's real layout (headers, carried-down dates, text prices, a Credits tab).",
+ "tabs": [
+  {
+   "title": "Sheet 3 - 1/1-12/31/2025",
+   "values": [
+    [
+     "REC. DATE",
+     "ITEM DECRIPTION",
+     "INVOICE #",
+     "PRICE",
+     "DEL. DATE"
+    ],
+    [
+     "12/30/2025",
+     "Hats Imperial Mens Stock",
+     "1400001",
+     "$500.00"
+    ]
+   ]
+  },
+  {
+   "title": "SHEET 4 1/1-12-31/2026",
+   "values": [
+    [
+     "REC. DATE",
+     "ITEM DECRIPTION",
+     "INVOICE #",
+     "PRICE",
+     "DEL. DATE"
+    ],
+    [
+     "1/2/2026",
+     "Putter Scotty Cameron OC Stock",
+     "922012618",
+     "$377.97"
+    ],
+    [
+     "",
+     "T-shirts Angus & Grace Mens Stock",
+     "211",
+     "$1,891.62"
+    ],
+    [
+     "1/5/2026",
+     "Shirts/Sweaters FJ Mens Stock",
+     "9000498548",
+     "$1,038.82"
+    ],
+    [
+     "",
+     "T-Shirts/Backpack H&B Mens Stock",
+     "90114307",
+     "$2,780.92"
+    ],
+    [
+     "",
+     "Hats Melin Mens Stock",
+     "2387808",
+     "$4,950.21"
+    ],
+    [
+     "2/26/2025",
+     "Shirts Straight Down Mens Stock",
+     "149187",
+     "$4,295.50"
+    ],
+    [
+     "",
+     "Shirts Straight Down Ladies Stock",
+     "150426",
+     "$2,003.78"
+    ],
+    [
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "11/11/2026",
+     "Shirts/Sweaters/Jackets/Hats Angus & Grace Stock",
+     "512 Corp Crd",
+     "$22,332.00"
+    ],
+    [
+     "11/12/26",
+     "Woods Titleist GTS (Capurro)",
+     "9000724742",
+     "$613.27"
+    ],
+    [
+     "",
+     "Woods Titleist GTS (Capurro)",
+     "9000724742",
+     "$613.27"
+    ],
+    [
+     "",
+     "Balls Titleist ProV1 Stock",
+     "9000736536",
+     ""
+    ]
+   ]
+  },
+  {
+   "title": "SHEET 5 1/1-12/31/2027",
+   "values": [
+    [
+     "REC. DATE",
+     "ITEM DECRIPTION",
+     "INVOICE #",
+     "PRICE",
+     "DEL. DATE"
+    ]
+   ]
+  },
+  {
+   "title": "Credits",
+   "values": [
+    [
+     "DATE",
+     "ITEM DESCRIPTION",
+     "INVOICE #",
+     "PRICE"
+    ],
+    [
+     "3/7/26",
+     "Woods Stock Return TaylorMade Stealth",
+     "36402076",
+     "-$1,327.56"
+    ],
+    [
+     "11/13/26",
+     "FJ Return (Smith)",
+     "555",
+     "-$48.00"
+    ]
+   ]
+  },
+  {
+   "title": "Notes",
+   "values": [
+    [
+     "anything",
+     "else"
+    ]
+   ]
+  }
+ ]
+}

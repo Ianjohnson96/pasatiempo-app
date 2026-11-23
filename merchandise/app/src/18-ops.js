@@ -190,3 +190,84 @@ function seasonBuys(rows, season) {
 function posDates(t) {
   return String(t == null ? "" : t).replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(\d{1,2})\/(\d{2})\b/g, (_, m, d, y) => `${m} ${+d}, 20${y}`);
 }
+
+/* ---------- receiving log matching (pure) ----------
+   Rows come from receivinglog/current (lib/merch/receiving-log.ts parses the sheet on the server). The page suggests
+   which order a row belongs to; a person confirms. vendorKeyOf(po) gives an order's vendor key; openOf(po) what is
+   still open on it. Spec: docs/superpowers/specs/2026-11-22-merch-phase2-design.md, stage 2. */
+const LOG_RE = new Map();   // compiled once per word: matching runs over every row and order on each redraw
+const logWordRe = w => LOG_RE.get(w) || LOG_RE.set(w, new RegExp('(^|[^a-z0-9])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-z0-9])')).get(w);
+/** The vendor key a vendor's name belongs to: the key itself or one of its words, as a whole word; longest wins. */
+function vendorKeyFor(name, words) {
+  const n = ' ' + String(name || '').toLowerCase() + ' ';
+  let best = null, len = 0;
+  for (const k of Object.keys(words || {})) for (const w of [k].concat(words[k] || [])) {
+    const x = String(w).toLowerCase().trim();
+    if (x && x.length > len && logWordRe(x).test(n)) { best = k; len = x.length; }
+  }
+  return best;
+}
+const monthGap = (a, b) => Math.abs((+a.slice(0, 4) * 12 + +a.slice(5, 7)) - (+b.slice(0, 4) * 12 + +b.slice(5, 7)));
+/** Orders a log row could belong to: same vendor, delivery month within one month of the row's, and enough still
+    open (2% leeway); a credit can go against any order of the vendor in that window that isn't cancelled. Nearest
+    month first, then nearest amount. */
+function logCandidates(row, orders, vendorKeyOf, openOf) {
+  if (!row || !row.brand) return [];
+  const m = String(row.date).slice(0, 7);
+  return (orders || []).filter(p => {
+    // a late order (due before the row's month) can match however late it is; otherwise within a month either way
+    if (!p || !p.deliveryMonth || vendorKeyOf(p) !== row.brand || (monthGap(p.deliveryMonth, m) > 1 && !(p.deliveryMonth < m && !row.credit))) return false;
+    if (row.credit) return p.status !== 'cancelled';
+    return (p.status === 'open' || p.status === 'partial' || p.status === 'hold') && Number(openOf(p)) >= row.amount * 0.98;
+  }).sort((a, b) => monthGap(a.deliveryMonth, m) - monthGap(b.deliveryMonth, m) || Math.abs(openOf(a) - row.amount) - Math.abs(openOf(b) - row.amount));
+}
+/** The Receiving view's lists: rows to match (with their candidates), rows not from an order (none possible, or marked
+    by a person), rows matched, and matches whose row is no longer in the log. */
+function logQueue(rows, orders, decisions, vendorKeyOf, openOf) {
+  const out = {toMatch: [], notOrder: [], matched: [], changed: [], twice: []}, have = new Set();
+  // What an order carries is the record of a match: a row is matched when some order has its entry, even if the call
+  // (logmatch) failed to save; a row on two orders is flagged.
+  const carriers = new Map(), byVendor = new Map(), keyOf = new Map();
+  for (const p of orders || []) {
+    for (const e of p.invoicesIn || []) if (e && e.logKey) (carriers.get(e.logKey) || carriers.set(e.logKey, []).get(e.logKey)).push(p.id);
+    const k = vendorKeyOf(p); keyOf.set(p, k);
+    if (k) (byVendor.get(k) || byVendor.set(k, []).get(k)).push(p);
+  }
+  const vk = p => keyOf.has(p) ? keyOf.get(p) : vendorKeyOf(p);
+  for (const row of rows || []) {
+    have.add(row.key);
+    const on = carriers.get(row.key) || [], d = (decisions || {})[row.key];
+    if (on.length > 1) out.twice.push({key: row.key, pos: on.slice()});
+    if (on.length) { out.matched.push({row, po: on[0]}); continue; }
+    if (d && d.state === 'matched') { out.matched.push({row, po: d.po}); continue; }
+    if (d && d.state === 'notorder') { out.notOrder.push({row, why: 'marked'}); continue; }
+    const cands = logCandidates(row, byVendor.get(row.brand) || [], vk, openOf);
+    if (cands.length) out.toMatch.push({row, cands}); else out.notOrder.push({row, why: 'none'});
+  }
+  const gone = new Set();
+  for (const [key, on] of carriers) if (!have.has(key)) for (const po of on) { out.changed.push({key, po}); gone.add(key); }
+  for (const [key, d] of Object.entries(decisions || {})) if (d && d.state === 'matched' && !have.has(key) && !gone.has(key)) out.changed.push({key, po: d.po});
+  return out;
+}
+/** An order's invoice entries after a save conflict: theirs, less what we removed (an Undo), plus what we added (a
+    Confirm), so two people's confirms on one order both survive (club-shim.js merge3). An entry is known by its log
+    row, or by when and what it was. */
+function mergeInvoices(base, ours, theirs) {
+  const id = e => e && e.logKey ? 'L' + e.logKey : 'E' + [e && e.at, e && e.date, e && e.amount, e && e.invoice, e && e.source].join('|');
+  const b = new Set((base || []).map(id)), o = new Set((ours || []).map(id)), t = new Set((theirs || []).map(id));
+  return (theirs || []).filter(e => !(b.has(id(e)) && !o.has(id(e)))).concat((ours || []).filter(e => !b.has(id(e)) && !t.has(id(e))));
+}
+
+/** The invoice entry a confirmed log row puts on its order. `at` is the row's own date, so a row dated before the
+    order was cleared from the store-room list stays cleared (liveInvoices). */
+function logEntry(row, po, by) {
+  return {date: row.date, amount: row.amount, invoice: row.invoice, note: row.desc, source: 'log', logKey: row.key, by,
+    at: row.date + 'T00:00:00Z', rcvd: Math.max(0, Number(po && po.received) || 0)};
+}
+/** An order's entries with this log row's: one entry per row (a second confirm replaces it), and a hand entry for the
+    same invoice number is replaced rather than counted twice. */
+function withLogEntry(invoicesIn, entry) {
+  const inv = String(entry.invoice || '').trim();
+  return (invoicesIn || []).filter(e => e && e.logKey !== entry.logKey && !(e.source === 'hand' && inv && String(e.invoice || '').trim() === inv)).concat([entry]);
+}
+const withoutLogEntry = (invoicesIn, logKey) => (invoicesIn || []).filter(e => e && e.logKey !== logKey);

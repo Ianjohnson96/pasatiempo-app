@@ -57,7 +57,8 @@ const KIND_SEV = {order:'crit', reorder:'good', stockout:'good', overstock:'warn
 let PLAN = FALLBACK.plan, INV = FALLBACK.inventory, INS = FALLBACK.insights;
 let ADJ = [], POS = [], VENDORS = [], SUBCATS = [], COUNTS = [], ISTATE = {};
 let db = null, userNS = null, canWrite = null, isAdmin = false, myId = null, dbState = 'connecting', readOnly = false;
-let SEL = (() => { try { return localStorage.getItem('ob.month') || null; } catch (_) { return null; } })();
+// The month picked on the Budget page or Orders, for this visit only: each visit opens on the whole year.
+let SEL = null;
 // The page last open in this browser; the first time, everyone starts on Today.
 const FIRST_TAB = 'today';
 // The page is in the address (#orders, 90-io.js), so a refresh, a bookmark or a shared link opens that page; plain
@@ -71,7 +72,8 @@ const LAST = () => PLAN.window.to;
 const catList = () => PLAN.order.map(code => ({code, ...PLAN.cats[code]}));
 const CAT = code => PLAN.cats[code] || {name: code, call: 'buy'};
 const inOTB = code => code !== '640' && PLAN.cats[code] && PLAN.cats[code].plan != null;
-function selMonth(){ const w = WIN(); if (SEL === 'season') return 'season'; if (SEL && w.includes(SEL)) return SEL; return w.includes(THIS_MONTH) ? THIS_MONTH : 'season'; }
+// The Budget page opens on the whole plan year; a month someone picked (SEL) stays picked.
+function selMonth(){ const w = WIN(); if (SEL && w.includes(SEL)) return SEL; return 'season'; }
 const through = () => { const s = selMonth(); return s === 'season' ? LAST() : s; };
 
 /* ---------- order arithmetic ---------- */

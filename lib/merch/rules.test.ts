@@ -66,4 +66,19 @@ describe("merch access rules", () => {
       history: [{ at: '2026-11-19T00:00:00Z', by: 'u', what: 'Apparel margin', from: '45%', to: '48%' }],
     })).toBeNull();
   });
+
+describe("receiving log documents", () => {
+  it("nobody writes the log copy through the page; owner and staff write match decisions", () => {
+    expect(canWrite("owner", "receivinglog/current")).toBe(false);
+    expect(canWrite("staff", "receivinglog/current")).toBe(false);
+    expect(canWrite("staff", "logmatch/abc")).toBe(true);
+    expect(canWrite("viewer", "logmatch/abc")).toBe(false);
+  });
+  it("checks a match decision's shape", () => {
+    expect(docProblem("logmatch/abc", { state: "matched", po: "p1", amount: 10, date: "2026-11-02", by: "x" })).toBeNull();
+    expect(docProblem("logmatch/abc", { state: "notorder", by: "x" })).toBeNull();
+    expect(docProblem("logmatch/abc", { state: "maybe" })).toMatch(/state/);
+    expect(docProblem("logmatch/abc", { state: "matched", amount: 10, date: "2026-11-02" })).toMatch(/order/);
+  });
+});
 });

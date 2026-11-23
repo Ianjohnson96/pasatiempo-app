@@ -57,6 +57,97 @@ function rcvHTML(R){
     ${loose ? `<div class="note"><b>Arrived with no open order in the book</b> (reorders, or orders that weren't entered):<ul style="margin:4px 0 0;padding-left:18px">${loose}</ul>${R.loose.length > 8 ? `<div>…and ${R.loose.length - 8} more.</div>` : ''}</div>` : ''}
     ${A.down && A.down.value >= 25 ? `<div class="note">Stock on ${A.down.skus} SKU${A.down.skus === 1 ? '' : 's'} fell by more than it sold (${money(A.down.value)} at cost): counts, shrink or returns to vendors.</div>` : ''}`;
 }
+/* ---------- the receiving log on the page ----------
+   RLOG is receivinglog/current, the app's read-only copy of the accounting team's sheet (the server keeps it:
+   lib/merch/receiving-log-server.ts); LOGMATCH holds people's calls on its rows (logmatch/{row key}). The page
+   suggests an order for each row and a person confirms: Confirm adds a 'log' invoice entry to the order, just as
+   Invoice in does, so nothing about the budget changes. */
+let RLOG = null, LOGMATCH = {};
+const logLive = () => !!(RLOG && !RLOG.error && RLOG.readAt);
+/* The vendor words the server read the log with, plus every vendor's own name. */
+function logWords(){
+  const w = {...((RLOG && RLOG.words) || {})};
+  for (const v of VENDORS){ const n = String(v.name || '').toLowerCase().trim(); if (n && !vendorKeyFor(n, w)) w[n] = [n]; }
+  return w;
+}
+/* Worked out once per change, not once per caller: the sidebar, Home, the verdict and the page all ask on each redraw.
+   A new copy of the log, of the calls, of the orders or vendors (each snapshot is a new array), or a log action, makes
+   it fresh. */
+let LOGQ = null, LOGQ_GEN = 0;
+function receivingQueue(){
+  const key = [RLOG, LOGMATCH, POS, VENDORS, LOGQ_GEN];
+  if (LOGQ && LOGQ.key.every((x, i) => x === key[i])) return LOGQ.q;
+  const words = logWords();
+  const rows = ((RLOG && RLOG.rows) || []).map(r => ({...r, brand: vendorKeyFor(r.desc, words)}));
+  const q = logQueue(rows, POS, LOGMATCH, p => vendorKeyFor(vendorName(p), words), p => Math.max(onOrder(p) - storeRoomOf(p), 0));
+  LOGQ = {key, q};
+  return q;
+}
+/** Whether this person may mark an order arrived by hand: before the receiving log is read, or as the owner's override. */
+const invoiceInAllowed = () => canAct() && (!logLive() || isAdmin);
+const logRow = key => ((RLOG && RLOG.rows) || []).find(r => r.key === key);
+async function putOrder(p, invoicesIn){
+  const body = {...p, invoicesIn, updatedBy: myId, updatedAt: new Date().toISOString()};
+  delete body.id; delete body.vendor;
+  return write('pos/' + p.id, body);
+}
+/* Log actions run one at a time on this page, so a quick run of Confirms on one order never races itself. */
+let logChain = Promise.resolve();
+const logAction = f => (logChain = logChain.then(f, f).then(r => { LOGQ_GEN++; return r; }));
+/** Confirm a log row against an order: the order gets the row's invoice entry (replacing a hand entry for the same
+    invoice number, and, if the person agrees, hand entries with no number), and the call is kept with what it replaced
+    so Undo can put it back. */
+function confirmLogRow(key, poId){
+  return logAction(async () => {
+    const row = logRow(key), p = POS.find(x => x.id === poId); if (!row || !p || !canAct()) return false;
+    const blank = (p.invoicesIn || []).filter(e => e && e.source === 'hand' && !String(e.invoice || '').trim());
+    const swap = blank.length && confirm(`PO ${p.poNumber || poId} was marked arrived by hand without an invoice number (${blank.map(e => dateLabel(e.date) + (e.amount != null ? ' ' + money(e.amount) : '')).join(', ')}). Replace that with this row from the receiving log?`);
+    const kept = swap ? (p.invoicesIn || []).filter(e => !blank.includes(e)) : (p.invoicesIn || []);
+    const next = withLogEntry(kept, logEntry(row, p, myId)), replaced = (p.invoicesIn || []).filter(e => !next.includes(e) && e.logKey !== key);
+    if (!(await putOrder(p, next))) return false;
+    const ok = await write('logmatch/' + key, {state: 'matched', po: poId, amount: row.amount, date: row.date, invoice: row.invoice, by: myId, at: new Date().toISOString(), ...(replaced.length ? {replaced} : {})});
+    if (ok) toast(`PO ${p.poNumber || poId}: ${money(row.amount)} arrived (invoice ${row.invoice || 'without a number'})`);
+    return ok;
+  });
+}
+function markNotOrder(key){
+  return logAction(async () => {
+    if (!logRow(key) || !canAct()) return false;
+    return write('logmatch/' + key, {state: 'notorder', by: myId, at: new Date().toISOString()});
+  });
+}
+/** Take back a call on a row: its entry comes off the order (or orders) carrying it, any hand entry it replaced comes
+    back, and the row returns to the list. */
+function undoLogRow(key, onlyPo){
+  return logAction(async () => {
+    if (!canAct()) return false;
+    const d = LOGMATCH[key];
+    for (const p of POS.filter(x => (x.invoicesIn || []).some(e => e && e.logKey === key) && (!onlyPo || x.id === onlyPo))){
+      const back = d && d.state === 'matched' && d.po === p.id ? (d.replaced || []) : [];
+      if (!(await putOrder(p, withoutLogEntry(p.invoicesIn, key).concat(back)))) return false;
+    }
+    if (onlyPo && POS.some(x => (x.invoicesIn || []).some(e => e && e.logKey === key))) return true;   // still on another order
+    return d ? write('logmatch/' + key, null) : true;
+  });
+}
+/* Opening Orders & receiving asks the server to read the log again (it reads at most every two minutes); the copy
+   arrives with the next poll. */
+let logPokedAt = 0;
+function pokeReceivingLog(){
+  if (!canAct() || typeof window === 'undefined' || !window.MERCH_HOST || Date.now() - logPokedAt < 120000) return;
+  logPokedAt = Date.now();
+  fetch(window.MERCH_HOST.base + '/api/receiving-log', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: '{}'}).catch(() => {});
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('[data-logok],[data-lognot],[data-logundo]');
+  if (!b) return;
+  b.disabled = true;
+  if (b.dataset.logok){ const [key, po] = b.dataset.logok.split('|'); await confirmLogRow(key, po); }
+  else if (b.dataset.lognot) await markNotOrder(b.dataset.lognot);
+  else { const [key, po] = b.dataset.logundo.split('|'); await undoLogRow(key, po || null); }
+  b.disabled = false;
+});
+
 /* Record the ticked deliveries on their orders. */
 async function applyArrivals(R){
   let ok = true;
@@ -87,14 +178,16 @@ function rcvRows(){
   }
   return rows;
 }
-const rcvBtns = p => canAct() ? `<button class="btn sm" type="button" data-invin="${esc(p.id)}">Invoice in</button>` : '';
+// Once the receiving log is read, arrivals come from it: staff no longer mark them by hand; the owner keeps the
+// button as an override for a shipment the log hasn't caught up with.
+const rcvBtns = p => !invoiceInAllowed() ? '' : !logLive() ? `<button class="btn sm" type="button" data-invin="${esc(p.id)}">Invoice in</button>`
+  : `<button class="btn ghost sm" type="button" data-invin="${esc(p.id)}" title="Mark it arrived by hand: for a shipment the receiving log doesn't show yet">Override</button>`;
 function rcvTable(rows, kind){
-  const head = kind === 'arrived' ? '<th>Order</th><th class="r">Days waiting</th><th class="r">Arrived</th><th>Invoice</th><th></th>' : '<th>Order</th><th>Expected</th><th class="r">Still to come</th><th></th>';
+  const head = kind === 'arrived' ? '<th>Order</th><th class="r">Days waiting</th><th class="r">Arrived</th><th>Trail</th><th></th>' : '<th>Order</th><th>Expected</th><th class="r">Still to come</th><th></th>';
   return `<div class="tbl"><table class="mini rt" style="min-width:0"><thead><tr>${head}</tr></thead><tbody class="click">${rows.map(({p, inv, arrived, days}) => {
     const first = `<td class="wrapv"><b>PO ${esc(p.poNumber)}</b> · ${esc(vendorName(p))}</td>`;
     if (kind === 'arrived'){
-      const refs = (inv || []).map(e => e.invoice).filter(Boolean).map(esc).join(', ');
-      return `<tr data-po="${esc(p.id)}" tabindex="0">${first}<td data-l="Days waiting" class="r num">${days}</td><td data-l="Arrived" class="r num">${money(arrived)}</td><td data-l="Invoice">${refs || '—'}</td>
+      return `<tr data-po="${esc(p.id)}" tabindex="0">${first}<td data-l="Days waiting" class="r num">${days}</td><td data-l="Arrived" class="r num">${money(arrived)}</td><td data-l="Trail" style="font-size:12.5px">${rcvTrail(p, inv)}</td>
         <td class="r">${canAct() ? `<button class="btn ghost sm" type="button" data-invclear="${esc(p.id)}" title="Take it off this list. It doesn't change what the POS or the budget say.">Clear</button>` : ''}</td></tr>`;
     }
     return `<tr data-po="${esc(p.id)}" tabindex="0">${first}<td data-l="Expected">${monthLabel(p.deliveryMonth)}</td><td data-l="Still to come" class="r num">${money(onOrder(p))}</td><td class="r">${rcvBtns(p)}</td></tr>`;
@@ -115,7 +208,45 @@ function rcvChart(rows){
     ${chLegend(series)}${chStack({labels, series, fmt: moneyK, label: 'Receiving backlog at cost, by vendor', go: i => 'orders:' + vs[i].key})}
     ${anaNumbers(['Vendor', 'In the store room', 'Late', 'Total'], vs.map(v => [v.name, money(v.store), money(v.late), money(v.store + v.late)]))}</section>`;
 }
+/* The receiving log's part of the page: where the copy stands, rows to match, rows not from an order, and matches
+   whose row has changed in the log. */
+const ago = iso => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : dateLabel(iso.slice(0, 10)); };
+function logStatusHtml(){
+  if (!RLOG) return `<div class="warnbox info"><b>The receiving log isn't connected yet.</b> Once it is, every row the accounting team adds shows up here to match against an order. Setup: docs/merch-receiving-log-setup.md (the owner, once).</div>`;
+  const probs = (RLOG.problems || []).length;
+  return `<div class="note">${RLOG.error ? `<span class="neg"><b>${esc(RLOG.error)}</b></span>` : `Receiving log read ${esc(ago(RLOG.readAt || RLOG.at))}, rows from ${esc(dateLabel(RLOG.since))} on.`}
+    ${probs ? ` <details style="display:inline"><summary>${probs} row${probs === 1 ? '' : 's'} couldn't be read</summary><ul>${RLOG.problems.map(p => `<li>${esc(p)}</li>`).join('')}</ul></details>` : ''}</div>`;
+}
+const logRowCells = r => `<td data-l="Date">${dateLabel(r.date)}</td><td class="wrapv">${esc(r.desc)}${r.special ? ' <span class="pill">special order</span>' : ''}</td><td data-l="Invoice">${esc(r.invoice || '—')}</td><td data-l="Amount" class="r num ${r.amount < 0 ? 'neg' : ''}">${money(r.amount)}</td>`;
+const poLabel = p => `PO ${esc(p.poNumber || p.id)} · ${esc(vendorName(p))} · due ${monthLabel(p.deliveryMonth)} · ${money(Math.max(onOrder(p) - storeRoomOf(p), 0))} open`;
+function logMatchHtml(q){
+  if (!RLOG) return '';
+  const act = canAct(), who = id => id ? `<span class="person" data-uid="${esc(id)}"></span>` : '';
+  const toMatch = q.toMatch.length ? `<div class="tbl"><table class="mini rt" style="min-width:0"><thead><tr><th>Date</th><th>From the log</th><th>Invoice</th><th class="r">Amount</th><th>Order</th></tr></thead><tbody>${q.toMatch.map(({row, cands}) =>
+    `<tr>${logRowCells(row)}<td data-l="Order">${poLabel(cands[0])}${act ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn primary sm" type="button" data-logok="${esc(row.key)}|${esc(cands[0].id)}">Confirm</button>${cands.slice(1).map(p => `<button class="btn sm" type="button" data-logok="${esc(row.key)}|${esc(p.id)}" title="${poLabel(p)}">Pick PO ${esc(p.poNumber || p.id)}</button>`).join('')}<button class="btn ghost sm" type="button" data-lognot="${esc(row.key)}">Not an order</button></div>` : ''}</td></tr>`).join('')}</tbody></table></div>`
+    : '<div class="note">Nothing to match: every row in the log is matched or isn\'t from an order.</div>';
+  const was = (key, poId) => { const p = POS.find(x => x.id === poId), e = p && (p.invoicesIn || []).find(x => x && x.logKey === key), d = LOGMATCH[key] || {};
+    const src = e || d; return `${p ? `PO ${esc(p.poNumber || p.id)} · ${esc(vendorName(p))}` : esc(poId)}: ${src.date ? dateLabel(src.date) : ''}${src.invoice ? ` · invoice ${esc(src.invoice)}` : ''}${src.amount != null ? ` · ${money(src.amount)}` : ''}`; };
+  const fixes = q.changed.map(c => ({...c, why: 'changed or removed in the log'})).concat(q.twice.flatMap(t => t.pos.map(po => ({key: t.key, po, why: 'matched to more than one order'}))));
+  const changed = fixes.length ? `<section class="panel"><header><h2>Check these matches</h2><span class="lab">${fixes.length}</span></header><div class="note">A matched row that was changed or removed in the receiving log, or one matched to two orders. Undo the match that no longer applies, then match the corrected row.</div>
+    <ul class="items">${fixes.map(c => `<li class="item warn"><div class="stripe"></div><div class="body"><div class="t">${was(c.key, c.po)}</div><div class="d">${c.why}</div></div>${act ? `<button class="btn sm" type="button" data-logundo="${esc(c.key)}|${esc(c.po)}">Undo this match</button>` : ''}</li>`).join('')}</ul></section>` : '';
+  const not = q.notOrder.length ? `<details class="panel" style="padding:12px 16px"><summary><b>Not from an order</b> · ${q.notOrder.length} row${q.notOrder.length === 1 ? '' : 's'}: reorders, special orders and anything else not in the order book. Nothing to do.</summary>
+    <div class="tbl"><table class="mini rt" style="min-width:0"><tbody>${q.notOrder.map(({row, why}) => { const d = LOGMATCH[row.key];
+      return `<tr>${logRowCells(row)}<td>${why === 'marked' ? `marked by ${who(d && d.by)}${act ? ` <button class="btn ghost sm" type="button" data-logundo="${esc(row.key)}">Undo</button>` : ''}` : '<span class="faint">no open order matches</span>'}</td></tr>`; }).join('')}</tbody></table></div></details>` : '';
+  const matched = q.matched.length ? `<details class="panel" style="padding:12px 16px"><summary><b>Matched</b> · ${q.matched.length} row${q.matched.length === 1 ? '' : 's'}</summary>
+    <div class="tbl"><table class="mini rt" style="min-width:0"><tbody>${q.matched.map(({row, po}) => { const p = POS.find(x => x.id === po), d = LOGMATCH[row.key];
+      return `<tr>${logRowCells(row)}<td>${p ? `PO ${esc(p.poNumber || p.id)} · ${esc(vendorName(p))}` : esc(po)} · ${who(d && d.by)}${act ? ` <button class="btn ghost sm" type="button" data-logundo="${esc(row.key)}">Undo</button>` : ''}</td></tr>`; }).join('')}</tbody></table></div></details>` : '';
+  return `<section class="panel"><header><h2>Match from the receiving log</h2><span class="lab">${q.toMatch.length} to match</span></header>
+    <div class="note" style="padding-bottom:4px">Each row is what the accounting team logged. The app suggests the order it most likely belongs to: same vendor, due within a month, enough still open. Confirm marks the order arrived (it stays committed in the budget until Jonas records it).</div>${toMatch}</section>${changed}${not}${matched}`;
+}
+/* An order's trail: placed, arrived (from the log or by hand), in Jonas. */
+function rcvTrail(p, inv){
+  const first = (inv || []).map(e => e.date).sort()[0], refs = (inv || []).map(e => e.invoice).filter(Boolean);
+  return `<span class="faint">Placed ${p.orderDate ? dateLabel(p.orderDate) : '—'} → </span>Arrived ${first ? dateLabel(first) : '—'}${refs.length ? ` (inv ${refs.map(esc).join(', ')})` : ''}<span class="faint"> → In Jonas at the next upload</span>`;
+}
 function renderReceiving(S){
+  pokeReceivingLog();
+  const q = receivingQueue();
   const rows = rcvRows(), by = st => rows.filter(r => r.st === st);
   const arr = by('arrived').sort((a, b) => b.days - a.days || String(a.p.poNumber).localeCompare(String(b.p.poNumber)));
   const late = by('late').sort((a, b) => String(a.p.deliveryMonth).localeCompare(String(b.p.deliveryMonth)) || onOrder(b.p) - onOrder(a.p));
@@ -130,11 +261,13 @@ function renderReceiving(S){
       ${todayTile('Oldest wait', arr.length ? oldest + (oldest === 1 ? ' day' : ' days') : '—', arr.length ? 'since the first invoice came in' : '')}
       ${todayTile('Late orders', String(late.length), late.length ? `${moneyK(lateCost)} past the delivery month` : 'none past their delivery month')}
     </section>
+    ${logStatusHtml()}
+    ${logMatchHtml(q)}
     ${rcvChart(rows)}
     ${sec('In the store room, not in the POS', 'Oldest first. Arrived is what the invoices add up to. Clear takes an order off this list once it is in the POS; it changes no figures. Open an order to change what was received.', arr, 'arrived', 'Nothing is waiting. Use Invoice in on an order (or on the Late and Due lists below) when its goods arrive.')}
     ${sec('Late', 'Open orders past their delivery month with nothing arrived.', late, 'open', 'No late orders.')}
     ${sec('Due this month', `Open orders due in ${monthFull(THIS_MONTH)} with nothing arrived.`, due, 'open', 'Nothing else is due this month.')}
-    <div class="note">The receiving log will fill this page in by itself once it is linked. Until then, mark orders by hand with Invoice in. Arrived goods stay committed in the budget until month-end records them as received.</div></div>`;
+    <div class="note">${logLive() ? 'Arrivals come from the receiving log: match each row above.' : 'Until the receiving log is connected, mark orders by hand with Invoice in.'} Arrived goods stay committed in the budget until month-end records them as received.</div></div>`;
 }
 /* The Invoice in dialog: date (today), optional amount, optional invoice #, note. Blank amount = the whole open balance. */
 function openInvoiceIn(poId){

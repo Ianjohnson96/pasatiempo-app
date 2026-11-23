@@ -99,11 +99,16 @@ function sideBadges(S){
   if (!S) return b;
   // One count failing (a page's data still loading) must not take the whole sidebar with it.
   const put = (id, f) => { try { const v = f(); if (v) b[id] = v; } catch (e){ console.error('Sidebar count for ' + id + ' failed', e); } };
-  put('orders', () => { const n = POS.filter(p => isOpen(p) && (rowFlag(p) === 'flag-crit' || (p.deliveryMonth && p.deliveryMonth < THIS_MONTH))).length; return n ? [n, 'hot'] : null; });
-  put('receiving', () => {
-    let n = 0, late = false;
-    for (const p of POS){ const st = rcvOf(p); if (st === 'arrived' || st === 'late'){ n++; if (st === 'late') late = true; } }
-    return n ? [n, late ? 'hot' : ''] : null;
+  // Orders & receiving: each open order that needs a look counts once (a problem, past its month, or in the store room).
+  put('orders', () => {
+    let n = 0, hot = false;
+    for (const p of POS){
+      if (!isOpen(p)) continue;
+      const st = rcvOf(p), bad = rowFlag(p) === 'flag-crit' || (p.deliveryMonth && p.deliveryMonth < THIS_MONTH) || st === 'late';
+      if (bad || st === 'arrived'){ n++; if (bad) hot = true; }
+    }
+    n += receivingQueue().toMatch.length;   // receiving log rows waiting for a person to match
+    return n ? [n, hot ? 'hot' : ''] : null;
   });
   put('attention', () => { const n = openAttention(S).filter(i => i.sev === 'crit').length; return n ? [n, 'hot'] : null; });
   put('monthend', () => {
@@ -115,20 +120,35 @@ function sideBadges(S){
   put('scorecard', () => { const n = ssUnsorted().length + ssPlace().length; return n ? [n, ''] : null; });
   return b;
 }
+/* A sidebar entry's count: the counts of every page it holds (Orders & receiving: late orders plus the store room;
+   Home: To do's urgent items), hot if any of them is. */
+function sideCount(b, id){
+  const parts = Object.keys(b).filter(k => navParent(k) === id).map(k => b[k]);
+  if (!parts.length) return null;
+  const nums = parts.map(p => p[0]).filter(n => typeof n === 'number');
+  return [nums.length ? nums.reduce((a, n) => a + n, 0) : parts[0][0], parts.some(p => p[1] === 'hot') ? 'hot' : ''];
+}
+/** The view switch under a page's title: the sidebar page's views, the open one pressed; '' for a page without views. */
+function renderViewBar(tab){
+  const vs = VIEWS[navParent(tab)];
+  if (!vs) return '';
+  return `<div class="seg viewbar" role="group" aria-label="${esc(pageLabel(navParent(tab)))} views">${vs.map(([id, l]) => `<button type="button" data-tab="${id}" aria-pressed="${tab === id}">${esc(l)}</button>`).join('')}</div>`;
+}
 function renderSide(S){
-  const b = sideBadges(S);
+  const b = sideBadges(S), cur = navParent(TAB);
   const item = ([id, label]) => {
-    const [c, tone] = b[id] || [];
+    const [c, tone] = sideCount(b, id) || [];
     const tail = c != null ? `<span class="sb ${tone || ''}">${c}</span>` : '';
-    const tip = id === 'vendors' ? ' title="Vendor contacts, terms and lead times"' : '';
-    return `<button type="button" class="sitem" data-tab="${id}"${TAB === id ? ' aria-current="page"' : ''}${tip}><span class="sl">${esc(label)}</span>${tail}</button>`;
+    return `<button type="button" class="sitem" data-tab="${sideTarget(id)}"${cur === id ? ' aria-current="page"' : ''}><span class="sl">${esc(label)}</span>${tail}</button>`;
   };
-  $('#sideNav').innerHTML = NAV.map(g => `<div class="sgroup" role="group" aria-label="${esc(g.label)}"><div class="sglab" aria-hidden="true">${esc(g.label)}</div>${g.pages.map(item).join('')}</div>`).join('');
+  $('#sideNav').innerHTML = `<div class="sgroup">${item(HOME_PAGE)}</div>` + NAV.map(g => `<div class="sgroup" role="group" aria-label="${esc(g.label)}"><div class="sglab" aria-hidden="true">${esc(g.label)}</div>${g.pages.map(item).join('')}</div>`).join('');
   const foot = $('#sideFootNav'); if (foot) foot.innerHTML = FOOT_PAGES.map(item).join('');
-  const [title, sub] = TABHEAD[TAB] || [pageLabel(TAB) || 'Today', ''];
+  const [, sub] = TABHEAD[TAB] || ['', ''];
   const grp = NAV.find(g => g.key === pageGroup(TAB));
   $('#pageGroup').textContent = grp ? grp.label : '';
-  $('#pageTitle').textContent = title; $('#pageSub').textContent = sub;
+  $('#pageTitle').textContent = pageLabel(cur) || pageLabel(TAB) || 'Home'; $('#pageSub').textContent = sub;
+  const vb = $('#viewBar'); if (vb){ vb.innerHTML = renderViewBar(TAB); vb.hidden = !vb.innerHTML; }
+  const pv = $('#pageVerdict'); if (pv) pv.innerHTML = verdictHtml(verdictFor(TAB, S));
   $('#pageActs').innerHTML = PAGE_ACTIONS[TAB] ? PAGE_ACTIONS[TAB]() : '';
 }
 const ANALYSIS_TABS = new Set(['today', 'scorecard', 'rounds', 'trends', 'stuck', 'inventory']);
@@ -136,12 +156,15 @@ const ANALYSIS_TABS = new Set(['today', 'scorecard', 'rounds', 'trends', 'stuck'
 const PAGE_ACTIONS = {brands: () => brandActions()};
 // Each page's title (its sidebar label) and one line saying what it is for.
 const TABHEAD = Object.fromEntries(Object.entries({
-  today: "What needs you this week, and how the shop is doing.",
+  today: "What needs you this week, and how the shop is doing: buying, arrivals and sales.",
+  // Views of Orders & receiving, Upload & count and Settings keep their own line.
   orders: "Every purchase order, by vendor, season and month.",
   receiving: "What's arrived but isn't in the POS yet, and what's due.",
   attention: "Every order problem and item suggestion to work through.",
   vendors: "The vendors you buy from.",
   overview: "Room to buy by category and month, against what's committed.",
+  budget: "Room to buy by category and month, against what's committed.",
+  settings: "The rules the program grades and suggests by, and the forecast's assumptions.",
   seasons: "Each season's buy: prebooked, reorders and what's held back.",
   forecast: "Sales by month for this year and next.",
   guidelines: "The rules the program grades and suggests by, beside what's suggested and where the shop is now.",
@@ -182,7 +205,7 @@ function budgetTiles(S){
   </section>`;
 }
 function catRow(c, S){
-  const m = S.m, inv = INV.cats[c.code] || {units:0, cost:0}, wks = wksNow(c.code, inv.cost);
+  const m = S.m, inv = INV.cats[c.code] || {units:0, cost:0}, wks = catWeeks(c.code, shelfCost(c.code, inv.cost));
   const first = `<td data-l="Category"><span class="code">${c.code}</span>${esc(c.name)} <span class="chip ${c.call}">${CALLTXT[c.call]}</span></td><td data-l="Role" class="crole">${esc(roleOf(c.code).name)}</td>`;
   const wk = `<td data-l="Weeks of supply" class="r num">${wks ? Math.round(wks) : '—'}</td>`;
   if (!inOTB(c.code)){

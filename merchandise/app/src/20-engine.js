@@ -189,5 +189,16 @@ function withPlan(key, fn){
   try { return fn(); } finally { PLAN = P0; ADJ = A0; }
 }
 const planWeeks = (P = PLAN) => Math.max(1, daysBetween(P.start, P.window.to + '-' + pad(new Date(+P.window.to.slice(0,4), +P.window.to.slice(5,7), 0).getDate())) + 1) / 7;
-/* weeks the stock on hand lasts at this year's forecast pace */
-function wksNow(code, cost){ const P = PLANS.cur || PLAN, c = P.cats[code]; return c && c.cogs ? Math.max(cost - num(c.soOnHand), 0) / (c.cogs / planWeeks(P)) : 0; }
+/* A category's forecast cost of shelf sales per week: the four months after month m (the engine's first month by
+   default) at cost, over 17.3 weeks: the basis the budget sets target stock on, so planned stock reads as its target
+   weeks. 0 when there is no forecast for it. */
+function fwdWeeklyCost(code, m){
+  if (!ENG || !BASE || !BASE.cats[code] || !ENG.S[code]) return 0;
+  const v = BASE.cats[code], k0 = m || ENG.months[0];
+  let f = 0; for (let i = 1; i <= 4; i++){ const k = addMonths(k0, i); f += num(ENG.S[code][k]) * (1 - soShare(v, k)); }
+  return Math.max(f * (1 - v.gm) / 17.3, 0);
+}
+/** Weeks of supply for a category: shelf stock at cost over fwdWeeklyCost; null when there is no forecast ahead. */
+function catWeeks(code, shelfCost){ const w = fwdWeeklyCost(code); return w > 0 ? Math.max(num(shelfCost), 0) / w : null; }
+/* shelf stock at cost for a category: on hand less special orders waiting for their customers */
+const shelfCost = (code, cost) => Math.max(num(cost) - num(((BASE || {}).cats || {})[code] ? BASE.cats[code].soOnHand : 0), 0);

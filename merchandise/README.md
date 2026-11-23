@@ -54,24 +54,20 @@ The top of **Today** (and the To do page) lists the six decisions worth the most
 
 ## Pages
 
-Fourteen pages in four groups, listed in the sidebar (`NAV` in `app/src/05-nav.js`). Everyone opens on **Today** the first time; after that the program opens on the last page used in that browser.
+The sidebar follows the shop's three phases (`NAV` in `app/src/05-nav.js`): **Home** at the top, then **Buy**, **Sell & stock** and **Month-end**, with **Settings** at the foot. A sidebar page can hold several views (`VIEWS`), shown as a switch under its title; each view keeps its old page id, so saved links still open it. Every page opens with a one-sentence **verdict** under its title (`PAGE_VERDICT` in `app/src/06-verdict.js`): green for room or fine, amber for waiting, red for act. Tiles show a label, a number and one short line; their explanation sits behind an ⓘ. Everyone opens on **Home** the first time; after that the program opens on the last page used in that browser.
 
-| Group | Page | What it shows |
+| Group | Page (views) | What it shows |
 |---|---|---|
-| Every day | Today | Four headline tiles (sales, margin, room to buy, sales per round), the decisions worth the most money this week, sales and receiving room by month, checklists that are due, and orders due in. Charts click through to the detail. Prints on one page |
-| | Orders | Purchase orders with sizes. Each order is checked against the budget of the fiscal year it arrives in. **On hold** marks an order that was placed but needs fixing (missing sizes or quantities, or held by the vendor); `fix` says what. It still counts against the budget, and can be saved with lines that have no quantities yet. Each order has an order date, which is required |
-| | Receiving | What has arrived but is not in the POS yet, late orders, orders due this month and a backlog-by-vendor chart (see Receiving below) |
-| | To do | Order alerts plus item suggestions (`insights/current`) |
-| | Vendors | A page listing every vendor with its open orders, open cost and next delivery. **Edit** and **+ Add a vendor** open the vendor drawer |
-| Plan & buy | Budget & open-to-buy | Budget left by category for the chosen fiscal year and month, the category × month open-to-buy grid (this FY, next FY, calendar year), the inherited-stock table and the classic OTB worksheet |
-| | Season buys | Each season's buy, prebooked against reorders, with what is held back (see Season buys below) |
-| | Forecast | Sales by month for this year and next. Growth, extra category growth and target weeks can be edited as a what-if, and the owner can save them as the plan (`plan/assumptions`) |
-| Analyse | Scorecard | Every category, opening to its subcategories: sales, growth, share of sales against share of stock, margin, markdowns, turns, GMROI, weeks and aged stock, shaded against the rules of thumb; a growth-against-GMROI bubble chart. Subcategory calls, special orders and **Sort SKUs** are here |
-| | Brands | Scorecard by segment with a suggested call (Grow / Keep / Watch / Reduce / Drop). The owner can override a call in `brandCalls/{id}`. Orders link to brands by vendor name |
-| | Stuck money & markdowns | Stock over 16 weeks of sales, aged stock, the cash a 30% markdown would free, markdown candidates by subcategory, lines to reorder, and the oldest items |
-| | Trends & rounds | Shop sales by month, seasonality, each category's two years, and spend per round: retail sales per round by month against a year earlier, and rounds by member, guest, public and other |
-| Month-end | Upload & close | The upload, the checklists on the reporting calendar (`checklist/{key}`), refresh history (`refreshes/{asOf}`) with Undo last update, forecast vs actual, and How the program works |
-| | Counts | On hand by category; quarterly counts |
+| | Home | Three lines (Buy: Left to buy this year and the most room; Arriving: due, late and in the store room; Selling: last 12 months, growth, margin), this week's five decisions with **See all** (the To do list, `attention`), checklists that are due, sales and receiving room by month, and orders late or due. Prints on one page |
+| Buy | Budget | Left to buy for the whole plan year first (pick a month to see through it), by category, the category × month open-to-buy grid (this FY, next FY, calendar year), the inherited-stock table and the classic OTB worksheet |
+| | Orders & receiving (Orders · Receiving · Vendors) | Purchase orders with sizes, each checked against the budget of the fiscal year it arrives in (**On hold** marks one placed but needing a fix; it still counts). Receiving: what has arrived but is not in the POS yet, late orders, orders due this month and a backlog-by-vendor chart (see Receiving below). Vendors: every vendor with its open orders, open cost and next delivery |
+| | Season plan | Each season's buy, prebooked against reorders, with what is held back (see Season buys below) |
+| Sell & stock | Scorecard | Every category, opening to its subcategories: sales, growth, share of sales against share of stock, margin, markdowns, turns, GMROI, weeks and aged stock, shaded against the rules of thumb; a growth-against-GMROI bubble chart. Subcategory calls, special orders and **Sort SKUs** are here |
+| | Trends & rounds | Shop sales by month, seasonality, each category's two years, and spend per round |
+| | Brands | Scorecard by segment with a suggested call (Grow / Keep / Watch / Reduce / Drop). The owner can override a call in `brandCalls/{id}` |
+| | Markdowns | Stock over its role's weeks target, aged stock, the cash a 30% markdown would free, markdown candidates by subcategory, lines to reorder, and the oldest items |
+| Month-end | Upload & count (Upload & close · Stock & counts) | The upload, the checklists on the reporting calendar (`checklist/{key}`), refresh history with Undo last update, forecast vs actual and How the program works; on hand by category and quarterly counts |
+| | Settings (Guidelines · Forecast) | Every rule the program grades and suggests by (see Guidelines below); sales by month for this year and next, with growth and target weeks as a what-if the owner can save as the plan (`plan/assumptions`) |
 
 Every chart has a hover readout and a table or readout of the numbers behind it, and most click through to the page that holds the detail. Charts are hand-built SVG (`app/src/16-charts.js`), with no chart library.
 
@@ -93,6 +89,7 @@ Fiscal year: May 1 – Apr 30. Sales are at retail. Stock and budgets are at cos
 - **Shelf sales** = sales less special orders. Budgets count shelf sales and shelf stock only (see Special orders below).
 - **Cost of sales** = shelf sales × (1 − realized margin from the cost & margin report).
 - **Target end-of-month stock** = target weeks × (next four months' cost of shelf sales) ÷ 17.3. Opening stock is on hand less special-order stock.
+- **Weeks of supply** for a category = shelf stock at cost ÷ (next four months' forecast cost of shelf sales ÷ 17.3) (`catWeeks` in `20-engine.js`), the same pace the budget plans with, so a category budgeted to 16 weeks reads 16 weeks on every page (Budget, Scorecard, Markdowns, Stock & counts). It is "—" when no sales are forecast ahead. Subcategories and brands have no forecast of their own, so theirs is at the last 12 months' pace and labelled that way.
 - **Linked to the mix total.** While the owner has a total stock to plan for saved (Guidelines → Merchandise mix, `guidelines/current` `mix.total`), every budgeted category's target weeks are multiplied by one factor so that target month-end stock, averaged over the first 12 months the engine plans, equals that total (`mixScale` in `20-engine.js`, `mix_scale` in `engine.py`). Turns are a year's cost of sales over average stock and the suggested total is that cost over the turns target, so the budget and the mix then agree. Typed weeks set how the total splits between categories. With no total saved the factor is 1. Unsaved edits don't move the budget, but the save bar shows what they would do to this year's Left to buy, and the change history records it. The total can **follow the suggestion** (`mix.follow: 'suggested'`): it is then worked out again from every month-end's sales and whenever a turns target changes (`mixTotalOf` in `19-guides.js`, `config.mix_total`). The month-end upload sends the saved total, the follow setting and the turns targets; Update brands reads them from `guidelines/current`. Both build the subcategory report first so a followed total uses that month's sales.
 - **When guidelines disagree.** A category whose budget weeks (typed × the factor) fall outside its role's weeks-of-supply range is listed on Budget inputs and the Mix tab and adds one To do item (`wosConflicts`), since Stuck money and the Scorecard judge stock by the role ranges.
 - **Reorder and out-of-stock items** (`insights/current`) are listed by the reader for every category, those in a category stopped at the upload marked `held`; the page shows one only while its category is open to buy by the live budget (`itemOpenToBuy`), so a guideline or plan change shows at once.
@@ -145,7 +142,7 @@ Items bought for one member (custom clubs, a named order, imprinted balls) or on
 
 ## Navigation
 
-The four groups sit in a sidebar, each listing its pages (`NAV` in `app/src/05-nav.js`). The open page is remembered in the browser (`ob.tab2`). Old page ids still work, from a saved browser, an emailed link or an older button, and `TAB_ALIAS` sends them to where they live now: `summary` to Today, `otb` to Budget & open-to-buy, `subcats` to Scorecard, `rounds` to Trends & rounds, and `reports` and `help` to Upload & close. A link can name a spot on a page as `page:key` (for example `overview:2027-03`).
+The sidebar's groups and pages are `NAV`, the views inside a page `VIEWS`, and `navParent(id)` says which sidebar page a page id belongs to (`app/src/05-nav.js`). The open page is remembered in the browser (`ob.tab2`). Old page ids still work, from a saved browser, an emailed link or an older button: a merged page is a view and keeps its id (`#receiving`, `#vendors`, `#inventory`, `#forecast`, `#guidelines`, `#attention`), and `TAB_ALIAS` sends the rest where they live now: `summary` and `home` to Home, `otb` and `budget` to Budget, `settings` to Guidelines, `subcats` to Scorecard, `rounds` to Trends & rounds, and `reports` and `help` to Upload & close. A link can name a spot on a page as `page:key` (for example `overview:2027-03`).
 
 ## Receiving
 
@@ -157,7 +154,15 @@ Boxes go to the store room, the invoice goes to Chris or CJ, and the goods are r
 - Month-end matching (see Deliveries) still records the deliveries from the POS. When it does, the order's `received` rises and the store-room figure falls by the same amount.
 - Orders are marked late when the delivery month has passed and nothing is waiting in the store room.
 
-The receiving log, an Excel spreadsheet, will later write the same `invoicesIn` entries with `source: 'log'`, so nothing on this page needs to change when it is linked.
+### The receiving log
+
+The people who pay invoices keep a Google Sheet, the receiving log: one tab per year (`REC. DATE | ITEM DECRIPTION | INVOICE # | PRICE`, the date written only on each day's first row) and a Credits tab. The program reads it, read-only, with a Google service account (`lib/merch/google.ts`; the key is `GOOGLE_SERVICE_ACCOUNT_JSON`, the sheet `MERCH_LOG_SHEET_ID`, defaulting to the shop's). It never writes to the sheet. Setup: `docs/merch-receiving-log-setup.md`.
+
+- **Reading.** `refreshReceivingLog` (`lib/merch/receiving-log-server.ts`) reads every tab laid out like the log (found by its headers, so a new year's tab is picked up), parses it (`lib/merch/receiving-log.ts`) and stores `receivinglog/current`: the rows dated on or after `since` (the day it was first read), the vendor word list, unreadable rows as `problems` (a missing price, a date that can't be read, a date far behind the rows above it, such as a mistyped year), and `error`, one plain line when the read fails (the rows from the last good read are kept). It runs when someone opens Orders & receiving (`POST /merch/api/receiving-log`, at most every two minutes) and every morning from the cron. Nobody writes `receivinglog` through the page, the owner included.
+- **Matching.** Each row's vendor comes from its description: the word list (`VENDOR_WORDS_DEFAULT`, e.g. `FJ` is FootJoy, `H&B` Holderness & Bourne, plus `guidelines/current.vendorWords`) and every vendor's own name. The page suggests open orders of that vendor due within a month of the row's date with enough still open (`logCandidates`, `logQueue` in `app/src/18-ops.js`). A row with no candidate is filed under **Not from an order** with no click (reorders and special orders mostly); nothing is ever checked off automatically.
+- **Confirming.** Confirm (or Pick another order) adds an `invoicesIn` entry `{source: 'log', logKey, invoice, amount, date}` to the order, dated with the row's date, and keeps the call in `logmatch/{row key}`; a second confirm of the same row replaces its entry, and a hand entry with the same invoice number is replaced, not added to. **Not an order** files a row by hand. **Undo** takes either back. Anyone who can enter orders can do all of these.
+- **Changed in the log.** A matched row that is edited or removed in the sheet shows under Changed in the log, for a person to check and undo.
+- Once the log is read, staff no longer see **Invoice in**; the owner keeps it as **Override** for a shipment the log hasn't caught up with. The budget is untouched either way.
 
 ## Season buys
 

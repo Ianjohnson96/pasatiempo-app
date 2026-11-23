@@ -11,6 +11,15 @@ function anaNow(){
     const names = Object.fromEntries(Object.entries((BASE && BASE.cats) || (PLAN && PLAN.cats) || {}).map(([k, v]) => [k, v.name]));
     ANA = analyze(ASSORT, names, Object.fromEntries(SUBCATS.map(s => [s.id, s.name])));
   }
+  // A category's weeks of supply (and the stock its role's weeks allow) use the budget's forward pace, so the Scorecard,
+  // Stuck money, Budget and Stock & counts agree; its last-year figures stay as wksLY and cogsWkLY. Subcategories keep
+  // last year's pace: they have no forecast of their own.
+  if (ANA && BASE && ENG) for (const c of ANA.cats){
+    if (c.wksLY === undefined){ c.wksLY = c.wks; c.cogsWkLY = c.cogsWk; }
+    const f = fwdWeeklyCost(c.cat);
+    c.cogsWk = f > 0 ? f : null;   // no forecast ahead: no weeks, and no weeks target in dollars (stuckMoney)
+    c.wks = f > 0 ? c.oh / f : null;
+  }
   return ANA;
 }
 const aPct = v => v == null ? '—' : Math.round(v * 100) + '%';
@@ -28,7 +37,9 @@ function anaCmpText(a){
   if (a.cmpMonths >= 12) return 'the last 12 months against the 12 before';
   return `${monthShort(a.cmpFrom)}–${monthShort(a.through || a.months[a.months.length - 1])} against the same months a year earlier`;
 }
-const anaTile = (lab, v, sub, extra = '', x = '') => `<div class="tile"><div class="lab">${lab}</div><div class="v">${v}</div>${sub ? `<div class="d">${sub}</div>` : ''}${extra}${x ? `<div class="x">${x}</div>` : ''}</div>`;
+// A tile: its label, the number, one short line; the explanation sits behind an (i) beside the label.
+const tileTip = (lab, x) => x ? `<button type="button" class="tipi" data-cvt="${esc(String(lab).replace(/<[^>]*>/g, ''))}" data-cv="${esc(String(x).replace(/<[^>]*>/g, ''))}" aria-label="About ${esc(String(lab).replace(/<[^>]*>/g, ''))}">i</button>` : '';
+const anaTile = (lab, v, sub, extra = '', x = '') => `<div class="tile"><div class="lab">${lab}${tileTip(lab, x)}</div><div class="v">${v}</div>${sub ? `<div class="d">${sub}</div>` : ''}${extra}</div>`;
 const anaEmpty = () => `<section class="panel"><div class="note" style="font-size:14px">The analysis appears after the next month-end upload${isAdmin ? ', or press <b>Update brands</b> on the Brands page' : ''}. It needs the category and subcategory report the upload builds.</div></section>`;
 const anaBench = () => `<div class="bench"><b>Rules of thumb</b> (<button type="button" class="btn ghost sm" data-go="guidelines:targets">see or change them on the Guidelines page</button>):${[BENCH.agedPct, BENCH.md, BENCH.wks, BENCH.gmroi, BENCH.turns, BENCH.gm].map(b => b.text).join(' · ')}. Sales are at retail and stock at cost. Special orders in 640 are left out; special orders filed in a category count in its sales but not in its stock, turns, weeks or GMROI.</div>`;
 function anaSugList(list, empty){
