@@ -92,7 +92,7 @@ describe("refreshing the receiving log", () => {
     expect(signals.every((s) => s instanceof AbortSignal)).toBe(true);
   });
   it("says when the key is there but can't be read", async () => {
-    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = "{“type”: “service_account”}";
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = "{";
     const r = await refreshReceivingLog({ db: memStore(), fetchImpl: google(), now: NOW });
     expect(r.error).toMatch(/isn't a readable key file/);
   });

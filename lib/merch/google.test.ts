@@ -50,11 +50,21 @@ describe("Google service account", () => {
   });
   it("says what is wrong with the key: missing, not JSON, or not a service account key", () => {
     expect(googleKeyProblem()).toBe("missing");
-    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = "{“type”: “service_account”}";   // curly quotes from a word processor
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = "{";   // only the first line made it in
     expect(googleKeyProblem()).toBe("unreadable");
     process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({ type: "service_account" });
     expect(googleKeyProblem()).toBe("incomplete");
     process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify(KEY);
     expect(googleKeyProblem()).toBeNull();
+  });
+  it("reads a key pasted with stray spaces, invisible characters, curly quotes or wrapping quotes", () => {
+    const good = JSON.stringify(KEY, null, 2);
+    const nbsp = "\u00a0\u00a0\ufeff\n" + good.replace(/\n {2}/g, "\n\u00a0\u00a0") + "\r\n\u200b ";
+    const curly = good.replace(/"(type|client_email|private_key)"/g, "\u201c$1\u201d");
+    for (const v of [nbsp, curly, JSON.stringify(good), "GOOGLE_SERVICE_ACCOUNT_JSON=" + good]) {
+      process.env.GOOGLE_SERVICE_ACCOUNT_JSON = v;
+      expect(googleKeyProblem()).toBeNull();
+      expect(googleConfigured()).toBe(true);
+    }
   });
 });

@@ -21,10 +21,35 @@ interface Key {
   private_key: string;
 }
 
+/* The key file's text as pasted into Vercel, made readable: copying from a word processor or a web page can bring
+   invisible characters (a byte-order mark, zero-width or non-breaking spaces), curly quotes, a "NAME=" prefix, or quotes
+   around the whole thing. None of those belong in a key file, so they are taken out before it is read. */
+function parseKey(raw: string): unknown {
+  let s = raw
+    .replace(/[\ufeff\u200b-\u200d\u2060]/g, "")
+    .replace(/[\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]/g, " ")
+    .replace(/[\u201c\u201d\u201e\u201f\u2033\u2036]/g, '"')
+    .trim();
+  s = s.replace(/^GOOGLE_SERVICE_ACCOUNT_JSON\s*=\s*/, "");
+  for (let i = 0; i < 2; i++) {
+    let v: unknown;
+    try {
+      v = JSON.parse(s);
+    } catch {
+      const a = s.indexOf("{"), b = s.lastIndexOf("}");
+      if (a < 0 || b <= a) throw new Error("not JSON");
+      v = JSON.parse(s.slice(a, b + 1));
+    }
+    if (typeof v !== "string") return v;
+    s = v.trim();   // the whole file pasted as one quoted string
+  }
+  throw new Error("not JSON");
+}
+
 function key(): Key | null {
   try {
-    const k = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON || "");
-    return k && typeof k.client_email === "string" && typeof k.private_key === "string" ? k : null;
+    const k = parseKey(process.env.GOOGLE_SERVICE_ACCOUNT_JSON || "") as Partial<Key> | null;
+    return k && typeof k.client_email === "string" && typeof k.private_key === "string" ? (k as Key) : null;
   } catch {
     return null;
   }
@@ -38,7 +63,7 @@ export function googleKeyProblem(): "missing" | "unreadable" | "incomplete" | nu
   if (!raw) return "missing";
   let k: unknown;
   try {
-    k = JSON.parse(raw);
+    k = parseKey(raw);
   } catch {
     return "unreadable";
   }
