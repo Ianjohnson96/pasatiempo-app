@@ -115,4 +115,28 @@ describe("matching receiving log rows on the page", () => {
     R(`isAdmin = false; RLOG = null`);
     expect(R(`invoiceInAllowed()`)).toBe(true);
   });
+  it("a failed read shows its code and message on the page, and the owner can read again", async () => {
+    const R = page();
+    R(`RLOG = null; isAdmin = true;
+      globalThis.fetch = async () => ({ ok: false, status: 503, text: async () => JSON.stringify({ ok: false, error: "The receiving log copy couldn't be saved." }) })`);
+    await R(`readLogNow(true)`);
+    const html = R(`(renderReceiving(stats()), document.__html)`) as string;
+    expect(html).toMatch(/copy couldn&#39;t be saved/);
+    expect(html).toMatch(/503/);
+    expect(html).toMatch(/data-logread/);
+    R(`isAdmin = false`);
+    expect(R(`(renderReceiving(stats()), document.__html)`) as string).not.toMatch(/data-logread/);
+  });
+  it("a read that can't reach the app says so", async () => {
+    const R = page();
+    R(`RLOG = null; globalThis.fetch = async () => { throw new Error("network down"); }`);
+    await R(`readLogNow(true)`);
+    expect(R(`(renderReceiving(stats()), document.__html)`) as string).toMatch(/reach the app to read the receiving log/);
+  });
+  it("a good read clears the failure", async () => {
+    const R = page();
+    R(`globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ ok: true, rows: 3 }) })`);
+    await R(`readLogNow(true)`);
+    expect(R(`LOGPOKE.error`)).toBeNull();
+  });
 });
