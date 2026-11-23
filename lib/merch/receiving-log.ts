@@ -115,21 +115,24 @@ export function parseLog(tabs: SheetTab[], opts: { since: string; words: Record<
       const cell = (k: keyof typeof cols) => norm(r[cols[k]]);
       const rawDate = cell("date"), desc = cell("desc"), invoice = cell("invoice"), rawPrice = cell("price");
       const where = `${tab.title} row ${i + 2}`;
+      // Only rows from the go-live date on are read, so only their problems are worth listing: `when` is the date
+      // the row sits among (the dates above it).
+      const note = (msg: string, when: string | null) => { if (!when || when >= opts.since) problems.push(`${where}: ${msg}`); };
       if (rawDate) {
         const d = readDate(rawDate);
-        if (!d) { problems.push(`${where}: the date "${rawDate}" can't be read`); return; }
+        if (!d) { note(`the date "${rawDate}" can't be read`, latest || date); return; }
         date = d; shown = rawDate;
       }
       if (!desc && !invoice && !rawPrice) return;
-      if (!date) { problems.push(`${where}: no date`); return; }
+      if (!date) { note("no date", null); return; }
       const price = readPrice(rawPrice);
-      if (price == null) { problems.push(`${where}: no price`); return; }
+      if (price == null) { note("no price", date); return; }
       // A date well behind the rows above it is a typo (the 2026 tab has a 2/26/2025 among February 2026 rows): say so
       // rather than let it fall before `since` and vanish.
-      if (latest && daysBetween(date, latest) > 60) { problems.push(`${where}: the date ${shown} looks wrong (well before the rows above it)`); return; }
+      if (latest && daysBetween(date, latest) > 60) { note(`the date ${shown} looks wrong (well before the rows above it)`, latest); return; }
       // ...and one well after today (a month and day swapped, 11/3 for 3/11): a problem, and it doesn't move `latest`,
       // so the rows after it still read.
-      if (opts.today && daysBetween(opts.today, date) > 31) { problems.push(`${where}: the date ${shown} looks wrong (after today)`); return; }
+      if (opts.today && daysBetween(opts.today, date) > 31) { note(`the date ${shown} looks wrong (after today)`, latest || opts.today); return; }
       if (date > latest) latest = date;
       if (date < opts.since) return;
       const amount = credit ? -Math.abs(price) : price;
