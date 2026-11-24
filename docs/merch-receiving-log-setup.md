@@ -32,8 +32,9 @@ marked arrived by hand with **Invoice in**.
 1. Sign in to Google as **pasatiemposhop@gmail.com** (the sheet's owner) and open the receiving log.
 2. **Share** → paste the service account's email from step 1.6 → choose **Viewer** → untick "Notify people" → **Share**.
 
-That's all. The next time someone opens Orders & receiving (or the next morning), the log is read. Rows from that day
-on appear under **Match from the receiving log**; earlier rows are left out.
+That's all. The next time someone opens Orders & receiving (or the next morning), the log is read. Receiving starts
+**January 1, 2027**, when the orders in the app begin: rows dated from then on appear under **Match from the receiving
+log**; earlier rows are left out. To move the start, set `MERCH_LOG_START` (YYYY-MM-DD) in Vercel and redeploy.
 
 ## Columns the team can add (optional)
 
