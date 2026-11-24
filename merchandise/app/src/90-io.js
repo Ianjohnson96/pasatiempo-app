@@ -120,15 +120,15 @@ function closeOverlay(){ $('#overlay').innerHTML = ''; D = null; DX = null; }
 
 /* ---------- render + mode ---------- */
 const renderSoon = () => { $('#pane').innerHTML = `<section class="panel"><div class="note" style="font-size:14px">Coming in this build.</div></section>`; };
-const PAGES = {guidelines: renderGuidelines, today: renderToday, receiving: renderReceiving, seasons: renderSeasons, vendors: renderVendorsPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
+const PAGES = {category: renderCategory, actions: renderAttention, guidelines: renderGuidelines, today: renderToday, receiving: renderReceiving, seasons: renderSeasons, vendors: renderVendorsPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
 /* Page addresses: each page is #id in the address bar (old ids such as the reminder email's #reports are routed by
    resolveTab), a page change adds a history entry, and Back / Forward move between pages. */
-const pageUrl = id => location.pathname + location.search + '#' + id;
+const pageUrl = id => location.pathname + location.search + '#' + id + (id === 'category' && CATSEL ? ':' + CATSEL : '');
 history.replaceState(null, '', pageUrl(TAB));
 addEventListener('popstate', () => {
-  const t = resolveTab(decodeURIComponent((location.hash || '').slice(1)) || FIRST_TAB);
-  if (t === TAB) return;
-  goTab._pop = true; try { goTab(t); } finally { goTab._pop = false; }
+  const [t, k] = parseHash(location.hash);
+  if (t === TAB && !(t === 'category' && k !== CATSEL)) return;
+  goTab._pop = true; try { goTab(t, k); } finally { goTab._pop = false; }
   if (t !== TAB) history.replaceState(null, '', pageUrl(TAB));  // Guidelines kept the page (unsaved changes): put its address back
 });
 function render(){
@@ -139,6 +139,9 @@ function render(){
   }
   derive();
   TAB = resolveTab(TAB); if (!PAGES[TAB]) TAB = FIRST_TAB;
+  // The address's key (#category:620, #orders:v-fj), once there is data to apply it to.
+  if (INIT_KEY != null){ const k = INIT_KEY; INIT_KEY = null; if (TAB === 'category') CATSEL = k; else { goTab._pop = true; try { goTab(TAB, k); } finally { goTab._pop = false; } return; } }
+  if (TAB === 'category' && !catPageTarget(CATSEL)){ TAB = 'scorecard'; history.replaceState(null, '', pageUrl(TAB)); }
   // The month bar belongs to Orders and to Budget & open-to-buy's By category view; #summary and #kpis are retired
   // (Budget & open-to-buy draws its own tiles).
   const S = stats(), bar = (TAB === 'overview' && BV === 'cats') || TAB === 'orders';
@@ -164,6 +167,10 @@ function goTab(id, key){
   if (id === 'otb') setBV('months');
   if (resolveTab(id) === 'guidelines' && key){ GD.tab = key; try { localStorage.setItem('mp.guideTab', key); } catch (_) {} }
   const toOrders = id === 'orders' && key && !isMonthKey(key);
+  // A category's page: a known code opens it; anything else opens All categories.
+  const prevCat = CATSEL;
+  if (resolveTab(id) === 'category'){ const c = catPageTarget(key); if (c) CATSEL = c; else { id = 'scorecard'; key = null; } }
+  const catMoved = TAB === 'category' && resolveTab(id) === 'category' && CATSEL !== prevCat;   // one category to another
   if (toOrders){ filt.status = 'active'; filt.vendor = key; filt.season = 'all'; filt.cat = 'all'; filt.q = ''; filt.arriving = false; }
   const tab = resolveTab(id), moved = tab !== TAB;
   if (isMonthKey(key)){
@@ -172,10 +179,10 @@ function goTab(id, key){
     SEL = key; try { localStorage.setItem('ob.month', SEL); } catch (_) {}
   }
   TAB = tab;
-  if (moved && !goTab._pop) history.pushState(null, '', pageUrl(TAB));
+  if ((moved || catMoved) && !goTab._pop) history.pushState(null, '', pageUrl(TAB));
   closePops(); closeOverlay(); closeSide();
-  if (moved || isMonthKey(key) || !key || toOrders) render();
-  if (key && !isMonthKey(key)){
+  if (moved || isMonthKey(key) || !key || toOrders || TAB === 'category') render();
+  if (key && !isMonthKey(key) && TAB !== 'category'){
     if (TAB === 'brands' && typeof BRANDS !== 'undefined' && BRANDS && (BRANDS.rows || []).some(r => r.id === key)) openBrand(key);
     else if (PLAN && PLAN.cats && PLAN.cats[key]) openCategory(key);
   }
