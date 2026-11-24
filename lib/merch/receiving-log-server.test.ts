@@ -19,19 +19,27 @@ const google = (status = 200) => (async (url: string) => {
 }) as unknown as typeof fetch;
 const NOW = new Date("2026-11-22T20:00:00Z");   // Nov 22 in Pacific time
 
-beforeEach(() => { process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({ client_email: `log${n++}@example.iam.gserviceaccount.com`, private_key: privateKey.export({ type: "pkcs8", format: "pem" }).toString() }); });
-afterEach(() => { delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON; });
+beforeEach(() => { process.env.MERCH_LOG_START = "2026-01-01"; process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({ client_email: `log${n++}@example.iam.gserviceaccount.com`, private_key: privateKey.export({ type: "pkcs8", format: "pem" }).toString() }); });
+afterEach(() => { delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON; delete process.env.MERCH_LOG_START; });
 
 describe("refreshing the receiving log", () => {
-  it("stores parsed rows, the word list and since = today on the first read", async () => {
+  it("receiving starts Jan 1, 2027 unless MERCH_LOG_START says otherwise; an earlier since moves up to it", async () => {
+    delete process.env.MERCH_LOG_START;
+    const db = memStore({ "receivinglog/current": { since: "2026-11-23", at: "2026-11-01T00:00:00Z", rows: [{ key: "old" }] } });
+    await refreshReceivingLog({ db, fetchImpl: google(), now: NOW });
+    const doc = db.docs["receivinglog/current"] as { since: string; rows: unknown[] };
+    expect(doc.since).toBe("2027-01-01");
+    expect(doc.rows).toEqual([]);
+  });
+  it("stores parsed rows, the word list and since = the start date", async () => {
     const db = memStore();
     const r = await refreshReceivingLog({ db, fetchImpl: google(), now: NOW });
     expect(r.ok).toBe(true);
     const doc = db.docs["receivinglog/current"] as { since: string; rows: { date: string }[]; words: Record<string, string[]>; error: null };
-    expect(doc.since).toBe("2026-11-22");
+    expect(doc.since).toBe("2026-01-01");
     expect(doc.error).toBeNull();
     expect(doc.words.footjoy).toContain("fj");
-    expect(doc.rows.every((x) => x.date >= "2026-11-22")).toBe(true);
+    expect(doc.rows.every((x) => x.date >= "2026-01-01")).toBe(true);
   });
   it("keeps an earlier since, and adds the owner's vendor words", async () => {
     const db = memStore({ "receivinglog/current": { since: "2026-01-01", at: "2026-11-01T00:00:00Z", rows: [] }, "guidelines/current": { vendorWords: { melin: ["melin"] } } });

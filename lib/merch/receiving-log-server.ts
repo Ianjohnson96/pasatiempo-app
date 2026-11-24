@@ -11,6 +11,9 @@ import { pacificToday } from "./schedule";
 export const LOG_DOC = "receivinglog/current";
 const SHEET_ID = () => process.env.MERCH_LOG_SHEET_ID || "1L2H5NaP_6nV1FwyYE5ThjKv8GenbvdtFulW6gYsCkSs";
 const FRESH_MS = 2 * 60 * 1000;
+// The day receiving starts: orders in the app are for deliveries from then on, so only log rows dated from then can
+// belong to one. MERCH_LOG_START (YYYY-MM-DD) moves it.
+const START = () => (/^\d{4}-\d{2}-\d{2}$/.test(process.env.MERCH_LOG_START || "") ? process.env.MERCH_LOG_START! : "2027-01-01");
 
 /** Where the copy lives: merch.docs by default (writes go through put_doc, as page writes do). */
 export interface LogStore {
@@ -57,7 +60,7 @@ export async function refreshReceivingLog(opts: { force?: boolean; fetchImpl?: t
   const extra = (guide?.vendorWords && typeof guide.vendorWords === "object" ? guide.vendorWords : {}) as Record<string, unknown>;
   const words: Record<string, string[]> = { ...VENDOR_WORDS_DEFAULT };
   for (const [k, v] of Object.entries(extra)) if (Array.isArray(v)) words[k.toLowerCase()] = [...(words[k.toLowerCase()] ?? []), ...v.map(String)];
-  const since = typeof prev?.since === "string" ? prev.since : pacificToday(now);
+  const since = START();
   try {
     if (!googleConfigured()) throw new GoogleError("not configured", 0);
     const tabs = await readSheetTabs(SHEET_ID(), opts.fetchImpl);
@@ -65,14 +68,15 @@ export async function refreshReceivingLog(opts: { force?: boolean; fetchImpl?: t
     if (!tabsRead) throw new LayoutError();
     // Unchanged since the last read (and that read under an hour old): leave the copy alone, so open pages don't
     // download it again and redraw for nothing.
-    const same = prev && !prev.error && JSON.stringify([prev.rows, prev.problems, prev.words]) === JSON.stringify([rows, problems, words]);
+    const same = prev && !prev.error && prev.since === since && JSON.stringify([prev.rows, prev.problems, prev.words]) === JSON.stringify([rows, problems, words]);
     if (same && typeof prev.readAt === "string" && now.getTime() - Date.parse(prev.readAt) < 60 * 60 * 1000) return { ok: true, rows: rows.length };
     await db.put(LOG_DOC, { at: now.toISOString(), since, sheet: SHEET_ID(), words, rows, problems, error: null, readAt: now.toISOString() });
     return { ok: true, rows: rows.length };
   } catch (e) {
     const error = failure(e, typeof prev?.readAt === "string" ? prev.readAt : null);
     console.error("receiving log:", e instanceof Error ? e.message : e);
-    await db.put(LOG_DOC, { ...(prev ?? {}), at: now.toISOString(), since: prev?.since ?? null, words, rows: prev?.rows ?? [], problems: prev?.problems ?? [], error });
+    const keep = prev?.since === since;   // rows from an earlier start date don't carry over
+    await db.put(LOG_DOC, { ...(prev ?? {}), at: now.toISOString(), since, words, rows: keep ? prev?.rows ?? [] : [], problems: keep ? prev?.problems ?? [] : [], error });
     return { ok: false, error };
   }
 }

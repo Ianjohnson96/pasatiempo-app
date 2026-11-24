@@ -324,7 +324,7 @@ function logStatusHtml(){
   if (failed) return failed;
   if (!RLOG) return `<div class="warnbox info"><b>The receiving log isn't connected yet.</b> Once it is, every row the accounting team adds shows up here to match against an order. Setup: docs/merch-receiving-log-setup.md (the owner, once).${btn}</div>`;
   const probs = (RLOG.problems || []).length;
-  return `<div class="note">${RLOG.error ? `<span class="neg"><b>${esc(RLOG.error)}</b></span>` : `Receiving log read ${esc(ago(RLOG.readAt || RLOG.at))}, rows from ${esc(dateLabel(RLOG.since))} on.`}${btn}
+  return `<div class="note">${RLOG.error ? `<span class="neg"><b>${esc(RLOG.error)}</b></span>` : RLOG.since && RLOG.since > todayISO ? `The receiving log is connected (read ${esc(ago(RLOG.readAt || RLOG.at))}). Receiving starts ${esc(dateLabel(RLOG.since))}: rows dated from then on show here to match against orders.` : `Receiving log read ${esc(ago(RLOG.readAt || RLOG.at))}, rows from ${esc(dateLabel(RLOG.since))} on.`}${btn}
     ${probs ? ` <details style="display:inline"><summary>${probs} row${probs === 1 ? '' : 's'} couldn't be read</summary><ul>${RLOG.problems.map(p => `<li>${esc(p)}</li>`).join('')}</ul></details>` : ''}</div>`;
 }
 const logRowCells = r => `<td data-l="Date">${dateLabel(r.date)}</td><td class="wrapv">${esc(r.desc)}${r.special ? ' <span class="pill">special order</span>' : ''}</td><td data-l="Invoice">${esc(r.invoice || '—')}</td><td data-l="Amount" class="r num ${r.amount < 0 ? 'neg' : ''}">${money2(r.amount)}</td>`;

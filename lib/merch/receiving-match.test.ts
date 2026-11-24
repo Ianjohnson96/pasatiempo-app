@@ -342,3 +342,10 @@ describe("orders that should have arrived", () => {
     expect(R(`renderViewBar('receiving')`)).toMatch(/data-tab="receiving"[^>]*>Receiving <span class="sb hot">\d+<\/span>/);
   });
 });
+describe("before receiving starts", () => {
+  it("says when it starts, while the log is connected but its start date is ahead", () => {
+    const R = page();
+    R(`RLOG = {...RLOG, since: '2027-01-01', rows: []}`);
+    expect(R(`(renderReceiving(stats()), document.__html)`) as string).toMatch(/Receiving starts Jan 1, 2027/);
+  });
+});
