@@ -88,10 +88,10 @@ const PAGE_VERDICT = {
     const P = PLANS.cur;
     return vd('ok', `${P.fy} sales forecast ${money(sum(P.order, c => num(P.cats[c].fySales)))}. Budgets follow it.`);
   },
-  attention(S){
+  actions(S){
     if (!S) return null;
-    const n = openAttention(S).length;
-    return n ? vd('watch', `${vdPlural(n, 'item')} to work through, biggest dollars first.`) : vd('ok', 'Nothing needs attention.');
+    const open = allActions(S).filter(actionOpen), usd = open.reduce((t, d) => t + num(d.usd), 0);
+    return open.length ? vd('watch', `${vdPlural(open.length, 'action')}, ${money(usd)} at stake. Start with the first.`) : vd('ok', 'Nothing needs doing.');
   }
 };
 /** A page's verdict, or null if it can't be worked out yet (a verdict must never take the page down). */

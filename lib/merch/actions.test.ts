@@ -60,3 +60,48 @@ describe("the actions list", () => {
     expect(R(`decisionHtml(topDecisions(stats())[0], 0)`)).toContain(`data-usd="${Math.round(d.usd)}"`);
   });
 });
+
+describe("the Actions view", () => {
+  const html = (R: (e: string) => unknown) => R(`(renderActions(stats()), document.__html)`) as string;
+  it("lists every open action, numbered, biggest dollars first", () => {
+    const R = page();
+    R(`canWrite = true; dbState = 'live'`);
+    const h = html(R), open = (R(`allActions(stats()).filter(actionOpen)`) as (A & { title: string })[]);
+    let at = -1;
+    for (const a of open) { const i = h.indexOf(R(`esc(${JSON.stringify(a.title)})`) as string, at + 1); expect(i).toBeGreaterThan(at); at = i; }
+    const usds = [...h.matchAll(/data-v="done" data-usd="(\d+)"/g)].map((m) => +m[1]);
+    expect(usds[0]).toBe(Math.max(...usds));
+  });
+  it("filters by category and by kind of decision", () => {
+    const R = page();
+    const cat = (R(`allActions(stats()).find(a => a.cat)`) as A).cat!;
+    R(`afilt.cat = ${JSON.stringify(cat)}`);
+    const n = (R(`allActions(stats()).filter(a => actionOpen(a) && a.cat === ${JSON.stringify(cat)}).length`) as number);
+    expect((html(R).match(/<li class="item/g) || []).length).toBe(n);
+    R(`afilt.cat = 'all'; afilt.kind = 'chase'`);
+    const m = (R(`allActions(stats()).filter(a => actionOpen(a) && a.verb === 'chase').length`) as number);
+    expect((html(R).match(/<li class="item/g) || []).length).toBe(m);
+  });
+  it("viewers see the actions without Done or Not now", () => {
+    const R = page();
+    R(`readOnly = true`);
+    expect(html(R)).not.toMatch(/data-istate/);
+  });
+  it("set-aside actions show only with Show done, with Undo", () => {
+    const R = page();
+    R(`canWrite = true; dbState = 'live'`);
+    const x = (R(`allActions(stats())[0]`) as A & { title: string });
+    R(`ISTATE[${JSON.stringify(x.id)}] = {status: 'done', usd: ${x.usd}, by: 'x', at: '2026-11-20T00:00:00Z'}`);
+    expect(html(R)).not.toContain(`data-istate="${x.id}" data-v=""`);
+    R(`afilt.showResolved = true`);
+    expect(html(R)).toContain(`data-istate="${x.id}" data-v=""`);
+  });
+  it("before the first upload it says when actions appear", () => {
+    const R = page({});
+    expect(R(`(renderActions(null), document.__html)`)).toMatch(/The actions appear after the first month-end upload\./);
+  });
+  it("its verdict counts the actions and the dollars at stake", () => {
+    const R = page();
+    expect((R(`PAGE_VERDICT.actions(stats())`) as { text: string }).text).toMatch(/^\d+ actions?, \$[\d,]+ at stake\. Start with the first\.$/);
+  });
+});

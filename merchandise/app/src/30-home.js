@@ -81,7 +81,9 @@ function topDecisions(S, n = 5){
   return pick;
 }
 function decisionHtml(d, k){
-  const go = d.po ? `<button class="btn sm" type="button" data-openpo="${esc(d.po)}">Open order</button>`
+  const go = (d.kind === 'reorder' || d.kind === 'stockout') && canAct() && !d.state ? `<button class="btn primary sm" type="button" data-startorder="${esc(d.id)}">Start an order</button>`
+    : d.guide ? `<button class="btn sm" type="button" data-go="guidelines:${esc(d.guide)}">Open the guideline</button>`
+    : d.po ? `<button class="btn sm" type="button" data-openpo="${esc(d.po)}">Open order</button>`
     : d.page ? `<button class="btn sm" type="button" data-tab="${esc(d.page)}">Look at it</button>`
     : d.cat ? `<button class="btn sm" type="button" data-cat="${esc(d.cat)}">Open category</button>` : '';
   const u = ` data-usd="${Math.round(num(d.usd))}"`;
@@ -176,7 +178,7 @@ const TABHEAD = Object.fromEntries(Object.entries({
   // Views of Orders & receiving, Upload & count and Settings keep their own line.
   orders: "Every purchase order, by vendor, season and month.",
   receiving: "What's arrived but isn't in the POS yet, and what's due.",
-  attention: "Every order problem and item suggestion to work through.",
+  actions: "Every order problem, item to-do and suggestion, biggest dollars first.",
   vendors: "The vendors you buy from.",
   overview: "Room to buy by category and month, against what's committed.",
   budget: "Room to buy by category and month, against what's committed.",

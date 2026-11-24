@@ -120,7 +120,7 @@ function closeOverlay(){ $('#overlay').innerHTML = ''; D = null; DX = null; }
 
 /* ---------- render + mode ---------- */
 const renderSoon = () => { $('#pane').innerHTML = `<section class="panel"><div class="note" style="font-size:14px">Coming in this build.</div></section>`; };
-const PAGES = {category: renderCategory, actions: renderAttention, guidelines: renderGuidelines, today: renderToday, receiving: renderReceiving, seasons: renderSeasons, vendors: renderVendorsPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
+const PAGES = {category: renderCategory, actions: renderActions, guidelines: renderGuidelines, today: renderToday, receiving: renderReceiving, seasons: renderSeasons, vendors: renderVendorsPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
 /* Page addresses: each page is #id in the address bar (old ids such as the reminder email's #reports are routed by
    resolveTab), a page change adds a history entry, and Back / Forward move between pages. */
 const pageUrl = id => location.pathname + location.search + '#' + id + (id === 'category' && CATSEL ? ':' + CATSEL : '');
@@ -285,7 +285,6 @@ document.addEventListener('click', async e => {
   if (ds.sborders){ filt = {...filt, status: 'all', cat: 'all', vendor: 'all', season: ds.sborders, q: '', arriving: false}; return goTab('orders'); }
   if (ds.oclear){ filt.vendor = 'all'; filt.season = 'all'; return render(); }
   if (ds.akind){ afilt.kind = ds.akind; return render(); }
-  if (ds.amore){ afilt.more = {...(afilt.more || {}), [ds.amore]: !(afilt.more || {})[ds.amore]}; return render(); }
   if (ds.invin) return openInvoiceIn(ds.invin);
   if (ds.invsave) return saveInvoiceIn(ds.invsave, t);
   if (ds.invclear) return clearArrived(ds.invclear);
