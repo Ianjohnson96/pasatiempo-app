@@ -325,7 +325,7 @@ function logMatchHtml(q){
       return `<tr>${logRowCells(row)}<td>${p ? `PO ${esc(p.poNumber || p.id)} · ${esc(vendorName(p))}` : esc(po)} · ${who(d && d.by)}${act ? ` <button class="btn ghost sm" type="button" data-logundo="${esc(row.key)}">Undo</button>` : ''}</td></tr>`; }).join('')}</tbody></table></div></details>` : '';
   const sure = act ? sureMatches(q).length : 0;
   return `<section class="panel"><header><h2>Match from the receiving log</h2><span style="display:flex;gap:8px;align-items:center">${sure >= 2 ? `<button class="btn primary sm" type="button" data-logall="1" title="Rows named in the log, or with only one possible order">Confirm all ${sure} sure matches</button>` : ''}<span class="lab">${q.toMatch.length} to match</span></span></header>
-    <div class="note" style="padding-bottom:4px">Each row is what the accounting team logged. The app suggests the order it most likely belongs to: same vendor, due within a month, enough still open. Confirm marks the order arrived (it stays committed in the budget until Jonas records it).</div>${toMatch}</section>${changed}${not}${matched}`;
+    <div class="note" style="padding-bottom:4px">Each row is what the accounting team logged. A PO # in the log names its order; otherwise the app suggests the likeliest: same vendor, due within a month, enough still open, or lets you pick when nothing fits exactly. Confirm marks the order arrived (it stays committed in the budget until Jonas records it).</div>${toMatch}</section>${changed}${not}${matched}`;
 }
 /* ---------- an order's arrival: the Orders list's bar and the order's timeline ----------
    Three parts that add up to the order's cost: what Jonas has recorded received (the official record), what has
