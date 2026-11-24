@@ -288,31 +288,9 @@ describe("remembering a vendor's word from a hand match", () => {
     expect(R(`__asked.length`)).toBe(0);
   });
 });
-describe("in-season reorders: entered sometimes, not always", () => {
+describe("an order entered after its row was marked not an order", () => {
   const melinGarb = (R: (e: string) => unknown) => R(`VENDORS = VENDORS.concat([{id: 'v-garb', name: 'Garb'}]);
     RLOG = {...RLOG, words: {...RLOG.words, garb: ['garb']}, rows: RLOG.rows.concat([{key: 'r-garb', tab: 'S', date: '2026-11-23', desc: 'Garb JR Stock', invoice: '281084', amount: 1933.16, credit: false, brand: 'garb', special: false}])}`);
-  it("a row not from an order offers Add as a reorder, which opens a new order filled in from the row", () => {
-    const R = page();
-    melinGarb(R);
-    const html = R(`(renderReceiving(stats()), document.__html)`) as string;
-    expect(html).toMatch(/data-logreorder="r-garb"/);
-    R(`globalThis.__opened = null; globalThis.openOrder = (id, preset) => { __opened = [id, preset]; }`);
-    R(`addReorderFromLog('r-garb')`);
-    expect(R(`__opened`)).toEqual([null, expect.objectContaining({ vendorId: "v-garb", orderDate: "2026-11-23", deliveryMonth: "2026-11", cost: 1933.16, _fromLog: "r-garb" })]);
-  });
-  it("saving that order puts the row's invoice on it and records the match, so it shows as arrived", async () => {
-    const R = page();
-    melinGarb(R);
-    R(`db = {collection: () => ({doc: () => ({id: 'new-po'})})}; globalThis.closeOverlay = () => {}; globalThis.validateOrder = () => true;
-       const q0 = document.querySelector; document.querySelector = s => q0(s) || {disabled: false, value: ''};
-       D = {poNumber: 'R-1', vendorId: 'v-garb', cat: '620', orderDate: '2026-11-23', deliveryMonth: '2026-11', cost: 1933.16, status: 'open', received: 0, lines: [], _fromLog: 'r-garb'}; DX = null`);
-    await R(`saveOrder()`);
-    const w = R(`__writes.map(w => w[0])`) as string[];
-    expect(w).toEqual(["pos/new-po", "logmatch/r-garb"]);
-    expect(R(`__writes[0][1]._fromLog`)).toBeUndefined();
-    expect(R(`__writes[0][1].invoicesIn.map(e => [e.logKey, e.amount, e.source])`)).toEqual([["r-garb", 1933.16, "log"]]);
-    expect(R(`receivingQueue().matched.map(x => [x.row.key, x.po])`)).toContainEqual(["r-garb", "new-po"]);
-  });
   it("a row marked Not an order comes back to match when an order that fits is entered afterwards", () => {
     const R = page();
     R(`LOGMATCH = {'r-fj': {state: 'notorder', by: 'x', at: '2026-11-20T00:00:00Z'}}`);
@@ -320,5 +298,16 @@ describe("in-season reorders: entered sometimes, not always", () => {
     expect(R(`receivingQueue().notOrder.map(x => x.row.key)`)).toContain("r-fj");   // the order was there before the mark: stays filed
     R(`POS = POS.concat([{id: 'fj-re', status: 'open', cat: '620', vendorId: 'v-fj', deliveryMonth: '2026-11', orderDate: '2026-11-21', cost: 1038.82, lines: [], createdAt: '2026-11-21T00:00:00Z'}])`);
     expect(R(`(() => { const x = receivingQueue().toMatch.find(x => x.row.key === 'r-fj'); return x && [x.fit, x.cands.map(p => p.id)]; })()`)).toEqual(["good", ["fj-re"]]);
+  });
+});
+describe("special orders", () => {
+  it("are filed as not from an order without asking, even when a stock order would fit, unless a PO # names one", () => {
+    const R = page();
+    R(`POS.find(p => p.id === 'fj-dec').poNumber = '4471';
+       RLOG = {...RLOG, rows: RLOG.rows.concat([{...RLOG.rows[0], key: 'r-sp', desc: 'Shoes FJ (Smith)', amount: 210, special: true},
+         {...RLOG.rows[0], key: 'r-sp-po', desc: 'Shoes FJ (Jones)', amount: 190, special: true, po: '4471'}])}`);
+    expect(R(`receivingQueue().notOrder.find(x => x.row.key === 'r-sp').why`)).toBe("special");
+    expect(R(`receivingQueue().toMatch.find(x => x.row.key === 'r-sp-po').fit`)).toBe("exact");
+    expect(R(`(renderReceiving(stats()), document.__html)`) as string).toMatch(/a special order/);
   });
 });

@@ -5,7 +5,7 @@ const activeVendors = () => VENDORS.filter(v => v.active !== false).sort((a,b) =
 const subsFor = cat => SUBCATS.filter(s => s.cat === cat && s.active !== false).sort((a,b) => (a.sort ?? 99) - (b.sort ?? 99) || a.name.localeCompare(b.name));
 const newLine = (cat, extra = {}) => ({id: uid(), cat: cat || '', sub: '', style: '', color: '', cost: '', run: 'none', sizes: [], qty: {}, units: '', ...extra});
 function runCols(l){ return l.run === 'custom' ? (l.sizes || []) : (RUNS[l.run] || {}).cols || []; }
-function draftPo(){ const p = {...D}; delete p._addVendor; delete p._fromLog; p.lines = (D.lines || []).map(l => { const x = {...l}; delete x._addSub; return x; });
+function draftPo(){ const p = {...D}; delete p._addVendor; p.lines = (D.lines || []).map(l => { const x = {...l}; delete x._addSub; return x; });
   if (p.lines.length){ p.cost = poTotal(p); p.units = poUnits(p); } else { p.cost = r2(num(p.cost)); p.units = num(p.units); } return p; }
 
 function openOrder(id, preset){
@@ -186,14 +186,8 @@ async function saveOrder(){
   const body = {...p, createdBy: DX ? (DX.createdBy || null) : myId, createdAt: DX ? (DX.createdAt || now) : now, updatedBy: myId, updatedAt: now};
   delete body.id; delete body.vendor;
   const id = DX ? DX.id : db.collection('pos').doc().id;
-  // A reorder written from a receiving log row (Add as a reorder): it arrives with that row's invoice on it.
-  const fromLog = !DX && D._fromLog && logRow(D._fromLog);
-  if (fromLog) body.invoicesIn = withLogEntry([], logEntry(fromLog, body, myId));
   $('#dSave').disabled = true;
-  if (await write(`pos/${id}`, body)){
-    closeOverlay(); toast(DX ? `PO ${p.poNumber} updated` : fromLog ? `PO ${p.poNumber} saved and marked arrived from the receiving log` : `PO ${p.poNumber} saved`);
-    if (fromLog) await write('logmatch/' + fromLog.key, {state: 'matched', po: id, amount: fromLog.amount, date: fromLog.date, invoice: fromLog.invoice, by: myId, at: now});
-  }
+  if (await write(`pos/${id}`, body)){ closeOverlay(); toast(DX ? `PO ${p.poNumber} updated` : `PO ${p.poNumber} saved`); }
   else if ($('#dSave')) $('#dSave').disabled = false;
 }
 async function recordReceipt(){

@@ -269,6 +269,8 @@ function logQueue(rows, orders, decisions, vendorKeyOf, openOf) {
     // The log names the order (a PO # column), or a credit names the invoice it is against: that order, no guessing.
     const named = logNamedOrder(row, orders);
     if (named) { out.toMatch.push({row, cands: [named], fit: 'exact'}); continue; }
+    // A special order (a customer's name in brackets, or Type Special) has no order placed: nothing to confirm.
+    if (row.special) { out.notOrder.push({row, why: 'special'}); continue; }
     const cands = logCandidates(row, byVendor.get(row.brand) || [], vk, openOf);
     if (cands.length) { out.toMatch.push({row, cands, fit: 'good'}); continue; }
     // No exact fit, but the vendor has orders still open (due months away, or less left open than the invoice: an

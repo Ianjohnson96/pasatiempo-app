@@ -126,15 +126,6 @@ async function confirmAllSure(){
   for (const [k, po] of list) if (await confirmLogRow(k, po)) n++;
   return n;
 }
-/** Write a reorder from a log row that no order covers: a new order filled in from the row (vendor, date, month, cost),
-    for the person to finish (PO #, category). Saving it puts the row's invoice on it (saveOrder, 50-order.js). */
-function addReorderFromLog(key){
-  const row = logRow(key); if (!row || !canAct()) return;
-  const words = logWords(), brand = (row.vendor && vendorKeyFor(row.vendor, words)) || vendorKeyFor(row.desc, words);
-  const v = brand && VENDORS.find(x => vendorKeyFor(x.name, words) === brand);
-  openOrder(null, {vendorId: v ? v.id : '', orderDate: row.date, deliveryMonth: row.date.slice(0, 7), cost: row.amount, status: 'open',
-    notes: `In-season reorder, from the receiving log: ${row.desc}${row.invoice ? `, invoice ${row.invoice}` : ''}`, _fromLog: row.key});
-}
 function markNotOrder(key){
   return logAction(async () => {
     if (!logRow(key) || !canAct()) return false;
@@ -183,8 +174,6 @@ document.addEventListener('click', async e => {
   if (all){ all.disabled = true; const n = await confirmAllSure(); if (n) toast(`${n} match${n === 1 ? '' : 'es'} confirmed`); all.disabled = false; return; }
   const r = e.target.closest && e.target.closest('[data-logread]');
   if (r){ r.disabled = true; const x = await readLogNow(true); toast(x.error ? 'The receiving log could not be read: see the message on the page.' : x.skipped ? 'The receiving log was read moments ago.' : `Receiving log read: ${x.rows || 0} row${x.rows === 1 ? '' : 's'} from the go-live date on.`); return; }
-  const ro = e.target.closest && e.target.closest('[data-logreorder]');
-  if (ro){ addReorderFromLog(ro.dataset.logreorder); return; }
   const b = e.target.closest && e.target.closest('[data-logok],[data-lognot],[data-logundo]');
   if (!b) return;
   b.disabled = true;
@@ -315,13 +304,12 @@ function logPickHtml(key, first, label){
   if (!first.length && !rest.length) return '';
   return `<select class="pick" data-logpick="${esc(key)}" aria-label="${esc(label)}"><option value="">${esc(label)}</option>${first.map(opt).join('')}${first.length && rest.length ? '<option disabled>── other open orders ──</option>' : ''}${rest.map(opt).join('')}</select>`;
 }
-const reorderBtn = row => row.credit ? '' : `<button class="btn sm" type="button" data-logreorder="${esc(row.key)}" title="Write the in-season reorder this came from; it saves already arrived">Add as a reorder</button>`;
 function logMatchHtml(q){
   if (!RLOG) return '';
   const act = canAct(), who = id => id ? `<span class="person" data-uid="${esc(id)}"></span>` : '';
   const toMatch = q.toMatch.length ? `<div class="tbl"><table class="mini rt" style="min-width:0"><thead><tr><th>Date</th><th>From the log</th><th>Invoice</th><th class="r">Amount</th><th>Order</th></tr></thead><tbody>${q.toMatch.map(({row, cands, fit, reopened}) =>
     fit === 'loose'
-      ? `<tr>${logRowCells(row)}<td data-l="Order"><span class="faint">No order fits exactly: ${esc(vendorName(cands[0]))} has ${cands.length === 1 ? 'an order' : cands.length + ' orders'} open, but due in another month or with less left open than this invoice.</span>${act ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${logPickHtml(row.key, cands, 'Pick the order…')}${reorderBtn(row)}<button class="btn ghost sm" type="button" data-lognot="${esc(row.key)}">Not an order</button></div>` : ''}</td></tr>`
+      ? `<tr>${logRowCells(row)}<td data-l="Order"><span class="faint">No order fits exactly: ${esc(vendorName(cands[0]))} has ${cands.length === 1 ? 'an order' : cands.length + ' orders'} open, but due in another month or with less left open than this invoice.</span>${act ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${logPickHtml(row.key, cands, 'Pick the order…')}<button class="btn ghost sm" type="button" data-lognot="${esc(row.key)}">Not an order</button></div>` : ''}</td></tr>`
       : `<tr>${logRowCells(row)}<td data-l="Order">${poLabel(cands[0])}${fit === 'exact' ? ' <span class="pill">named in the log</span>' : ''}${reopened ? ' <span class="pill">entered after you marked it not an order</span>' : ''}${act ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn primary sm" type="button" data-logok="${esc(row.key)}|${esc(cands[0].id)}">Confirm</button>${cands.slice(1).map(p => `<button class="btn sm" type="button" data-logok="${esc(row.key)}|${esc(p.id)}" title="${poLabel(p)}">Pick PO ${esc(p.poNumber || p.id)}</button>`).join('')}<button class="btn ghost sm" type="button" data-lognot="${esc(row.key)}">Not an order</button></div>` : ''}</td></tr>`).join('')}</tbody></table></div>`
     : '<div class="note">Nothing to match: every row in the log is matched or isn\'t from an order.</div>';
   const was = (key, poId) => { const p = POS.find(x => x.id === poId), e = p && (p.invoicesIn || []).find(x => x && x.logKey === key), d = LOGMATCH[key] || {};
@@ -331,7 +319,7 @@ function logMatchHtml(q){
     <ul class="items">${fixes.map(c => `<li class="item warn"><div class="stripe"></div><div class="body"><div class="t">${was(c.key, c.po)}</div><div class="d">${c.why}</div></div>${act ? `<button class="btn sm" type="button" data-logundo="${esc(c.key)}|${esc(c.po)}">Undo this match</button>` : ''}</li>`).join('')}</ul></section>` : '';
   const not = q.notOrder.length ? `<details class="panel" style="padding:12px 16px"><summary><b>Not from an order</b> · ${q.notOrder.length} row${q.notOrder.length === 1 ? '' : 's'}: reorders, special orders and anything else not in the order book. Nothing to do.</summary>
     <div class="tbl"><table class="mini rt" style="min-width:0"><tbody>${q.notOrder.map(({row, why}) => { const d = LOGMATCH[row.key];
-      return `<tr>${logRowCells(row)}<td>${why === 'marked' ? `marked by ${who(d && d.by)}${act ? ` ${reorderBtn(row)}<button class="btn ghost sm" type="button" data-logundo="${esc(row.key)}">Undo</button>` : ''}` : `<span class="faint">${why === 'reorder' ? 'a reorder in the log' : 'no open order from this vendor'}</span>${act ? ` ${logPickHtml(row.key, [], 'Match to an order…')} ${reorderBtn(row)}` : ''}`}</td></tr>`; }).join('')}</tbody></table></div></details>` : '';
+      return `<tr>${logRowCells(row)}<td>${why === 'marked' ? `marked by ${who(d && d.by)}${act ? ` <button class="btn ghost sm" type="button" data-logundo="${esc(row.key)}">Undo</button>` : ''}` : `<span class="faint">${why === 'special' ? 'a special order' : why === 'reorder' ? 'a reorder in the log' : 'no open order from this vendor'}</span>${act ? ` ${logPickHtml(row.key, [], 'Match to an order…')}` : ''}`}</td></tr>`; }).join('')}</tbody></table></div></details>` : '';
   const matched = q.matched.length ? `<details class="panel" style="padding:12px 16px"><summary><b>Matched</b> · ${q.matched.length} row${q.matched.length === 1 ? '' : 's'}</summary>
     <div class="tbl"><table class="mini rt" style="min-width:0"><tbody>${q.matched.map(({row, po}) => { const p = POS.find(x => x.id === po), d = LOGMATCH[row.key];
       return `<tr>${logRowCells(row)}<td>${p ? `PO ${esc(p.poNumber || p.id)} · ${esc(vendorName(p))}` : esc(po)} · ${who(d && d.by)}${act ? ` <button class="btn ghost sm" type="button" data-logundo="${esc(row.key)}">Undo</button>` : ''}</td></tr>`; }).join('')}</tbody></table></div></details>` : '';
