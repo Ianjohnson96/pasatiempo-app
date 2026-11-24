@@ -326,6 +326,26 @@ function arrivalTimelineHtml(p){
     ${p.status !== 'cancelled' && a.toCome ? step('', 'Still to come', money2(a.toCome) + (ym && ym < THIS_MONTH ? ' <span class="rstat overdue">late</span>' : '')) : ''}
   </ol>`;
 }
+/** A vendor's record on orders that were due (delivery month before today's): judged, those whose first arrival
+    (invoice in, from the log or by hand) came by the end of the delivery month; avgLate, the average days late of the
+    rest (still not arrived counts to today); due and arrived, dollars of those orders and how much of it is in Jonas
+    or the store room; lastArrival, the latest invoice date on any of the vendor's orders. An order Jonas received with
+    no arrival date counts toward arrived but not timing. Cancelled orders are left out. */
+function vendorScore(orders, today){
+  const month = today.slice(0, 7), late = [];
+  let judged = 0, onTime = 0, due = 0, arrived = 0, lastArrival = null;
+  for (const p of orders || []){
+    if (!p || p.status === 'cancelled') continue;
+    const dates = (p.invoicesIn || []).map(e => e && e.date).filter(Boolean).sort();
+    if (dates.length && (!lastArrival || dates[dates.length - 1] > lastArrival)) lastArrival = dates[dates.length - 1];
+    const ym = /^\d{4}-\d{2}/.test(p.deliveryMonth || '') ? p.deliveryMonth.slice(0, 7) : null;
+    if (!ym || ym >= month) continue;
+    const a = arrivalSplit(p); due += a.total; arrived += a.inJonas + a.storeRoom;
+    if (dates.length){ judged++; const n = daysAfterMonth(ym, dates[0]); if (n <= 0) onTime++; else late.push(n); }
+    else if (a.inJonas + a.storeRoom < a.total - 0.5){ judged++; late.push(daysAfterMonth(ym, today)); }
+  }
+  return {judged, onTime, avgLate: late.length ? Math.round(late.reduce((x, y) => x + y, 0) / late.length) : null, due: r2(due), arrived: r2(arrived), lastArrival};
+}
 /* An order's trail: placed, arrived (from the log or by hand), in Jonas. */
 function rcvTrail(p, inv){
   const first = (inv || []).map(e => e.date).sort()[0], refs = (inv || []).map(e => e.invoice).filter(Boolean);
