@@ -85,7 +85,7 @@ function decisionHtml(d, k){
     : d.guide ? `<button class="btn sm" type="button" data-go="guidelines:${esc(d.guide)}">Open the guideline</button>`
     : d.po ? `<button class="btn sm" type="button" data-openpo="${esc(d.po)}">Open order</button>`
     : d.page ? `<button class="btn sm" type="button" data-tab="${esc(d.page)}">Look at it</button>`
-    : d.cat ? `<button class="btn sm" type="button" data-cat="${esc(d.cat)}">Open category</button>` : '';
+    : d.cat ? `<button class="btn sm" type="button" data-go="category:${esc(d.cat)}">Open category</button>` : '';
   const u = ` data-usd="${Math.round(num(d.usd))}"`;
   const btns = !canAct() ? '' : d.state && !d.back ? `<button class="btn sm" type="button" data-istate="${esc(d.id)}" data-v="">Undo</button>`
     : `<button class="btn sm" type="button" data-istate="${esc(d.id)}" data-v="done"${u}>Done</button><button class="btn ghost sm" type="button" data-istate="${esc(d.id)}" data-v="dismissed"${u}>Not now</button>`;

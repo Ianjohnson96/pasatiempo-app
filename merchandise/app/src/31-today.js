@@ -67,7 +67,7 @@ function renderToday(S){
     ${L ? `<section class="homelines" aria-label="The shop at a glance">${line('Buy', L.buy, L.buyTone, 'overview')}${line('Arriving', L.arriving, L.arrivingTone, 'receiving')}${line('Selling', L.selling, L.sellingTone, 'trends')}</section>`
       : '<section class="panel"><div class="note">Home fills in after the first month-end upload.</div></section>'}
     <div class="tgrid">
-      <section class="panel"><header><h2>This week's decisions</h2><button class="btn ghost sm" type="button" data-tab="attention">See all</button></header>
+      <section class="panel"><header><h2>This week's decisions</h2><button class="btn ghost sm" type="button" data-tab="actions">See all actions</button></header>
         <ul class="items">${d.length ? d.map(decisionHtml).join('') : '<li class="item good"><div class="stripe"></div><div class="body"><div class="t">Nothing needs attention.</div></div></li>'}</ul></section>
       ${a ? anaSalesCard(a, {w, go: 'trends'}) : '<section class="ccard"><h3>Sales by month</h3><div class="cs">Appears after the next month-end upload: it needs the category and subcategory report the upload builds.</div></section>'}
     </div>

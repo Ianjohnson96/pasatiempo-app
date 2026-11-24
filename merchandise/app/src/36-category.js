@@ -60,7 +60,7 @@ function renderCategory(S){
       ${anaTile('Weeks of supply', d.stock.wks != null ? aWk(d.stock.wks) : '—', d.stock.wksTarget != null ? `target ${d.stock.wksTarget}` : '', aGrade(g('wks')))}
       ${anaTile('Margin', d.margin ? aPct(d.margin.gm) : '—', d.margin ? `GMROI ${aX(d.margin.gmroi, 2)}` : '', aGrade(g('gmroi')))}
       ${anaTile('Aged stock', money(d.stock.aged), d.stock.agedPct != null ? `${aPct(d.stock.agedPct)} of ${money(d.stock.oh)} on hand unsold 12+ months` : '', aGrade(g('agedPct')))}
-      ${anaTile('Left to buy', b ? `<span class="${b.left < 0 ? 'neg' : ''}">${money(b.left)}</span>` : '—', b ? `of a ${money(b.budget)} ${esc(PLAN.fy)} budget` : 'not in the open-to-buy')}
+      ${anaTile('Left to buy', b ? `<span class="${b.left < 0 ? 'neg' : ''}">${money(b.left)}</span>` : '—', !b ? 'not in the open-to-buy' : b.budget > 0 ? `of a ${money(b.budget)} ${esc(PLAN.fy)} budget` : `No budget: the plan already holds ${money(-b.budget)} too much`)}
     </section>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" type="button" data-cat="${esc(d.code)}">Budget details</button>${seg ? `<button class="btn ghost sm" type="button" data-tab="brands">Brands in ${esc(seg.toLowerCase())}</button>` : ''}</div>
     ${acts}${chart}${subs}${orders}${md}</div>`;

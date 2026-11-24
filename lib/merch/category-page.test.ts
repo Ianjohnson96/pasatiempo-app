@@ -56,3 +56,37 @@ describe("a category's page", () => {
     expect((R(`(CATSEL = '620', PAGE_VERDICT.category(stats()))`) as { text: string }).text).toContain(R(`CAT('620').name`) as string);
   });
 });
+
+describe("every way into a category's page", () => {
+  it("the Scorecard names link to the page; Trends, Markdowns and the chart open it", () => {
+    const R = page();
+    R(`globalThis.renderSubcats = () => { $('#pane').innerHTML = ''; }`);   // the subcategory panel needs data the harness doesn't load
+    expect(R(`(renderScorecard(stats()), document.__html)`)).toContain('data-go="category:620"');
+    expect(R(`(renderTrends(), document.__html)`)).toContain('data-anaopen="620"');
+    expect(R(`(renderStuck(), document.__html)`)).toContain('data-anaopen="620"');
+    R(`globalThis.__go = null; globalThis.goTab = (t, k) => { __go = [t, k]; }`);
+    R(`anaOpen('620')`);
+    expect(R(`__go`)).toEqual(["category", "620"]);
+  });
+  it("an action's Open category goes to the page", () => {
+    const R = page();
+    const h = R(`decisionHtml({id: 'x', verb: 'hold', usd: 500, title: 't', detail: '', action: '', sev: 'warn', cat: '620', state: null, back: false}, 0)`) as string;
+    expect(h).toContain('data-go="category:620"');
+  });
+  it("Home shows at most five decisions and links to Actions", () => {
+    const R = page();
+    R(`canWrite = true; dbState = 'live'`);
+    const h = R(`(renderToday(stats()), document.__html)`) as string;
+    expect((h.match(/data-v="done"/g) || []).length).toBeLessThanOrEqual(5);
+    expect(h).toContain('data-tab="actions"');
+  });
+});
+describe("the Left to buy tile", () => {
+  it("says a category has no budget, not 'of a negative budget'", () => {
+    const R = page();
+    const h = R(`(CATSEL = '620', renderCategory(stats()), document.__html)`) as string;
+    expect(R(`seasonBudget('620') <= 0`)).toBe(true);   // the fixture's 620 is overbought
+    expect(h).not.toMatch(/of a −\$/);
+    expect(h).toMatch(/No budget: the plan already holds \$[\d,]+ too much/);
+  });
+});
