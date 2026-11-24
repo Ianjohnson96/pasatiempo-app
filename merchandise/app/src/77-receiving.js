@@ -297,6 +297,35 @@ function logMatchHtml(q){
   return `<section class="panel"><header><h2>Match from the receiving log</h2><span style="display:flex;gap:8px;align-items:center">${sure >= 2 ? `<button class="btn primary sm" type="button" data-logall="1" title="Rows named in the log, or with only one possible order">Confirm all ${sure} sure matches</button>` : ''}<span class="lab">${q.toMatch.length} to match</span></span></header>
     <div class="note" style="padding-bottom:4px">Each row is what the accounting team logged. The app suggests the order it most likely belongs to: same vendor, due within a month, enough still open. Confirm marks the order arrived (it stays committed in the budget until Jonas records it).</div>${toMatch}</section>${changed}${not}${matched}`;
 }
+/* ---------- an order's arrival: the Orders list's bar and the order's timeline ----------
+   Three parts that add up to the order's cost: what Jonas has recorded received (the official record), what has
+   arrived by invoice and sits in the store room, and what is still to come. */
+function arrivalSplit(p){
+  const total = r2(poTotal(p)), inJonas = r2(Math.min(Math.max(num(p.received), 0), total)), storeRoom = r2(Math.min(storeRoomOf(p), total - inJonas));
+  return {total, inJonas, storeRoom, toCome: r2(Math.max(total - inJonas - storeRoom, 0))};
+}
+function arrivalBarHtml(p){
+  if (p.status === 'cancelled') return '';
+  const a = arrivalSplit(p); if (a.total <= 0) return '';
+  const pct = v => Math.round(v / a.total * 1000) / 10, t = `In Jonas ${money2(a.inJonas)} · in the store room ${money2(a.storeRoom)} · still to come ${money2(a.toCome)}`;
+  return `<span class="abar" role="img" aria-label="${t}" title="${t}"><i class="j" style="width:${pct(a.inJonas)}%"></i><i class="s" style="width:${pct(a.storeRoom)}%"></i></span>`;
+}
+/** Days from the end of a 'YYYY-MM' delivery month to a date (0 or less: on time). */
+const daysAfterMonth = (ym, iso) => { const [y, m] = ym.split('-').map(Number); return Math.round((Date.parse(iso + 'T00:00:00Z') - Date.UTC(y, m, 0)) / 864e5); };
+function arrivalTimelineHtml(p){
+  const a = arrivalSplit(p), placed = orderDateISO(p.orderDate), ym = /^\d{4}-\d{2}/.test(p.deliveryMonth || '') ? p.deliveryMonth.slice(0, 7) : null;
+  const inv = (p.invoicesIn || []).filter(Boolean).slice().sort((x, y) => String(x.date).localeCompare(String(y.date)));
+  const step = (cls, label, what) => `<li class="${cls}"><b>${label}</b> <span class="faint">${what}</span></li>`;
+  const late = d => { if (!ym || !d) return ''; const n = daysAfterMonth(ym, d); return n > 0 ? ` <span class="rstat overdue">late, ${n} day${n === 1 ? '' : 's'} after ${monthLabel(ym)}</span>` : ''; };
+  return `<ol class="atl">
+    ${step('done', 'Placed', placed ? dateLabel(placed) : '—')}
+    ${step(inv.length || a.inJonas ? 'done' : '', 'Due', ym ? monthLabel(ym) : 'no delivery month')}
+    ${inv.map((e, i) => step('done', 'Arrived', `${dateLabel(e.date)} · ${e.amount != null && e.amount !== '' ? money2(num(e.amount)) : 'whole order'}${e.invoice ? ` · invoice ${esc(e.invoice)}` : ''} · ${e.source === 'log' ? 'from the receiving log' : 'marked by hand'}`) + (i === 0 ? late(e.date) : '')).join('')}
+    ${step(a.inJonas ? 'done' : '', 'In Jonas', `${money2(a.inJonas)} of ${money2(a.total)} received${BASE && BASE.asOf ? `, as of the ${dateLabel(BASE.asOf)} upload` : ''}`)}
+    ${a.storeRoom ? step('', 'In the store room', `${money2(a.storeRoom)}, not in Jonas yet`) : ''}
+    ${p.status !== 'cancelled' && a.toCome ? step('', 'Still to come', money2(a.toCome) + (ym && ym < THIS_MONTH ? ' <span class="rstat overdue">late</span>' : '')) : ''}
+  </ol>`;
+}
 /* An order's trail: placed, arrived (from the log or by hand), in Jonas. */
 function rcvTrail(p, inv){
   const first = (inv || []).map(e => e.date).sort()[0], refs = (inv || []).map(e => e.invoice).filter(Boolean);

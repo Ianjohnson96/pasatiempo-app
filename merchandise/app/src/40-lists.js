@@ -79,7 +79,7 @@ function renderOrders(S){
     <tbody class="click">${rows.map((p, i) => `${byMonth && (i === 0 || mkey(rows[i - 1]) !== mkey(p)) ? monthHead(mkey(p)) : ''}<tr class="${rowFlag(p)}" data-po="${esc(p.id)}" tabindex="0">
       <td class="po">${esc(p.poNumber)}</td><td>${esc(vendorName(p))}${RISK_VENDORS.test(vendorName(p)) ? '<span class="sm" style="color:var(--ochre)">cost risk</span>' : ''}</td>
       <td>${catSummary(p)}</td><td>${itemsSummary(p)}</td><td class="nowrap">${monthLabel(p.deliveryMonth)}</td><td class="num nowrap">${p.cancelDate ? dateLabel(p.cancelDate) : '—'}</td>
-      <td class="r num">${money(poTotal(p))}</td><td class="r num">${onOrder(p) ? money(onOrder(p)) : '—'}</td>
+      <td class="r num">${money(poTotal(p))}</td><td class="r num">${onOrder(p) ? money(onOrder(p)) : '—'}${arrivalBarHtml(p)}</td>
       <td><span class="pill ${esc(p.status)}">${STATUS[p.status] || esc(p.status)}</span>${p.status === 'hold' && p.fix ? `<span class="sm fixnote" title="${esc(p.fix)}">${esc(p.fix)}</span>` : ''}</td></tr>`).join('')}</tbody></table></div>
     ${!POS.length ? `<div class="empty"><h3>No purchase orders yet</h3><p>Click <b>+ New order</b> to write one, or use <b>Tools → Paste orders from a spreadsheet</b> to load your current open orders all at once.</p>${canAct() ? '<button class="btn primary" type="button" data-act="new">+ New order</button>' : ''}</div>` : !rows.length ? `<div class="empty"><p>No orders match these filters.</p>${filtered ? '<button type="button" class="btn sm" data-oclear="1">Clear vendor and season</button>' : ''}</div>` : ''}
   </section>`;
