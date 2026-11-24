@@ -132,7 +132,10 @@ function sideCount(b, id){
 function renderViewBar(tab){
   const vs = VIEWS[navParent(tab)];
   if (!vs) return '';
-  return `<div class="seg viewbar" role="group" aria-label="${esc(pageLabel(navParent(tab)))} views">${vs.map(([id, l]) => `<button type="button" data-tab="${id}" aria-pressed="${tab === id}">${esc(l)}</button>`).join('')}</div>`;
+  // Receiving carries what needs doing there: orders that should have arrived (red) and log rows to match.
+  const badge = id => { if (id !== 'receiving') return ''; try { const o = overdueOrders().length, m = receivingQueue().toMatch.length;
+    return o + m ? ` <span class="sb ${o ? 'hot' : ''}">${o + m}</span>` : ''; } catch (e){ return ''; } };
+  return `<div class="seg viewbar" role="group" aria-label="${esc(pageLabel(navParent(tab)))} views">${vs.map(([id, l]) => `<button type="button" data-tab="${id}" aria-pressed="${tab === id}">${esc(l)}${badge(id)}</button>`).join('')}</div>`;
 }
 function renderSide(S){
   const b = sideBadges(S), cur = navParent(TAB);

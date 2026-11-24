@@ -311,3 +311,34 @@ describe("special orders", () => {
     expect(R(`(renderReceiving(stats()), document.__html)`) as string).toMatch(/a special order/);
   });
 });
+describe("orders that should have arrived", () => {
+  const late = (R: (e: string) => unknown) => R(`POS = POS.concat([{id: 'fj-oct', poNumber: '3920', status: 'open', cat: '620', vendorId: 'v-fj', deliveryMonth: '2026-09', orderDate: '2026-06-01', cost: 900, lines: []}])`);
+  it("lists open orders past their delivery month with nothing arrived, most overdue first", () => {
+    const R = page();
+    late(R);
+    const ids = R(`overdueOrders().map(p => p.id)`) as string[];
+    expect(ids[0]).toBe("fj-oct");
+    expect(ids).not.toContain("fj-dec");
+  });
+  it("Receiving opens with them, each with the log's unmatched rows to match, its vendor's first", () => {
+    const R = page();
+    late(R);
+    const html = R(`(renderReceiving(stats()), document.__html)`) as string;
+    expect(html.indexOf("Should have arrived")).toBeLessThan(html.indexOf("Match from the receiving log"));
+    const sel = html.match(/<select[^>]*data-invpick="fj-oct"[\s\S]*?<\/select>/)![0];
+    expect(sel.indexOf("r-fj")).toBeLessThan(sel.indexOf("r-melin"));
+    expect(html).toMatch(/days late/);
+  });
+  it("choosing an invoice confirms it on that order", async () => {
+    const R = page();
+    late(R);
+    await R(`onInvPick({target: (() => { const s = {dataset: {invpick: 'fj-oct'}, value: 'r-fj', closest: k => k === '[data-invpick]' ? s : null}; return s; })()})`);
+    expect(R(`POS.find(p => p.id === 'fj-oct').invoicesIn.map(e => e.logKey)`)).toEqual(["r-fj"]);
+    expect(R(`overdueOrders().map(p => p.id)`)).not.toContain("fj-oct");
+  });
+  it("the Receiving tab carries a red count while any order is overdue", () => {
+    const R = page();
+    late(R);
+    expect(R(`renderViewBar('receiving')`)).toMatch(/data-tab="receiving"[^>]*>Receiving <span class="sb hot">\d+<\/span>/);
+  });
+});

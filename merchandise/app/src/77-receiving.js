@@ -209,6 +209,41 @@ async function offerVendorWord(row, p){
   if (ok) toast(`Log rows with "${word}" will now suggest ${name} orders.`);
   return ok;
 }
+/* ----- orders that should have arrived ----- */
+/** Open orders past their delivery month with nothing arrived (rcvOf 'late'), most overdue first, then biggest. */
+const overdueOrders = () => POS.filter(p => isOpen(p) && rcvOf(p) === 'late')
+  .sort((a, b) => String(a.deliveryMonth).localeCompare(String(b.deliveryMonth)) || onOrder(b) - onOrder(a));
+/** The log's rows not matched to any order (still to match, or filed as not from an order), its vendor's first. */
+function invoicePickHtml(p, q){
+  const words = logWords(), key = vendorKeyFor(vendorName(p), words);
+  const rows = q.toMatch.map(x => x.row).concat(q.notOrder.map(x => x.row)).filter(r => !r.credit);
+  const mine = rows.filter(r => key && r.brand === key), rest = rows.filter(r => !(key && r.brand === key));
+  if (!rows.length) return '';
+  const opt = r => `<option value="${esc(r.key)}">${dateLabel(r.date)} · ${esc(r.desc)} · ${r.invoice ? 'inv ' + esc(r.invoice) + ' · ' : ''}${money2(r.amount)}</option>`;
+  return `<select class="pick" data-invpick="${esc(p.id)}" aria-label="Match an invoice to PO ${esc(p.poNumber || p.id)}"><option value="">Match an invoice…</option>${mine.map(opt).join('')}${mine.length && rest.length ? '<option disabled>── other vendors ──</option>' : ''}${rest.map(opt).join('')}</select>`;
+}
+function overdueHtml(q){
+  const list = overdueOrders();
+  if (!list.length) return '';
+  const act = canAct(), words = logWords();
+  const lastDay = ym => { const [y, m] = ym.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); };
+  return `<section class="panel attn"><header><h2>Should have arrived</h2><span class="lab">${list.length} order${list.length === 1 ? '' : 's'}</span></header>
+    <div class="note" style="padding-bottom:4px">Past their delivery month with nothing arrived. Match each to its invoice in the receiving log; with no invoice yet, chase the vendor or move the delivery month on the order.</div>
+    <div class="tbl"><table class="mini rt" style="min-width:0"><thead><tr><th>Order</th><th>Expected</th><th class="r">Still to come</th><th>Invoice</th></tr></thead><tbody class="click">${list.map(p => {
+      const days = Math.max(0, daysAfterMonth(String(p.deliveryMonth).slice(0, 7), todayISO)), key = vendorKeyFor(vendorName(p), words);
+      const has = key && receivingQueue().toMatch.concat(receivingQueue().notOrder).some(x => x.row.brand === key && !x.row.credit);
+      return `<tr data-po="${esc(p.id)}" tabindex="0"><td class="wrapv"><b>PO ${esc(p.poNumber)}</b> · ${esc(vendorName(p))}</td><td data-l="Expected">${monthLabel(p.deliveryMonth)} <span class="rstat overdue">${days} day${days === 1 ? '' : 's'} late</span></td><td data-l="Still to come" class="r num">${money2(onOrder(p))}</td>
+        <td data-l="Invoice">${act && RLOG ? invoicePickHtml(p, q) : ''}${has ? '' : `<div class="faint" style="font-size:12px">No unmatched invoice from ${esc(vendorName(p))} in the log${RLOG && RLOG.since ? ` since ${dateLabel(RLOG.since)}` : ''}.</div>`}</td></tr>`; }).join('')}</tbody></table></div></section>`;
+}
+/** Choosing an invoice for an overdue order confirms that log row on it. */
+async function onInvPick(e){
+  const sel = e.target.closest && e.target.closest('[data-invpick]');
+  if (!sel || !sel.value) return;
+  sel.disabled = true;
+  await confirmLogRow(sel.value, sel.dataset.invpick);
+  sel.disabled = false;
+}
+document.addEventListener('change', onInvPick);
 /** Choosing an order in a row's pick list confirms the match, and for the owner offers to remember the vendor's word. */
 async function onLogPick(e){
   const sel = e.target.closest && e.target.closest('[data-logpick]');
@@ -399,10 +434,10 @@ function renderReceiving(S){
       ${todayTile('Late orders', String(late.length), late.length ? `${moneyK(lateCost)} past the delivery month` : 'none past their delivery month')}
     </section>
     ${logStatusHtml()}
+    ${overdueHtml(q)}
     ${logMatchHtml(q)}
     ${rcvChart(rows)}
-    ${sec('In the store room, not in the POS', 'Oldest first. Arrived is what the invoices add up to. Clear takes an order off this list once it is in the POS; it changes no figures. Open an order to change what was received.', arr, 'arrived', 'Nothing is waiting. Use Invoice in on an order (or on the Late and Due lists below) when its goods arrive.')}
-    ${sec('Late', 'Open orders past their delivery month with nothing arrived.', late, 'open', 'No late orders.')}
+    ${sec('In the store room, not in the POS', 'Oldest first. Arrived is what the invoices add up to. Clear takes an order off this list once it is in the POS; it changes no figures. Open an order to change what was received.', arr, 'arrived', 'Nothing is waiting. Match a receiving log invoice, or use Invoice in, when the goods arrive.')}
     ${sec('Due this month', `Open orders due in ${monthFull(THIS_MONTH)} with nothing arrived.`, due, 'open', 'Nothing else is due this month.')}
     <div class="note">${logLive() ? 'Arrivals come from the receiving log: match each row above.' : 'Until the receiving log is connected, mark orders by hand with Invoice in.'} Arrived goods stay committed in the budget until month-end records them as received.</div></div>`;
 }
