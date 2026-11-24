@@ -67,6 +67,9 @@ const logLive = () => !!(RLOG && !RLOG.error && RLOG.readAt);
 /* The vendor words the server read the log with, plus every vendor's own name. */
 function logWords(){
   const w = {...((RLOG && RLOG.words) || {})};
+  // words the owner saved since the server last read the log take effect at once
+  const g = (typeof GUIDE !== 'undefined' && GUIDE && GUIDE.vendorWords) || {};
+  for (const k of Object.keys(g)) if (Array.isArray(g[k])) w[k] = [...new Set([...(w[k] || []), ...g[k].map(x => String(x).toLowerCase())])];
   for (const v of VENDORS){ const n = String(v.name || '').toLowerCase().trim(); if (n && !vendorKeyFor(n, w)) w[n] = [n]; }
   return w;
 }
@@ -75,7 +78,7 @@ function logWords(){
    it fresh. */
 let LOGQ = null, LOGQ_GEN = 0;
 function receivingQueue(){
-  const key = [RLOG, LOGMATCH, POS, VENDORS, LOGQ_GEN];
+  const key = [RLOG, LOGMATCH, POS, VENDORS, LOGQ_GEN, typeof GUIDE !== 'undefined' ? GUIDE : null];
   if (LOGQ && LOGQ.key.every((x, i) => x === key[i])) return LOGQ.q;
   const words = logWords();
   const rows = ((RLOG && RLOG.rows) || []).map(r => ({...r, brand: (r.vendor && vendorKeyFor(r.vendor, words)) || vendorKeyFor(r.desc, words)}));
@@ -180,12 +183,39 @@ document.addEventListener('click', async e => {
   b.disabled = false;
 });
 
-/** Choosing an order in a row's pick list confirms the match. */
+/* ----- learning the log's words for a vendor ----- */
+const NOT_BRAND = new Set(('shirts t-shirts tshirts shirt tees tee sweaters sweater hats hat caps cap visors gloves glove balls socks shoes pants shorts '
+  + 'skirts skorts dresses jackets jacket outerwear vests vest bags bag backpack backpacks headwear accessories polos polo quarter zip pullover belts belt '
+  + 'umbrellas umbrella towels towel mens men\'s womens women\'s ladies jr junior juniors kids youth boys girls stock reorder re-order special order orders '
+  + 'demo misc golf apparel gear and the for with new').split(' '));
+/** The word in a log description most likely to be the brand: the first that isn't a product, size, gender or stock
+    word, a number, or inside brackets (a customer's name). Null if none. */
+function guessVendorWord(desc){
+  const words = String(desc || '').toLowerCase().replace(/\([^)]*\)/g, ' ').split(/[^a-z0-9&'-]+/).flatMap(w => w.split('/'));
+  return words.find(w => w.length >= 3 && !/^\d/.test(w) && !NOT_BRAND.has(w) && !NOT_BRAND.has(w.replace(/s$/, ''))) || null;
+}
+/** After the owner matches a row by hand to a vendor its description didn't name: offer to remember a word, saved to
+    the guidelines (vendorWords) so later rows with it suggest that vendor's orders. */
+async function offerVendorWord(row, p){
+  if (!row || !p || !ownerHere()) return false;
+  const words = logWords(), key = vendorKeyFor(vendorName(p), words) || vendorName(p).toLowerCase().trim();
+  if (!key || key.includes('.') || row.brand === key) return false;
+  const name = vendorName(p), w = prompt(`Remember a word for ${name}? Receiving log rows with it will suggest ${name} orders. Edit it, or clear it to skip.`, guessVendorWord(row.desc) || '');
+  const word = String(w || '').trim().toLowerCase();
+  if (!word || word.length > 40) return false;
+  const have = ((GUIDE && GUIDE.vendorWords && GUIDE.vendorWords[key]) || []).map(String);
+  if (have.includes(word)) return false;
+  const ok = await saveGuides({['vendorWords.' + key]: [...have, word]}, [{what: `Receiving log word for ${name}`, to: word}]);
+  if (ok) toast(`Log rows with "${word}" will now suggest ${name} orders.`);
+  return ok;
+}
+/** Choosing an order in a row's pick list confirms the match, and for the owner offers to remember the vendor's word. */
 async function onLogPick(e){
   const sel = e.target.closest && e.target.closest('[data-logpick]');
   if (!sel || !sel.value) return;
   sel.disabled = true;
-  await confirmLogRow(sel.dataset.logpick, sel.value);
+  const key = sel.dataset.logpick, row = receivingQueue().toMatch.concat(receivingQueue().notOrder).map(x => x.row).find(r => r.key === key);
+  if (await confirmLogRow(key, sel.value)) await offerVendorWord(row, POS.find(p => p.id === sel.value));
   sel.disabled = false;
 }
 document.addEventListener('change', onLogPick);

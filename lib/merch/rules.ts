@@ -194,6 +194,13 @@ function guidelinesProblem(d: Record<string, unknown>): string | null {
           return `${r} mix range must be two percentages, low to high`;
     }
   }
+  if (d.vendorWords != null) {
+    // the receiving log's extra words per vendor key (Orders & receiving offers them after a hand match)
+    if (!isObj(d.vendorWords) || Object.keys(d.vendorWords).length > 300) return "vendorWords must be an object of word lists";
+    for (const [k, v] of Object.entries(d.vendorWords))
+      if (!k.trim() || !Array.isArray(v) || v.length > 30 || !v.every((w) => typeof w === "string" && w.trim().length > 0 && w.length <= 40))
+        return `vendorWords for ${k} must be a list of words, each 1-40 characters`;
+  }
   if (d.history != null) {
     if (!Array.isArray(d.history) || d.history.length > 200) return "history must be a list of at most 200 changes";
     for (const e of d.history) if (!isObj(e) || typeof e.at !== "string" || typeof e.what !== "string") return "each history entry needs at and what";

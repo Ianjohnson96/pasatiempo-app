@@ -256,3 +256,35 @@ describe("confirming every sure match at once", () => {
     expect(R(`(renderReceiving(stats()), document.__html)`) as string).not.toMatch(/data-logall/);
   });
 });
+
+describe("remembering a vendor's word from a hand match", () => {
+  const owner = (R: (e: string) => unknown) => R(`window.MERCH_HOST = globalThis.MERCH_HOST = {me: {role: 'owner'}}; globalThis.__asked = []; globalThis.prompt = (m, d) => (__asked.push([m, d]), d)`);
+  it("guesses the brand word from the description, skipping product and stock words", () => {
+    const R = page();
+    expect(R(`guessVendorWord('Hats Melin Mens Stock')`)).toBe("melin");
+    expect(R(`guessVendorWord('T-Shirts/Backpack Mens Stock (Smith)')`)).toBe(null);
+  });
+  it("the owner picking an order for a row it didn't name is offered the word, and it is saved to the guidelines", async () => {
+    const R = page();
+    owner(R);
+    await R(`onLogPick({target: (() => { const s = {dataset: {logpick: 'r-melin'}, value: 'fj-dec', closest: () => s}; return s; })()})`);
+    expect(R(`__asked.length`)).toBe(1);
+    expect(R(`__asked[0][1]`)).toBe("melin");
+    const w = R(`__writes.find(w => w[0] === 'guidelines/current')[1].vendorWords`);
+    expect(w).toEqual({ footjoy: ["melin"] });
+  });
+  it("a remembered word takes effect on the page at once", async () => {
+    const R = page();
+    R(`GUIDE = {vendorWords: {footjoy: ['melin']}}`);
+    R(`RLOG = {...RLOG, rows: RLOG.rows.map(r => r.key === 'r-melin' ? {...r, amount: 900, date: '2026-12-01'} : r)}`);
+    expect(R(`receivingQueue().toMatch.map(x => x.row.key)`)).toContain("r-melin");
+  });
+  it("staff aren't asked; nor is anyone when the row already named the vendor", async () => {
+    const R = page();
+    R(`globalThis.__asked = []; globalThis.prompt = (m, d) => (__asked.push(m), d)`);
+    await R(`onLogPick({target: (() => { const s = {dataset: {logpick: 'r-melin'}, value: 'fj-dec', closest: () => s}; return s; })()})`);
+    owner(R);
+    await R(`onLogPick({target: (() => { const s = {dataset: {logpick: 'r-fj'}, value: 'fj-dec', closest: () => s}; return s; })()})`);
+    expect(R(`__asked.length`)).toBe(0);
+  });
+});
