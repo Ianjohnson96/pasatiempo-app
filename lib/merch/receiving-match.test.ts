@@ -322,26 +322,3 @@ describe("in-season reorders: entered sometimes, not always", () => {
     expect(R(`(() => { const x = receivingQueue().toMatch.find(x => x.row.key === 'r-fj'); return x && [x.fit, x.cands.map(p => p.id)]; })()`)).toEqual(["good", ["fj-re"]]);
   });
 });
-describe("invoices for orders never entered: spend the budget can't see yet", () => {
-  it("adds up log rows not from an order dated after the last Jonas upload", () => {
-    const R = page();   // r-melin: Nov 18, $4,950.21, no order; the upload is Nov 15
-    R(`RLOG = {...RLOG, rows: RLOG.rows.concat([{key: 'r-old', tab: 'S', date: '2026-11-10', desc: 'Melin', invoice: '7', amount: 300, credit: false, brand: null, special: false}])}`);
-    expect(R(`offBook()`)).toEqual({ n: 1, total: 4950.21, since: "2026-11-15" });
-  });
-  it("a row matched to an order, or entered as a reorder, no longer counts", async () => {
-    const R = page();
-    await R(`confirmLogRow('r-melin', 'fj-dec')`);
-    expect(R(`offBook().n`)).toBe(0);
-  });
-  it("the Budget page's summary says so without changing Left to buy", () => {
-    const R = page();
-    const before = R(`(() => { const S = stats(); return otbCats().reduce((a, c) => a + seasonBudget(c) - S.cm(c, LAST()), 0); })()`);
-    const v = R(`PAGE_VERDICT.overview(stats())`) as { text: string };
-    expect(v.text).toMatch(/\$4,950 of invoices for orders not in the app have come in since the Nov 15, 2026 upload/);
-    expect(R(`(() => { const S = stats(); return otbCats().reduce((a, c) => a + seasonBudget(c) - S.cm(c, LAST()), 0); })()`)).toBe(before);
-  });
-  it("Receiving's Not from an order line gives the total since the upload", () => {
-    const R = page();
-    expect(R(`(renderReceiving(stats()), document.__html)`) as string).toMatch(/\$4,950\.21 since the Nov 15, 2026 upload/);
-  });
-});

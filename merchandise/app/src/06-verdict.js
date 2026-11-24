@@ -16,11 +16,8 @@ const PAGE_VERDICT = {
     const cats = otbCats(), left = sum(cats, c => seasonBudget(c) - S.cm(c, LAST()));
     const room = cats.map(c => [c, seasonBudget(c) - S.cm(c, LAST())]).sort((a, b) => b[1] - a[1])[0];
     const big = room && room[1] > 0.5 ? ` Most room: ${PLAN.cats[room[0]].name} ${money(room[1])}.` : '';
-    // Invoices for orders never entered (receiving log): spend Left to buy can't see until the next Jonas upload.
-    const ob = typeof offBook === 'function' && RLOG ? offBook() : {n: 0};
-    const off = ob.n && ob.since ? ` ${money(ob.total)} of invoices for orders not in the app have come in since the ${dateLabel(ob.since)} upload; Left to buy doesn't include them yet.` : '';
-    return left < -0.5 ? vd('act', `${PLAN.fy} is ${money(-left)} over budget after what's committed.${big}${off}`)
-      : vd(off ? 'watch' : 'ok', `You can still buy ${money(left)} in ${PLAN.fy}.${big}${off}`);
+    return left < -0.5 ? vd('act', `${PLAN.fy} is ${money(-left)} over budget after what's committed.${big}`)
+      : vd('ok', `You can still buy ${money(left)} in ${PLAN.fy}.${big}`);
   },
   orders(S){
     if (!S) return null;
