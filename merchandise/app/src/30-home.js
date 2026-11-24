@@ -34,18 +34,22 @@ function allAttention(S){
 }
 const openAttention = S => allAttention(S).filter(i => !i.state);
 
-/* The few decisions worth making this week: order problems, item to-dos and the analysis's suggestions on one scale
-   (dollars at stake, at cost), at most two of each kind of decision so one problem can't fill the list. Each can be
-   marked Done or Not now (istate/{id}); the full To do list keeps everything. */
-const DECIDE = {cut: 'Cut orders', cancel: 'Cancel or confirm', chase: 'Chase', push: 'Push out', reorder: 'Reorder', markdown: 'Mark down', hold: 'Hold buying', fix: 'Fix'};
-function topDecisions(S, n = 6){
+/* Actions (stage 3): every order problem, item to-do, scorecard suggestion and mix alert on one scale, dollars at
+   stake at cost, biggest first; those with no dollar figure after, by severity. Done / Not now (istate/{id}) set one
+   aside with its dollars at the time; it comes back (back: true) if its dollars grow by more than a quarter. */
+const DECIDE = {cut: 'Cut orders', cancel: 'Cancel or confirm', chase: 'Chase', push: 'Push out', reorder: 'Reorder', markdown: 'Mark down', hold: 'Hold buying', fix: 'Fix', review: 'Review'};
+const SEV_RANK = {crit: 0, warn: 1, good: 2, info: 3};
+/** Open: not set aside, or set aside and grown by more than a quarter since. */
+const actionOpen = x => !!x && (!x.state || x.back);
+function allActions(S){
   const out = [];
-  for (let i of openAttention(S)){
-    let verb = null, usd = 0, page = null;
+  const put = (x, usd) => { const st = ISTATE[x.id] || null, was = st ? num(st.usd) : 0;
+    out.push({...x, usd, state: st, back: !!(st && was > 0 && usd > was * 1.25)}); };
+  for (let i of allAttention(S)){
+    let verb = 'review', usd = num(i.usd);
     if (i.kind === 'order'){
       const t = i.id.split('-')[1];
-      verb = t === 'stop' || t === 'over' ? 'cut' : t === 'cx' || t === 'cw' ? 'cancel' : t === 'late' ? 'chase' : t === 'room' ? 'push' : null;
-      usd = num(i.usd);
+      verb = t === 'stop' || t === 'over' ? 'cut' : t === 'cx' || t === 'cw' ? 'cancel' : t === 'late' ? 'chase' : t === 'room' ? 'push' : 'review';
     } else {
       const m = i.metrics || {};
       if (i.kind === 'reorder' || i.kind === 'stockout'){ verb = 'reorder'; usd = num(m.suggest) * num(m.cost); }
@@ -55,29 +59,38 @@ function topDecisions(S, n = 6){
     }
     // Cutting orders already placed: say what to do with them, then the category's rule for new ones.
     if (verb === 'cut') i = {...i, action: `Trim or cancel the open orders before their cancel dates. After that: ${i.action}`};
-    if (verb && usd >= 250) out.push({...i, verb, usd, page});
+    put({...i, verb, page: null}, usd);
   }
   const a = typeof anaNow === 'function' ? anaNow() : null;
   for (const x of a ? suggest(a) : []){
     const id = ('sug-' + x.kind + '-' + x.key).replace(/[^A-Za-z0-9_.~:@+-]/g, '_');
-    if (ISTATE[id]) continue;
     const verb = x.kind === 'aged' ? 'markdown' : x.kind === 'short' ? 'reorder' : 'hold';
-    out.push({id, kind: 'suggestion', sev: x.kind === 'short' ? 'good' : 'warn', title: x.title, detail: x.why, action: x.action, cat: x.cat, verb, usd: x.impact, page: x.page});
+    put({id, kind: 'suggestion', sev: x.kind === 'short' ? 'good' : 'warn', title: x.title, detail: x.why, action: x.action, cat: x.cat, verb, page: x.page}, x.impact);
   }
-  out.sort((p, q) => q.usd - p.usd);
+  return out.sort((p, q) => (q.usd > 0) - (p.usd > 0) || q.usd - p.usd || (SEV_RANK[p.sev] ?? 3) - (SEV_RANK[q.sev] ?? 3));
+}
+/** A category's open actions, biggest first. */
+const actionsFor = (S, cat) => allActions(S).filter(x => actionOpen(x) && x.cat === cat);
+/** Home's few decisions: open actions worth $250 or more, at most two of each kind so one problem can't fill the list. */
+function topDecisions(S, n = 5){
   const per = {}, pick = [];
-  for (const d of out){ if ((per[d.verb] || 0) >= 2) continue; per[d.verb] = (per[d.verb] || 0) + 1; pick.push(d); if (pick.length >= n) break; }
+  for (const d of allActions(S)){
+    if (!actionOpen(d) || d.verb === 'review' || d.usd < 250 || (per[d.verb] || 0) >= 2) continue;
+    per[d.verb] = (per[d.verb] || 0) + 1; pick.push(d); if (pick.length >= n) break;
+  }
   return pick;
 }
 function decisionHtml(d, k){
   const go = d.po ? `<button class="btn sm" type="button" data-openpo="${esc(d.po)}">Open order</button>`
     : d.page ? `<button class="btn sm" type="button" data-tab="${esc(d.page)}">Look at it</button>`
     : d.cat ? `<button class="btn sm" type="button" data-cat="${esc(d.cat)}">Open category</button>` : '';
-  const btns = canAct() ? `<button class="btn sm" type="button" data-istate="${esc(d.id)}" data-v="done">Done</button><button class="btn ghost sm" type="button" data-istate="${esc(d.id)}" data-v="dismissed">Not now</button>` : '';
+  const u = ` data-usd="${Math.round(num(d.usd))}"`;
+  const btns = !canAct() ? '' : d.state && !d.back ? `<button class="btn sm" type="button" data-istate="${esc(d.id)}" data-v="">Undo</button>`
+    : `<button class="btn sm" type="button" data-istate="${esc(d.id)}" data-v="done"${u}>Done</button><button class="btn ghost sm" type="button" data-istate="${esc(d.id)}" data-v="dismissed"${u}>Not now</button>`;
   return `<li class="item ${d.sev}"><div class="stripe"></div><div class="body">
     <div class="t"><span class="num" style="color:var(--muted);margin-right:6px">${k + 1}.</span><span class="kind order">${DECIDE[d.verb]}</span>${esc(d.title)} <span class="num" style="color:var(--muted);font-weight:400">· ${moneyK(d.usd)}</span></div>
     ${d.sku ? `<div class="d"><span class="num">${esc(d.sku)}</span> · ${esc(d.desc)}</div>` : ''}
-    <div class="d">${esc(posDates(d.detail))}</div><div class="a"><b>Do:</b> ${esc(d.action)}</div>
+    <div class="d">${esc(posDates(d.detail))}${d.back ? ` <span class="rstat due">Back: up from ${esc(moneyK(num(d.state.usd)))} when it was set aside</span>` : ''}</div><div class="a"><b>Do:</b> ${esc(d.action)}</div>
   </div><div class="side">${go}${btns}</div></li>`;
 }
 

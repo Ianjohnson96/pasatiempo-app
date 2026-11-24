@@ -295,7 +295,7 @@ document.addEventListener('click', async e => {
   if (ds.istate != null && ds.v != null){
     const id = ds.istate;
     if (!ds.v){ try { await db.doc('istate/' + id).delete(); } catch (err){ writeError(err); } return; }
-    await write('istate/' + id, {status: ds.v, by: myId, at: new Date().toISOString()}); toast(ds.v === 'done' ? 'Marked done' : ds.v ? 'Set aside for now' : 'Back on the list'); return;
+    await write('istate/' + id, {status: ds.v, by: myId, at: new Date().toISOString(), ...(ds.usd ? {usd: num(ds.usd)} : {})}); toast(ds.v === 'done' ? 'Marked done' : ds.v ? 'Set aside for now' : 'Back on the list'); return;
   }
   if (ds.applycount) return applyCount(ds.applycount);
   if (ds.delcount){ if (!confirm('Delete this count?')) return; try { await db.doc('counts/' + ds.delcount).delete(); closeOverlay(); toast('Count deleted'); } catch (err){ writeError(err); } return; }
