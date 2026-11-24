@@ -64,9 +64,6 @@ describe("every way into a category's page", () => {
     expect(R(`(renderScorecard(stats()), document.__html)`)).toContain('data-go="category:620"');
     expect(R(`(renderTrends(), document.__html)`)).toContain('data-anaopen="620"');
     expect(R(`(renderStuck(), document.__html)`)).toContain('data-anaopen="620"');
-    R(`globalThis.__go = null; globalThis.goTab = (t, k) => { __go = [t, k]; }`);
-    R(`anaOpen('620')`);
-    expect(R(`__go`)).toEqual(["category", "620"]);
   });
   it("an action's Open category goes to the page", () => {
     const R = page();
@@ -88,5 +85,31 @@ describe("the Left to buy tile", () => {
     expect(R(`seasonBudget('620') <= 0`)).toBe(true);   // the fixture's 620 is overbought
     expect(h).not.toMatch(/of a −\$/);
     expect(h).toMatch(/No budget: the plan already holds \$[\d,]+ too much/);
+  });
+});
+
+describe("final review fixes", () => {
+  it("a #category:<code> address keeps its code from the moment the page loads (refresh, bookmark, Back)", async () => {
+    const { readdirSync } = await import("node:fs");
+    const vm = await import("node:vm");
+    const dir = path.join(process.cwd(), "merchandise/app/src");
+    const files = readdirSync(dir).filter((f) => f.endsWith(".js")).sort().filter((f) => f <= "10-core.js" || f === "36-category.js");
+    const code = files.map((f) => readFileSync(path.join(dir, f), "utf8")).join("\n;\n");
+    const ctx = { window: {}, location: { hash: "#category:620" }, __FALLBACK__: { plan: {}, inventory: {}, insights: {} }, localStorage: { getItem: () => null, setItem() {} } };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = vm.runInNewContext(code + ";({TAB, CATSEL})", ctx) as any;
+    expect(r).toEqual({ TAB: "category", CATSEL: "620" });
+  });
+  it("opening a category from a chart or a row goes through goFrom, so the new page starts at the top", () => {
+    const R = page();
+    R(`globalThis.__from = null; globalThis.goFrom = s => { __from = s; }`);
+    R(`anaOpen('620')`);
+    expect(R(`__from`)).toBe("category:620");
+  });
+  it("Home keeps its red count of urgent actions", () => {
+    const R = page();
+    const n = R(`allActions(stats()).filter(a => actionOpen(a) && a.sev === 'crit').length`) as number;
+    expect(n).toBeGreaterThan(0);
+    expect(R(`sideCount(sideBadges(stats()), 'home')`)).toEqual([n, "hot"]);
   });
 });

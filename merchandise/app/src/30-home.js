@@ -125,7 +125,8 @@ function sideBadges(S){
     n += receivingQueue().toMatch.length;   // receiving log rows waiting for a person to match
     return n ? [n, hot ? 'hot' : ''] : null;
   });
-  put('attention', () => { const n = openAttention(S).filter(i => i.sev === 'crit').length; return n ? [n, 'hot'] : null; });
+  // Home: urgent actions (crit), including set-aside ones that have grown back.
+  put('today', () => { const n = allActions(S).filter(a => actionOpen(a) && a.sev === 'crit').length; return n ? [n, 'hot'] : null; });
   put('monthend', () => {
     const a = RPT ? rptAlerts() : [];
     const due = BASE ? nextRefreshMonth() : null, late = !!due && todayISO > due + '-' + pad(new Date(+due.slice(0,4), +due.slice(5,7), 0).getDate());

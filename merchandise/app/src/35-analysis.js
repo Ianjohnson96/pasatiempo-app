@@ -203,7 +203,7 @@ function renderStuck(){
 }
 
 /** A category's page, from a chart, a Trends tile or a Markdowns row. */
-const anaOpen = code => goTab('category', code);
+const anaOpen = code => goFrom('category:' + code);   // through goFrom, so the page opens at the top
 document.addEventListener('click', e => {
   if (e.target.closest && e.target.closest('[data-go]')) return;   // the category name inside a Scorecard row: its link, not the row
   const t = e.target.closest && e.target.closest('[data-anaopen],[data-anacat],[data-analevel],[data-anaall],[data-print]'); if (!t) return;
