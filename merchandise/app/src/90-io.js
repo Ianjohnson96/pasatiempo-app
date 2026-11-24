@@ -208,6 +208,7 @@ function closePops(except){ for (const [p, b] of POPS){ if (p === except || !$(p
 function togglePop(p, b){ closePops(p); const el = $(p); el.hidden = !el.hidden; $(b).setAttribute('aria-expanded', String(!el.hidden)); }
 document.addEventListener('click', e => { const m = e.target.closest('.menu'); closePops(m ? '#' + (m.querySelector('.pop') || {}).id : null); if (!e.target.closest('#side')) closeSide(); }, true);
 document.addEventListener('click', async e => {
+  if (e.target.closest('select')) return;   // a list inside a clickable row (Match an invoice…) mustn't open the row
   const t = e.target.closest('button,[data-go],[data-cat],[data-po],[data-count],tr[data-po],tr[data-brand],tr[data-subrow]'); if (!t) return;
   const ds = t.dataset;
   if (ds.close) return closeOverlay();

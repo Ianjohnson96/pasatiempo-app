@@ -288,3 +288,57 @@ describe("remembering a vendor's word from a hand match", () => {
     expect(R(`__asked.length`)).toBe(0);
   });
 });
+describe("an order entered after its row was marked not an order", () => {
+  const melinGarb = (R: (e: string) => unknown) => R(`VENDORS = VENDORS.concat([{id: 'v-garb', name: 'Garb'}]);
+    RLOG = {...RLOG, words: {...RLOG.words, garb: ['garb']}, rows: RLOG.rows.concat([{key: 'r-garb', tab: 'S', date: '2026-11-23', desc: 'Garb JR Stock', invoice: '281084', amount: 1933.16, credit: false, brand: 'garb', special: false}])}`);
+  it("a row marked Not an order comes back to match when an order that fits is entered afterwards", () => {
+    const R = page();
+    R(`LOGMATCH = {'r-fj': {state: 'notorder', by: 'x', at: '2026-11-20T00:00:00Z'}}`);
+    R(`POS.find(p => p.id === 'fj-dec').createdAt = '2026-09-01T00:00:00Z'`);
+    expect(R(`receivingQueue().notOrder.map(x => x.row.key)`)).toContain("r-fj");   // the order was there before the mark: stays filed
+    R(`POS = POS.concat([{id: 'fj-re', status: 'open', cat: '620', vendorId: 'v-fj', deliveryMonth: '2026-11', orderDate: '2026-11-21', cost: 1038.82, lines: [], createdAt: '2026-11-21T00:00:00Z'}])`);
+    expect(R(`(() => { const x = receivingQueue().toMatch.find(x => x.row.key === 'r-fj'); return x && [x.fit, x.cands.map(p => p.id)]; })()`)).toEqual(["good", ["fj-re"]]);
+  });
+});
+describe("special orders", () => {
+  it("are filed as not from an order without asking, even when a stock order would fit, unless a PO # names one", () => {
+    const R = page();
+    R(`POS.find(p => p.id === 'fj-dec').poNumber = '4471';
+       RLOG = {...RLOG, rows: RLOG.rows.concat([{...RLOG.rows[0], key: 'r-sp', desc: 'Shoes FJ (Smith)', amount: 210, special: true},
+         {...RLOG.rows[0], key: 'r-sp-po', desc: 'Shoes FJ (Jones)', amount: 190, special: true, po: '4471'}])}`);
+    expect(R(`receivingQueue().notOrder.find(x => x.row.key === 'r-sp').why`)).toBe("special");
+    expect(R(`receivingQueue().toMatch.find(x => x.row.key === 'r-sp-po').fit`)).toBe("exact");
+    expect(R(`(renderReceiving(stats()), document.__html)`) as string).toMatch(/a special order/);
+  });
+});
+describe("orders that should have arrived", () => {
+  const late = (R: (e: string) => unknown) => R(`POS = POS.concat([{id: 'fj-oct', poNumber: '3920', status: 'open', cat: '620', vendorId: 'v-fj', deliveryMonth: '2026-09', orderDate: '2026-06-01', cost: 900, lines: []}])`);
+  it("lists open orders past their delivery month with nothing arrived, most overdue first", () => {
+    const R = page();
+    late(R);
+    const ids = R(`overdueOrders().map(p => p.id)`) as string[];
+    expect(ids[0]).toBe("fj-oct");
+    expect(ids).not.toContain("fj-dec");
+  });
+  it("Receiving opens with them, each with the log's unmatched rows to match, its vendor's first", () => {
+    const R = page();
+    late(R);
+    const html = R(`(renderReceiving(stats()), document.__html)`) as string;
+    expect(html.indexOf("Should have arrived")).toBeLessThan(html.indexOf("Match from the receiving log"));
+    const sel = html.match(/<select[^>]*data-invpick="fj-oct"[\s\S]*?<\/select>/)![0];
+    expect(sel.indexOf("r-fj")).toBeLessThan(sel.indexOf("r-melin"));
+    expect(html).toMatch(/days late/);
+  });
+  it("choosing an invoice confirms it on that order", async () => {
+    const R = page();
+    late(R);
+    await R(`onInvPick({target: (() => { const s = {dataset: {invpick: 'fj-oct'}, value: 'r-fj', closest: k => k === '[data-invpick]' ? s : null}; return s; })()})`);
+    expect(R(`POS.find(p => p.id === 'fj-oct').invoicesIn.map(e => e.logKey)`)).toEqual(["r-fj"]);
+    expect(R(`overdueOrders().map(p => p.id)`)).not.toContain("fj-oct");
+  });
+  it("the Receiving tab carries a red count while any order is overdue", () => {
+    const R = page();
+    late(R);
+    expect(R(`renderViewBar('receiving')`)).toMatch(/data-tab="receiving"[^>]*>Receiving <span class="sb hot">\d+<\/span>/);
+  });
+});
