@@ -126,6 +126,14 @@ async function confirmAllSure(){
   for (const [k, po] of list) if (await confirmLogRow(k, po)) n++;
   return n;
 }
+/** Invoices in the log for orders never entered (last-minute reorders): rows not from an order dated after the last
+    Jonas upload. That spend isn't in Left to buy until the next upload records it, so the Budget page says how much.
+    By vendor only (a row has no category), so it is shown, never taken off a category's budget. */
+function offBook(){
+  const since = (BASE && BASE.asOf) || '';
+  const rows = receivingQueue().notOrder.map(x => x.row).filter(r => !since || r.date > since);
+  return {n: rows.length, total: r2(rows.reduce((a, r) => a + num(r.amount), 0)), since};
+}
 /** Write a reorder from a log row that no order covers: a new order filled in from the row (vendor, date, month, cost),
     for the person to finish (PO #, category). Saving it puts the row's invoice on it (saveOrder, 50-order.js). */
 function addReorderFromLog(key){
@@ -329,7 +337,8 @@ function logMatchHtml(q){
   const fixes = q.changed.map(c => ({...c, why: 'changed or removed in the log'})).concat(q.twice.flatMap(t => t.pos.map(po => ({key: t.key, po, why: 'matched to more than one order'}))));
   const changed = fixes.length ? `<section class="panel"><header><h2>Check these matches</h2><span class="lab">${fixes.length}</span></header><div class="note">A matched row that was changed or removed in the receiving log, or one matched to two orders. Undo the match that no longer applies, then match the corrected row.</div>
     <ul class="items">${fixes.map(c => `<li class="item warn"><div class="stripe"></div><div class="body"><div class="t">${was(c.key, c.po)}</div><div class="d">${c.why}</div></div>${act ? `<button class="btn sm" type="button" data-logundo="${esc(c.key)}|${esc(c.po)}">Undo this match</button>` : ''}</li>`).join('')}</ul></section>` : '';
-  const not = q.notOrder.length ? `<details class="panel" style="padding:12px 16px"><summary><b>Not from an order</b> · ${q.notOrder.length} row${q.notOrder.length === 1 ? '' : 's'}: reorders, special orders and anything else not in the order book. Nothing to do.</summary>
+  const ob = offBook();
+  const not = q.notOrder.length ? `<details class="panel" style="padding:12px 16px"><summary><b>Not from an order</b> · ${q.notOrder.length} row${q.notOrder.length === 1 ? '' : 's'}: reorders, special orders and anything else not in the order book.${ob.n ? ` ${money2(ob.total)} since the ${dateLabel(ob.since)} upload, not in Left to buy until the next one. Add a reorder to count it now.` : ' Nothing to do.'}</summary>
     <div class="tbl"><table class="mini rt" style="min-width:0"><tbody>${q.notOrder.map(({row, why}) => { const d = LOGMATCH[row.key];
       return `<tr>${logRowCells(row)}<td>${why === 'marked' ? `marked by ${who(d && d.by)}${act ? ` ${reorderBtn(row)}<button class="btn ghost sm" type="button" data-logundo="${esc(row.key)}">Undo</button>` : ''}` : `<span class="faint">${why === 'reorder' ? 'a reorder in the log' : 'no open order from this vendor'}</span>${act ? ` ${logPickHtml(row.key, [], 'Match to an order…')} ${reorderBtn(row)}` : ''}`}</td></tr>`; }).join('')}</tbody></table></div></details>` : '';
   const matched = q.matched.length ? `<details class="panel" style="padding:12px 16px"><summary><b>Matched</b> · ${q.matched.length} row${q.matched.length === 1 ? '' : 's'}</summary>
