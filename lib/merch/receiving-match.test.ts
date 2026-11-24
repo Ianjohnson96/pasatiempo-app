@@ -140,3 +140,46 @@ describe("matching receiving log rows on the page", () => {
     expect(R(`LOGPOKE.error`)).toBeNull();
   });
 });
+
+describe("refining arrivals: cents and rows no order fits exactly", () => {
+  it("log rows, confirms and the store-room list show cents", async () => {
+    const R = page();
+    const html = R(`(renderReceiving(stats()), document.__html)`) as string;
+    expect(html).toMatch(/\$1,038\.82/);
+    expect(html).toMatch(/\$4,950\.21/);
+    R(`globalThis.__toasts = []; globalThis.toast = m => __toasts.push(m)`);
+    await R(`confirmLogRow('r-fj', 'fj-dec')`);
+    expect(R(`__toasts[0]`)).toMatch(/\$1,038\.82/);
+    expect(R(`(renderReceiving(stats()), document.__html)`) as string).toMatch(/data-l="Arrived" class="r num">\$1,038\.82/);
+  });
+  it("a vendor's row due months away, or bigger than what is open, is still offered that vendor's orders to pick from", () => {
+    const R = page();
+    // Shipped in November against an order due next April, and $2,400 against $2,000 open: no exact fit
+    R(`RLOG = {...RLOG, rows: RLOG.rows.concat([{key: 'r-far', tab: 'SHEET 4', date: '2026-11-20', desc: 'FJ Mens Stock', invoice: '77', amount: 2400, credit: false, brand: 'footjoy', special: false}])};
+       POS.push({id: 'fj-apr', status: 'open', cat: '620', vendorId: 'v-fj', deliveryMonth: '2027-04', orderDate: '2026-09-01', cost: 1500, lines: []})`);
+    const q = R(`(() => { const q = receivingQueue(); const x = q.toMatch.find(x => x.row.key === 'r-far'); return x && {fit: x.fit, cands: x.cands.map(p => p.id)}; })()`);
+    expect(q).toEqual({ fit: "loose", cands: ["fj-dec", "fj-apr"] });
+    expect(R(`receivingQueue().toMatch.find(x => x.row.key === 'r-fj').fit`)).toBe("good");
+    const html = R(`(renderReceiving(stats()), document.__html)`) as string;
+    expect(html).toMatch(/data-logpick="r-far"/);
+    expect(html).toMatch(/No order fits exactly/);
+  });
+  it("a row from no vendor's orders can still be matched to any open order by hand", async () => {
+    const R = page();
+    const html = R(`(renderReceiving(stats()), document.__html)`) as string;
+    expect(html).toMatch(/data-logpick="r-melin"/);
+    await R(`confirmLogRow('r-melin', 'fj-dec')`);
+    expect(R(`receivingQueue().matched.map(x => x.row.key)`)).toContain("r-melin");
+  });
+  it("picking from the list confirms the match", async () => {
+    const R = page();
+    await R(`(async () => { const sel = {dataset: {logpick: 'r-melin'}, value: 'fj-dec', disabled: false, closest: () => sel};
+      await onLogPick({target: sel}); })()`);
+    expect(R(`POS.find(p => p.id === 'fj-dec').invoicesIn.map(e => e.logKey)`)).toEqual(["r-melin"]);
+  });
+  it("a viewer gets no pick list", () => {
+    const R = page();
+    R(`readOnly = true`);
+    expect(R(`(renderReceiving(stats()), document.__html)`) as string).not.toMatch(/data-logpick/);
+  });
+});

@@ -101,12 +101,12 @@ function confirmLogRow(key, poId){
   return logAction(async () => {
     const row = logRow(key), p = POS.find(x => x.id === poId); if (!row || !p || !canAct()) return false;
     const blank = (p.invoicesIn || []).filter(e => e && e.source === 'hand' && !String(e.invoice || '').trim());
-    const swap = blank.length && confirm(`PO ${p.poNumber || poId} was marked arrived by hand without an invoice number (${blank.map(e => dateLabel(e.date) + (e.amount != null ? ' ' + money(e.amount) : '')).join(', ')}). Replace that with this row from the receiving log?`);
+    const swap = blank.length && confirm(`PO ${p.poNumber || poId} was marked arrived by hand without an invoice number (${blank.map(e => dateLabel(e.date) + (e.amount != null ? ' ' + money2(e.amount) : '')).join(', ')}). Replace that with this row from the receiving log?`);
     const kept = swap ? (p.invoicesIn || []).filter(e => !blank.includes(e)) : (p.invoicesIn || []);
     const next = withLogEntry(kept, logEntry(row, p, myId)), replaced = (p.invoicesIn || []).filter(e => !next.includes(e) && e.logKey !== key);
     if (!(await putOrder(p, next))) return false;
     const ok = await write('logmatch/' + key, {state: 'matched', po: poId, amount: row.amount, date: row.date, invoice: row.invoice, by: myId, at: new Date().toISOString(), ...(replaced.length ? {replaced} : {})});
-    if (ok) toast(`PO ${p.poNumber || poId}: ${money(row.amount)} arrived (invoice ${row.invoice || 'without a number'})`);
+    if (ok) toast(`PO ${p.poNumber || poId}: ${money2(row.amount)} arrived (invoice ${row.invoice || 'without a number'})`);
     return ok;
   });
 }
@@ -165,6 +165,16 @@ document.addEventListener('click', async e => {
   b.disabled = false;
 });
 
+/** Choosing an order in a row's pick list confirms the match. */
+async function onLogPick(e){
+  const sel = e.target.closest && e.target.closest('[data-logpick]');
+  if (!sel || !sel.value) return;
+  sel.disabled = true;
+  await confirmLogRow(sel.dataset.logpick, sel.value);
+  sel.disabled = false;
+}
+document.addEventListener('change', onLogPick);
+
 /* Record the ticked deliveries on their orders. */
 async function applyArrivals(R){
   let ok = true;
@@ -204,7 +214,7 @@ function rcvTable(rows, kind){
   return `<div class="tbl"><table class="mini rt" style="min-width:0"><thead><tr>${head}</tr></thead><tbody class="click">${rows.map(({p, inv, arrived, days}) => {
     const first = `<td class="wrapv"><b>PO ${esc(p.poNumber)}</b> · ${esc(vendorName(p))}</td>`;
     if (kind === 'arrived'){
-      return `<tr data-po="${esc(p.id)}" tabindex="0">${first}<td data-l="Days waiting" class="r num">${days}</td><td data-l="Arrived" class="r num">${money(arrived)}</td><td data-l="Trail" style="font-size:12.5px">${rcvTrail(p, inv)}</td>
+      return `<tr data-po="${esc(p.id)}" tabindex="0">${first}<td data-l="Days waiting" class="r num">${days}</td><td data-l="Arrived" class="r num">${money2(arrived)}</td><td data-l="Trail" style="font-size:12.5px">${rcvTrail(p, inv)}</td>
         <td class="r">${canAct() ? `<button class="btn ghost sm" type="button" data-invclear="${esc(p.id)}" title="Take it off this list. It doesn't change what the POS or the budget say.">Clear</button>` : ''}</td></tr>`;
     }
     return `<tr data-po="${esc(p.id)}" tabindex="0">${first}<td data-l="Expected">${monthLabel(p.deliveryMonth)}</td><td data-l="Still to come" class="r num">${money(onOrder(p))}</td><td class="r">${rcvBtns(p)}</td></tr>`;
@@ -237,22 +247,34 @@ function logStatusHtml(){
   return `<div class="note">${RLOG.error ? `<span class="neg"><b>${esc(RLOG.error)}</b></span>` : `Receiving log read ${esc(ago(RLOG.readAt || RLOG.at))}, rows from ${esc(dateLabel(RLOG.since))} on.`}${btn}
     ${probs ? ` <details style="display:inline"><summary>${probs} row${probs === 1 ? '' : 's'} couldn't be read</summary><ul>${RLOG.problems.map(p => `<li>${esc(p)}</li>`).join('')}</ul></details>` : ''}</div>`;
 }
-const logRowCells = r => `<td data-l="Date">${dateLabel(r.date)}</td><td class="wrapv">${esc(r.desc)}${r.special ? ' <span class="pill">special order</span>' : ''}</td><td data-l="Invoice">${esc(r.invoice || '—')}</td><td data-l="Amount" class="r num ${r.amount < 0 ? 'neg' : ''}">${money(r.amount)}</td>`;
-const poLabel = p => `PO ${esc(p.poNumber || p.id)} · ${esc(vendorName(p))} · due ${monthLabel(p.deliveryMonth)} · ${money(Math.max(onOrder(p) - storeRoomOf(p), 0))} open`;
+const logRowCells = r => `<td data-l="Date">${dateLabel(r.date)}</td><td class="wrapv">${esc(r.desc)}${r.special ? ' <span class="pill">special order</span>' : ''}</td><td data-l="Invoice">${esc(r.invoice || '—')}</td><td data-l="Amount" class="r num ${r.amount < 0 ? 'neg' : ''}">${money2(r.amount)}</td>`;
+const poLabel = p => `PO ${esc(p.poNumber || p.id)} · ${esc(vendorName(p))} · due ${monthLabel(p.deliveryMonth)} · ${money2(Math.max(onOrder(p) - storeRoomOf(p), 0))} open`;
+/* A list to match a row to an order by hand: the orders given first, then every other open order (a vendor the log
+   names differently, a reorder entered late). Choosing one confirms the match; Undo takes it back. */
+function logPickHtml(key, first, label){
+  const seen = new Set(first.map(p => p.id));
+  const rest = POS.filter(p => !seen.has(p.id) && (p.status === 'open' || p.status === 'partial' || p.status === 'hold'))
+    .sort((a, b) => vendorName(a).localeCompare(vendorName(b)) || String(a.deliveryMonth).localeCompare(String(b.deliveryMonth)));
+  const opt = p => `<option value="${esc(p.id)}">${poLabel(p)}</option>`;
+  if (!first.length && !rest.length) return '';
+  return `<select class="pick" data-logpick="${esc(key)}" aria-label="${esc(label)}"><option value="">${esc(label)}</option>${first.map(opt).join('')}${first.length && rest.length ? '<option disabled>── other open orders ──</option>' : ''}${rest.map(opt).join('')}</select>`;
+}
 function logMatchHtml(q){
   if (!RLOG) return '';
   const act = canAct(), who = id => id ? `<span class="person" data-uid="${esc(id)}"></span>` : '';
-  const toMatch = q.toMatch.length ? `<div class="tbl"><table class="mini rt" style="min-width:0"><thead><tr><th>Date</th><th>From the log</th><th>Invoice</th><th class="r">Amount</th><th>Order</th></tr></thead><tbody>${q.toMatch.map(({row, cands}) =>
-    `<tr>${logRowCells(row)}<td data-l="Order">${poLabel(cands[0])}${act ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn primary sm" type="button" data-logok="${esc(row.key)}|${esc(cands[0].id)}">Confirm</button>${cands.slice(1).map(p => `<button class="btn sm" type="button" data-logok="${esc(row.key)}|${esc(p.id)}" title="${poLabel(p)}">Pick PO ${esc(p.poNumber || p.id)}</button>`).join('')}<button class="btn ghost sm" type="button" data-lognot="${esc(row.key)}">Not an order</button></div>` : ''}</td></tr>`).join('')}</tbody></table></div>`
+  const toMatch = q.toMatch.length ? `<div class="tbl"><table class="mini rt" style="min-width:0"><thead><tr><th>Date</th><th>From the log</th><th>Invoice</th><th class="r">Amount</th><th>Order</th></tr></thead><tbody>${q.toMatch.map(({row, cands, fit}) =>
+    fit === 'loose'
+      ? `<tr>${logRowCells(row)}<td data-l="Order"><span class="faint">No order fits exactly: ${esc(vendorName(cands[0]))} has ${cands.length === 1 ? 'an order' : cands.length + ' orders'} open, but due in another month or with less left open than this invoice.</span>${act ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${logPickHtml(row.key, cands, 'Pick the order…')}<button class="btn ghost sm" type="button" data-lognot="${esc(row.key)}">Not an order</button></div>` : ''}</td></tr>`
+      : `<tr>${logRowCells(row)}<td data-l="Order">${poLabel(cands[0])}${act ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn primary sm" type="button" data-logok="${esc(row.key)}|${esc(cands[0].id)}">Confirm</button>${cands.slice(1).map(p => `<button class="btn sm" type="button" data-logok="${esc(row.key)}|${esc(p.id)}" title="${poLabel(p)}">Pick PO ${esc(p.poNumber || p.id)}</button>`).join('')}<button class="btn ghost sm" type="button" data-lognot="${esc(row.key)}">Not an order</button></div>` : ''}</td></tr>`).join('')}</tbody></table></div>`
     : '<div class="note">Nothing to match: every row in the log is matched or isn\'t from an order.</div>';
   const was = (key, poId) => { const p = POS.find(x => x.id === poId), e = p && (p.invoicesIn || []).find(x => x && x.logKey === key), d = LOGMATCH[key] || {};
-    const src = e || d; return `${p ? `PO ${esc(p.poNumber || p.id)} · ${esc(vendorName(p))}` : esc(poId)}: ${src.date ? dateLabel(src.date) : ''}${src.invoice ? ` · invoice ${esc(src.invoice)}` : ''}${src.amount != null ? ` · ${money(src.amount)}` : ''}`; };
+    const src = e || d; return `${p ? `PO ${esc(p.poNumber || p.id)} · ${esc(vendorName(p))}` : esc(poId)}: ${src.date ? dateLabel(src.date) : ''}${src.invoice ? ` · invoice ${esc(src.invoice)}` : ''}${src.amount != null ? ` · ${money2(src.amount)}` : ''}`; };
   const fixes = q.changed.map(c => ({...c, why: 'changed or removed in the log'})).concat(q.twice.flatMap(t => t.pos.map(po => ({key: t.key, po, why: 'matched to more than one order'}))));
   const changed = fixes.length ? `<section class="panel"><header><h2>Check these matches</h2><span class="lab">${fixes.length}</span></header><div class="note">A matched row that was changed or removed in the receiving log, or one matched to two orders. Undo the match that no longer applies, then match the corrected row.</div>
     <ul class="items">${fixes.map(c => `<li class="item warn"><div class="stripe"></div><div class="body"><div class="t">${was(c.key, c.po)}</div><div class="d">${c.why}</div></div>${act ? `<button class="btn sm" type="button" data-logundo="${esc(c.key)}|${esc(c.po)}">Undo this match</button>` : ''}</li>`).join('')}</ul></section>` : '';
   const not = q.notOrder.length ? `<details class="panel" style="padding:12px 16px"><summary><b>Not from an order</b> · ${q.notOrder.length} row${q.notOrder.length === 1 ? '' : 's'}: reorders, special orders and anything else not in the order book. Nothing to do.</summary>
     <div class="tbl"><table class="mini rt" style="min-width:0"><tbody>${q.notOrder.map(({row, why}) => { const d = LOGMATCH[row.key];
-      return `<tr>${logRowCells(row)}<td>${why === 'marked' ? `marked by ${who(d && d.by)}${act ? ` <button class="btn ghost sm" type="button" data-logundo="${esc(row.key)}">Undo</button>` : ''}` : '<span class="faint">no open order matches</span>'}</td></tr>`; }).join('')}</tbody></table></div></details>` : '';
+      return `<tr>${logRowCells(row)}<td>${why === 'marked' ? `marked by ${who(d && d.by)}${act ? ` <button class="btn ghost sm" type="button" data-logundo="${esc(row.key)}">Undo</button>` : ''}` : `<span class="faint">no open order from this vendor</span>${act ? ` ${logPickHtml(row.key, [], 'Match to an order…')}` : ''}`}</td></tr>`; }).join('')}</tbody></table></div></details>` : '';
   const matched = q.matched.length ? `<details class="panel" style="padding:12px 16px"><summary><b>Matched</b> · ${q.matched.length} row${q.matched.length === 1 ? '' : 's'}</summary>
     <div class="tbl"><table class="mini rt" style="min-width:0"><tbody>${q.matched.map(({row, po}) => { const p = POS.find(x => x.id === po), d = LOGMATCH[row.key];
       return `<tr>${logRowCells(row)}<td>${p ? `PO ${esc(p.poNumber || p.id)} · ${esc(vendorName(p))}` : esc(po)} · ${who(d && d.by)}${act ? ` <button class="btn ghost sm" type="button" data-logundo="${esc(row.key)}">Undo</button>` : ''}</td></tr>`; }).join('')}</tbody></table></div></details>` : '';

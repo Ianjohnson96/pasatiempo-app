@@ -221,6 +221,14 @@ function logCandidates(row, orders, vendorKeyOf, openOf) {
     return (p.status === 'open' || p.status === 'partial' || p.status === 'hold') && Number(openOf(p)) >= row.amount * 0.98;
   }).sort((a, b) => monthGap(a.deliveryMonth, m) - monthGap(b.deliveryMonth, m) || Math.abs(openOf(a) - row.amount) - Math.abs(openOf(b) - row.amount));
 }
+/** A vendor's orders a row could still belong to when none fits exactly: any not finished or cancelled (a credit: any
+    not cancelled), nearest due month first, then nearest open amount. */
+function logLooseCandidates(row, orders, openOf) {
+  if (!row || !row.brand) return [];
+  const m = String(row.date).slice(0, 7);
+  return (orders || []).filter(p => p && (row.credit ? p.status !== 'cancelled' : (p.status === 'open' || p.status === 'partial' || p.status === 'hold')))
+    .sort((a, b) => monthGap(a.deliveryMonth || m, m) - monthGap(b.deliveryMonth || m, m) || Math.abs(openOf(a) - row.amount) - Math.abs(openOf(b) - row.amount));
+}
 /** The Receiving view's lists: rows to match (with their candidates), rows not from an order (none possible, or marked
     by a person), rows matched, and matches whose row is no longer in the log. */
 function logQueue(rows, orders, decisions, vendorKeyOf, openOf) {
@@ -242,7 +250,11 @@ function logQueue(rows, orders, decisions, vendorKeyOf, openOf) {
     if (d && d.state === 'matched') { out.matched.push({row, po: d.po}); continue; }
     if (d && d.state === 'notorder') { out.notOrder.push({row, why: 'marked'}); continue; }
     const cands = logCandidates(row, byVendor.get(row.brand) || [], vk, openOf);
-    if (cands.length) out.toMatch.push({row, cands}); else out.notOrder.push({row, why: 'none'});
+    if (cands.length) { out.toMatch.push({row, cands, fit: 'good'}); continue; }
+    // No exact fit, but the vendor has orders still open (due months away, or less left open than the invoice: an
+    // early or over-shipped delivery): offer those for a person to pick rather than file the row away.
+    const loose = logLooseCandidates(row, byVendor.get(row.brand) || [], openOf);
+    if (loose.length) out.toMatch.push({row, cands: loose, fit: 'loose'}); else out.notOrder.push({row, why: 'none'});
   }
   const gone = new Set();
   for (const [key, on] of carriers) if (!have.has(key)) for (const po of on) { out.changed.push({key, po}); gone.add(key); }
