@@ -140,3 +140,151 @@ describe("matching receiving log rows on the page", () => {
     expect(R(`LOGPOKE.error`)).toBeNull();
   });
 });
+
+describe("refining arrivals: cents and rows no order fits exactly", () => {
+  it("log rows, confirms and the store-room list show cents", async () => {
+    const R = page();
+    const html = R(`(renderReceiving(stats()), document.__html)`) as string;
+    expect(html).toMatch(/\$1,038\.82/);
+    expect(html).toMatch(/\$4,950\.21/);
+    R(`globalThis.__toasts = []; globalThis.toast = m => __toasts.push(m)`);
+    await R(`confirmLogRow('r-fj', 'fj-dec')`);
+    expect(R(`__toasts[0]`)).toMatch(/\$1,038\.82/);
+    expect(R(`(renderReceiving(stats()), document.__html)`) as string).toMatch(/data-l="Arrived" class="r num">\$1,038\.82/);
+  });
+  it("a vendor's row due months away, or bigger than what is open, is still offered that vendor's orders to pick from", () => {
+    const R = page();
+    // Shipped in November against an order due next April, and $2,400 against $2,000 open: no exact fit
+    R(`RLOG = {...RLOG, rows: RLOG.rows.concat([{key: 'r-far', tab: 'SHEET 4', date: '2026-11-20', desc: 'FJ Mens Stock', invoice: '77', amount: 2400, credit: false, brand: 'footjoy', special: false}])};
+       POS.push({id: 'fj-apr', status: 'open', cat: '620', vendorId: 'v-fj', deliveryMonth: '2027-04', orderDate: '2026-09-01', cost: 1500, lines: []})`);
+    const q = R(`(() => { const q = receivingQueue(); const x = q.toMatch.find(x => x.row.key === 'r-far'); return x && {fit: x.fit, cands: x.cands.map(p => p.id)}; })()`);
+    expect(q).toEqual({ fit: "loose", cands: ["fj-dec", "fj-apr"] });
+    expect(R(`receivingQueue().toMatch.find(x => x.row.key === 'r-fj').fit`)).toBe("good");
+    const html = R(`(renderReceiving(stats()), document.__html)`) as string;
+    expect(html).toMatch(/data-logpick="r-far"/);
+    expect(html).toMatch(/No order fits exactly/);
+  });
+  it("a row from no vendor's orders can still be matched to any open order by hand", async () => {
+    const R = page();
+    const html = R(`(renderReceiving(stats()), document.__html)`) as string;
+    expect(html).toMatch(/data-logpick="r-melin"/);
+    await R(`confirmLogRow('r-melin', 'fj-dec')`);
+    expect(R(`receivingQueue().matched.map(x => x.row.key)`)).toContain("r-melin");
+  });
+  it("picking from the list confirms the match", async () => {
+    const R = page();
+    await R(`(async () => { const sel = {dataset: {logpick: 'r-melin'}, value: 'fj-dec', disabled: false, closest: () => sel};
+      await onLogPick({target: sel}); })()`);
+    expect(R(`POS.find(p => p.id === 'fj-dec').invoicesIn.map(e => e.logKey)`)).toEqual(["r-melin"]);
+  });
+  it("a viewer gets no pick list", () => {
+    const R = page();
+    R(`readOnly = true`);
+    expect(R(`(renderReceiving(stats()), document.__html)`) as string).not.toMatch(/data-logpick/);
+  });
+});
+
+describe("matching with the columns the team may add", () => {
+  const add = (R: (e: string) => unknown, row: object) => R(`RLOG = {...RLOG, rows: RLOG.rows.concat([${JSON.stringify(row)}])}`);
+  const fit = (R: (e: string) => unknown, key: string) => R(`(() => { const x = receivingQueue().toMatch.find(x => x.row.key === '${key}'); return x ? [x.fit, x.cands.map(p => p.id)] : (receivingQueue().notOrder.find(x => x.row.key === '${key}') || {}).why; })()`);
+  const row = { tab: "2027", date: "2026-11-20", desc: "Melin hats", invoice: "5", amount: 9999, credit: false, brand: null, special: false };
+  it("a PO # on the row matches that order exactly, whatever the vendor words or amount", () => {
+    const R = page();
+    R(`POS.find(p => p.id === 'fj-dec').poNumber = 'P-4471'`);
+    add(R, { ...row, key: "r-po", po: "p 4471" });
+    expect(fit(R, "r-po")).toEqual(["exact", ["fj-dec"]]);
+  });
+  it("a PO # no order has falls back to the usual suggestions", () => {
+    const R = page();
+    add(R, { ...row, key: "r-po", po: "NOPE-1" });
+    expect(fit(R, "r-po")).toBe("none");
+  });
+  it("a credit naming its original invoice goes to the order that invoice is on", async () => {
+    const R = page();
+    await R(`confirmLogRow('r-fj', 'fj-dec')`);
+    add(R, { ...row, key: "r-cr", credit: true, amount: -48, invoice: "C1", origInvoice: "9000498548" });
+    expect(fit(R, "r-cr")).toEqual(["exact", ["fj-dec"]]);
+  });
+  it("the Vendor column names the vendor when the description doesn't", () => {
+    const R = page();
+    add(R, { ...row, key: "r-v", vendor: "FJ", amount: 500, date: "2026-12-02" });
+    expect(fit(R, "r-v")).toEqual(["good", ["fj-dec"]]);
+  });
+  it("a Reorder row no order fits is filed as a reorder, not offered loose", () => {
+    const R = page();
+    R(`POS.push({id: 'fj-apr', status: 'open', cat: '620', vendorId: 'v-fj', deliveryMonth: '2027-04', orderDate: '2026-09-01', cost: 1500, lines: []})`);
+    add(R, { ...row, key: "r-re", desc: "FJ gloves", type: "reorder", amount: 9000 });
+    expect(fit(R, "r-re")).toBe("reorder");
+  });
+});
+describe("how filed and named rows read", () => {
+  it("says a reorder row is a reorder and an exact PO match is named in the log", () => {
+    const R = page();
+    R(`POS.find(p => p.id === 'fj-dec').poNumber = '4471';
+       RLOG = {...RLOG, rows: RLOG.rows.concat([{key: 'r-re', tab: 'x', date: '2026-11-20', desc: 'Melin', invoice: '1', amount: 5, credit: false, brand: null, special: false, type: 'reorder'},
+         {key: 'r-po', tab: 'x', date: '2026-11-20', desc: 'Hats', invoice: '2', amount: 5, credit: false, brand: null, special: false, po: '4471'}])}`);
+    const html = R(`(renderReceiving(stats()), document.__html)`) as string;
+    expect(html).toMatch(/a reorder in the log/);
+    expect(html).toMatch(/named in the log/);
+  });
+});
+describe("confirming every sure match at once", () => {
+  const two = (R: (e: string) => unknown) => R(`RLOG = {...RLOG, rows: RLOG.rows.concat([{...RLOG.rows[0], key: 'r-fj2', invoice: '9000505441', amount: 299.39}])}`);
+  it("counts only named rows and rows with one possible order as sure", () => {
+    const R = page();
+    two(R);
+    R(`POS.push({id: 'fj-dec2', status: 'open', cat: '620', vendorId: 'v-fj', deliveryMonth: '2026-12', orderDate: '2026-09-01', cost: 5000, lines: []})`);
+    expect(R(`sureMatches(receivingQueue()).length`)).toBe(0);   // two FootJoy orders fit each row: a person picks
+  });
+  it("offers the button for two or more sure rows and confirms them all, after one question", async () => {
+    const R = page();
+    two(R);
+    const html = R(`(renderReceiving(stats()), document.__html)`) as string;
+    expect(html).toMatch(/data-logall="1"[^>]*>Confirm all 2 sure matches/);
+    R(`globalThis.__asked = []; globalThis.confirm = m => (__asked.push(m), true)`);
+    await R(`confirmAllSure()`);
+    expect(R(`__asked.length`)).toBe(1);
+    expect(R(`POS.find(p => p.id === 'fj-dec').invoicesIn.map(e => e.logKey).sort()`)).toEqual(["r-fj", "r-fj2"]);
+  });
+  it("does nothing if the person says no, and viewers get no button", async () => {
+    const R = page();
+    two(R);
+    R(`globalThis.confirm = () => false`);
+    await R(`confirmAllSure()`);
+    expect(R(`POS.find(p => p.id === 'fj-dec').invoicesIn`)).toBeFalsy();
+    R(`readOnly = true`);
+    expect(R(`(renderReceiving(stats()), document.__html)`) as string).not.toMatch(/data-logall/);
+  });
+});
+
+describe("remembering a vendor's word from a hand match", () => {
+  const owner = (R: (e: string) => unknown) => R(`window.MERCH_HOST = globalThis.MERCH_HOST = {me: {role: 'owner'}}; globalThis.__asked = []; globalThis.prompt = (m, d) => (__asked.push([m, d]), d)`);
+  it("guesses the brand word from the description, skipping product and stock words", () => {
+    const R = page();
+    expect(R(`guessVendorWord('Hats Melin Mens Stock')`)).toBe("melin");
+    expect(R(`guessVendorWord('T-Shirts/Backpack Mens Stock (Smith)')`)).toBe(null);
+  });
+  it("the owner picking an order for a row it didn't name is offered the word, and it is saved to the guidelines", async () => {
+    const R = page();
+    owner(R);
+    await R(`onLogPick({target: (() => { const s = {dataset: {logpick: 'r-melin'}, value: 'fj-dec', closest: () => s}; return s; })()})`);
+    expect(R(`__asked.length`)).toBe(1);
+    expect(R(`__asked[0][1]`)).toBe("melin");
+    const w = R(`__writes.find(w => w[0] === 'guidelines/current')[1].vendorWords`);
+    expect(w).toEqual({ footjoy: ["melin"] });
+  });
+  it("a remembered word takes effect on the page at once", async () => {
+    const R = page();
+    R(`GUIDE = {vendorWords: {footjoy: ['melin']}}`);
+    R(`RLOG = {...RLOG, rows: RLOG.rows.map(r => r.key === 'r-melin' ? {...r, amount: 900, date: '2026-12-01'} : r)}`);
+    expect(R(`receivingQueue().toMatch.map(x => x.row.key)`)).toContain("r-melin");
+  });
+  it("staff aren't asked; nor is anyone when the row already named the vendor", async () => {
+    const R = page();
+    R(`globalThis.__asked = []; globalThis.prompt = (m, d) => (__asked.push(m), d)`);
+    await R(`onLogPick({target: (() => { const s = {dataset: {logpick: 'r-melin'}, value: 'fj-dec', closest: () => s}; return s; })()})`);
+    owner(R);
+    await R(`onLogPick({target: (() => { const s = {dataset: {logpick: 'r-fj'}, value: 'fj-dec', closest: () => s}; return s; })()})`);
+    expect(R(`__asked.length`)).toBe(0);
+  });
+});

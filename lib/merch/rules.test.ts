@@ -60,6 +60,10 @@ describe("merch access rules", () => {
     expect(docProblem('guidelines/current', { history: Array(201).fill({ at: '2026-11-19T00:00:00Z', what: 'x' }) })).toMatch(/history/);
     expect(docProblem('guidelines/current', { roleOf: { '480': 'bogus' } })).toMatch(/role/);
     expect(docProblem('guidelines/current', { bench: { gm: { apparel: 'x' } } })).toMatch(/bench/);
+    expect(docProblem('guidelines/current', { vendorWords: { footjoy: ['fj', 'melin'] } })).toBeNull();
+    expect(docProblem('guidelines/current', { vendorWords: { footjoy: 'melin' } })).toMatch(/vendorWords/);
+    expect(docProblem('guidelines/current', { vendorWords: { footjoy: [''] } })).toMatch(/vendorWords/);
+    expect(docProblem('guidelines/current', { vendorWords: { footjoy: ['x'.repeat(41)] } })).toMatch(/vendorWords/);
     expect(docProblem('guidelines/current', {
       bench: { gm: { apparel: 0.48 } }, roles: { fashion: { wks: [12, 16, 8, 24], over: 30 } }, roleOf: { '480': 'impulse' },
       mix: { total: 700000, ranges: { fashion: [38, 48] } }, seasons: { spring: 1, summer: 5, fall: 8, holiday: 11 }, memberDiscount: 0.25,

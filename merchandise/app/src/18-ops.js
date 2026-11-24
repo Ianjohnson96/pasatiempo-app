@@ -221,6 +221,25 @@ function logCandidates(row, orders, vendorKeyOf, openOf) {
     return (p.status === 'open' || p.status === 'partial' || p.status === 'hold') && Number(openOf(p)) >= row.amount * 0.98;
   }).sort((a, b) => monthGap(a.deliveryMonth, m) - monthGap(b.deliveryMonth, m) || Math.abs(openOf(a) - row.amount) - Math.abs(openOf(b) - row.amount));
 }
+/** PO numbers compare without case, spaces, punctuation or a "PO" in front: "P-4471", "po 4471" and "4471" agree. */
+const poNorm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '').replace(/^po?(?=\d)/, '');
+/** The order a row names: its PO # column, or on a credit the order carrying its original invoice. Null if none. */
+function logNamedOrder(row, orders) {
+  const live = (orders || []).filter(p => p && p.status !== 'cancelled');
+  const po = poNorm(row && row.po);
+  if (po) { const p = live.find(x => poNorm(x.poNumber) === po); if (p) return p; }
+  const orig = String((row && row.credit && row.origInvoice) || '').trim().toLowerCase();
+  if (orig) { const p = live.find(x => (x.invoicesIn || []).some(e => e && String(e.invoice || '').trim().toLowerCase() === orig)); if (p) return p; }
+  return null;
+}
+/** A vendor's orders a row could still belong to when none fits exactly: any not finished or cancelled (a credit: any
+    not cancelled), nearest due month first, then nearest open amount. */
+function logLooseCandidates(row, orders, openOf) {
+  if (!row || !row.brand) return [];
+  const m = String(row.date).slice(0, 7);
+  return (orders || []).filter(p => p && (row.credit ? p.status !== 'cancelled' : (p.status === 'open' || p.status === 'partial' || p.status === 'hold')))
+    .sort((a, b) => monthGap(a.deliveryMonth || m, m) - monthGap(b.deliveryMonth || m, m) || Math.abs(openOf(a) - row.amount) - Math.abs(openOf(b) - row.amount));
+}
 /** The Receiving view's lists: rows to match (with their candidates), rows not from an order (none possible, or marked
     by a person), rows matched, and matches whose row is no longer in the log. */
 function logQueue(rows, orders, decisions, vendorKeyOf, openOf) {
@@ -241,8 +260,17 @@ function logQueue(rows, orders, decisions, vendorKeyOf, openOf) {
     if (on.length) { out.matched.push({row, po: on[0]}); continue; }
     if (d && d.state === 'matched') { out.matched.push({row, po: d.po}); continue; }
     if (d && d.state === 'notorder') { out.notOrder.push({row, why: 'marked'}); continue; }
+    // The log names the order (a PO # column), or a credit names the invoice it is against: that order, no guessing.
+    const named = logNamedOrder(row, orders);
+    if (named) { out.toMatch.push({row, cands: [named], fit: 'exact'}); continue; }
     const cands = logCandidates(row, byVendor.get(row.brand) || [], vk, openOf);
-    if (cands.length) out.toMatch.push({row, cands}); else out.notOrder.push({row, why: 'none'});
+    if (cands.length) { out.toMatch.push({row, cands, fit: 'good'}); continue; }
+    // No exact fit, but the vendor has orders still open (due months away, or less left open than the invoice: an
+    // early or over-shipped delivery): offer those for a person to pick rather than file the row away.
+    // A row the log calls a reorder isn't expected to be in the order book unless an order fits it.
+    if (/reorder/.test(row.type || '')) { out.notOrder.push({row, why: 'reorder'}); continue; }
+    const loose = logLooseCandidates(row, byVendor.get(row.brand) || [], openOf);
+    if (loose.length) out.toMatch.push({row, cands: loose, fit: 'loose'}); else out.notOrder.push({row, why: 'none'});
   }
   const gone = new Set();
   for (const [key, on] of carriers) if (!have.has(key)) for (const po of on) { out.changed.push({key, po}); gone.add(key); }

@@ -35,6 +35,21 @@ marked arrived by hand with **Invoice in**.
 That's all. The next time someone opens Orders & receiving (or the next morning), the log is read. Rows from that day
 on appear under **Match from the receiving log**; earlier rows are left out.
 
+## Columns the team can add (optional)
+
+The app needs only REC. DATE, ITEM DESCRIPTION, INVOICE # and PRICE. These extra columns, anywhere in a tab, make
+matching surer. Leave a cell blank when it doesn't apply; adding a column never changes a match already made.
+
+| Heading | What to put | What the app does with it |
+|---|---|---|
+| **PO #** | The order number from the invoice or packing slip | Matches the row to that order exactly ("named in the log") |
+| **Vendor** | The vendor's name | Reads the vendor from here before the description |
+| **Type** | Stock, Reorder or Special | A Reorder no order fits is filed as not from an order; Special marks a special order |
+| **Orig. Invoice #** (Credits tab) | The invoice the credit is against | Puts the credit on the order that invoice is on |
+
+Writing the date on every row (rather than once per day) and setting the column to a date with **Data → Data
+validation → Is valid date** stops mistyped dates at the source.
+
 ## If something goes wrong
 
 Orders & receiving shows one line saying what to fix:
