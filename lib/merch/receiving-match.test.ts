@@ -183,3 +183,48 @@ describe("refining arrivals: cents and rows no order fits exactly", () => {
     expect(R(`(renderReceiving(stats()), document.__html)`) as string).not.toMatch(/data-logpick/);
   });
 });
+
+describe("matching with the columns the team may add", () => {
+  const add = (R: (e: string) => unknown, row: object) => R(`RLOG = {...RLOG, rows: RLOG.rows.concat([${JSON.stringify(row)}])}`);
+  const fit = (R: (e: string) => unknown, key: string) => R(`(() => { const x = receivingQueue().toMatch.find(x => x.row.key === '${key}'); return x ? [x.fit, x.cands.map(p => p.id)] : (receivingQueue().notOrder.find(x => x.row.key === '${key}') || {}).why; })()`);
+  const row = { tab: "2027", date: "2026-11-20", desc: "Melin hats", invoice: "5", amount: 9999, credit: false, brand: null, special: false };
+  it("a PO # on the row matches that order exactly, whatever the vendor words or amount", () => {
+    const R = page();
+    R(`POS.find(p => p.id === 'fj-dec').poNumber = 'P-4471'`);
+    add(R, { ...row, key: "r-po", po: "p 4471" });
+    expect(fit(R, "r-po")).toEqual(["exact", ["fj-dec"]]);
+  });
+  it("a PO # no order has falls back to the usual suggestions", () => {
+    const R = page();
+    add(R, { ...row, key: "r-po", po: "NOPE-1" });
+    expect(fit(R, "r-po")).toBe("none");
+  });
+  it("a credit naming its original invoice goes to the order that invoice is on", async () => {
+    const R = page();
+    await R(`confirmLogRow('r-fj', 'fj-dec')`);
+    add(R, { ...row, key: "r-cr", credit: true, amount: -48, invoice: "C1", origInvoice: "9000498548" });
+    expect(fit(R, "r-cr")).toEqual(["exact", ["fj-dec"]]);
+  });
+  it("the Vendor column names the vendor when the description doesn't", () => {
+    const R = page();
+    add(R, { ...row, key: "r-v", vendor: "FJ", amount: 500, date: "2026-12-02" });
+    expect(fit(R, "r-v")).toEqual(["good", ["fj-dec"]]);
+  });
+  it("a Reorder row no order fits is filed as a reorder, not offered loose", () => {
+    const R = page();
+    R(`POS.push({id: 'fj-apr', status: 'open', cat: '620', vendorId: 'v-fj', deliveryMonth: '2027-04', orderDate: '2026-09-01', cost: 1500, lines: []})`);
+    add(R, { ...row, key: "r-re", desc: "FJ gloves", type: "reorder", amount: 9000 });
+    expect(fit(R, "r-re")).toBe("reorder");
+  });
+});
+describe("how filed and named rows read", () => {
+  it("says a reorder row is a reorder and an exact PO match is named in the log", () => {
+    const R = page();
+    R(`POS.find(p => p.id === 'fj-dec').poNumber = '4471';
+       RLOG = {...RLOG, rows: RLOG.rows.concat([{key: 'r-re', tab: 'x', date: '2026-11-20', desc: 'Melin', invoice: '1', amount: 5, credit: false, brand: null, special: false, type: 'reorder'},
+         {key: 'r-po', tab: 'x', date: '2026-11-20', desc: 'Hats', invoice: '2', amount: 5, credit: false, brand: null, special: false, po: '4471'}])}`);
+    const html = R(`(renderReceiving(stats()), document.__html)`) as string;
+    expect(html).toMatch(/a reorder in the log/);
+    expect(html).toMatch(/named in the log/);
+  });
+});

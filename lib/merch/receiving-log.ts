@@ -14,7 +14,13 @@ export interface LogRow {
   amount: number; // at cost; a credit is negative
   credit: boolean;
   brand: string | null; // a vendor key from the word list
-  special: boolean; // a customer's name in brackets: a special order
+  special: boolean; // a customer's name in brackets (or a Type of "special"): a special order
+  // Optional columns the team may add (docs/merch-receiving-log-setup.md); absent when the tab has no such column or
+  // the cell is blank.
+  po?: string; // PO #: the order the delivery is against, matched exactly
+  vendor?: string; // Vendor: the vendor as written, read before the description's words
+  type?: string; // Type, lower case: "stock", "reorder", "special"...
+  origInvoice?: string; // on a credit: the invoice it is against
 }
 
 export interface SheetTab {
@@ -85,16 +91,23 @@ function readPrice(s: string): number | null {
 }
 
 /** Which column holds what, from a tab's first row; null when it isn't laid out like the receiving log. */
-function columns(header: string[]): { date: number; desc: number; invoice: number; price: number } | null {
+interface Cols { date: number; desc: number; invoice: number; price: number; po: number; vendor: number; type: number; orig: number }
+function columns(header: string[]): Cols | null {
   const h = header.map((x) => norm(x).toLowerCase().replace(/\s+/g, " "));
   const find = (f: (s: string) => boolean) => h.findIndex(f);
-  const c = {
+  const need = {
     date: find((s) => /^(rec\.? ?)?date$/.test(s)),
     desc: find((s) => /^item desc?ription$|^item decription$/.test(s)),
     invoice: find((s) => /^invoice ?#?$/.test(s)),
     price: find((s) => s === "price"),
   };
-  return Object.values(c).every((i) => i >= 0) ? c : null;
+  if (!Object.values(need).every((i) => i >= 0)) return null;
+  // optional, -1 when missing
+  return { ...need,
+    po: find((s) => /^p\.?o\.? ?(#|no\.?|number)?$/.test(s)),
+    vendor: find((s) => /^vendor( name)?$/.test(s)),
+    type: find((s) => /^(type|order type)$/.test(s)),
+    orig: find((s) => /^orig(inal|\.)? ?invoice ?#?$/.test(s)) };
 }
 
 /** The log's rows dated on or after `since`, from every tab laid out like it (found by headers, not tab names), with
@@ -112,7 +125,7 @@ export function parseLog(tabs: SheetTab[], opts: { since: string; words: Record<
     const seen = new Map<string, number>();
     let date: string | null = null, shown = "", latest = "";
     values.slice(1).forEach((r, i) => {
-      const cell = (k: keyof typeof cols) => norm(r[cols[k]]);
+      const cell = (k: keyof Cols) => (cols[k] < 0 ? "" : norm(r[cols[k]]));
       const rawDate = cell("date"), desc = cell("desc"), invoice = cell("invoice"), rawPrice = cell("price");
       const where = `${tab.title} row ${i + 2}`;
       // Only rows from the go-live date on are read, so only their problems are worth listing: `when` is the date
@@ -139,8 +152,11 @@ export function parseLog(tabs: SheetTab[], opts: { since: string; words: Record<
       const base = [date, invoice, Math.round(amount * 100), desc.toLowerCase()].join("|");
       const n = seen.get(base) ?? 0;
       seen.set(base, n + 1);
+      // The key leaves the optional columns out, so filling them in later keeps the matches already made.
+      const po = cell("po"), vendor = cell("vendor"), type = cell("type").toLowerCase(), orig = cell("orig");
       rows.push({ key: rowKey(credit ? "credit" : "row", date, invoice, amount, desc, n), tab: tab.title, date, desc, invoice, amount, credit,
-        brand: brandOf(desc, opts.words), special: /\([^)]+\)/.test(desc) });
+        brand: (vendor && brandOf(vendor, opts.words)) || brandOf(desc, opts.words), special: /\([^)]+\)/.test(desc) || /special/.test(type),
+        ...(po ? { po } : {}), ...(vendor ? { vendor } : {}), ...(type ? { type } : {}), ...(orig ? { origInvoice: orig } : {}) });
     });
   }
   return { rows, problems, tabsRead };

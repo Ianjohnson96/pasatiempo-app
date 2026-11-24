@@ -78,3 +78,35 @@ describe("reading the receiving log", () => {
     expect(problems).toEqual(["SHEET 4 1/1-12-31/2026 row 13: no price"]);
   });
 });
+
+describe("columns the team may add to the log", () => {
+  const H = ["REC. DATE", "ITEM DESCRIPTION", "INVOICE #", "PRICE"];
+  const tab = (title: string, header: string[], rows: string[][]) => ({ title, values: [header, ...rows] });
+  it("reads PO #, Vendor and Type when present, in any position", () => {
+    const { rows } = parseLog([tab("2027", ["PO #", ...H, "Vendor", "Type"], [["4471", "11/20/2026", "Shirts Mens Stock", "88", "$500.00", "Foot Joy", "Reorder"]])],
+      { since: "2026-11-01", words: { ...VENDOR_WORDS_DEFAULT, footjoy: ["fj", "footjoy", "foot joy"] } });
+    expect(rows[0]).toMatchObject({ po: "4471", vendor: "Foot Joy", type: "reorder", brand: "footjoy", amount: 500 });
+  });
+  it("prefers the Vendor column over words in the description, and marks a Special type as a special order", () => {
+    const { rows } = parseLog([tab("2027", [...H, "VENDOR", "TYPE"], [["11/20/2026", "FJ hats", "1", "10", "Garb", "Special order"]])], { since: "2026-11-01", words: VENDOR_WORDS_DEFAULT });
+    expect(rows[0]).toMatchObject({ brand: "garb", special: true, type: "special order" });
+  });
+  it("reads the original invoice a credit is against", () => {
+    const { rows } = parseLog([tab("Credits", [...H, "Orig. Invoice #"], [["11/20/2026", "FJ return", "C9", "48", "211"]])], { since: "2026-11-01", words: VENDOR_WORDS_DEFAULT });
+    expect(rows[0]).toMatchObject({ credit: true, amount: -48, origInvoice: "211" });
+  });
+  it("adding the new columns to an existing row doesn't change its key, so matches already made hold", () => {
+    const before = parseLog([tab("2026", H, [["11/20/2026", "FJ Mens Stock", "88", "500"]])], { since: "2026-11-01", words: VENDOR_WORDS_DEFAULT }).rows[0];
+    const after = parseLog([tab("2026", ["PO #", ...H, "Vendor"], [["4471", "11/20/2026", "FJ Mens Stock", "88", "500", "FootJoy"]])], { since: "2026-11-01", words: VENDOR_WORDS_DEFAULT }).rows[0];
+    expect(after.key).toBe(before.key);
+  });
+  it("a date on every row reads the same as a carried-down date", () => {
+    const { rows } = parseLog([tab("2026", H, [["11/20/2026", "FJ a", "1", "10"], ["11/20/2026", "FJ b", "2", "20"]])], { since: "2026-11-01", words: VENDOR_WORDS_DEFAULT });
+    expect(rows.map((r) => r.date)).toEqual(["2026-11-20", "2026-11-20"]);
+  });
+  it("without the new columns, rows carry no po, vendor or type", () => {
+    const { rows } = parseLog([tab("2026", H, [["11/20/2026", "FJ a", "1", "10"]])], { since: "2026-11-01", words: VENDOR_WORDS_DEFAULT });
+    expect(rows[0].po).toBeUndefined();
+    expect(rows[0].vendor).toBeUndefined();
+  });
+});
