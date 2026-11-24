@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 // merchandise/app/src/05-nav.js is plain browser JS joined into the page; it uses no page globals.
 const src = readFileSync(path.join(process.cwd(), "merchandise/app/src/05-nav.js"), "utf8");
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const N: any = vm.runInNewContext(src + ";({NAV,VIEWS,TAB_ALIAS,resolveTab,pageLabel,pageGroup,navParent,sideTarget,parseGo})");
+const N: any = vm.runInNewContext(src + ";({NAV,VIEWS,TAB_ALIAS,resolveTab,pageLabel,pageGroup,navParent,sideTarget,parseGo,parseHash})");
 
 describe("merchandise navigation", () => {
   it("routes old page ids to the new pages", () => {
@@ -20,13 +20,13 @@ describe("merchandise navigation", () => {
   it("groups pages by phase", () => {
     expect(N.NAV.map((g: { key: string }) => g.key)).toEqual(["buy", "sell", "close"]);
     expect(N.NAV[0].pages.map((p: string[]) => p[1])).toEqual(["Budget", "Orders & receiving", "Season plan"]);
-    expect(N.NAV[1].pages.map((p: string[]) => p[1])).toEqual(["Scorecard", "Trends & rounds", "Brands", "Markdowns"]);
+    expect(N.NAV[1].pages.map((p: string[]) => p[1])).toEqual(["Categories", "Brands", "Markdowns"]);
     expect(N.NAV[2].pages.map((p: string[]) => p[1])).toEqual(["Upload & count"]);
   });
   it("every old page id still opens, under its parent", () => {
     const want: [string, string][] = [["receiving", "orders"], ["vendors", "orders"], ["orders", "orders"], ["inventory", "monthend"], ["monthend", "monthend"],
-      ["forecast", "settings"], ["guidelines", "settings"], ["attention", "home"], ["today", "home"], ["overview", "budget"], ["stuck", "stuck"],
-      ["seasons", "seasons"], ["scorecard", "scorecard"], ["trends", "trends"], ["brands", "brands"]];
+      ["forecast", "settings"], ["guidelines", "settings"], ["attention", "categories"], ["today", "home"], ["overview", "budget"], ["stuck", "stuck"],
+      ["seasons", "seasons"], ["scorecard", "categories"], ["trends", "categories"], ["rounds", "categories"], ["subcats", "categories"], ["brands", "brands"]];
     for (const [id, parent] of want) expect(N.navParent(N.resolveTab(id))).toBe(parent);
     expect(N.resolveTab("receiving")).toBe("receiving");
     expect(N.parseGo("orders:po27-x")).toEqual({ tab: "orders", key: "po27-x" });
@@ -71,5 +71,24 @@ describe("guidelines page", () => {
     expect(N.pageLabel("guidelines")).toBe("Guidelines");
     expect(N.pageGroup("guidelines")).toBe("foot");
     expect(N.navParent("guidelines")).toBe("settings");
+  });
+});
+
+describe("categories", () => {
+  it("is a sidebar entry with All categories, Actions and Trends & rounds, and a page per category", () => {
+    expect(N.VIEWS.categories).toEqual([["scorecard", "All categories"], ["actions", "Actions"], ["trends", "Trends & rounds"]]);
+    expect(N.sideTarget("categories")).toBe("scorecard");
+    expect(N.resolveTab("categories")).toBe("scorecard");
+    for (const id of ["category", "actions", "scorecard", "trends"]) expect(N.navParent(id)).toBe("categories");
+    expect(N.resolveTab("attention")).toBe("actions");
+    expect(N.resolveTab("category")).toBe("category");
+  });
+  it("reads a page and its key from the address", () => {
+    expect(N.parseHash("#category:620")).toEqual(["category", "620"]);
+    expect(N.parseHash("#orders:v-fj")).toEqual(["orders", "v-fj"]);
+    expect(N.parseHash("#bogus")).toEqual(["today", null]);
+    expect(N.parseHash("#attention")).toEqual(["actions", null]);
+    expect(N.parseHash("")).toEqual(["today", null]);
+    expect(N.parseHash("#category%3A620")).toEqual(["category", "620"]);
   });
 });

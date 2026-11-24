@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { loadPage } from "./page-harness";
 
 const docs = JSON.parse(readFileSync(path.join(process.cwd(), "lib/merch/fixtures/page-docs.json"), "utf8"));
-const IDS = ["today", "overview", "orders", "receiving", "vendors", "seasons", "scorecard", "trends", "brands", "stuck", "monthend", "inventory", "guidelines", "forecast", "attention"];
+const IDS = ["today", "overview", "orders", "receiving", "vendors", "seasons", "scorecard", "trends", "brands", "stuck", "monthend", "inventory", "guidelines", "forecast", "actions", "category"];
 
 describe("page verdicts", () => {
   it("Budget's verdict states the year's Left to buy", () => {

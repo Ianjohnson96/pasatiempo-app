@@ -88,10 +88,17 @@ const PAGE_VERDICT = {
     const P = PLANS.cur;
     return vd('ok', `${P.fy} sales forecast ${money(sum(P.order, c => num(P.cats[c].fySales)))}. Budgets follow it.`);
   },
-  attention(S){
+  category(S){
+    if (!S || !CATSEL) return null;
+    const d = catPageData(CATSEL, S), bad = d.cat ? badOf(d.cat).map(k => BADNAME[k]) : [];
+    if (d.budget && d.budget.left < -0.5) return vd('act', `${d.name} is ${money(-d.budget.left)} over budget.`);
+    if (bad.length) return vd('watch', `${d.name} is outside its guideline on ${bad.join(', ')}.`);
+    return vd('ok', `${d.name} is within its guidelines${d.budget ? `, with ${money(d.budget.left)} left to buy` : ''}.`);
+  },
+  actions(S){
     if (!S) return null;
-    const n = openAttention(S).length;
-    return n ? vd('watch', `${vdPlural(n, 'item')} to work through, biggest dollars first.`) : vd('ok', 'Nothing needs attention.');
+    const open = allActions(S).filter(actionOpen), usd = open.reduce((t, d) => t + num(d.usd), 0);
+    return open.length ? vd('watch', `${vdPlural(open.length, 'action')}, ${money(usd)} at stake. Start with the first.`) : vd('ok', 'Nothing needs doing.');
   }
 };
 /** A page's verdict, or null if it can't be worked out yet (a verdict must never take the page down). */

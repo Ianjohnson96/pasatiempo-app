@@ -63,7 +63,8 @@ let SEL = null;
 const FIRST_TAB = 'today';
 // The page is in the address (#orders, 90-io.js), so a refresh, a bookmark or a shared link opens that page; plain
 // /merch opens Today.
-let TAB = resolveTab(decodeURIComponent((location.hash || '').slice(1)) || FIRST_TAB);
+// A key after the page (#category:620, #orders:v-fj) is applied once the data is in (render, 90-io.js).
+let [TAB, INIT_KEY] = parseHash(location.hash);
 let filt = {status:'active', cat:'all', vendor:'all', season:'all', q:'', arriving:false}, sort = {key:'deliveryMonth', dir:1};
 let afilt = {kind:'all', showResolved:false, cat:'all'};
 

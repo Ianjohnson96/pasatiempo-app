@@ -84,7 +84,7 @@ function anaSalesCard(a, {w, go} = {}){
 function anaRow(M, isSub, open){
   const g = k => grade(k, M[k], M.seg || SHOPSEG, M.cat);
   const subKey = isSub && M.cat && M.sub != null && typeof ASSORT !== 'undefined' && ASSORT && ASSORT.rows.some(r => r.cat === M.cat && r.sub === M.sub) ? M.cat + '|' + M.sub : '';
-  const first = isSub ? `<td>${esc(M.name)}${subKey ? ' <span class="sm" style="color:var(--faint);font-size:11px">details ›</span>' : ''}</td>` : `<td title="${esc(roleOf(M.cat).name + ': ' + roleOf(M.cat).judge)}"><span class="caret" aria-hidden="true">▸</span>${esc(M.name)} <span style="color:var(--faint);font-weight:400;font-size:11.5px">${M.subs.length}</span><span class="rolepill" title="${esc(roleOf(M.cat).judge)}">${esc(roleOf(M.cat).name)}</span></td>`;
+  const first = isSub ? `<td>${esc(M.name)}${subKey ? ' <span class="sm" style="color:var(--faint);font-size:11px">details ›</span>' : ''}</td>` : `<td title="${esc(roleOf(M.cat).name + ': ' + roleOf(M.cat).judge)}"><span class="caret" aria-hidden="true">▸</span><a href="#category:${esc(M.cat)}" class="catlink" data-go="category:${esc(M.cat)}" title="Open ${esc(M.name)}'s page">${esc(M.name)}</a> <span style="color:var(--faint);font-weight:400;font-size:11.5px">${M.subs.length}</span><span class="rolepill" title="${esc(roleOf(M.cat).judge)}">${esc(roleOf(M.cat).name)}</span></td>`;
   return `<tr class="${isSub ? 'asub' : 'acat' + (open ? ' open' : '')}" ${isSub ? (subKey ? `data-subrow="${esc(subKey)}" tabindex="0" style="cursor:pointer" title="Open ${esc(M.name)}: best sellers and aged stock"` : '') : `data-anacat="${esc(M.cat)}" tabindex="0" aria-expanded="${open}"`}>${first}
     <td class="r num">${money(M.t12)}</td><td class="r num ${M.growth == null ? '' : M.growth >= 0 ? 'up' : 'dn'}">${aChg(M.growth)}</td><td class="r num ${M.trend3 == null ? '' : M.trend3 >= 0 ? 'up' : 'dn'}">${aChg(M.trend3)}</td>
     <td><div class="sharebar" title="Sales ${aPct(M.share)} · stock ${aPct(M.stockShare)}"><i class="sb-s" style="width:${Math.min(100, M.share * 250)}%"></i><i class="sb-o" style="width:${Math.min(100, M.stockShare * 250)}%"></i></div><span class="num" style="font-size:11px;color:var(--muted)">${aPct(M.share)} / ${aPct(M.stockShare)}</span></td>
@@ -202,13 +202,15 @@ function renderStuck(){
     ${anaBench()}</div>`;
 }
 
+/** A category's page, from a chart, a Trends tile or a Markdowns row. */
+const anaOpen = code => goFrom('category:' + code);   // through goFrom, so the page opens at the top
 document.addEventListener('click', e => {
+  if (e.target.closest && e.target.closest('[data-go]')) return;   // the category name inside a Scorecard row: its link, not the row
   const t = e.target.closest && e.target.closest('[data-anaopen],[data-anacat],[data-analevel],[data-anaall],[data-print]'); if (!t) return;
   const d = t.dataset;
   if (d.print) return window.print();
   if (d.anacat){ AN.open.has(d.anacat) ? AN.open.delete(d.anacat) : AN.open.add(d.anacat); return render(); }
-  if (d.anaopen){ AN.open.add(d.anaopen); goTab('scorecard');
-    return setTimeout(() => document.querySelector(`tr[data-anacat="${CSS.escape(d.anaopen)}"]`)?.scrollIntoView({block: 'center'}), 0); }
+  if (d.anaopen) return anaOpen(d.anaopen);
   if (d.analevel){ AN.level = d.analevel; return render(); }
   if (d.anaall){ const a = anaNow(); if (!a) return; if (AN.open.size >= a.cats.length) AN.open.clear(); else a.cats.forEach(c => AN.open.add(c.cat)); return render(); }
 });
