@@ -110,6 +110,19 @@ function confirmLogRow(key, poId){
     return ok;
   });
 }
+/** Rows sure enough to confirm together: named in the log (PO # or a credit's invoice), or with only one possible
+    order. A row two orders could take is left for a person to pick. */
+const sureMatches = q => q.toMatch.filter(x => x.fit === 'exact' || (x.fit === 'good' && x.cands.length === 1));
+/** Confirm every sure match after one question. Each runs as a normal Confirm (Undo works the same). */
+async function confirmAllSure(){
+  const list = sureMatches(receivingQueue()).map(x => [x.row.key, x.cands[0].id]);
+  if (!list.length || !canAct()) return 0;
+  const total = list.reduce((a, [k]) => a + num((logRow(k) || {}).amount), 0);
+  if (!confirm(`Confirm ${list.length} matches from the receiving log (${money2(total)} in all)? Each can be undone.`)) return 0;
+  let n = 0;
+  for (const [k, po] of list) if (await confirmLogRow(k, po)) n++;
+  return n;
+}
 function markNotOrder(key){
   return logAction(async () => {
     if (!logRow(key) || !canAct()) return false;
@@ -154,6 +167,8 @@ function pokeReceivingLog(){
   readLogNow(false);
 }
 document.addEventListener('click', async e => {
+  const all = e.target.closest && e.target.closest('[data-logall]');
+  if (all){ all.disabled = true; const n = await confirmAllSure(); if (n) toast(`${n} match${n === 1 ? '' : 'es'} confirmed`); all.disabled = false; return; }
   const r = e.target.closest && e.target.closest('[data-logread]');
   if (r){ r.disabled = true; const x = await readLogNow(true); toast(x.error ? 'The receiving log could not be read: see the message on the page.' : x.skipped ? 'The receiving log was read moments ago.' : `Receiving log read: ${x.rows || 0} row${x.rows === 1 ? '' : 's'} from the go-live date on.`); return; }
   const b = e.target.closest && e.target.closest('[data-logok],[data-lognot],[data-logundo]');
@@ -278,7 +293,8 @@ function logMatchHtml(q){
   const matched = q.matched.length ? `<details class="panel" style="padding:12px 16px"><summary><b>Matched</b> · ${q.matched.length} row${q.matched.length === 1 ? '' : 's'}</summary>
     <div class="tbl"><table class="mini rt" style="min-width:0"><tbody>${q.matched.map(({row, po}) => { const p = POS.find(x => x.id === po), d = LOGMATCH[row.key];
       return `<tr>${logRowCells(row)}<td>${p ? `PO ${esc(p.poNumber || p.id)} · ${esc(vendorName(p))}` : esc(po)} · ${who(d && d.by)}${act ? ` <button class="btn ghost sm" type="button" data-logundo="${esc(row.key)}">Undo</button>` : ''}</td></tr>`; }).join('')}</tbody></table></div></details>` : '';
-  return `<section class="panel"><header><h2>Match from the receiving log</h2><span class="lab">${q.toMatch.length} to match</span></header>
+  const sure = act ? sureMatches(q).length : 0;
+  return `<section class="panel"><header><h2>Match from the receiving log</h2><span style="display:flex;gap:8px;align-items:center">${sure >= 2 ? `<button class="btn primary sm" type="button" data-logall="1" title="Rows named in the log, or with only one possible order">Confirm all ${sure} sure matches</button>` : ''}<span class="lab">${q.toMatch.length} to match</span></span></header>
     <div class="note" style="padding-bottom:4px">Each row is what the accounting team logged. The app suggests the order it most likely belongs to: same vendor, due within a month, enough still open. Confirm marks the order arrived (it stays committed in the budget until Jonas records it).</div>${toMatch}</section>${changed}${not}${matched}`;
 }
 /* An order's trail: placed, arrived (from the log or by hand), in Jonas. */

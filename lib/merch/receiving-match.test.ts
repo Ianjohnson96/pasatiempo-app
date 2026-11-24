@@ -228,3 +228,31 @@ describe("how filed and named rows read", () => {
     expect(html).toMatch(/named in the log/);
   });
 });
+describe("confirming every sure match at once", () => {
+  const two = (R: (e: string) => unknown) => R(`RLOG = {...RLOG, rows: RLOG.rows.concat([{...RLOG.rows[0], key: 'r-fj2', invoice: '9000505441', amount: 299.39}])}`);
+  it("counts only named rows and rows with one possible order as sure", () => {
+    const R = page();
+    two(R);
+    R(`POS.push({id: 'fj-dec2', status: 'open', cat: '620', vendorId: 'v-fj', deliveryMonth: '2026-12', orderDate: '2026-09-01', cost: 5000, lines: []})`);
+    expect(R(`sureMatches(receivingQueue()).length`)).toBe(0);   // two FootJoy orders fit each row: a person picks
+  });
+  it("offers the button for two or more sure rows and confirms them all, after one question", async () => {
+    const R = page();
+    two(R);
+    const html = R(`(renderReceiving(stats()), document.__html)`) as string;
+    expect(html).toMatch(/data-logall="1"[^>]*>Confirm all 2 sure matches/);
+    R(`globalThis.__asked = []; globalThis.confirm = m => (__asked.push(m), true)`);
+    await R(`confirmAllSure()`);
+    expect(R(`__asked.length`)).toBe(1);
+    expect(R(`POS.find(p => p.id === 'fj-dec').invoicesIn.map(e => e.logKey).sort()`)).toEqual(["r-fj", "r-fj2"]);
+  });
+  it("does nothing if the person says no, and viewers get no button", async () => {
+    const R = page();
+    two(R);
+    R(`globalThis.confirm = () => false`);
+    await R(`confirmAllSure()`);
+    expect(R(`POS.find(p => p.id === 'fj-dec').invoicesIn`)).toBeFalsy();
+    R(`readOnly = true`);
+    expect(R(`(renderReceiving(stats()), document.__html)`) as string).not.toMatch(/data-logall/);
+  });
+});
