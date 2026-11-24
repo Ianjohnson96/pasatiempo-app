@@ -259,7 +259,13 @@ function logQueue(rows, orders, decisions, vendorKeyOf, openOf) {
     if (on.length > 1) out.twice.push({key: row.key, pos: on.slice()});
     if (on.length) { out.matched.push({row, po: on[0]}); continue; }
     if (d && d.state === 'matched') { out.matched.push({row, po: d.po}); continue; }
-    if (d && d.state === 'notorder') { out.notOrder.push({row, why: 'marked'}); continue; }
+    if (d && d.state === 'notorder') {
+      // Marked not from an order, then a reorder that fits was entered: offer it again (reorders are entered sometimes,
+      // not always, and often after the goods arrive).
+      const later = logCandidates(row, byVendor.get(row.brand) || [], vk, openOf).filter(p => p.createdAt && d.at && p.createdAt > d.at);
+      if (later.length) out.toMatch.push({row, cands: later, fit: 'good', reopened: true}); else out.notOrder.push({row, why: 'marked'});
+      continue;
+    }
     // The log names the order (a PO # column), or a credit names the invoice it is against: that order, no guessing.
     const named = logNamedOrder(row, orders);
     if (named) { out.toMatch.push({row, cands: [named], fit: 'exact'}); continue; }
