@@ -339,3 +339,9 @@ export function eventContact(e: {
   if (!email) return DEFAULT_CONTACT;
   return { name: e.contactName?.trim() || email, email };
 }
+
+/** Logo files in an event's storage folder that the look no longer uses. */
+export function unusedLogoPaths(files: string[], keepUrl: string | null): string[] {
+  const keep = keepUrl ? keepUrl.split("/").pop() : null;
+  return files.filter((f) => /^logo-/.test(f) && f !== keep);
+}

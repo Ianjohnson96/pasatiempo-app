@@ -9,7 +9,7 @@ import { newId, newSlug, slugify } from "./ids";
 import { availability, rosterCount, onRoster } from "./seats";
 import { formatSlot } from "./format";
 import { normalizeFields } from "./question-builder";
-import { type EventTheme, eventContact, parseTheme } from "./theme";
+import { type EventTheme, eventContact, parseTheme, unusedLogoPaths } from "./theme";
 import { TYPE_SWITCH_BLOCKED, crossesTournamentBoundary } from "./editor";
 import {
   cleanTeam,
@@ -239,6 +239,7 @@ async function saveEventInner(input: EventInput): Promise<SaveEventResult> {
       .single();
     if (error) throw error;
     saved = rowToEvent(data);
+    await removeUnusedLogos(supa, saved);
   } else {
     let slug = requestedSlug || newSlug();
     if (requestedSlug && (await slugTaken(requestedSlug)))
@@ -371,6 +372,56 @@ export async function uploadPhoto(
   await setPhotos(supa, eventId, photos);
   revalidatePath(`/admin/events/${eventId}`);
   return { ok: true, photos };
+}
+
+const LOGO_TYPES: Record<string, string> = {
+  "image/png": "png",
+  "image/svg+xml": "svg",
+  "image/jpeg": "jpg",
+};
+
+// Stores a logo for the event's look. The event only points at it once the
+// organiser saves; files the look no longer uses are cleared on save.
+export async function uploadLogo(
+  eventId: string,
+  formData: FormData,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  try {
+    await assertCanManageEvent(eventId);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+  const file = formData.get("file");
+  const ext = file instanceof File ? LOGO_TYPES[file.type] : undefined;
+  if (!(file instanceof File) || file.size === 0 || !ext || file.size > 2 * 1024 * 1024)
+    return { ok: false, error: "Logos must be PNG, SVG or JPG under 2 MB." };
+
+  const supa = createAdminClient("events");
+  const objectPath = `${eventId}/logo-${newId()}.${ext}`;
+  const { error } = await supa.storage
+    .from(PHOTO_BUCKET)
+    .upload(objectPath, Buffer.from(await file.arrayBuffer()), {
+      contentType: file.type,
+      upsert: false,
+    });
+  if (error) return { ok: false, error: error.message };
+  const { data } = supa.storage.from(PHOTO_BUCKET).getPublicUrl(objectPath);
+  return { ok: true, url: data.publicUrl };
+}
+
+async function removeUnusedLogos(
+  supa: ReturnType<typeof createAdminClient>,
+  ev: EventRec,
+): Promise<void> {
+  try {
+    const { data: files } = await supa.storage.from(PHOTO_BUCKET).list(ev.id);
+    const keep = ev.theme?.logo && "url" in ev.theme.logo ? ev.theme.logo.url : null;
+    const stale = unusedLogoPaths((files ?? []).map((f) => f.name), keep);
+    if (stale.length)
+      await supa.storage.from(PHOTO_BUCKET).remove(stale.map((f) => `${ev.id}/${f}`));
+  } catch {
+    /* a stale logo file is harmless; never fail a save over it */
+  }
 }
 
 export async function removePhoto(

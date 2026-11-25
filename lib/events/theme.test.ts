@@ -9,6 +9,7 @@ import {
   resolveHero,
   resolveLogo,
   themeVars,
+  unusedLogoPaths,
 } from "./theme";
 
 describe("theme model", () => {
@@ -122,5 +123,20 @@ describe("theme model", () => {
       name: "pat@x.com",
       email: "pat@x.com",
     });
+  });
+});
+
+describe("unusedLogoPaths", () => {
+  const files = ["a.jpg", "logo-1.png", "logo-2.svg"];
+  test("keeps the logo the look uses", () => {
+    expect(
+      unusedLogoPaths(files, "https://x.supabase.co/storage/v1/object/public/event-photos/E/logo-2.svg"),
+    ).toEqual(["logo-1.png"]);
+  });
+  test("with no uploaded logo in use, every logo file goes", () => {
+    expect(unusedLogoPaths(files, null)).toEqual(["logo-1.png", "logo-2.svg"]);
+  });
+  test("never touches photos", () => {
+    expect(unusedLogoPaths(["a.jpg", "b.png"], null)).toEqual([]);
   });
 });
