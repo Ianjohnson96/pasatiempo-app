@@ -9,6 +9,7 @@ import { newId, newSlug, slugify } from "./ids";
 import { availability, rosterCount, onRoster } from "./seats";
 import { formatSlot } from "./format";
 import { normalizeFields } from "./question-builder";
+import { type EventTheme, eventContact, parseTheme } from "./theme";
 import { TYPE_SWITCH_BLOCKED, crossesTournamentBoundary } from "./editor";
 import {
   cleanTeam,
@@ -57,6 +58,12 @@ async function currentEmail(): Promise<string | null> {
 // Event create / update (admin)
 // ---------------------------------------------------------------------------
 
+// "Name at email" for the person members should contact about an event.
+function whoToEmail(ev: Pick<EventRec, "contactName" | "contactEmail">): string {
+  const c = eventContact(ev);
+  return `${c.name} at ${c.email}`;
+}
+
 export interface EventInput {
   id?: string;
   slug?: string;
@@ -87,6 +94,9 @@ export interface EventInput {
   rosterStyle: RosterStyle;
   managers: string[];
   status: "draft" | "open" | "closed";
+  theme: EventTheme | null;
+  contactName: string | null;
+  contactEmail: string | null;
 }
 
 export type SaveEventResult =
@@ -164,6 +174,9 @@ async function saveEventInner(input: EventInput): Promise<SaveEventResult> {
     rosterStyle: input.rosterStyle,
     managers: input.managers.map((e) => e.trim().toLowerCase()).filter(Boolean),
     status: input.status,
+    theme: parseTheme(input.theme),
+    contactName: input.contactName?.trim() || null,
+    contactEmail: input.contactEmail?.trim().toLowerCase() || null,
   };
 
   // A tournament is one date, a Member + Guest team, capacity in teams.
@@ -370,11 +383,18 @@ export async function removePhoto(
   if (path) await supa.storage.from(PHOTO_BUCKET).remove([path]).catch(() => {});
   const { data: ev } = await supa
     .from("events")
-    .select("photos")
+    .select("*")
     .eq("id", eventId)
     .single();
   const photos = ((ev?.photos as string[]) ?? []).filter((p) => p !== photoUrl);
   await setPhotos(supa, eventId, photos);
+  // A look that pointed at this photo falls back to the first one.
+  const theme = parseTheme(ev?.theme);
+  if (theme?.heroPhoto === photoUrl) {
+    delete theme.heroPhoto;
+    delete theme.heroFocus;
+    await supa.from("events").update({ theme }).eq("id", eventId);
+  }
   revalidatePath(`/admin/events/${eventId}`);
   return photos;
 }
@@ -547,7 +567,7 @@ export async function register(input: RegisterInput): Promise<RegisterResult> {
       return {
         ok: false,
         error:
-          "Sorry — this program's roster is full. Please email Ian Johnson at Ijohnson@pasatiempo.com to be added to a waiting list.",
+          `Sorry — this program's roster is full. Please email ${whoToEmail(ev)} to be added to a waiting list.`,
       };
     }
   }
@@ -769,7 +789,7 @@ export async function updateMyRegistration(
     return {
       ok: false,
       error:
-        "This event is closed — please email Ian Johnson at Ijohnson@pasatiempo.com.",
+        `This event is closed — please email ${whoToEmail(ev)}.`,
     };
 
   const { data: allRows } = await supa
@@ -834,7 +854,7 @@ export async function updateMyRegistration(
       const slot = ev.slots.find((s) => s.id === id);
       return {
         ok: false,
-        error: `${slot ? formatSlot(slot) : "That date"} is full — please email Ian Johnson at Ijohnson@pasatiempo.com.`,
+        error: `${slot ? formatSlot(slot) : "That date"} is full — please email ${whoToEmail(ev)}.`,
       };
     }
   }
@@ -845,7 +865,7 @@ export async function updateMyRegistration(
       return {
         ok: false,
         error:
-          "The roster is full — please email Ian Johnson at Ijohnson@pasatiempo.com to add anyone else.",
+          `The roster is full — please email ${whoToEmail(ev)} to add anyone else.`,
       };
   }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rowToEvent, rowToReg } from "./map";
+import { eventToRow, rowToEvent, rowToReg } from "./map";
 import { answerText } from "./format";
 
 const baseEvent = {
@@ -93,5 +93,38 @@ describe("answerText", () => {
     expect(answerText(["S", "M"])).toBe("S, M");
     expect(answerText(undefined)).toBe("");
     expect(answerText("x")).toBe("x");
+  });
+});
+
+describe("look and contact columns", () => {
+  it("rowToEvent tolerates missing look columns", () => {
+    const e = rowToEvent(baseEvent);
+    expect(e.theme).toBeNull();
+    expect(e.contactName).toBeNull();
+    expect(e.contactEmail).toBeNull();
+  });
+
+  it("rowToEvent parses theme jsonb", () => {
+    const e = rowToEvent({
+      ...baseEvent,
+      theme: { preset: "disco", accent: "#ABC" },
+      contact_name: "Pat",
+      contact_email: "pat@x.com",
+    });
+    expect(e.theme).toEqual({ preset: "clubhouse", accent: "#aabbcc" });
+    expect(e.contactName).toBe("Pat");
+    expect(e.contactEmail).toBe("pat@x.com");
+  });
+
+  it("eventToRow writes theme and contact", () => {
+    const row = eventToRow({
+      theme: { preset: "evening" },
+      contactName: "Pat",
+      contactEmail: "pat@x.com",
+    });
+    expect(row.theme).toEqual({ preset: "evening" });
+    expect(row.contact_name).toBe("Pat");
+    expect(row.contact_email).toBe("pat@x.com");
+    expect(eventToRow({ title: "x" })).not.toHaveProperty("theme");
   });
 });

@@ -19,6 +19,7 @@ import {
   PreviewPanel,
 } from "@/components/events/editor/EditorPreview";
 import { formatSlot } from "@/lib/events/format";
+import type { EventTheme } from "@/lib/events/theme";
 import {
   buildEventInput,
   crossesTournamentBoundary,
@@ -167,6 +168,9 @@ export default function EventEditor({
   );
 
   const [status, setStatus] = useState(event?.status ?? "open");
+  const [theme, setTheme] = useState<EventTheme | null>(event?.theme ?? null);
+  const [contactName, setContactName] = useState(event?.contactName ?? "");
+  const [contactEmail, setContactEmail] = useState(event?.contactEmail ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -213,6 +217,9 @@ export default function EventEditor({
     rosterStyle,
     managersText,
     status,
+    theme,
+    contactName,
+    contactEmail,
   };
 
   // The preview lags a keystroke behind under load rather than slowing typing.

@@ -1,3 +1,4 @@
+import type { EventTheme } from "./theme";
 // Domain model for the Pasatiempo event registration app.
 // Kept storage-agnostic so the file-backed prototype store (lib/db.ts) can later
 // be swapped for Supabase without touching the UI or server actions.
@@ -90,6 +91,11 @@ export interface EventRec {
   // Branding / media
   photos: string[]; // public paths, e.g. /uploads/<id>/x.jpg
   galleryMode: GalleryMode;
+  theme: EventTheme | null; // the public page's look; null = Clubhouse
+
+  // Who members contact about this event; null = the planner's default.
+  contactName: string | null;
+  contactEmail: string | null;
 
   // Pricing (optional, toggleable)
   pricingEnabled: boolean;

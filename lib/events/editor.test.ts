@@ -56,6 +56,9 @@ function state(over: Partial<EditorState> = {}): EditorState {
     rosterStyle: "first_initial",
     managersText: "pro@pasatiempo.com\nother@x.com",
     status: "open",
+    theme: null,
+    contactName: "",
+    contactEmail: "",
     ...over,
   };
 }
@@ -143,6 +146,9 @@ describe("buildEventInput", () => {
       rosterStyle: "first_initial",
       managers: ["pro@pasatiempo.com", "other@x.com"],
       status: "open",
+      theme: null,
+      contactName: null,
+      contactEmail: null,
     });
   });
 
@@ -291,5 +297,29 @@ describe("crossesTournamentBoundary", () => {
     expect(TYPE_SWITCH_BLOCKED).toBe(
       "This event already has sign-ups, so it can't be switched to or from Tournament. Make a new event instead.",
     );
+  });
+});
+
+describe("look and contact", () => {
+  it("buildEventInput carries theme and blank contact becomes null", () => {
+    const input = buildEventInput(
+      state({ theme: { preset: "evening", accent: "#b41c14" }, contactName: "  ", contactEmail: " " }),
+    );
+    expect(input.theme).toEqual({ preset: "evening", accent: "#b41c14" });
+    expect(input.contactName).toBeNull();
+    expect(input.contactEmail).toBeNull();
+    const named = buildEventInput(state({ contactName: " Pat ", contactEmail: " Pat@X.com " }));
+    expect(named.contactName).toBe("Pat");
+    expect(named.contactEmail).toBe("pat@x.com");
+  });
+
+  it("previewEvent carries theme, contact and the event's photos", () => {
+    const ev = previewEvent(
+      buildEventInput(state({ theme: { preset: "coastal" }, contactEmail: "pat@x.com" })),
+      ["/a.jpg"],
+    );
+    expect(ev.theme).toEqual({ preset: "coastal" });
+    expect(ev.contactEmail).toBe("pat@x.com");
+    expect(ev.photos).toEqual(["/a.jpg"]);
   });
 });
