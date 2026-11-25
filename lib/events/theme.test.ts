@@ -87,7 +87,8 @@ describe("theme model", () => {
   test("resolveHero falls back when heroPhoto is gone", () => {
     expect(resolveHero({ preset: "clubhouse", heroPhoto: "/x.jpg" }, ["/a.jpg"])).toEqual({
       src: "/a.jpg",
-      focus: { x: 50, y: 50 },
+      // today's page centres the hero at 50% 40%
+      focus: { x: 50, y: 40 },
     });
     expect(
       resolveHero({ preset: "clubhouse", heroPhoto: "/b.jpg", heroFocus: { x: 20, y: 70 } }, [

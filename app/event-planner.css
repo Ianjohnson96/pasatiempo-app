@@ -961,17 +961,23 @@
 .ep .pub-hero-photo {
   position: absolute;
   inset: 0;
-  background-size: cover;
-  background-position: center 40%;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 40%; /* the look's focal point overrides this inline */
   transform-origin: 50% 60%;
   animation: ep-settle 1.8s var(--ease) both;
 }
+/* each look brings its own scrim; Clubhouse's is the original green one */
 .ep .pub-hero.has-img::after {
-  background: linear-gradient(
-    180deg,
-    rgba(12, 26, 19, 0.3) 0%,
-    rgba(12, 26, 19, 0.34) 40%,
-    rgba(12, 26, 19, 0.9) 100%
+  background: var(
+    --scrim,
+    linear-gradient(
+      180deg,
+      rgba(12, 26, 19, 0.3) 0%,
+      rgba(12, 26, 19, 0.34) 40%,
+      rgba(12, 26, 19, 0.9) 100%
+    )
   );
 }
 .ep .pub-hero .hero-inner {

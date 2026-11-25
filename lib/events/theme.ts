@@ -303,6 +303,9 @@ export function themeVars(theme: EventTheme | null): {
   return { vars, accentUsed: accent, adjusted: accent !== input };
 }
 
+// Where the hero has always been centred (event-planner.css: 50% 40%).
+export const DEFAULT_FOCUS = { x: 50, y: 40 };
+
 /** The hero photo to show and where to centre it. */
 export function resolveHero(
   theme: EventTheme | null,
@@ -312,7 +315,7 @@ export function resolveHero(
   const chosen = theme?.heroPhoto && photos.includes(theme.heroPhoto);
   return {
     src: chosen ? theme!.heroPhoto! : photos[0],
-    focus: chosen && theme?.heroFocus ? theme.heroFocus : { x: 50, y: 50 },
+    focus: chosen && theme?.heroFocus ? theme.heroFocus : DEFAULT_FOCUS,
   };
 }
 
