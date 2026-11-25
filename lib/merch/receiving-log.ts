@@ -84,7 +84,8 @@ const daysBetween = (a: string, b: string) => (Date.parse(b + "T00:00:00Z") - Da
 /** "$1,891.62", "-$48.00", "($48.00)", "1891.62" → number; null if unreadable or blank. */
 function readPrice(s: string): number | null {
   const t = s.replace(/[\s$,]/g, "");
-  if (!t) return null;
+  // blank, or a dash on its own (accounting formats show zero as "$ -"): no price
+  if (!t || /^[-–—()]+$/.test(t)) return null;
   const neg = /^-|^\(.*\)$/.test(t);
   const v = Number(t.replace(/^-|[()]/g, ""));
   return Number.isFinite(v) ? Math.round((neg ? -v : v) * 100) / 100 : null;

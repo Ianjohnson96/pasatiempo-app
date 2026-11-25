@@ -86,7 +86,7 @@ function decisionHtml(d, k){
     : d.po ? `<button class="btn sm" type="button" data-openpo="${esc(d.po)}">Open order</button>`
     : d.page ? `<button class="btn sm" type="button" data-tab="${esc(d.page)}">Look at it</button>`
     : d.cat ? `<button class="btn sm" type="button" data-go="category:${esc(d.cat)}">Open category</button>` : '';
-  const u = ` data-usd="${Math.round(num(d.usd))}"`;
+  const u = ` data-usd="${r2(num(d.usd))}"`;
   const btns = !canAct() ? '' : d.state && !d.back ? `<button class="btn sm" type="button" data-istate="${esc(d.id)}" data-v="">Undo</button>`
     : `<button class="btn sm" type="button" data-istate="${esc(d.id)}" data-v="done"${u}>Done</button><button class="btn ghost sm" type="button" data-istate="${esc(d.id)}" data-v="dismissed"${u}>Not now</button>`;
   return `<li class="item ${d.sev}"><div class="stripe"></div><div class="body">
@@ -122,7 +122,8 @@ function sideBadges(S){
       const st = rcvOf(p), bad = rowFlag(p) === 'flag-crit' || (p.deliveryMonth && p.deliveryMonth < THIS_MONTH) || st === 'late';
       if (bad || st === 'arrived'){ n++; if (bad) hot = true; }
     }
-    n += receivingQueue().toMatch.length;   // receiving log rows waiting for a person to match
+    const q = receivingQueue();
+    n += q.toMatch.length + q.changed.length + q.twice.length;   // log rows to match, and matches to check
     return n ? [n, hot ? 'hot' : ''] : null;
   });
   // Home: urgent actions (crit), including set-aside ones that have grown back.
@@ -149,7 +150,7 @@ function renderViewBar(tab){
   const vs = VIEWS[navParent(tab)];
   if (!vs) return '';
   // Receiving carries what needs doing there: orders that should have arrived (red) and log rows to match.
-  const badge = id => { if (id !== 'receiving') return ''; try { const o = overdueOrders().length, m = receivingQueue().toMatch.length;
+  const badge = id => { if (id !== 'receiving') return ''; try { const o = overdueOrders().length, q = receivingQueue(), m = q.toMatch.length + q.changed.length + q.twice.length;
     return o + m ? ` <span class="sb ${o ? 'hot' : ''}">${o + m}</span>` : ''; } catch (e){ return ''; } };
   return `<div class="seg viewbar" role="group" aria-label="${esc(pageLabel(navParent(tab)))} views">${vs.map(([id, l]) => `<button type="button" data-tab="${id}" aria-pressed="${tab === id}">${esc(l)}${badge(id)}</button>`).join('')}</div>`;
 }
@@ -226,7 +227,7 @@ function budgetTiles(S){
 function catRow(c, S){
   const m = S.m, inv = INV.cats[c.code] || {units:0, cost:0}, wks = catWeeks(c.code, shelfCost(c.code, inv.cost));
   const first = `<td data-l="Category"><span class="code">${c.code}</span>${esc(c.name)} <span class="chip ${c.call}">${CALLTXT[c.call]}</span></td><td data-l="Role" class="crole">${esc(roleOf(c.code).name)}</td>`;
-  const wk = `<td data-l="Weeks of supply" class="r num">${wks ? Math.round(wks) : '—'}</td>`;
+  const wk = `<td data-l="Weeks of supply" class="r num">${wks != null ? Math.round(wks) : '—'}</td>`;
   if (!inOTB(c.code)){
     const so = S.L.filter(e => e.cat === '640').reduce((a,e) => a + e.open, 0);
     return `<tr data-cat="${c.code}" tabindex="0" aria-label="${esc(c.name)} details">${first}<td data-l="Committed / room"><div class="bfig num">${money(so)} <span>on order</span></div></td><td data-l="Left" class="r" style="color:var(--faint)">Not budgeted</td>${wk}</tr>`;

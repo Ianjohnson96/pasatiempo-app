@@ -35,7 +35,14 @@ function catPageData(code, S){
     actions: S ? actionsFor(S, code) : []
   };
 }
+/** On load with #category:<code>: 'open' it, 'wait' for the sales data (a code the budget lacks may be in it), or
+    'redirect' to All categories once the data is in and the code is in neither. */
+function catPageOnLoad(code){
+  if (catPageTarget(code)) return 'open';
+  return typeof ASSORT !== 'undefined' && ASSORT ? 'redirect' : 'wait';
+}
 function renderCategory(S){
+  if (BASE && CATSEL && catPageOnLoad(CATSEL) === 'wait'){ $('#pane').innerHTML = '<section class="panel"><div class="note" style="font-size:14px">Loading the sales data…</div></section>'; return; }
   if (!BASE || !CATSEL){ $('#pane').innerHTML = '<section class="panel"><div class="note" style="font-size:14px">A category\'s page appears after the first month-end upload.</div></section>'; return; }
   const d = catPageData(CATSEL, S), c = d.cat, g = k => c ? grade(k, c[k], c.seg, c.cat) : null;
   const sales = d.sales;

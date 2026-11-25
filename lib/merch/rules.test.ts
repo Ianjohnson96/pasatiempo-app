@@ -82,7 +82,7 @@ describe("receiving log documents", () => {
     expect(docProblem("logmatch/abc", { state: "matched", po: "p1", amount: 10, date: "2026-11-02", by: "x" })).toBeNull();
     expect(docProblem("logmatch/abc", { state: "notorder", by: "x" })).toBeNull();
     expect(docProblem("logmatch/abc", { state: "maybe" })).toMatch(/state/);
-    expect(docProblem("logmatch/abc", { state: "matched", amount: 10, date: "2026-11-02" })).toMatch(/order/);
+    expect(docProblem("logmatch/abc", { state: "matched", amount: 10, date: "2026-11-02", by: "x" })).toMatch(/order/);
   });
 });
 });

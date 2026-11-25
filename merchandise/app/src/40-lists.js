@@ -18,6 +18,8 @@ function catSummary(p){
 }
 // Orders are grouped by vendor record, or by the typed name when an order has no vendor record.
 const vkey = p => p.vendorId || ('n:' + vendorName(p));
+/** What a key after #orders means: an order's id opens that order; anything else filters the list by vendor. */
+const ordersKey = key => POS.some(p => p.id === key) ? {po: key} : {vendor: key};
 // Open cost (still to come) by vendor, biggest first.
 function vendorOpen(){
   const m = new Map();
@@ -143,7 +145,7 @@ function renderInventory(S){
     <div class="note" style="border-bottom:1px solid var(--rule)">This is the starting point for every budget. It updates each month-end when the new SKU Analysis comes in. <b>Weeks of supply</b> is how long the stock lasts at the sales pace forecast for the coming months. <b>Target by Apr 30</b> is the stock level the plan is steering towards.</div>
     <div class="tbl"><table style="min-width:900px"><thead><tr><th><span class="h">Category</span></th><th class="r"><span class="h">SKUs</span></th><th class="r"><span class="h">Units</span></th><th class="r"><span class="h">At cost</span></th><th class="r"><span class="h">Not sold 12+ mo</span></th><th class="r"><span class="h">Weeks of supply</span></th><th class="r"><span class="h">Target by Apr 30</span></th><th><span class="h">Read</span></th></tr></thead>
     <tbody class="click">${rows.map(r => `<tr data-cat="${r.c.code}"><td><b>${esc(r.c.name)}</b><span class="sm">${r.c.code}</span></td><td class="r num">${int(r.i.skus)}</td><td class="r num">${int(r.i.units)}</td><td class="r num">${money(r.i.cost)}</td>
-      <td class="r num">${r.i.aged ? money(r.i.aged) + `<span class="sm">${Math.round(r.i.aged / r.i.cost * 100)}%</span>` : '—'}</td><td class="r num" ${r.wks > 30 ? 'style="color:var(--brick)"' : ''}>${r.wks ? Math.round(r.wks) : '—'}</td>
+      <td class="r num">${r.i.aged ? money(r.i.aged) + `<span class="sm">${Math.round(r.i.aged / r.i.cost * 100)}%</span>` : '—'}</td><td class="r num" ${(roleOf(r.c.code) || {}).over && r.wks > roleOf(r.c.code).over ? 'style="color:var(--brick)"' : ''}>${r.wks != null ? Math.round(r.wks) : '—'}</td>
       <td class="r num">${r.tgt != null ? money(r.tgt) : '—'}</td><td style="font-size:12.5px;color:var(--muted)">${invRead(r)}</td></tr>`).join('')}
       <tr class="tot"><td>Total merchandise</td><td class="r num">${int(T.skus)}</td><td class="r num">${int(T.units)}</td><td class="r num">${money(T.cost)}</td><td class="r num">${money(T.aged)}</td><td></td><td class="r num">${money(rows.reduce((a,r) => a + (r.tgt || 0), 0))}</td><td></td></tr></tbody></table></div>
     ${S.receivedSince ? `<div class="note">${money(S.receivedSince)} has been received on orders logged here since ${dateLabel(INV.asOf)}. It will show in on-hand after the next month-end SKU Analysis.</div>` : ''}
@@ -160,9 +162,11 @@ function renderInventory(S){
 function invRead(r){
   if (!inOTB(r.c.code)) return 'Customer orders — not budgeted.';
   if (r.i.aged / Math.max(r.i.cost, 1) > .3) return 'Heavy with old stock — clear before buying.';
-  if (r.wks > 30) return 'Too much stock for the pace of sales.';
+  // Judged by the category's role (Guidelines → Category roles), as the Scorecard and Markdowns judge it.
+  const role = roleOf(r.c.code) || {}, lo = role.wks ? role.wks[0] : null, over = role.over || null;
+  if (over && r.wks > over) return 'Too much stock for the pace of sales.';
   if (r.gap > r.tgt * .5 && r.tgt > 0) return 'Above target; buy lightly until it works down.';
-  if (r.wks && r.wks < 12) return 'Lean — keep reorders flowing.';
+  if (lo && r.wks != null && r.wks < lo) return 'Lean — keep reorders flowing.';
   return 'In line with plan.';
 }
 const countTotals = ct => Object.values(ct.cats || {}).reduce((a,c) => ({book:a.book + num(c.book), counted:a.counted + num(c.counted), diff:a.diff + num(c.counted) - num(c.book)}), {book:0, counted:0, diff:0});

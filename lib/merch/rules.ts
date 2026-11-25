@@ -90,6 +90,7 @@ export function docProblem(path: string, data: unknown): string | null {
   switch (topCollection(path)) {
     case "logmatch": {
       if (d.state !== "matched" && d.state !== "notorder") return "state must be matched or notorder";
+      if (typeof d.by !== "string" || !d.by.trim()) return "a match must say who made it (by)";
       if (d.state === "matched") {
         if (typeof d.po !== "string" || !d.po) return "a match needs the order it belongs to";
         if (d.amount == null || !isNum(d.amount)) return "amount must be a number";

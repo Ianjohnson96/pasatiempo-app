@@ -141,7 +141,7 @@ function render(){
   TAB = resolveTab(TAB); if (!PAGES[TAB]) TAB = FIRST_TAB;
   // The address's key (#category:620, #orders:v-fj), once there is data to apply it to.
   if (INIT_KEY != null){ const k = INIT_KEY; INIT_KEY = null; if (TAB === 'category') CATSEL = k; else { goTab._pop = true; try { goTab(TAB, k); } finally { goTab._pop = false; } return; } }
-  if (TAB === 'category' && !catPageTarget(CATSEL)){ TAB = 'scorecard'; history.replaceState(null, '', pageUrl(TAB)); }
+  if (TAB === 'category' && catPageOnLoad(CATSEL) === 'redirect'){ TAB = 'scorecard'; history.replaceState(null, '', pageUrl(TAB)); }
   // The month bar belongs to Orders and to Budget & open-to-buy's By category view; #summary and #kpis are retired
   // (Budget & open-to-buy draws its own tiles).
   const S = stats(), bar = (TAB === 'overview' && BV === 'cats') || TAB === 'orders';
@@ -166,7 +166,8 @@ function goTab(id, key){
   if (TAB === 'guidelines' && resolveTab(id) !== 'guidelines' && !gdLeaveOk()) return;
   if (id === 'otb') setBV('months');
   if (resolveTab(id) === 'guidelines' && key){ GD.tab = key; try { localStorage.setItem('mp.guideTab', key); } catch (_) {} }
-  const toOrders = id === 'orders' && key && !isMonthKey(key);
+  const ok = id === 'orders' && key && !isMonthKey(key) ? ordersKey(key) : null, openPo = ok && ok.po;
+  const toOrders = !!(ok && ok.vendor);
   // A category's page: a known code opens it; anything else opens All categories.
   const prevCat = CATSEL;
   if (resolveTab(id) === 'category'){ const c = catPageTarget(key); if (c) CATSEL = c; else { id = 'scorecard'; key = null; } }
@@ -182,6 +183,7 @@ function goTab(id, key){
   if ((moved || catMoved) && !goTab._pop) history.pushState(null, '', pageUrl(TAB));
   closePops(); closeOverlay(); closeSide();
   if (moved || isMonthKey(key) || !key || toOrders || TAB === 'category') render();
+  if (openPo){ openOrder(openPo); return moved; }
   if (key && !isMonthKey(key) && TAB !== 'category'){
     if (TAB === 'brands' && typeof BRANDS !== 'undefined' && BRANDS && (BRANDS.rows || []).some(r => r.id === key)) openBrand(key);
     else if (PLAN && PLAN.cats && PLAN.cats[key]) openCategory(key);
