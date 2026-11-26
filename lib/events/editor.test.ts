@@ -56,6 +56,9 @@ function state(over: Partial<EditorState> = {}): EditorState {
     rosterStyle: "first_initial",
     managersText: "pro@pasatiempo.com\nother@x.com",
     status: "open",
+    theme: null,
+    contactName: "",
+    contactEmail: "",
     ...over,
   };
 }
@@ -70,9 +73,10 @@ describe("tiles and steps", () => {
     ]);
   });
 
-  it("has the seven sections in order", () => {
+  it("has the eight sections in order, Look after Details", () => {
     expect(EDITOR_SECTIONS.map((s) => s.id)).toEqual([
       "details",
+      "look",
       "schedule",
       "questions",
       "pricing",
@@ -80,7 +84,8 @@ describe("tiles and steps", () => {
       "access",
       "publish",
     ]);
-    expect(EDITOR_SECTIONS[2].label).toBe("Players & Questions");
+    expect(EDITOR_SECTIONS[1].label).toBe("Look");
+    expect(EDITOR_SECTIONS[3].label).toBe("Players & Questions");
   });
 });
 
@@ -143,6 +148,9 @@ describe("buildEventInput", () => {
       rosterStyle: "first_initial",
       managers: ["pro@pasatiempo.com", "other@x.com"],
       status: "open",
+      theme: null,
+      contactName: null,
+      contactEmail: null,
     });
   });
 
@@ -291,5 +299,29 @@ describe("crossesTournamentBoundary", () => {
     expect(TYPE_SWITCH_BLOCKED).toBe(
       "This event already has sign-ups, so it can't be switched to or from Tournament. Make a new event instead.",
     );
+  });
+});
+
+describe("look and contact", () => {
+  it("buildEventInput carries theme and blank contact becomes null", () => {
+    const input = buildEventInput(
+      state({ theme: { preset: "evening", accent: "#b41c14" }, contactName: "  ", contactEmail: " " }),
+    );
+    expect(input.theme).toEqual({ preset: "evening", accent: "#b41c14" });
+    expect(input.contactName).toBeNull();
+    expect(input.contactEmail).toBeNull();
+    const named = buildEventInput(state({ contactName: " Pat ", contactEmail: " Pat@X.com " }));
+    expect(named.contactName).toBe("Pat");
+    expect(named.contactEmail).toBe("pat@x.com");
+  });
+
+  it("previewEvent carries theme, contact and the event's photos", () => {
+    const ev = previewEvent(
+      buildEventInput(state({ theme: { preset: "coastal" }, contactEmail: "pat@x.com" })),
+      ["/a.jpg"],
+    );
+    expect(ev.theme).toEqual({ preset: "coastal" });
+    expect(ev.contactEmail).toBe("pat@x.com");
+    expect(ev.photos).toEqual(["/a.jpg"]);
   });
 });

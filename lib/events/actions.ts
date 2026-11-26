@@ -4,11 +4,24 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { assertCanManageEvent, assertCanManageRegistration, assertEventsViewer } from "./auth";
-import { eventToRow, rowToEvent, rowToReg } from "./map";
+import {
+  eventToRow,
+  isMissingLookColumn,
+  rowToEvent,
+  rowToReg,
+  withoutLookColumns,
+} from "./map";
 import { newId, newSlug, slugify } from "./ids";
 import { availability, rosterCount, onRoster } from "./seats";
 import { formatSlot } from "./format";
 import { normalizeFields } from "./question-builder";
+import {
+  type EventTheme,
+  eventContact,
+  logoUploadCheck,
+  parseTheme,
+  unusedLogoPaths,
+} from "./theme";
 import { TYPE_SWITCH_BLOCKED, crossesTournamentBoundary } from "./editor";
 import {
   cleanTeam,
@@ -57,6 +70,24 @@ async function currentEmail(): Promise<string | null> {
 // Event create / update (admin)
 // ---------------------------------------------------------------------------
 
+// Until migration-event-looks.sql has run, the look columns don't exist: save
+// without them rather than refusing every edit.
+async function withLookFallback<T extends { error: { code?: string; message?: string } | null }>(
+  row: Record<string, unknown>,
+  write: (row: Record<string, unknown>) => PromiseLike<T>,
+): Promise<T> {
+  const first = await write(row);
+  if (!isMissingLookColumn(first.error)) return first;
+  console.warn("Event looks: run supabase/migration-event-looks.sql — saved without the look.");
+  return write(withoutLookColumns(row));
+}
+
+// "Name at email" for the person members should contact about an event.
+function whoToEmail(ev: Pick<EventRec, "contactName" | "contactEmail">): string {
+  const c = eventContact(ev);
+  return `${c.name} at ${c.email}`;
+}
+
 export interface EventInput {
   id?: string;
   slug?: string;
@@ -87,6 +118,9 @@ export interface EventInput {
   rosterStyle: RosterStyle;
   managers: string[];
   status: "draft" | "open" | "closed";
+  theme: EventTheme | null;
+  contactName: string | null;
+  contactEmail: string | null;
 }
 
 export type SaveEventResult =
@@ -164,6 +198,9 @@ async function saveEventInner(input: EventInput): Promise<SaveEventResult> {
     rosterStyle: input.rosterStyle,
     managers: input.managers.map((e) => e.trim().toLowerCase()).filter(Boolean),
     status: input.status,
+    theme: parseTheme(input.theme),
+    contactName: input.contactName?.trim() || null,
+    contactEmail: input.contactEmail?.trim().toLowerCase() || null,
   };
 
   // A tournament is one date, a Member + Guest team, capacity in teams.
@@ -218,31 +255,29 @@ async function saveEventInner(input: EventInput): Promise<SaveEventResult> {
         throw new Error(`The link "/e/${requestedSlug}" is already taken.`);
       slug = requestedSlug;
     }
-    const { data, error } = await supa
-      .from("events")
-      .update({ ...eventToRow(fields), slug })
-      .eq("id", input.id)
-      .select("*")
-      .single();
+    const { data, error } = await withLookFallback(
+      { ...eventToRow(fields), slug },
+      (row) => supa.from("events").update(row).eq("id", input.id!).select("*").single(),
+    );
     if (error) throw error;
     saved = rowToEvent(data);
+    await removeUnusedLogos(supa, saved);
   } else {
     let slug = requestedSlug || newSlug();
     if (requestedSlug && (await slugTaken(requestedSlug)))
       throw new Error(`The link "/e/${requestedSlug}" is already taken.`);
     while (await slugTaken(slug)) slug = newSlug();
 
-    const { data, error } = await supa
-      .from("events")
-      .insert({
+    const { data, error } = await withLookFallback(
+      {
         ...eventToRow(fields),
         slug,
         photos: [],
         gallery_mode: "slideshow",
         created_by: await currentEmail(),
-      })
-      .select("*")
-      .single();
+      },
+      (row) => supa.from("events").insert(row).select("*").single(),
+    );
     if (error) throw error;
     saved = rowToEvent(data);
   }
@@ -360,6 +395,51 @@ export async function uploadPhoto(
   return { ok: true, photos };
 }
 
+// Stores a logo for the event's look. The event only points at it once the
+// organiser saves; files the look no longer uses are cleared on save.
+export async function uploadLogo(
+  eventId: string,
+  formData: FormData,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  try {
+    await assertCanManageEvent(eventId);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+  const file = formData.get("file");
+  if (!(file instanceof File)) return { ok: false, error: "No file received." };
+  const checked = logoUploadCheck(file.type, file.size);
+  if (!checked.ok) return checked;
+  const ext = checked.ext;
+
+  const supa = createAdminClient("events");
+  const objectPath = `${eventId}/logo-${newId()}.${ext}`;
+  const { error } = await supa.storage
+    .from(PHOTO_BUCKET)
+    .upload(objectPath, Buffer.from(await file.arrayBuffer()), {
+      contentType: file.type,
+      upsert: false,
+    });
+  if (error) return { ok: false, error: error.message };
+  const { data } = supa.storage.from(PHOTO_BUCKET).getPublicUrl(objectPath);
+  return { ok: true, url: data.publicUrl };
+}
+
+async function removeUnusedLogos(
+  supa: ReturnType<typeof createAdminClient>,
+  ev: EventRec,
+): Promise<void> {
+  try {
+    const { data: files } = await supa.storage.from(PHOTO_BUCKET).list(ev.id);
+    const keep = ev.theme?.logo && "url" in ev.theme.logo ? ev.theme.logo.url : null;
+    const stale = unusedLogoPaths((files ?? []).map((f) => f.name), keep);
+    if (stale.length)
+      await supa.storage.from(PHOTO_BUCKET).remove(stale.map((f) => `${ev.id}/${f}`));
+  } catch {
+    /* a stale logo file is harmless; never fail a save over it */
+  }
+}
+
 export async function removePhoto(
   eventId: string,
   photoUrl: string,
@@ -370,11 +450,18 @@ export async function removePhoto(
   if (path) await supa.storage.from(PHOTO_BUCKET).remove([path]).catch(() => {});
   const { data: ev } = await supa
     .from("events")
-    .select("photos")
+    .select("*")
     .eq("id", eventId)
     .single();
   const photos = ((ev?.photos as string[]) ?? []).filter((p) => p !== photoUrl);
   await setPhotos(supa, eventId, photos);
+  // A look that pointed at this photo falls back to the first one.
+  const theme = parseTheme(ev?.theme);
+  if (theme?.heroPhoto === photoUrl) {
+    delete theme.heroPhoto;
+    delete theme.heroFocus;
+    await supa.from("events").update({ theme }).eq("id", eventId);
+  }
   revalidatePath(`/admin/events/${eventId}`);
   return photos;
 }
@@ -547,7 +634,7 @@ export async function register(input: RegisterInput): Promise<RegisterResult> {
       return {
         ok: false,
         error:
-          "Sorry — this program's roster is full. Please email Ian Johnson at Ijohnson@pasatiempo.com to be added to a waiting list.",
+          `Sorry — this program's roster is full. Please email ${whoToEmail(ev)} to be added to a waiting list.`,
       };
     }
   }
@@ -769,7 +856,7 @@ export async function updateMyRegistration(
     return {
       ok: false,
       error:
-        "This event is closed — please email Ian Johnson at Ijohnson@pasatiempo.com.",
+        `This event is closed — please email ${whoToEmail(ev)}.`,
     };
 
   const { data: allRows } = await supa
@@ -834,7 +921,7 @@ export async function updateMyRegistration(
       const slot = ev.slots.find((s) => s.id === id);
       return {
         ok: false,
-        error: `${slot ? formatSlot(slot) : "That date"} is full — please email Ian Johnson at Ijohnson@pasatiempo.com.`,
+        error: `${slot ? formatSlot(slot) : "That date"} is full — please email ${whoToEmail(ev)}.`,
       };
     }
   }
@@ -845,7 +932,7 @@ export async function updateMyRegistration(
       return {
         ok: false,
         error:
-          "The roster is full — please email Ian Johnson at Ijohnson@pasatiempo.com to add anyone else.",
+          `The roster is full — please email ${whoToEmail(ev)} to add anyone else.`,
       };
   }
 

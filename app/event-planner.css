@@ -53,6 +53,25 @@
   --warn: #8a5a12;
   --maxw: 1040px;
 
+  /* per-event looks (lib/events/theme.ts) override these on the public page;
+     the defaults are the Clubhouse values, so admin screens never change */
+  --btn: var(--club);
+  --on-btn: var(--ivory);
+  --btn-hover: var(--club-2);
+  --hero-btn: var(--ivory);
+  --on-hero-btn: var(--club);
+  --hero-btn-hover: #fff;
+  --hero-bg: var(--club);
+  --hero-ink: var(--ivory);
+  --hero-kicker: var(--brass-soft);
+  --prose-ink: #2b322d;
+  --focus: var(--brass);
+  --notice-warn-bg: #faf3e2;
+  --notice-warn-line: #e6d4ad;
+  --notice-warn-ink: #5e3f0f;
+  --notice-err-bg: #f8ece8;
+  --notice-err-line: #e7c7bf;
+
   min-height: 100vh;
   background: var(--bg);
   color: var(--ink);
@@ -176,7 +195,7 @@
 .ep button:focus-visible,
 .ep summary:focus-visible,
 .ep [tabindex]:focus-visible {
-  outline: 2px solid var(--brass);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
   box-shadow: none;
 }
@@ -345,10 +364,10 @@
   gap: 10px;
   min-height: 44px;
   padding: 0 22px;
-  border: 1px solid var(--club);
+  border: 1px solid var(--btn);
   border-radius: var(--radius);
-  background: var(--club);
-  color: var(--ivory);
+  background: var(--btn);
+  color: var(--on-btn);
   font-family: var(--sans);
   font-size: 13px;
   font-weight: 600;
@@ -362,18 +381,20 @@
     border-color 0.16s,
     color 0.16s,
     box-shadow 0.16s,
-    transform 0.16s;
+    transform 160ms ease-out;
 }
 .ep .btn:hover:not(:disabled) {
-  background: var(--club-2);
-  border-color: var(--club-2);
+  background: var(--btn-hover);
+  border-color: var(--btn-hover);
   box-shadow: inset 0 -2px 0 var(--brass);
 }
 .ep .btn:active:not(:disabled) {
-  transform: translateY(1px);
+  transform: scale(0.97);
+  transition-duration: 120ms;
+  transition-timing-function: ease-out;
 }
 .ep .btn:focus-visible {
-  outline: 2px solid var(--brass);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .ep .btn:disabled {
@@ -393,7 +414,7 @@
 }
 .ep .btn.secondary {
   background: transparent;
-  border-color: rgba(27, 32, 29, 0.3);
+  border-color: color-mix(in srgb, var(--ink) 30%, transparent);
   color: var(--ink);
 }
 .ep .btn.secondary:hover:not(:disabled) {
@@ -436,11 +457,11 @@
 }
 .ep .btn.danger {
   background: transparent;
-  border-color: rgba(154, 43, 32, 0.55);
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
   color: var(--danger);
 }
 .ep .btn.danger:hover:not(:disabled) {
-  background: rgba(154, 43, 32, 0.06);
+  background: color-mix(in srgb, var(--danger) 6%, transparent);
   border-color: var(--danger);
   box-shadow: none;
 }
@@ -454,17 +475,17 @@
 .ep .btn.gold {
   min-height: 48px;
   padding: 0 30px;
-  background: var(--ivory);
-  border-color: var(--ivory);
-  color: var(--club);
+  background: var(--hero-btn);
+  border-color: var(--hero-btn);
+  color: var(--on-hero-btn);
   font-size: 13px;
   letter-spacing: 0.14em;
   box-shadow: none;
 }
 .ep .btn.gold:hover {
-  background: #fff;
-  border-color: #fff;
-  color: var(--club);
+  background: var(--hero-btn-hover);
+  border-color: var(--hero-btn-hover);
+  color: var(--on-hero-btn);
   box-shadow: inset 0 -2px 0 var(--brass);
 }
 
@@ -474,6 +495,7 @@
 }
 /* every form field label, built-in or an admin's question: one quiet,
    sentence-case style. Small caps are kept for card and section headers. */
+.ep .field > .lbl,
 .ep .field > label:not(.check):not(.slot) {
   display: block;
   margin-bottom: 8px;
@@ -541,7 +563,7 @@
 .ep select:focus {
   outline: none;
   border-color: var(--club);
-  box-shadow: 0 0 0 3px rgba(23, 58, 42, 0.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--club) 12%, transparent);
 }
 .ep input::placeholder,
 .ep textarea::placeholder {
@@ -644,10 +666,10 @@
 .ep .field.has-err input:focus,
 .ep .field.has-err select:focus,
 .ep .field.has-err textarea:focus {
-  box-shadow: 0 0 0 3px rgba(154, 43, 32, 0.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 12%, transparent);
 }
 .ep .field.has-err .choice-chips .chip {
-  border-color: rgba(154, 43, 32, 0.45);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
 }
 
 /* choice chips: square-ish, filled club green when chosen */
@@ -822,14 +844,14 @@
   line-height: 1.55;
 }
 .ep .notice.warn {
-  background: #faf3e2;
-  border-color: #e6d4ad;
+  background: var(--notice-warn-bg);
+  border-color: var(--notice-warn-line);
   border-left-color: var(--brass);
-  color: #5e3f0f;
+  color: var(--notice-warn-ink);
 }
 .ep .notice.err {
-  background: #f8ece8;
-  border-color: #e7c7bf;
+  background: var(--notice-err-bg);
+  border-color: var(--notice-err-line);
   border-left-color: var(--danger);
   color: var(--danger);
 }
@@ -941,6 +963,8 @@
    ========================================================================= */
 .ep .pub {
   background: var(--bg);
+  /* re-declared so text that inherits takes the look's ink, not .ep's */
+  color: var(--ink);
 }
 .ep .pub-nav {
   padding: 18px 16px;
@@ -956,22 +980,28 @@
   align-items: flex-end;
   justify-content: flex-start;
   text-align: left;
-  background: var(--club);
+  background: var(--hero-bg);
 }
 .ep .pub-hero-photo {
   position: absolute;
   inset: 0;
-  background-size: cover;
-  background-position: center 40%;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 40%; /* the look's focal point overrides this inline */
   transform-origin: 50% 60%;
   animation: ep-settle 1.8s var(--ease) both;
 }
+/* each look brings its own scrim; Clubhouse's is the original green one */
 .ep .pub-hero.has-img::after {
-  background: linear-gradient(
-    180deg,
-    rgba(12, 26, 19, 0.3) 0%,
-    rgba(12, 26, 19, 0.34) 40%,
-    rgba(12, 26, 19, 0.9) 100%
+  background: var(
+    --scrim,
+    linear-gradient(
+      180deg,
+      rgba(12, 26, 19, 0.3) 0%,
+      rgba(12, 26, 19, 0.34) 40%,
+      rgba(12, 26, 19, 0.9) 100%
+    )
   );
 }
 .ep .pub-hero .hero-inner {
@@ -987,7 +1017,7 @@
 }
 .ep .pub-hero .kicker {
   margin-bottom: 18px;
-  color: var(--brass-soft);
+  color: var(--hero-kicker);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.22em;
@@ -995,7 +1025,7 @@
 .ep .pub-hero h1 {
   max-width: 15em;
   margin: 0;
-  color: var(--ivory);
+  color: var(--hero-ink);
   font-family: var(--serif);
   font-size: clamp(2.5rem, 5.5vw, 4rem);
   font-weight: 500;
@@ -1014,7 +1044,7 @@
   justify-content: flex-start;
   gap: 10px 32px;
   margin-bottom: 32px;
-  color: rgba(245, 241, 230, 0.92);
+  color: color-mix(in srgb, var(--hero-ink) 92%, transparent);
   font-size: 15px;
   font-variant-numeric: lining-nums;
 }
@@ -1025,7 +1055,7 @@
 }
 .ep .pub-hero .hero-meta .ico {
   margin: 0;
-  color: var(--brass-soft);
+  color: var(--hero-kicker);
   opacity: 1;
 }
 
@@ -1115,7 +1145,7 @@
 .ep .pub-section .prose {
   max-width: 68ch;
   margin: 20px 0 0;
-  color: #2b322d;
+  color: var(--prose-ink);
   font-size: 17px;
   line-height: 1.7;
 }
@@ -1224,7 +1254,7 @@
   box-shadow: none;
 }
 .ep .slideshow {
-  background: var(--club);
+  background: var(--hero-bg);
 }
 .ep .slideshow .slide {
   height: 420px;
@@ -2566,12 +2596,27 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* movement becomes a short fade; pressed, busy and done still show */
   .ep *,
   .ep *::before,
   .ep *::after {
     animation: none !important;
-    transition: none !important;
+    transition-property: opacity, color, background-color, border-color !important;
+    transition-duration: 150ms !important;
+    transition-delay: 0s !important;
     scroll-behavior: auto !important;
+  }
+  .ep .reveal {
+    animation: ep-fade 150ms linear both !important;
+  }
+  .ep .btn:active:not(:disabled) {
+    transform: none;
+    opacity: 0.85;
+  }
+  .ep .submit-btn.is-spin .sb-spin {
+    animation: none !important;
+    border-right-color: currentColor;
+    opacity: 0.6;
   }
   .ep .check-mark path {
     stroke-dashoffset: 0;
@@ -2786,4 +2831,462 @@
   .ep .editor-sec-head h2 {
     font-size: 1.45rem;
   }
+}
+
+/* ---- Editor: Look section ------------------------------------------------ */
+.ep .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.ep .look-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.ep .look-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.ep .look-tile:hover {
+  border-color: var(--rule-strong);
+}
+.ep .look-tile.on {
+  border-color: var(--club);
+  box-shadow: inset 0 0 0 1px var(--club);
+}
+.ep .look-swatch {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+  height: 44px;
+  padding: 6px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+}
+.ep .look-swatch i {
+  flex: 1;
+  height: 100%;
+  border-radius: 1px;
+}
+.ep .look-swatch i + i {
+  height: 55%;
+}
+.ep .look-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.ep .look-blurb {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.ep .look-accent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ep .look-accent input[type="color"] {
+  width: 48px;
+  height: 40px;
+  padding: 2px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--paper);
+  cursor: pointer;
+}
+.ep .look-hex {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 13px;
+}
+.ep .look-thumbs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.ep .look-thumb {
+  width: 72px;
+  height: 54px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--hairline);
+}
+.ep .look-thumb.on {
+  border-color: var(--club);
+}
+.ep .look-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ep .look-focus {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+.ep .look-focus .hint {
+  grid-column: 1 / -1;
+}
+.ep .look-focus-pick {
+  position: relative;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: crosshair;
+  background: none;
+}
+.ep .look-focus-pick img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.ep .look-cross {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+.ep .look-crops {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+.ep .look-crops figure {
+  margin: 0;
+  text-align: center;
+}
+.ep .look-crops figcaption {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.ep .look-crops .crop {
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+}
+.ep .look-crops .crop img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ep .look-crops .crop.phone {
+  width: 58px;
+  height: 104px;
+}
+.ep .look-crops .crop.desktop {
+  width: 150px;
+  height: 64px;
+}
+.ep .look-logos {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ep .look-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 104px;
+  padding: 10px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 12px;
+}
+.ep .look-logo.on {
+  border-color: var(--club);
+  box-shadow: inset 0 0 0 1px var(--club);
+}
+.ep .look-logo img {
+  height: 44px;
+  max-width: 100%;
+  object-fit: contain;
+}
+.ep .look-upload {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+.ep .look-upload input:focus-visible + label {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.ep .look-upload .is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (max-width: 720px) {
+  .ep .look-focus {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* the live preview shows the real hero, at preview size */
+.ep .ep-body .pub-nav {
+  padding: 10px 12px;
+}
+.ep .ep-body .pub-nav img {
+  height: 40px;
+}
+.ep .ep-body .pub-hero {
+  min-height: 300px;
+}
+.ep .ep-body .pub-hero .hero-inner {
+  padding: 56px 20px 64px;
+}
+.ep .ep-body .pub-hero h1 {
+  font-size: 1.9rem;
+}
+.ep .ep-body .facts {
+  margin: -36px 12px 0;
+}
+
+/* ---- Public page: the phone's sticky Register bar ------------------------ */
+.ep .sticky-cta {
+  display: none;
+}
+@media (max-width: 720px) {
+  .ep .sticky-cta {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--hairline);
+    background: var(--card);
+    box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.08);
+    transform: translateY(110%);
+    transition: transform 160ms ease-out;
+  }
+  .ep .sticky-cta.show {
+    transform: none;
+  }
+  /* room at the very bottom so the bar never covers the footer */
+  .ep .pub:has(.sticky-cta) .pub-foot {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+  .ep .sticky-cta .btn {
+    min-height: 48px;
+    flex: 0 0 auto;
+  }
+  .ep .sticky-spots {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.3;
+  }
+}
+@media (max-width: 720px) and (prefers-reduced-motion: reduce) {
+  .ep .sticky-cta {
+    transform: none;
+    opacity: 0;
+    transition: opacity 150ms linear;
+  }
+  .ep .sticky-cta.show {
+    opacity: 1;
+  }
+}
+
+/* ---- Submit buttons: label stays, spinner after a second, tick on success - */
+.ep .submit-btn {
+  position: relative;
+}
+.ep .submit-btn .sb-spin,
+.ep .submit-btn .sb-tick {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+.ep .submit-btn .sb-spin {
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+}
+.ep .submit-btn .sb-tick {
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+}
+.ep .submit-btn .sb-label {
+  transition: opacity 160ms ease-out;
+}
+.ep .submit-btn:disabled.is-busy,
+.ep .submit-btn:disabled.is-spin,
+.ep .submit-btn:disabled.is-done {
+  opacity: 1;
+  cursor: progress;
+}
+.ep .submit-btn.is-spin .sb-label,
+.ep .submit-btn.is-done .sb-label {
+  opacity: 0;
+}
+.ep .submit-btn.is-spin .sb-spin {
+  opacity: 1;
+  animation: ep-spin 0.8s linear infinite;
+}
+.ep .submit-btn.is-done .sb-tick {
+  opacity: 1;
+  stroke-dashoffset: 0;
+  transition:
+    stroke-dashoffset 300ms ease-out,
+    opacity 120ms ease-out;
+}
+@keyframes ep-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- Public page on phones: text and targets a thumb can use ------------ */
+@media (max-width: 720px) {
+  .ep .pub {
+    font-size: 17px;
+  }
+  .ep .pub input,
+  .ep .pub select,
+  .ep .pub textarea {
+    font-size: 16px; /* below 16px iOS zooms the page on focus */
+  }
+  .ep .pub .btn,
+  .ep .pub .slot,
+  .ep .pub .check,
+  .ep .pub .stepper button,
+  .ep .pub .choice-chips .chip {
+    min-height: 48px;
+  }
+  .ep .pub .slot + .slot,
+  .ep .pub .check + .check {
+    margin-top: 8px;
+  }
+}
+
+/* ---- Error summary: everything to fix, at the top of the form ----------- */
+.ep .error-summary {
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--notice-err-line);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--radius);
+  background: var(--notice-err-bg);
+  color: var(--ink);
+}
+.ep .error-summary:focus-visible,
+.ep .error-summary:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.ep .error-summary .es-title {
+  margin: 0 0 6px;
+  color: var(--danger);
+  font-weight: 600;
+}
+.ep .error-summary ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.ep .error-summary li + li {
+  margin-top: 4px;
+}
+.ep .error-summary a {
+  color: var(--danger);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ---- Confirmation: when/where, calendar, change or cancel, contact ------ */
+.ep .confirm-extras {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+}
+.ep .confirm-facts {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.ep .confirm-facts > div {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+}
+.ep .confirm-facts dt {
+  color: var(--brass-ink);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding-top: 2px;
+}
+.ep .confirm-facts dd {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+.ep .confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ep .confirm-cal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ep .confirm-cal-lbl {
+  font-weight: 600;
+  font-size: 14px;
+  margin-right: 4px;
+}
+.ep .confirm-contact {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 15px;
 }

@@ -1,4 +1,5 @@
 import type { EventInput } from "./actions";
+import type { EventTheme } from "./theme";
 import type { SeatInfo } from "@/components/events/RegistrationForm";
 import { TYPE_LABEL } from "./format";
 import type {
@@ -86,6 +87,7 @@ export function effectiveScheduleMode(
 
 export const EDITOR_SECTIONS = [
   { id: "details", label: "Details" },
+  { id: "look", label: "Look" },
   { id: "schedule", label: "Schedule" },
   { id: "questions", label: "Players & Questions" },
   { id: "pricing", label: "Pricing" },
@@ -131,6 +133,9 @@ export interface EditorState {
   rosterStyle: RosterStyle;
   managersText: string;
   status: EventStatus;
+  theme: EventTheme | null;
+  contactName: string; // blank = the planner's default contact
+  contactEmail: string;
 }
 
 export function fromLocalInput(v: string): string | null {
@@ -185,6 +190,9 @@ export function buildEventInput(s: EditorState, id?: string): EventInput {
     rosterStyle: s.rosterStyle,
     managers: s.managersText.split(/[\n,;]+/),
     status: s.status,
+    theme: s.theme,
+    contactName: s.contactName.trim() || null,
+    contactEmail: s.contactEmail.trim().toLowerCase() || null,
   };
 }
 
@@ -193,7 +201,7 @@ export function buildEventInput(s: EditorState, id?: string): EventInput {
 // The event the sign-up form would see if the editor saved now: what the server
 // keeps (tournament settings forced, slots only in slots mode) with
 // placeholders for what only a save creates.
-export function previewEvent(input: EventInput): EventRec {
+export function previewEvent(input: EventInput, photos: string[] = []): EventRec {
   const tournament = input.type === "tournament";
   const slotsMode = input.scheduleMode === "slots";
   const customFields: CustomField[] = input.customFields.map((f) => ({
@@ -225,8 +233,11 @@ export function previewEvent(input: EventInput): EventRec {
     allowlist: [],
     inviteOnlyMessage: input.inviteOnlyMessage,
     customFields,
-    photos: [],
+    photos,
     galleryMode: "slideshow",
+    theme: input.theme,
+    contactName: input.contactName,
+    contactEmail: input.contactEmail,
     pricingEnabled: input.pricingEnabled,
     pricing: input.pricing,
     showRoster: input.showRoster,
