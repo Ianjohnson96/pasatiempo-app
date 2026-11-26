@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { signupEmail } from "./registration-email";
+import { sampleEmail, signupEmail } from "./registration-email";
 import type { EventRec } from "./types";
 
 const base = {
@@ -87,5 +87,62 @@ describe("signupEmail", () => {
     const m = signupEmail(base, { ...reg, name: "<b>Pat</b>", answers: { diet: "<script>" } }, "confirmed", url);
     expect(m.html).not.toContain("<script>");
     expect(m.html).toContain("&lt;script&gt;");
+  });
+});
+
+describe("signupEmail: the event's own wording", () => {
+  const ev = {
+    ...base,
+    theme: {
+      preset: "clubhouse",
+      emailSubject: "See you at the Holiday Dinner!",
+      emailIntro: "Thanks for joining us for our favourite night of the year.",
+      emailSignOff: "— The Social Committee",
+      thankYou: "Jackets suggested.",
+    },
+  } as EventRec;
+  it("uses the custom subject, opening line and sign-off", () => {
+    const m = signupEmail(ev, reg, "confirmed", url);
+    expect(m.subject).toBe("See you at the Holiday Dinner!");
+    expect(m.text).toContain("Thanks for joining us for our favourite night of the year.");
+    expect(m.text).not.toContain("You're registered for Holiday Dinner.");
+    const t = m.text;
+    expect(t.indexOf("Jackets suggested.")).toBeLessThan(t.indexOf("— The Social Committee"));
+    expect(t.indexOf("— The Social Committee")).toBeLessThan(t.indexOf("To change or cancel"));
+  });
+  it("a waitlist email keeps its own wording", () => {
+    const m = signupEmail(ev, reg, "waitlist", url);
+    expect(m.subject).toBe("Holiday Dinner: you're on the waitlist");
+    expect(m.text).toContain("You're on the waitlist for Holiday Dinner.");
+    expect(m.text).not.toContain("— The Social Committee");
+  });
+});
+
+describe("sampleEmail", () => {
+  it("a dinner's preview is the real email for a sample member", () => {
+    const m = sampleEmail(base, url);
+    expect(m.subject).toBe("Holiday Dinner: you're registered");
+    expect(m.text).toContain("Hi Pat,");
+    expect(m.text).toContain("Dietary needs: (their answer)");
+  });
+  it("a tournament's preview is the member's team email", () => {
+    const t = { ...base, type: "tournament", customFields: [] } as unknown as EventRec;
+    const m = sampleEmail(t, url);
+    expect(m.subject).toBe("Holiday Dinner: your team entry");
+    expect(m.text).toContain("Team: Pat Member & Sam Guest");
+  });
+});
+
+describe("signupEmail: answers", () => {
+  it("a question ending in '?' gets no extra colon", () => {
+    const ev = {
+      ...base,
+      customFields: [
+        { id: "fire", label: "Seat near the fire?", type: "short_text", required: false, options: [], scope: "player" },
+      ],
+    } as unknown as EventRec;
+    expect(signupEmail(ev, { ...reg, answers: { fire: "Yes" } }, "confirmed", url).text).toContain(
+      "Seat near the fire? Yes",
+    );
   });
 });

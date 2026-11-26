@@ -264,21 +264,6 @@ export default function LookSection({
             </div>
           ))}
         </div>
-        <div className="field">
-          <label htmlFor="look-thanks">Message after signing up</label>
-          <textarea
-            id="look-thanks"
-            rows={2}
-            value={t.thankYou ?? ""}
-            maxLength={WORDING_LIMITS.thankYou}
-            placeholder="Optional, e.g. See you on the first tee! Bring your partner to registration on Thursday."
-            onChange={(e) => set({ thankYou: words(e.target.value) })}
-          />
-          <p className="hint">
-            Shown on the &ldquo;You&apos;re registered&rdquo; screen and added to
-            the confirmation email. Waitlisted sign-ups don&apos;t get it.
-          </p>
-        </div>
         <label className="check">
           <input
             type="checkbox"

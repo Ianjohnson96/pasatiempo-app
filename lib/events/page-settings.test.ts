@@ -42,6 +42,7 @@ describe("pageSettings", () => {
         register: "Register",
       },
       thankYou: null,
+      email: { subject: null, intro: null, signOff: null },
     });
   });
   test("the event's own wording wins", () => {
@@ -81,5 +82,29 @@ describe("thank-you message", () => {
     expect(
       pageSettings({ type: "dinner", theme: { preset: "clubhouse", thankYou: "Cheers!" } }).thankYou,
     ).toBe("Cheers!");
+  });
+});
+
+describe("confirmation email settings", () => {
+  test("subject, opening line and sign-off are kept trimmed and capped", () => {
+    const t = parseTheme({
+      preset: "clubhouse",
+      emailSubject: "  You're in!  ",
+      emailIntro: "x".repeat(400),
+      emailSignOff: "  The Men's Club  ",
+    });
+    expect(t?.emailSubject).toBe("You're in!");
+    expect(t?.emailIntro).toHaveLength(300);
+    expect(t?.emailSignOff).toBe("The Men's Club");
+  });
+  test("pageSettings gives them, or null", () => {
+    expect(pageSettings({ type: "dinner", theme: null }).email).toEqual({
+      subject: null,
+      intro: null,
+      signOff: null,
+    });
+    expect(
+      pageSettings({ type: "dinner", theme: { preset: "clubhouse", emailSubject: "Hi" } }).email.subject,
+    ).toBe("Hi");
   });
 });

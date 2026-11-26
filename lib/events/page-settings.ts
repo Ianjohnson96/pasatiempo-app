@@ -18,6 +18,7 @@ export interface PageSettings {
   showSpots: boolean;
   headings: typeof DEFAULT_HEADINGS;
   thankYou: string | null;
+  email: { subject: string | null; intro: string | null; signOff: string | null };
 }
 
 export function pageSettings(event: { type: EventType; theme: EventTheme | null }): PageSettings {
@@ -29,5 +30,10 @@ export function pageSettings(event: { type: EventType; theme: EventTheme | null 
     showSpots: !t?.hideSpots,
     headings: { ...DEFAULT_HEADINGS, ...t?.headings },
     thankYou: t?.thankYou ?? null,
+    email: {
+      subject: t?.emailSubject ?? null,
+      intro: t?.emailIntro ?? null,
+      signOff: t?.emailSignOff ?? null,
+    },
   };
 }

@@ -93,6 +93,7 @@ export const EDITOR_SECTIONS = [
   { id: "pricing", label: "Pricing" },
   { id: "roster", label: "Roster" },
   { id: "access", label: "Access" },
+  { id: "email", label: "Email" },
   { id: "publish", label: "Publish" },
 ] as const;
 
