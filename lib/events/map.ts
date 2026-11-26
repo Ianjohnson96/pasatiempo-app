@@ -163,3 +163,21 @@ export function rowToPrize(r: any): PrizePurchase {
     createdAt: r.created_at,
   };
 }
+
+// ---- Before migration-event-looks.sql has run ---------------------------------
+// Saving must keep working if the code ships before the three look columns
+// exist: the save retries without them, and the event keeps the default look.
+const LOOK_COLUMNS = ["theme", "contact_name", "contact_email"] as const;
+
+export function isMissingLookColumn(
+  err: { code?: string; message?: string } | null | undefined,
+): boolean {
+  if (!err || (err.code !== "PGRST204" && err.code !== "42703")) return false;
+  return LOOK_COLUMNS.some((c) => (err.message ?? "").includes(c));
+}
+
+export function withoutLookColumns(row: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...row };
+  for (const c of LOOK_COLUMNS) delete out[c];
+  return out;
+}

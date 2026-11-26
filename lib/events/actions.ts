@@ -4,7 +4,13 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { assertCanManageEvent, assertCanManageRegistration, assertEventsViewer } from "./auth";
-import { eventToRow, rowToEvent, rowToReg } from "./map";
+import {
+  eventToRow,
+  isMissingLookColumn,
+  rowToEvent,
+  rowToReg,
+  withoutLookColumns,
+} from "./map";
 import { newId, newSlug, slugify } from "./ids";
 import { availability, rosterCount, onRoster } from "./seats";
 import { formatSlot } from "./format";
@@ -57,6 +63,18 @@ async function currentEmail(): Promise<string | null> {
 // ---------------------------------------------------------------------------
 // Event create / update (admin)
 // ---------------------------------------------------------------------------
+
+// Until migration-event-looks.sql has run, the look columns don't exist: save
+// without them rather than refusing every edit.
+async function withLookFallback<T extends { error: { code?: string; message?: string } | null }>(
+  row: Record<string, unknown>,
+  write: (row: Record<string, unknown>) => PromiseLike<T>,
+): Promise<T> {
+  const first = await write(row);
+  if (!isMissingLookColumn(first.error)) return first;
+  console.warn("Event looks: run supabase/migration-event-looks.sql — saved without the look.");
+  return write(withoutLookColumns(row));
+}
 
 // "Name at email" for the person members should contact about an event.
 function whoToEmail(ev: Pick<EventRec, "contactName" | "contactEmail">): string {
@@ -231,12 +249,10 @@ async function saveEventInner(input: EventInput): Promise<SaveEventResult> {
         throw new Error(`The link "/e/${requestedSlug}" is already taken.`);
       slug = requestedSlug;
     }
-    const { data, error } = await supa
-      .from("events")
-      .update({ ...eventToRow(fields), slug })
-      .eq("id", input.id)
-      .select("*")
-      .single();
+    const { data, error } = await withLookFallback(
+      { ...eventToRow(fields), slug },
+      (row) => supa.from("events").update(row).eq("id", input.id!).select("*").single(),
+    );
     if (error) throw error;
     saved = rowToEvent(data);
     await removeUnusedLogos(supa, saved);
@@ -246,17 +262,16 @@ async function saveEventInner(input: EventInput): Promise<SaveEventResult> {
       throw new Error(`The link "/e/${requestedSlug}" is already taken.`);
     while (await slugTaken(slug)) slug = newSlug();
 
-    const { data, error } = await supa
-      .from("events")
-      .insert({
+    const { data, error } = await withLookFallback(
+      {
         ...eventToRow(fields),
         slug,
         photos: [],
         gallery_mode: "slideshow",
         created_by: await currentEmail(),
-      })
-      .select("*")
-      .single();
+      },
+      (row) => supa.from("events").insert(row).select("*").single(),
+    );
     if (error) throw error;
     saved = rowToEvent(data);
   }
