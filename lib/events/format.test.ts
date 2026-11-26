@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { factDate, factTime, formatPhone, formatWhen } from "./format";
+import { factDate, factTime, formatPhone, formatWhen, rosterName, shownAnswer } from "./format";
 
 // Node's ICU may put a narrow no-break space before AM/PM; normalise spaces.
 const norm = (s: string) => s.replace(/[  ]/g, " ");
@@ -63,5 +63,29 @@ describe("formatPhone", () => {
     expect(formatPhone("+44 20 7946 0958")).toBe("+44 20 7946 0958");
     expect(formatPhone("555-0100")).toBe("555-0100");
     expect(formatPhone("")).toBe("");
+  });
+});
+
+describe("rosterName", () => {
+  it("capitalizes the last initial even when typed in lower case", () => {
+    expect(rosterName("Ian johnson", "first_initial")).toBe("Ian J.");
+    expect(rosterName("cary johnson", "first_initial")).toBe("Cary J.");
+  });
+  it("leaves full names as typed", () => {
+    expect(rosterName("Ian johnson", "first_last")).toBe("Ian johnson");
+  });
+});
+
+describe("shownAnswer", () => {
+  const f = (type: string) => ({ type }) as never;
+  it("a yes/no box reads Yes or No, never blank", () => {
+    expect(shownAnswer(f("checkbox"), "Yes")).toBe("Yes");
+    expect(shownAnswer(f("checkbox"), "")).toBe("No");
+    expect(shownAnswer(f("checkbox"), undefined)).toBe("No");
+  });
+  it("anything else reads as typed or chosen", () => {
+    expect(shownAnswer(f("short_text"), "Vegetarian")).toBe("Vegetarian");
+    expect(shownAnswer(f("multi"), ["A", "B"])).toBe("A, B");
+    expect(shownAnswer(f("short_text"), undefined)).toBe("");
   });
 });

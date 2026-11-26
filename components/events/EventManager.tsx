@@ -27,6 +27,7 @@ import {
 } from "@/lib/events/actions";
 import {
   answerText,
+  shownAnswer,
   formatSlot,
   formatPhone,
   formatSlotShort,
@@ -334,7 +335,7 @@ export default function EventManager({
                   <TcRow
                     key={f.id}
                     label={f.label}
-                    value={answerText(p.answers[f.id])}
+                    value={shownAnswer(f, p.answers[f.id])}
                   />
                 ))}
               </dl>
@@ -750,7 +751,7 @@ function TeamAnswers({
       <div className="tc-role">Team</div>
       <dl className="tc-list">
         {fields.map((f) => (
-          <TcRow key={f.id} label={f.label} value={answerText(answers[f.id])} />
+          <TcRow key={f.id} label={f.label} value={shownAnswer(f, answers[f.id])} />
         ))}
       </dl>
     </div>
