@@ -9,6 +9,8 @@ import RegistrationEditor from "@/components/events/RegistrationEditor";
 import TeamEntryForm from "@/components/events/TeamEntryForm";
 import {
   csvFilename,
+  golfGeniusFilename,
+  golfGeniusRows,
   signupRows,
   teamNumbers,
   toCsv,
@@ -125,17 +127,28 @@ export default function EventManager({
     });
   }
 
-  function exportCsv() {
-    const rows =
-      event.type === "tournament"
-        ? tournamentRows(event, registrations)
-        : signupRows(event, registrations);
+  function download(rows: string[][], filename: string) {
     const blob = new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = csvFilename(event);
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+
+  function exportCsv() {
+    download(
+      event.type === "tournament"
+        ? tournamentRows(event, registrations)
+        : signupRows(event, registrations),
+      csvFilename(event),
+    );
+  }
+
+  // Confirmed teams, one row per player, ready for Golf Genius's
+  // Golfers > Upload Roster from Spreadsheet.
+  function exportGolfGenius() {
+    download(golfGeniusRows(event, registrations), golfGeniusFilename(event));
   }
 
   // unique confirmed-registrant emails (both players on a tournament team)
@@ -539,6 +552,16 @@ export default function EventManager({
           >
             Export CSV
           </button>
+          {isTournament && (
+            <button
+              className="btn small secondary"
+              onClick={exportGolfGenius}
+              disabled={confirmed.length === 0}
+              title="Confirmed teams, one row per player, for Golf Genius: Golfers > Upload Roster from Spreadsheet"
+            >
+              Golf Genius roster
+            </button>
+          )}
           {isTournament && (
             <button
               className="btn small"
