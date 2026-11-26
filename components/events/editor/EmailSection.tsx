@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { sampleEmail } from "@/lib/events/registration-email";
 import { WORDING_LIMITS, type EventTheme } from "@/lib/events/theme";
 import type { EventRec } from "@/lib/events/types";
@@ -34,6 +34,7 @@ export default function EmailSection({
   const pageUrl = origin && preview.slug ? `${origin}/events/e/${preview.slug}` : null;
 
   const mail = sampleEmail(preview, pageUrl);
+  const [view, setView] = useState<"designed" | "text">("designed");
   const title = preview.title.trim() || "Your event";
 
   return (
@@ -103,7 +104,31 @@ export default function EmailSection({
               <strong>{mail.subject}</strong>
             </div>
           </div>
-          <div className="ep-mail-body">{mail.text}</div>
+          {view === "designed" ? (
+            // the real email, as sent; sandboxed so nothing in it can run or navigate
+            <iframe
+              className="ep-mail-frame"
+              title="Confirmation email preview"
+              sandbox=""
+              srcDoc={mail.html}
+            />
+          ) : (
+            <div className="ep-mail-body">{mail.text}</div>
+          )}
+        </div>
+        <div className="ep-mail-switch" role="group" aria-label="Preview as">
+          {(["designed", "text"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={view === v}
+              className={view === v ? "on" : ""}
+              onClick={() => setView(v)}
+            >
+              {v === "designed" ? "Designed" : "Plain text"}
+            </button>
+          ))}
+          <span className="hint">Email programs that don&apos;t show designs get the plain text.</span>
         </div>
       </figure>
     </div>
