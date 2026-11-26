@@ -64,6 +64,26 @@ export function onRoster(regs: Registration[], email: string): boolean {
   return regs.some((r) => r.status === "confirmed" && r.email.trim().toLowerCase() === e);
 }
 
+// A live sign-up (confirmed or waitlisted) this email already has, which a
+// new sign-up would double. Cancelled ones don't count, so people can come
+// back. On a multi-date event the same person may add NEW dates; only a date
+// they already hold is a double.
+export function existingSignup(
+  event: Pick<EventRec, "scheduleMode">,
+  regs: Registration[],
+  email: string,
+  slotIds: string[],
+): Registration | null {
+  const e = email.trim().toLowerCase();
+  const mine = regs.filter(
+    (r) =>
+      (r.status === "confirmed" || r.status === "waitlist") &&
+      r.email.trim().toLowerCase() === e,
+  );
+  if (event.scheduleMode !== "slots") return mine[0] ?? null;
+  return mine.find((r) => r.slotIds.some((id) => slotIds.includes(id))) ?? null;
+}
+
 export interface Availability {
   capacity: number | null; // null = unlimited
   taken: number;

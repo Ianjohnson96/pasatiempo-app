@@ -3290,3 +3290,8 @@
   color: var(--muted);
   font-size: 15px;
 }
+
+/* "already signed up" on the email field: a way straight to Manage */
+.ep .already-manage {
+  margin-top: 8px;
+}

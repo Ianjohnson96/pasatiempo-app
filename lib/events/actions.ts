@@ -12,7 +12,7 @@ import {
   withoutLookColumns,
 } from "./map";
 import { newId, newSlug, slugify } from "./ids";
-import { availability, rosterCount, onRoster } from "./seats";
+import { availability, existingSignup, rosterCount, onRoster } from "./seats";
 import { formatSlot } from "./format";
 import { normalizeFields } from "./question-builder";
 import {
@@ -528,6 +528,9 @@ export interface RegisterResult {
   ok: boolean;
   status?: RegStatus;
   error?: string;
+  // set when this email already holds the sign-up, so the form can point the
+  // person to "Manage my registration" instead of a second entry
+  code?: "already_registered";
 }
 
 // Columns a tournament team writes, derived from a cleaned team.
@@ -649,6 +652,24 @@ export async function register(input: RegisterInput): Promise<RegisterResult> {
     if (!ev.allowMultiSlot && chosen.length > 1)
       return { ok: false, error: "Please choose just one option." };
     slotIds = chosen;
+  }
+
+  // No double sign-ups: an email with a live sign-up is pointed to Manage.
+  const already = existingSignup(ev, regs, email, slotIds);
+  if (already) {
+    const held =
+      ev.scheduleMode === "slots"
+        ? ev.slots.filter((x) => already.slotIds.includes(x.id) && slotIds.includes(x.id))
+        : [];
+    return {
+      ok: false,
+      code: "already_registered",
+      error:
+        (held.length
+          ? `That email is already signed up for ${held.map(formatSlot).join(", ")}.`
+          : "That email is already signed up for this event.") +
+        " To change your sign-up or cancel, use “Manage my registration” below.",
+    };
   }
 
   let status: RegStatus;
