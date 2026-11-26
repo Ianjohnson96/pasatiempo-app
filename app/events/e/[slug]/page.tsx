@@ -18,6 +18,7 @@ import { ctaState } from "@/lib/events/public-page";
 import { eventContact, resolveHero, resolveLogo, themeVars } from "@/lib/events/theme";
 import PublicNav from "@/components/events/public/PublicNav";
 import PublicHero from "@/components/events/public/PublicHero";
+import StickyRegister from "@/components/events/public/StickyRegister";
 import FactsStrip, {
   factsFor,
   rosterMeter,
@@ -85,6 +86,10 @@ export default async function PublicEventPage({
         hero={hero}
         cta={cta}
         whenLine={whenLineFor(event)}
+      />
+      <StickyRegister
+        cta={cta}
+        spots={spotsMeter(event, eventAvail)?.text ?? null}
       />
 
       <div className="pub-body">
