@@ -275,8 +275,8 @@ export default function LookSection({
             onChange={(e) => set({ thankYou: words(e.target.value) })}
           />
           <p className="hint">
-            Shown on the &ldquo;You&apos;re registered&rdquo; screen, above the
-            calendar buttons.
+            Shown on the &ldquo;You&apos;re registered&rdquo; screen and added to
+            the confirmation email. Waitlisted sign-ups don&apos;t get it.
           </p>
         </div>
         <label className="check">

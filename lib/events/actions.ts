@@ -35,7 +35,10 @@ import {
   type TeamInput,
 } from "./tournament";
 import { teamEmails } from "./tournament-email";
-import { sendMail } from "@/lib/mail";
+import { signupEmail } from "./registration-email";
+import { sendMail, type Mail } from "@/lib/mail";
+import { resolveOrigin } from "@/lib/caddie/origin";
+import { headers } from "next/headers";
 import type {
   Answers,
   CustomField,
@@ -546,17 +549,27 @@ function teamColumns(team: TeamInput) {
   };
 }
 
-// Best-effort: email the member and the guest. Never throws and never fails the
-// registration; any failure is logged and flagged on the row.
-async function sendTeamConfirmation(
-  regId: string,
-  event: EventRec,
-  team: TeamInput,
-  status: "confirmed" | "waitlist",
-): Promise<void> {
+// The event's public page, for the "change or cancel" link in emails.
+async function eventPageUrl(slug: string): Promise<string | null> {
+  try {
+    const h = await headers();
+    const origin = resolveOrigin({
+      configured: process.env.NEXT_PUBLIC_SITE_URL,
+      host: h.get("x-forwarded-host") ?? h.get("host"),
+      proto: h.get("x-forwarded-proto"),
+    });
+    return `${origin}/events/e/${slug}`;
+  } catch {
+    return null; // no request to read the host from; the email goes without the link
+  }
+}
+
+// Best-effort: send a sign-up's confirmation emails. Never throws and never
+// fails the registration; any failure is logged and flagged on the row.
+async function sendConfirmations(regId: string, mails: Mail[]): Promise<void> {
   try {
     const errors: string[] = [];
-    for (const m of teamEmails(event, team.players, team.teamAnswers, status)) {
+    for (const m of mails) {
       try {
         const err = await sendMail(m);
         if (err) errors.push(err);
@@ -565,9 +578,7 @@ async function sendTeamConfirmation(
       }
     }
     if (errors.length === 0) return;
-    console.error(
-      `Tournament confirmation email failed for registration ${regId}: ${errors.join("; ")}`,
-    );
+    console.error(`Confirmation email failed for registration ${regId}: ${errors.join("; ")}`);
     const supa = createAdminClient("events");
     const { error } = await supa
       .from("registrations")
@@ -576,8 +587,19 @@ async function sendTeamConfirmation(
     if (error)
       console.error(`Could not flag email_failed on ${regId}: ${error.message}`);
   } catch (e) {
-    console.error(`Tournament confirmation email crashed for ${regId}:`, e);
+    console.error(`Confirmation email crashed for ${regId}:`, e);
   }
+}
+
+// The member's and the guest's emails for a tournament team.
+async function sendTeamConfirmation(
+  regId: string,
+  event: EventRec,
+  team: TeamInput,
+  status: "confirmed" | "waitlist",
+): Promise<void> {
+  const url = await eventPageUrl(event.slug);
+  await sendConfirmations(regId, teamEmails(event, team.players, team.teamAnswers, status, url));
 }
 
 export async function register(input: RegisterInput): Promise<RegisterResult> {
@@ -695,21 +717,37 @@ export async function register(input: RegisterInput): Promise<RegisterResult> {
       };
   }
 
-  const { error: insErr } = await supa.from("registrations").insert({
-    event_id: ev.id,
-    name,
-    email,
-    phone: input.phone.trim(),
-    party_size: partySize,
-    guest_names: input.guestNames
-      .map((g) => g.trim())
-      .filter(Boolean)
-      .slice(0, Math.max(0, partySize - 1)),
-    slot_ids: slotIds,
-    answers: input.answers,
-    status,
-  });
-  if (insErr) return { ok: false, error: "Could not save your registration." };
+  const guestNames = input.guestNames
+    .map((g) => g.trim())
+    .filter(Boolean)
+    .slice(0, Math.max(0, partySize - 1));
+  const answers = coerceAnswers(input.answers);
+  const { data: inserted, error: insErr } = await supa
+    .from("registrations")
+    .insert({
+      event_id: ev.id,
+      name,
+      email,
+      phone: input.phone.trim(),
+      party_size: partySize,
+      guest_names: guestNames,
+      slot_ids: slotIds,
+      answers: input.answers,
+      status,
+    })
+    .select("id")
+    .single();
+  if (insErr || !inserted) return { ok: false, error: "Could not save your registration." };
+
+  const url = await eventPageUrl(ev.slug);
+  await sendConfirmations(inserted.id as string, [
+    signupEmail(
+      ev,
+      { name, email, partySize, guestNames, slotIds, answers },
+      status === "waitlist" ? "waitlist" : "confirmed",
+      url,
+    ),
+  ]);
 
   revalidatePath(`/events/e/${input.slug}`);
   return { ok: true, status };

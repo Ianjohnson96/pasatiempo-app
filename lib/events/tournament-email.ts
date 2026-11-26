@@ -4,15 +4,8 @@
 
 import type { Mail } from "../mail";
 import { answerText, formatWhen } from "./format";
+import { closingLines, linesToMail } from "./registration-email";
 import type { Answers, EventRec, Player } from "./types";
-
-const esc = (s: string) =>
-  s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 
 function answerLines(
   event: EventRec,
@@ -36,6 +29,7 @@ function buildOne(
   guest: Player,
   teamAnswers: Answers,
   status: "confirmed" | "waitlist",
+  pageUrl: string | null,
 ): Mail {
   const subject =
     status === "waitlist"
@@ -55,14 +49,9 @@ function buildOne(
   const own = answerLines(event, "player", recipient.answers);
   const team = answerLines(event, "team", teamAnswers);
   if (own.length || team.length) lines.push("", ...own, ...team);
-  lines.push("", statusLine, "", "Questions? Contact the golf shop.");
-
-  const text = lines.join("\n");
-  const html = `<div>${lines
-    .map((l) => (l === "" ? "<br>" : `<p style="margin:0">${esc(l)}</p>`))
-    .join("")}</div>`;
-
-  return { to: recipient.email, subject, text, html };
+  lines.push("", statusLine);
+  lines.push(...closingLines(event, status, pageUrl, "change or withdraw"));
+  return linesToMail(recipient.email, subject, lines);
 }
 
 export function teamEmails(
@@ -70,11 +59,12 @@ export function teamEmails(
   players: Player[],
   teamAnswers: Answers,
   status: "confirmed" | "waitlist",
+  pageUrl: string | null = null,
 ): Mail[] {
   const member = players.find((p) => p.role === "member") ?? players[0];
   const guest = players.find((p) => p.role === "guest") ?? players[1];
   return [
-    buildOne(event, member, member, guest, teamAnswers, status),
-    buildOne(event, guest, member, guest, teamAnswers, status),
+    buildOne(event, member, member, guest, teamAnswers, status, pageUrl),
+    buildOne(event, guest, member, guest, teamAnswers, status, pageUrl),
   ];
 }
