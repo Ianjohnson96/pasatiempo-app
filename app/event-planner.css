@@ -3203,3 +3203,36 @@
     margin-top: 8px;
   }
 }
+
+/* ---- Error summary: everything to fix, at the top of the form ----------- */
+.ep .error-summary {
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--notice-err-line);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--radius);
+  background: var(--notice-err-bg);
+  color: var(--ink);
+}
+.ep .error-summary:focus-visible,
+.ep .error-summary:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.ep .error-summary .es-title {
+  margin: 0 0 6px;
+  color: var(--danger);
+  font-weight: 600;
+}
+.ep .error-summary ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.ep .error-summary li + li {
+  margin-top: 4px;
+}
+.ep .error-summary a {
+  color: var(--danger);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

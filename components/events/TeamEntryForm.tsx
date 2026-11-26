@@ -3,6 +3,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { register } from "@/lib/events/actions";
 import SubmitButton, { useSubmit } from "@/components/events/public/SubmitButton";
+import ErrorSummary from "@/components/events/public/ErrorSummary";
+import type { FieldError } from "@/lib/events/validate";
 import { answerText } from "@/lib/events/format";
 import {
   isAnswered,
@@ -130,6 +132,7 @@ export default function TeamEntryForm({
   const [sendEmails, setSendEmails] = useState(true);
   const [step, setStep] = useState<Step>("form");
   const [attempt, setAttempt] = useState(0);
+  const [serverTries, setServerTries] = useState(0);
   const [cardErr, setCardErr] = useState<Partial<Record<PlayerRole, string>>>(
     {},
   );
@@ -161,22 +164,8 @@ export default function TeamEntryForm({
     rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [step]);
 
-  // After a failed attempt, move focus to the first field that needs fixing.
-  useEffect(() => {
-    if (attempt === 0) return;
-    const el = rootRef.current?.querySelector<HTMLElement>(
-      '[aria-invalid="true"], [data-invalid="true"]',
-    );
-    if (!el) return;
-    const target =
-      el instanceof HTMLInputElement ||
-      el instanceof HTMLSelectElement ||
-      el instanceof HTMLTextAreaElement
-        ? el
-        : el.querySelector<HTMLElement>("input");
-    target?.focus({ preventScroll: true });
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [attempt]);
+  // After a failed attempt the error summary at the top takes focus (see
+  // ErrorSummary); its links lead to each field.
 
   function setPlayer(i: number, patch: Partial<Player>) {
     setTeam((t) => ({
@@ -200,6 +189,7 @@ export default function TeamEntryForm({
 
   // Route an error to the card it belongs to, or to the form as a whole.
   function showError(msg: string) {
+    setServerTries((n) => n + 1);
     const { role, text } = splitRoleError(msg);
     if (role) {
       setCardErr({ [role]: text });
@@ -381,7 +371,23 @@ export default function TeamEntryForm({
   }
 
   // ---- Form ---------------------------------------------------------------
-  const errCount = Object.keys(errs).length;
+  // Everything to fix, for the summary at the top of the form.
+  const summary: FieldError[] = [
+    ...Object.entries(errs).map(([key, msg]) => {
+      const [scope, kind, qid] = key.split(".");
+      const q = kind === "q" ? event.customFields.find((f) => f.id === qid) : undefined;
+      const text = q ? `Answer: ${q.label}` : msg;
+      if (scope === "team") return { field: "", message: `Team — ${text}` };
+      return {
+        field: `pc-${scope}`,
+        message: `${ROLE_LABEL[scope as PlayerRole]} — ${text}`,
+      };
+    }),
+    ...(Object.entries(cardErr) as [PlayerRole, string | undefined][])
+      .filter(([, t]) => !!t)
+      .map(([role, t]) => ({ field: `pc-${role}`, message: `${ROLE_LABEL[role]} — ${t}` })),
+    ...(formErr ? [{ field: "", message: formErr }] : []),
+  ];
   return (
     <div
       className={`team-entry${isPreview ? " preview" : ""}`}
@@ -389,6 +395,7 @@ export default function TeamEntryForm({
     >
       <form onSubmit={onFormSubmit} noValidate>
         <fieldset className="team-fieldset" disabled={isPreview}>
+          <ErrorSummary errors={summary} focusKey={attempt + serverTries} />
           {!isAdmin && willWaitlist && !isEdit && (
             <div className="notice warn">
               The field is full — you can still enter your team on the{" "}
@@ -503,18 +510,6 @@ export default function TeamEntryForm({
             </section>
           )}
 
-          {formErr && (
-            <div className="notice err" role="alert">
-              {formErr}
-            </div>
-          )}
-          {errCount > 0 && (
-            <p className="field-err team-summary-err" role="alert">
-              {errCount === 1
-                ? "One field needs your attention above."
-                : `${errCount} fields need your attention above.`}
-            </p>
-          )}
 
           {isAdmin && !isEdit && (
             <label className="check team-send">

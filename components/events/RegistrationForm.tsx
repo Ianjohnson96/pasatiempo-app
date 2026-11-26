@@ -3,10 +3,10 @@
 import { useMemo, useState } from "react";
 import { register } from "@/lib/events/actions";
 import { formatSlot } from "@/lib/events/format";
-import { isAnswered } from "@/lib/events/tournament";
 import QuestionInput from "@/components/events/QuestionInput";
 import TeamEntryForm from "@/components/events/TeamEntryForm";
-import Toast from "@/components/events/Toast";
+import ErrorSummary from "@/components/events/public/ErrorSummary";
+import { registrationErrors, type FieldError } from "@/lib/events/validate";
 import SubmitButton, { useSubmit } from "@/components/events/public/SubmitButton";
 import type { Answers, EventRec } from "@/lib/events/types";
 
@@ -50,7 +50,9 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
   const [result, setResult] = useState<
     { status: "confirmed" | "waitlist" } | null
   >(null);
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<FieldError[]>([]);
+  const [tries, setTries] = useState(0);
+  const errFor = (field: string) => errors.find((e) => e.field === field)?.message;
 
   const maxParty = event.allowGuests ? 1 + (event.maxGuests ?? 1) : 1;
 
@@ -85,17 +87,16 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
-    if (isSlots && selected.length === 0) {
-      setError("Please choose at least one date/time.");
-      return;
-    }
-    for (const f of event.customFields) {
-      if (f.required && !isAnswered(answers[f.id])) {
-        setError(`Please answer: ${f.label}`);
-        return;
-      }
-    }
+    const found = registrationErrors({
+      event,
+      name,
+      email,
+      slotIds: isSlots ? selected : [],
+      answers,
+    });
+    setErrors(found);
+    setTries((n) => n + 1);
+    if (found.length) return;
     const res = await run(
       () =>
         register({
@@ -113,7 +114,10 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
     if (res.ok && (res.status === "confirmed" || res.status === "waitlist")) {
       setResult({ status: res.status });
     } else {
-      setError(res.error ?? "Something went wrong. Please try again.");
+      setErrors([
+        { field: "", message: res.error ?? "Something went wrong. Please try again." },
+      ]);
+      setTries((n) => n + 1);
     }
   }
 
@@ -155,8 +159,8 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
   }
 
   return (
-    <form className="card" onSubmit={submit}>
-      {error && <Toast message={error} onClose={() => setError("")} />}
+    <form className="card" onSubmit={submit} noValidate>
+      <ErrorSummary errors={errors} focusKey={tries} />
 
       {targetFull && event.waitlistEnabled && (
         <div className="notice warn">
@@ -179,10 +183,16 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
               {event.slotsPrompt}
             </p>
           )}
-          <label>
+          <label id="reg-slots-label">
             {multi ? "Choose your date(s)" : "Choose a date / time"}{" "}
             <span className="req">*</span>
           </label>
+          <div
+            id="reg-slots"
+            role="group"
+            aria-labelledby="reg-slots-label"
+            aria-describedby={errFor("reg-slots") ? "reg-slots-err" : undefined}
+          >
           {event.slots.map((s) => {
             const info = seats.slots.find((x) => x.id === s.id);
             const full = !!info?.full;
@@ -215,37 +225,48 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
               </label>
             );
           })}
+          </div>
+          <FieldErr id="reg-slots" message={errFor("reg-slots")} />
         </div>
       )}
 
-      <div className="field">
-        <label>
+      <div className={`field${errFor("reg-name") ? " has-err" : ""}`}>
+        <label htmlFor="reg-name">
           Your name <span className="req">*</span>
         </label>
         <input
+          id="reg-name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
           autoComplete="name"
+          aria-invalid={errFor("reg-name") ? true : undefined}
+          aria-describedby={errFor("reg-name") ? "reg-name-err" : undefined}
         />
+        <FieldErr id="reg-name" message={errFor("reg-name")} />
       </div>
       <div className="row">
-        <div className="field">
-          <label>
+        <div className={`field${errFor("reg-email") ? " has-err" : ""}`}>
+          <label htmlFor="reg-email">
             Email <span className="req">*</span>
           </label>
           <input
+            id="reg-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
+            aria-invalid={errFor("reg-email") ? true : undefined}
+            aria-describedby={errFor("reg-email") ? "reg-email-err" : undefined}
           />
+          <FieldErr id="reg-email" message={errFor("reg-email")} />
         </div>
         <div className="field">
-          <label>Phone</label>
+          <label htmlFor="reg-phone">Phone</label>
           <input
+            id="reg-phone"
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
@@ -291,6 +312,8 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
           field={f}
           value={answers[f.id]}
           onChange={(v) => setAnswers((a) => ({ ...a, [f.id]: v }))}
+          idBase={`reg-q-${f.id}`}
+          error={errFor(`reg-q-${f.id}`)}
         />
       ))}
 
@@ -298,5 +321,14 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
         {targetFull && event.waitlistEnabled ? "Join the waitlist" : "Register"}
       </SubmitButton>
     </form>
+  );
+}
+
+function FieldErr({ id, message }: { id: string; message: string | undefined }) {
+  if (!message) return null;
+  return (
+    <p className="field-err" id={`${id}-err`}>
+      {message}
+    </p>
   );
 }
