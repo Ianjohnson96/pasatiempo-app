@@ -5,8 +5,8 @@ import { register } from "@/lib/events/actions";
 import SubmitButton, { useSubmit } from "@/components/events/public/SubmitButton";
 import ErrorSummary from "@/components/events/public/ErrorSummary";
 import Confirmation from "@/components/events/public/Confirmation";
-import type { FieldError } from "@/lib/events/validate";
-import { answerText } from "@/lib/events/format";
+import { questionError, type FieldError } from "@/lib/events/validate";
+import { shownAnswer } from "@/lib/events/format";
 import {
   isAnswered,
   isValidGhin,
@@ -66,24 +66,24 @@ function fieldErrors(
   const errs: Errs = {};
   team.players.forEach((p, i) => {
     const role = ROLES[i];
-    if (!p.name.trim()) errs[`${role}.name`] = "Please enter a name.";
+    if (!p.name.trim()) errs[`${role}.name`] = "Enter a name";
     if (!EMAIL_RE.test(p.email.trim()))
-      errs[`${role}.email`] = "Please enter a valid email.";
+      errs[`${role}.email`] = "Enter an email address like name@example.com";
     if (!normalizeGhin(p.ghin))
-      errs[`${role}.ghin`] = "Please enter a GHIN number.";
+      errs[`${role}.ghin`] = "Enter a GHIN number";
     else if (!isValidGhin(p.ghin))
-      errs[`${role}.ghin`] = "GHIN numbers are digits only.";
+      errs[`${role}.ghin`] = "Enter a GHIN number using digits only";
     if (enforceRequired) {
       for (const f of fields) {
         if (f.scope === "player" && f.required && !isAnswered(p.answers[f.id]))
-          errs[`${role}.q.${f.id}`] = "Please answer this question.";
+          errs[`${role}.q.${f.id}`] = questionError(f);
       }
     }
   });
   if (enforceRequired) {
     for (const f of fields) {
       if (f.scope === "team" && f.required && !isAnswered(team.teamAnswers[f.id]))
-        errs[`team.q.${f.id}`] = "Please answer this question.";
+        errs[`team.q.${f.id}`] = questionError(f);
     }
   }
   return errs;
@@ -385,7 +385,7 @@ export default function TeamEntryForm({
     ...Object.entries(errs).map(([key, msg]) => {
       const [scope, kind, qid] = key.split(".");
       const q = kind === "q" ? event.customFields.find((f) => f.id === qid) : undefined;
-      const text = q ? `Answer: ${q.label}` : msg;
+      const text = q ? questionError(q) : msg;
       if (scope === "team") return { field: "", message: `Team — ${text}` };
       return {
         field: `pc-${scope}`,
@@ -648,7 +648,7 @@ function TeamSummary({
                   <ReviewRow
                     key={f.id}
                     label={f.label}
-                    value={answerText(p.answers[f.id]).trim()}
+                    value={shownAnswer(f, p.answers[f.id]).trim()}
                   />
                 ))}
               </dl>
@@ -664,7 +664,7 @@ function TeamSummary({
               <ReviewRow
                 key={f.id}
                 label={f.label}
-                value={answerText(team.teamAnswers[f.id]).trim()}
+                value={shownAnswer(f, team.teamAnswers[f.id]).trim()}
               />
             ))}
           </dl>

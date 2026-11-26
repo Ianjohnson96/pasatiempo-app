@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { registrationErrors } from "./validate";
+import { questionError, registrationErrors } from "./validate";
 import type { CustomField, EventRec } from "./types";
 
 const q = (over: Partial<CustomField> = {}): CustomField => ({
@@ -26,7 +26,7 @@ describe("registrationErrors", () => {
       { field: "reg-slots", message: "Choose at least one date" },
       { field: "reg-name", message: "Enter your name" },
       { field: "reg-email", message: "Enter an email address like name@example.com" },
-      { field: "reg-q-q1", message: "Answer: Dietary needs" },
+      { field: "reg-q-q1", message: "Enter dietary needs" },
     ]);
   });
 
@@ -65,5 +65,27 @@ describe("registrationErrors", () => {
         answers: {},
       }),
     ).toEqual([]);
+  });
+});
+
+describe("questionError", () => {
+  const q = (label: string, type: string) => ({ label, type }) as never;
+  test("a text question asks to enter it", () => {
+    expect(questionError(q("Dietary restrictions", "short_text"))).toBe("Enter dietary restrictions");
+    expect(questionError(q("Anything we should know", "long_text"))).toBe("Enter anything we should know");
+  });
+  test("a choice asks to choose", () => {
+    expect(questionError(q("Shirt size", "select"))).toBe("Choose a shirt size");
+    expect(questionError(q("Arrival time", "radio"))).toBe("Choose an arrival time");
+    expect(questionError(q("Sessions", "multi"))).toBe("Choose at least one: sessions");
+  });
+  test("a question asks to be answered", () => {
+    expect(questionError(q("Playing the Skins Game?", "checkbox"))).toBe("Answer “Playing the Skins Game?”");
+  });
+  test("a number asks for one", () => {
+    expect(questionError(q("Handicap", "number"))).toBe("Enter a number for handicap");
+  });
+  test("acronyms and names keep their capitals", () => {
+    expect(questionError(q("GHIN number", "short_text"))).toBe("Enter GHIN number");
   });
 });

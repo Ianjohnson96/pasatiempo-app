@@ -7,7 +7,7 @@ import {
   updateMyRegistration,
   type MyRegistration,
 } from "@/lib/events/actions";
-import { answerText, formatSlot } from "@/lib/events/format";
+import { answerText, formatSlot, shownAnswer } from "@/lib/events/format";
 import type { EventRec } from "@/lib/events/types";
 import type { TeamInput } from "@/lib/events/tournament";
 import TeamEntryForm from "@/components/events/TeamEntryForm";
@@ -94,7 +94,7 @@ export function TeamRegistration({
                 <SummaryRow
                   key={f.id}
                   label={f.label}
-                  value={answerText(p.answers[f.id])}
+                  value={shownAnswer(f, p.answers[f.id])}
                 />
               ))}
             </dl>
@@ -109,7 +109,7 @@ export function TeamRegistration({
               <SummaryRow
                 key={f.id}
                 label={f.label}
-                value={answerText(reg.answers[f.id])}
+                value={shownAnswer(f, reg.answers[f.id])}
               />
             ))}
           </dl>
