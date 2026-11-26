@@ -318,9 +318,13 @@ export function themeVars(theme: EventTheme | null): {
   const input = theme?.accent ? parseHex(theme.accent) : null;
   if (!input) return { vars, accentUsed: vars["--btn"], adjusted: false };
 
+  // The button must read (text 4.5:1) and show (fill 3:1 against the page and
+  // the form card); nudge the colour away from the page until both hold.
+  const shows = (c: string) =>
+    contrast(c, vars["--bg"]) >= 3 && contrast(c, vars["--card"]) >= 3;
   let accent = input;
   let on = textOn(accent);
-  for (let i = 0; i < 50 && !on; i++) {
+  for (let i = 0; i < 50 && !(on && shows(accent)); i++) {
     accent = shiftLightness(accent, preset.dark ? 2 : -2);
     on = textOn(accent);
   }

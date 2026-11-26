@@ -165,3 +165,23 @@ describe("logosFor", () => {
     expect(logosFor("clubhouse")).toEqual(["club-full", "logo-1929", "mark", "events-tile"]);
   });
 });
+
+describe("a custom button colour stands out from the page", () => {
+  test("a pale accent on a light look is deepened until the button shows", () => {
+    const r = themeVars({ preset: "clubhouse", accent: "#efe6cc" });
+    expect(r.adjusted).toBe(true);
+    expect(contrast(r.accentUsed, r.vars["--bg"])).toBeGreaterThanOrEqual(3);
+    expect(contrast(r.accentUsed, r.vars["--card"])).toBeGreaterThanOrEqual(3);
+    expect(contrast(r.vars["--on-btn"], r.accentUsed)).toBeGreaterThanOrEqual(4.5);
+  });
+  test("a very dark accent on Evening is lifted until the button shows", () => {
+    const r = themeVars({ preset: "evening", accent: "#1a1f20" });
+    expect(r.adjusted).toBe(true);
+    expect(contrast(r.accentUsed, r.vars["--bg"])).toBeGreaterThanOrEqual(3);
+    expect(contrast(r.accentUsed, r.vars["--card"])).toBeGreaterThanOrEqual(3);
+    expect(contrast(r.vars["--on-btn"], r.accentUsed)).toBeGreaterThanOrEqual(4.5);
+  });
+  test("a good accent is left alone", () => {
+    expect(themeVars({ preset: "clubhouse", accent: "#b41c14" }).adjusted).toBe(false);
+  });
+});
