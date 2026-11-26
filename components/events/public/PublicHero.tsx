@@ -1,5 +1,6 @@
 import Icon from "@/components/events/Icon";
-import { TYPE_LABEL } from "@/lib/events/format";
+import ShareButton from "./ShareButton";
+import { pageSettings } from "@/lib/events/page-settings";
 import type { Cta } from "@/lib/events/public-page";
 import type { EventRec } from "@/lib/events/types";
 
@@ -16,20 +17,25 @@ export default function PublicHero({
   cta: Cta;
   whenLine: string;
 }) {
+  const settings = pageSettings(event);
+  // "plain" sets the title on the look's colour band, with no photo
+  const photo = settings.heroStyle === "plain" ? null : hero;
   return (
-    <section className={`pub-hero ${hero ? "has-img" : ""}`}>
-      {hero && (
+    <section
+      className={`pub-hero hero-${settings.heroStyle}${photo ? " has-img" : ""}`}
+    >
+      {photo && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           className="pub-hero-photo"
-          src={hero.src}
+          src={photo.src}
           alt=""
           fetchPriority="high"
-          style={{ objectPosition: `${hero.focus.x}% ${hero.focus.y}%` }}
+          style={{ objectPosition: `${photo.focus.x}% ${photo.focus.y}%` }}
         />
       )}
       <div className="hero-inner reveal">
-        <span className="kicker">{TYPE_LABEL[event.type]}</span>
+        <span className="kicker">{settings.kicker}</span>
         <h1>{event.title}</h1>
         <hr className="hairline" />
         <div className="hero-meta">
@@ -44,7 +50,10 @@ export default function PublicHero({
             </span>
           )}
         </div>
-        <CtaButton cta={cta} id="hero-cta" className="btn gold" />
+        <div className="hero-actions">
+          <CtaButton cta={cta} id="hero-cta" className="btn gold" />
+          <ShareButton title={event.title} />
+        </div>
       </div>
     </section>
   );

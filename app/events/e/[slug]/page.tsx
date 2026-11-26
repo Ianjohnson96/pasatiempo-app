@@ -15,6 +15,7 @@ import {
 } from "@/lib/events/data";
 import { formatSlot, rosterName } from "@/lib/events/format";
 import { ctaState } from "@/lib/events/public-page";
+import { pageSettings } from "@/lib/events/page-settings";
 import { eventContact, resolveHero, resolveLogo, themeVars } from "@/lib/events/theme";
 import PublicNav from "@/components/events/public/PublicNav";
 import PublicHero from "@/components/events/public/PublicHero";
@@ -65,6 +66,7 @@ export default async function PublicEventPage({
   const contact = eventContact(event);
   const look = themeVars(event.theme);
   const hero = resolveHero(event.theme, event.photos);
+  const settings = pageSettings(event);
 
   // A price line reads as "item — amount" when it has a dash separator; the
   // two halves are set apart with a dotted leader. Anything else stays whole.
@@ -102,7 +104,7 @@ export default async function PublicEventPage({
         {event.description && (
           <section className="pub-section reveal">
             <p className="sec-eyebrow">Overview</p>
-            <h2>About this event</h2>
+            <h2>{settings.headings.about}</h2>
             <RichText text={event.description} className="prose" />
           </section>
         )}
@@ -110,7 +112,7 @@ export default async function PublicEventPage({
         {event.info && (
           <section className="pub-section reveal">
             <p className="sec-eyebrow">Particulars</p>
-            <h2>What you need to know</h2>
+            <h2>{settings.headings.info}</h2>
             <RichText text={event.info} className="prose" />
           </section>
         )}
@@ -222,7 +224,7 @@ export default async function PublicEventPage({
         {open && (
           <section className="pub-section reveal stacked" id="register">
             <p className="sec-eyebrow">Registration</p>
-            <h2>Register</h2>
+            <h2>{settings.headings.register}</h2>
             {rosterAvail.full && (
               <div className="notice warn" style={{ marginTop: 14 }}>
                 The program roster is <strong>full</strong> — new sign-ups are
@@ -279,6 +281,10 @@ export default async function PublicEventPage({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-mark.png" alt="" />
         <div className="est">Pasatiempo Golf Club · Est. 1929</div>
+        <p className="foot-contact">
+          Questions about this event?{" "}
+          <a href={`mailto:${contact.email}`}>Contact {contact.name}</a>
+        </p>
         <Link className="foot-admin" href="/admin/events">
           Pasatiempo staff — manage events →
         </Link>

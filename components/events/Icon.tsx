@@ -12,7 +12,8 @@ export type IconName =
   | "close"
   | "up"
   | "down"
-  | "repeat";
+  | "repeat"
+  | "share";
 
 export default function Icon({
   name,
@@ -37,6 +38,13 @@ export default function Icon({
     className: className ? `ep-icon ${className}` : "ep-icon",
   };
   switch (name) {
+    case "share":
+      return (
+        <svg {...props}>
+          <path d="M8 10V2.25M5 5.25l3-3 3 3" />
+          <path d="M5.5 7.25H4a1.25 1.25 0 0 0-1.25 1.25v4A1.25 1.25 0 0 0 4 13.75h8a1.25 1.25 0 0 0 1.25-1.25v-4A1.25 1.25 0 0 0 12 7.25h-1.5" />
+        </svg>
+      );
     case "calendar":
       return (
         <svg {...props}>

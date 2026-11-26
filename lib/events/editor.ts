@@ -1,5 +1,5 @@
 import type { EventInput } from "./actions";
-import type { EventTheme } from "./theme";
+import { DEFAULT_CONTACT, type EventTheme } from "./theme";
 import type { SeatInfo } from "@/components/events/RegistrationForm";
 import { TYPE_LABEL } from "./format";
 import type {
@@ -150,6 +150,13 @@ export function editorError(s: EditorState): string | null {
     s.slots.length === 0
   )
     return "Add at least one date/time slot, or switch to a single date.";
+  // A contact with no usable email would silently fall back to the default.
+  const contactName = s.contactName.trim();
+  const contactEmail = s.contactEmail.trim();
+  if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail))
+    return `The contact email doesn't look right — check it, or leave it blank for ${DEFAULT_CONTACT.name}.`;
+  if (contactName && !contactEmail)
+    return `Add ${contactName}'s email too, or clear the contact name.`;
   return null;
 }
 

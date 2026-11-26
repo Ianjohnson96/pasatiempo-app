@@ -53,6 +53,11 @@ describe("ctaState", () => {
     expect(ctaState(ev(), open, false)).toEqual({ kind: "register", label: "Register now" });
   });
 
+  test("the register button uses the event's own wording", () => {
+    const e = ev({ theme: { preset: "clubhouse", buttonLabel: "RSVP" } });
+    expect(ctaState(e, open, false)).toEqual({ kind: "register", label: "RSVP" });
+  });
+
   test("full without waitlist offers contact", () => {
     expect(ctaState(ev(), full, false)).toEqual({
       kind: "contact",
@@ -119,9 +124,15 @@ describe("priceFact", () => {
   test("is null when pricing is on but blank", () => {
     expect(priceFact(ev({ pricingEnabled: true, pricing: " \n " }))).toBeNull();
   });
-  test("takes the first non-blank line", () => {
-    expect(priceFact(ev({ pricingEnabled: true, pricing: "\n Members — $85 \nGuests — $95" }))).toBe(
-      "Members — $85",
-    );
+  test("takes the first non-blank line, amount first", () => {
+    expect(
+      priceFact(ev({ pricingEnabled: true, pricing: "\n Members — $85 \nGuests — $95" })),
+    ).toEqual({ amount: "$85", detail: "Members" });
+  });
+  test("a line without an 'item — amount' split stays whole", () => {
+    expect(priceFact(ev({ pricingEnabled: true, pricing: "$320 per person" }))).toEqual({
+      amount: "$320 per person",
+      detail: "",
+    });
   });
 });

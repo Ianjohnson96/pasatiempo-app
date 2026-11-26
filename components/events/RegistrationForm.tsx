@@ -53,6 +53,7 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
   >(null);
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [tries, setTries] = useState(0);
+  const [alreadyIn, setAlreadyIn] = useState(false);
   const errFor = (field: string) => errors.find((e) => e.field === field)?.message;
 
   const maxParty = event.allowGuests ? 1 + (event.maxGuests ?? 1) : 1;
@@ -96,6 +97,7 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
       answers,
     });
     setErrors(found);
+    setAlreadyIn(false);
     setTries((n) => n + 1);
     if (found.length) return;
     const res = await run(
@@ -116,8 +118,13 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
       setResult({ status: res.status });
     } else {
       setErrors([
-        { field: "", message: res.error ?? "Something went wrong. Please try again." },
+        {
+          // a double sign-up is about the email, so it sits on that field
+          field: res.code === "already_registered" ? "reg-email" : "",
+          message: res.error ?? "Something went wrong. Please try again.",
+        },
       ]);
+      setAlreadyIn(res.code === "already_registered");
       setTries((n) => n + 1);
     }
   }
@@ -269,6 +276,17 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
             aria-describedby={errFor("reg-email") ? "reg-email-err" : undefined}
           />
           <FieldErr id="reg-email" message={errFor("reg-email")} />
+          {alreadyIn && errFor("reg-email") && (
+            <button
+              type="button"
+              className="btn secondary small already-manage"
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent("ep:manage", { detail: { email } }))
+              }
+            >
+              Manage my registration
+            </button>
+          )}
         </div>
         <div className="field">
           <label htmlFor="reg-phone">Phone</label>
