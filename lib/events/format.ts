@@ -157,3 +157,10 @@ export function shownAnswer(field: Pick<CustomField, "type">, a: Answer | undefi
   if (field.type === "checkbox") return a === "Yes" ? "Yes" : "No";
   return answerText(a);
 }
+
+/** A date stamp as "Nov 26", in the club's time zone; "" for blank or broken stamps. */
+export function shortDate(iso: string): string {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: CLUB_TIME_ZONE });
+}

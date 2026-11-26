@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { factDate, factTime, formatPhone, formatWhen, rosterName, shownAnswer } from "./format";
+import { factDate, factTime, formatPhone, formatWhen, rosterName, shortDate, shownAnswer } from "./format";
 
 // Node's ICU may put a narrow no-break space before AM/PM; normalise spaces.
 const norm = (s: string) => s.replace(/[  ]/g, " ");
@@ -87,5 +87,17 @@ describe("shownAnswer", () => {
     expect(shownAnswer(f("short_text"), "Vegetarian")).toBe("Vegetarian");
     expect(shownAnswer(f("multi"), ["A", "B"])).toBe("A, B");
     expect(shownAnswer(f("short_text"), undefined)).toBe("");
+  });
+});
+
+describe("shortDate", () => {
+  it("a stamp as a short club-time date", () => {
+    expect(shortDate("2026-11-26T18:30:00.000Z")).toBe("Nov 26");
+    // 1 AM UTC on Nov 27 is still the evening of Nov 26 at the club
+    expect(shortDate("2026-11-27T01:00:00.000Z")).toBe("Nov 26");
+  });
+  it("blank or broken stamps give nothing", () => {
+    expect(shortDate("")).toBe("");
+    expect(shortDate("not a date")).toBe("");
   });
 });

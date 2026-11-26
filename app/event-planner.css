@@ -4117,3 +4117,200 @@
     padding-inline: 40px;
   }
 }
+
+/* ---------- Manage: teams as rows that open ---------- */
+.ep .tc-stack:has(> .team-row) {
+  gap: 8px;
+}
+.ep .team-card.team-row {
+  padding: 0;
+}
+.ep .team-row .tr-sum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 18px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ep .team-row .tr-sum:hover {
+  background: color-mix(in srgb, var(--club) 4%, transparent);
+}
+.ep .team-row .tr-sum:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.ep .team-row .tr-chev {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 160ms ease-out;
+}
+.ep .team-row.open .tr-chev {
+  transform: rotate(45deg);
+}
+.ep .team-row .tc-num {
+  min-width: 4.4em;
+  font-size: 1.15rem;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.ep .team-row .tr-names {
+  display: flex;
+  flex: 1 1 260px;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+.ep .team-row .tr-names > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.ep .team-row .tr-role {
+  padding: 1px 6px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  color: var(--club);
+  font: 600 10px/1.4 var(--sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.ep .team-row .tr-role.guest {
+  border-color: var(--brass-soft);
+  color: var(--brass-ink);
+}
+.ep .team-row .tr-flags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.ep .team-row .tr-body {
+  padding: 4px 22px 22px;
+  border-top: 1px solid var(--hairline);
+  animation: ep-pop-in 160ms ease-out;
+}
+.ep .team-row .tr-body .tc-head {
+  justify-content: flex-end;
+  margin: 12px 0 14px;
+}
+.ep .tr-expand {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ep .team-row .tr-chev {
+    transition: none;
+  }
+  .ep .team-row .tr-body {
+    animation: none;
+  }
+}
+@media (max-width: 560px) {
+  .ep .team-row .tr-sum {
+    padding: 12px 14px;
+  }
+  .ep .team-row .tr-body {
+    padding: 4px 14px 16px;
+  }
+  .ep .team-row .tr-flags {
+    margin-left: 0;
+  }
+}
+
+/* Manage: filter buttons over the list */
+.ep .reg-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.ep .reg-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 500 13.5px/1 var(--sans);
+  cursor: pointer;
+  transition-property: background-color, border-color, color;
+  transition-duration: 150ms;
+}
+.ep .reg-filter:hover {
+  border-color: var(--rule-strong);
+}
+.ep .reg-filter.on {
+  border-color: var(--club);
+  background: var(--club);
+  color: var(--ivory);
+}
+.ep .reg-filter.warn:not(.on) {
+  border-color: #e6d4ad;
+  background: #faf3e2;
+  color: var(--warn);
+}
+.ep .reg-filter .rf-n {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+.ep .reg-filter:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+@media (max-width: 560px) {
+  .ep .reg-filter {
+    min-height: 44px;
+  }
+}
+/* Manage: when a team entered, and contact/copy in the details */
+.ep .team-row .tr-date {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.ep .tc-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--rule-strong);
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+.ep .tc-link:hover {
+  text-decoration-color: currentColor;
+}
+.ep .tc-copy {
+  margin-left: 10px;
+  padding: 2px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--club);
+  font: 600 10.5px/1.6 var(--sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ep .tc-copy:hover {
+  border-color: var(--rule-strong);
+}
