@@ -139,3 +139,13 @@ export function rosterName(name: string, style: RosterStyle): string {
   }
   return name.trim();
 }
+
+/** A US phone number as (xxx) xxx-xxxx for staff lists; anything else as typed. */
+export function formatPhone(raw: string): string {
+  const t = raw.trim();
+  if (t.startsWith("+") && !t.startsWith("+1")) return raw; // another country
+  const d = t.replace(/\D/g, "");
+  const ten = d.length === 11 && d.startsWith("1") ? d.slice(1) : d;
+  if (ten.length !== 10) return raw;
+  return `(${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6)}`;
+}

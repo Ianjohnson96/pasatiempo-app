@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { matchesRegSearch } from "@/lib/events/search";
 import CopyLink from "@/components/events/CopyLink";
 import Icon from "@/components/events/Icon";
+import { whenLineFor } from "@/components/events/public/FactsStrip";
 import RegistrationEditor from "@/components/events/RegistrationEditor";
 import TeamEntryForm from "@/components/events/TeamEntryForm";
 import {
@@ -27,8 +28,8 @@ import {
 import {
   answerText,
   formatSlot,
+  formatPhone,
   formatSlotShort,
-  formatWhen,
   TYPE_LABEL,
 } from "@/lib/events/format";
 import { availability } from "@/lib/events/seats";
@@ -327,7 +328,7 @@ export default function EventManager({
                 <TcRow label="Email" value={p.email} />
                 <TcRow label="GHIN #" value={p.ghin} />
                 {p.role === "member" && r.phone && (
-                  <TcRow label="Phone" value={r.phone} />
+                  <TcRow label="Phone" value={formatPhone(r.phone)} />
                 )}
                 {playerFields.map((f) => (
                   <TcRow
@@ -379,7 +380,8 @@ export default function EventManager({
           {event.customFields.map((f) =>
             r.answers[f.id] ? (
               <div key={f.id} className="muted" style={{ fontSize: 13 }}>
-                {f.label}: {answerText(r.answers[f.id])}
+                {/[?:]$/.test(f.label.trim()) ? f.label.trim() : `${f.label}:`}{" "}
+                {answerText(r.answers[f.id])}
               </div>
             ) : null,
           )}
@@ -388,7 +390,7 @@ export default function EventManager({
           <div>{r.email}</div>
           {r.phone && (
             <div className="muted" style={{ fontSize: 13 }}>
-              {r.phone}
+              <a href={`tel:${r.phone.replace(/[^\d+]/g, "")}`} className="rt-phone">{formatPhone(r.phone)}</a>
             </div>
           )}
         </td>
@@ -425,14 +427,15 @@ export default function EventManager({
           className="ev-header"
           style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}
         >
-          <div style={{ flex: 1, minWidth: 0 }}>
+          {/* the title keeps a readable width; the buttons wrap below it before it squeezes */}
+          <div style={{ flex: "1 1 360px", minWidth: 0 }}>
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <h2 className="ev-manage-title">{event.title}</h2>
               <span className={`badge ${event.status}`}>{event.status}</span>
             </div>
             <div className="ev-meta" style={{ marginTop: 6 }}>
               <span>{TYPE_LABEL[event.type]}</span>
-              <span>{formatWhen(event.startsAt, event.endsAt)}</span>
+              <span>{whenLineFor(event)}</span>
               {event.location && (
                 <span>
                   <Icon name="pin" />

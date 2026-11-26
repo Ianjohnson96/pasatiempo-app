@@ -198,6 +198,17 @@ describe("editorError", () => {
       editorError(state({ type: "tournament", scheduleMode: "slots" })),
     ).toBeNull();
   });
+  it("a contact's email must look like an email", () => {
+    expect(editorError(state({ contactEmail: "pat at club" }))).toBe(
+      "The contact email doesn't look right — check it, or leave it blank for Ian Johnson.",
+    );
+    expect(editorError(state({ contactEmail: " pat@club.com " }))).toBeNull();
+  });
+  it("a contact name needs an email to go with it", () => {
+    expect(editorError(state({ contactName: "Pat", contactEmail: "" }))).toBe(
+      "Add Pat's email too, or clear the contact name.",
+    );
+  });
 });
 
 describe("previewEvent", () => {
