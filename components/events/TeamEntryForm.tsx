@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { register } from "@/lib/events/actions";
 import SubmitButton, { useSubmit } from "@/components/events/public/SubmitButton";
 import ErrorSummary from "@/components/events/public/ErrorSummary";
+import Confirmation from "@/components/events/public/Confirmation";
 import type { FieldError } from "@/lib/events/validate";
 import { answerText } from "@/lib/events/format";
 import {
@@ -310,6 +311,14 @@ export default function TeamEntryForm({
               </>
             )}
           </div>
+          {!isAdmin && (
+            <Confirmation
+              event={event}
+              status={isEdit ? "confirmed" : doneStatus}
+              email={member.email}
+              slotIds={[]}
+            />
+          )}
           <TeamSummary
             team={team}
             phone={phone}

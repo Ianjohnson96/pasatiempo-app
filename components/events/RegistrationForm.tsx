@@ -6,6 +6,7 @@ import { formatSlot } from "@/lib/events/format";
 import QuestionInput from "@/components/events/QuestionInput";
 import TeamEntryForm from "@/components/events/TeamEntryForm";
 import ErrorSummary from "@/components/events/public/ErrorSummary";
+import Confirmation from "@/components/events/public/Confirmation";
 import { registrationErrors, type FieldError } from "@/lib/events/validate";
 import SubmitButton, { useSubmit } from "@/components/events/public/SubmitButton";
 import type { Answers, EventRec } from "@/lib/events/types";
@@ -154,6 +155,12 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
             </>
           )}
         </div>
+        <Confirmation
+          event={event}
+          status={result.status}
+          email={email}
+          slotIds={isSlots ? selected : []}
+        />
       </div>
     );
   }

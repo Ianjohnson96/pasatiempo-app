@@ -3236,3 +3236,57 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* ---- Confirmation: when/where, calendar, change or cancel, contact ------ */
+.ep .confirm-extras {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+}
+.ep .confirm-facts {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.ep .confirm-facts > div {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+}
+.ep .confirm-facts dt {
+  color: var(--brass-ink);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding-top: 2px;
+}
+.ep .confirm-facts dd {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+.ep .confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ep .confirm-cal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ep .confirm-cal-lbl {
+  font-weight: 600;
+  font-size: 14px;
+  margin-right: 4px;
+}
+.ep .confirm-contact {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+}
