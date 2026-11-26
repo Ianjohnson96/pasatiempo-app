@@ -4117,3 +4117,120 @@
     padding-inline: 40px;
   }
 }
+
+/* ---------- Manage: teams as rows that open ---------- */
+.ep .tc-stack:has(> .team-row) {
+  gap: 8px;
+}
+.ep .team-card.team-row {
+  padding: 0;
+}
+.ep .team-row .tr-sum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 18px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ep .team-row .tr-sum:hover {
+  background: color-mix(in srgb, var(--club) 4%, transparent);
+}
+.ep .team-row .tr-sum:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.ep .team-row .tr-chev {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 160ms ease-out;
+}
+.ep .team-row.open .tr-chev {
+  transform: rotate(45deg);
+}
+.ep .team-row .tc-num {
+  min-width: 4.4em;
+  font-size: 1.15rem;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.ep .team-row .tr-names {
+  display: flex;
+  flex: 1 1 260px;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+.ep .team-row .tr-names > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.ep .team-row .tr-role {
+  padding: 1px 6px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  color: var(--club);
+  font: 600 10px/1.4 var(--sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.ep .team-row .tr-role.guest {
+  border-color: var(--brass-soft);
+  color: var(--brass-ink);
+}
+.ep .team-row .tr-flags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.ep .team-row .tr-body {
+  padding: 4px 22px 22px;
+  border-top: 1px solid var(--hairline);
+  animation: ep-pop-in 160ms ease-out;
+}
+.ep .team-row .tr-body .tc-head {
+  justify-content: flex-end;
+  margin: 12px 0 14px;
+}
+.ep .tr-expand {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ep .team-row .tr-chev {
+    transition: none;
+  }
+  .ep .team-row .tr-body {
+    animation: none;
+  }
+}
+@media (max-width: 560px) {
+  .ep .team-row .tr-sum {
+    padding: 12px 14px;
+  }
+  .ep .team-row .tr-body {
+    padding: 4px 14px 16px;
+  }
+  .ep .team-row .tr-flags {
+    margin-left: 0;
+  }
+}

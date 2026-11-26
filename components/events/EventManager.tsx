@@ -73,6 +73,15 @@ export default function EventManager({
   const cancelled = registrations.filter((r) => r.status === "cancelled");
   // The search box narrows the lists shown, never the counts or exports.
   const [query, setQuery] = useState("");
+  // Teams are one-line rows; these are the ones opened to show everything.
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
+  const toggleOpen = (id: string) =>
+    setOpenIds((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const searching = query.trim() !== "";
   const hit = (r: Registration) => matchesRegSearch(r, query);
   const shownConfirmed = confirmed.filter(hit);
@@ -301,21 +310,46 @@ export default function EventManager({
           ];
     const playerFields = event.customFields.filter((f) => f.scope === "player");
     const teamFields = event.customFields.filter((f) => f.scope === "team");
+    const member = players.find((p) => p.role === "member") ?? players[0];
+    const guest = players.find((p) => p.role === "guest");
+    // a search opens the teams it finds; otherwise each row opens on its own
+    const expanded = searching || openIds.has(r.id);
+    const bodyId = `team-${r.id}`;
     return (
-      <div key={r.id} className={`team-card ${r.status}`}>
-        <div className="tc-head">
+      <div key={r.id} className={`team-card team-row ${r.status}${expanded ? " open" : ""}`}>
+        <button
+          type="button"
+          className="tr-sum"
+          aria-expanded={expanded}
+          aria-controls={bodyId}
+          onClick={() => toggleOpen(r.id)}
+        >
+          <span className="tr-chev" aria-hidden="true" />
           {num !== undefined && <span className="tc-num">Team {num}</span>}
-          <span className={`tc-status ${r.status}`}>
-            {STATUS_LABEL[r.status]}
-          </span>
-          {r.emailFailed && (
-            <span
-              className="flag-warn"
-              title="The confirmation email could not be sent"
-            >
-              Email not sent
+          <span className="tr-names">
+            <span>
+              {member.name}
+              <span className="tr-role">Member</span>
             </span>
-          )}
+            {guest && (
+              <span>
+                {guest.name}
+                <span className="tr-role guest">Guest</span>
+              </span>
+            )}
+          </span>
+          <span className="tr-flags">
+            {r.emailFailed && (
+              <span className="flag-warn" title="The confirmation email could not be sent">
+                Email not sent
+              </span>
+            )}
+            <span className={`tc-status ${r.status}`}>{STATUS_LABEL[r.status]}</span>
+          </span>
+        </button>
+        {expanded && (
+          <div className="tr-body" id={bodyId}>
+        <div className="tc-head">
           <span className="tc-actions">{regActions(r)}</span>
         </div>
         <div className="tc-players">
@@ -344,6 +378,8 @@ export default function EventManager({
         </div>
         {teamFields.length > 0 && (
           <TeamAnswers fields={teamFields} answers={r.answers} />
+        )}
+          </div>
         )}
       </div>
     );
@@ -618,6 +654,21 @@ export default function EventManager({
             )}
           </div>
         </div>
+        {isTournament && registrations.length > 0 && !searching && (
+          <div className="tr-expand">
+            <button
+              type="button"
+              className="linklike"
+              onClick={() => setOpenIds(new Set(registrations.map((r) => r.id)))}
+            >
+              Expand all
+            </button>
+            <span aria-hidden="true">·</span>
+            <button type="button" className="linklike" onClick={() => setOpenIds(new Set())}>
+              Collapse all
+            </button>
+          </div>
+        )}
         {searching && (
           <p className="reg-search-note" role="status">
             {shown === 0
