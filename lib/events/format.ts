@@ -63,6 +63,26 @@ export function formatWhen(
   return `${dateStr} · ${timeStr}`;
 }
 
+// The facts strip's "Date" and "Time", in club time wherever the page renders.
+export function factDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    timeZone: CLUB_TIME_ZONE,
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+export function factTime(startIso: string, endIso: string | null): string {
+  const t = (iso: string) =>
+    new Date(iso).toLocaleTimeString("en-US", {
+      timeZone: CLUB_TIME_ZONE,
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  return endIso ? `${t(startIso)} – ${t(endIso)}` : t(startIso);
+}
+
 function to12h(t: string): string {
   if (!t) return "";
   const [h, m] = t.split(":").map(Number);

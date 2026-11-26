@@ -1,4 +1,4 @@
-import { formatSlot, formatWhen } from "@/lib/events/format";
+import { factDate, factTime, formatSlot, formatWhen } from "@/lib/events/format";
 import { priceFact } from "@/lib/events/public-page";
 import type { EventRec } from "@/lib/events/types";
 
@@ -29,26 +29,8 @@ export function factsFor(event: EventRec): Fact[] {
     const firstDated = event.slots.find((s) => s.date);
     if (firstDated) facts.push({ lbl: "Starts", val: formatSlot(firstDated) });
   } else if (event.startsAt) {
-    const d = new Date(event.startsAt);
-    facts.push({
-      lbl: "Date",
-      val: d.toLocaleDateString(undefined, {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-      }),
-    });
-    const time = d.toLocaleTimeString(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-    const end = event.endsAt
-      ? new Date(event.endsAt).toLocaleTimeString(undefined, {
-          hour: "numeric",
-          minute: "2-digit",
-        })
-      : "";
-    facts.push({ lbl: "Time", val: end ? `${time} – ${end}` : time });
+    facts.push({ lbl: "Date", val: factDate(event.startsAt) });
+    facts.push({ lbl: "Time", val: factTime(event.startsAt, event.endsAt) });
   }
   if (event.location) facts.push({ lbl: "Where", val: event.location });
   const price = priceFact(event);

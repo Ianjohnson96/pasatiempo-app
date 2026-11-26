@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatWhen } from "./format";
+import { factDate, factTime, formatWhen } from "./format";
 
 // Node's ICU may put a narrow no-break space before AM/PM; normalise spaces.
 const norm = (s: string) => s.replace(/[  ]/g, " ");
@@ -34,5 +34,18 @@ describe("formatWhen", () => {
 
   it("says Date TBD with no start", () => {
     expect(formatWhen(null, null)).toBe("Date TBD");
+  });
+});
+
+describe("fact date and time", () => {
+  // 02:00 UTC on Dec 6 is 6:00 PM on Saturday Dec 5 at the club
+  it("formats the date in the club's time zone", () => {
+    expect(factDate("2026-12-06T02:00:00.000Z")).toBe("Saturday, December 5");
+  });
+  it("formats the time range in the club's time zone", () => {
+    expect(norm(factTime("2026-12-06T02:00:00.000Z", null))).toBe("6:00 PM");
+    expect(norm(factTime("2026-12-06T02:00:00.000Z", "2026-12-06T05:30:00.000Z"))).toBe(
+      "6:00 PM – 9:30 PM",
+    );
   });
 });
