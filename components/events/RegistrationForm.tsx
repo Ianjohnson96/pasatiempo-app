@@ -7,6 +7,7 @@ import { isAnswered } from "@/lib/events/tournament";
 import QuestionInput from "@/components/events/QuestionInput";
 import TeamEntryForm from "@/components/events/TeamEntryForm";
 import Toast from "@/components/events/Toast";
+import SubmitButton, { useSubmit } from "@/components/events/public/SubmitButton";
 import type { Answers, EventRec } from "@/lib/events/types";
 
 export interface SeatInfo {
@@ -45,7 +46,7 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
     return first ? [first.id] : event.slots[0] ? [event.slots[0].id] : [];
   });
   const [answers, setAnswers] = useState<Answers>({});
-  const [submitting, setSubmitting] = useState(false);
+  const { phase, run } = useSubmit();
   const [result, setResult] = useState<
     { status: "confirmed" | "waitlist" } | null
   >(null);
@@ -95,18 +96,20 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
         return;
       }
     }
-    setSubmitting(true);
-    const res = await register({
-      slug: event.slug,
-      name,
-      email,
-      phone,
-      partySize,
-      guestNames,
-      slotIds: isSlots ? selected : [],
-      answers,
-    });
-    setSubmitting(false);
+    const res = await run(
+      () =>
+        register({
+          slug: event.slug,
+          name,
+          email,
+          phone,
+          partySize,
+          guestNames,
+          slotIds: isSlots ? selected : [],
+          answers,
+        }),
+      (r) => r.ok && (r.status === "confirmed" || r.status === "waitlist"),
+    );
     if (res.ok && (res.status === "confirmed" || res.status === "waitlist")) {
       setResult({ status: res.status });
     } else {
@@ -291,13 +294,9 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
         />
       ))}
 
-      <button className="btn block" type="submit" disabled={submitting}>
-        {submitting
-          ? "Submitting…"
-          : targetFull && event.waitlistEnabled
-            ? "Join the waitlist"
-            : "Register"}
-      </button>
+      <SubmitButton phase={phase} className="btn block">
+        {targetFull && event.waitlistEnabled ? "Join the waitlist" : "Register"}
+      </SubmitButton>
     </form>
   );
 }

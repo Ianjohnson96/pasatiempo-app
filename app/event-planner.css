@@ -381,7 +381,7 @@
     border-color 0.16s,
     color 0.16s,
     box-shadow 0.16s,
-    transform 0.16s;
+    transform 160ms ease-out;
 }
 .ep .btn:hover:not(:disabled) {
   background: var(--btn-hover);
@@ -389,7 +389,9 @@
   box-shadow: inset 0 -2px 0 var(--brass);
 }
 .ep .btn:active:not(:disabled) {
-  transform: translateY(1px);
+  transform: scale(0.97);
+  transition-duration: 120ms;
+  transition-timing-function: ease-out;
 }
 .ep .btn:focus-visible {
   outline: 2px solid var(--focus);
@@ -2594,12 +2596,27 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* movement becomes a short fade; pressed, busy and done still show */
   .ep *,
   .ep *::before,
   .ep *::after {
     animation: none !important;
-    transition: none !important;
+    transition-property: opacity, color, background-color, border-color !important;
+    transition-duration: 150ms !important;
+    transition-delay: 0s !important;
     scroll-behavior: auto !important;
+  }
+  .ep .reveal {
+    animation: ep-fade 150ms linear both !important;
+  }
+  .ep .btn:active:not(:disabled) {
+    transform: none;
+    opacity: 0.85;
+  }
+  .ep .submit-btn.is-spin .sb-spin {
+    animation: none !important;
+    border-right-color: currentColor;
+    opacity: 0.6;
   }
   .ep .check-mark path {
     stroke-dashoffset: 0;
@@ -3099,5 +3116,90 @@
   }
   .ep .sticky-cta.show {
     opacity: 1;
+  }
+}
+
+/* ---- Submit buttons: label stays, spinner after a second, tick on success - */
+.ep .submit-btn {
+  position: relative;
+}
+.ep .submit-btn .sb-spin,
+.ep .submit-btn .sb-tick {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+.ep .submit-btn .sb-spin {
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+}
+.ep .submit-btn .sb-tick {
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+}
+.ep .submit-btn .sb-label {
+  transition: opacity 160ms ease-out;
+}
+.ep .submit-btn:disabled.is-busy,
+.ep .submit-btn:disabled.is-spin,
+.ep .submit-btn:disabled.is-done {
+  opacity: 1;
+  cursor: progress;
+}
+.ep .submit-btn.is-spin .sb-label,
+.ep .submit-btn.is-done .sb-label {
+  opacity: 0;
+}
+.ep .submit-btn.is-spin .sb-spin {
+  opacity: 1;
+  animation: ep-spin 0.8s linear infinite;
+}
+.ep .submit-btn.is-done .sb-tick {
+  opacity: 1;
+  stroke-dashoffset: 0;
+  transition:
+    stroke-dashoffset 300ms ease-out,
+    opacity 120ms ease-out;
+}
+@keyframes ep-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- Public page on phones: text and targets a thumb can use ------------ */
+@media (max-width: 720px) {
+  .ep .pub {
+    font-size: 17px;
+  }
+  .ep .pub input,
+  .ep .pub select,
+  .ep .pub textarea {
+    font-size: 16px; /* below 16px iOS zooms the page on focus */
+  }
+  .ep .pub .btn,
+  .ep .pub .slot,
+  .ep .pub .check,
+  .ep .pub .stepper button,
+  .ep .pub .choice-chips .chip {
+    min-height: 48px;
+  }
+  .ep .pub .slot + .slot,
+  .ep .pub .check + .check {
+    margin-top: 8px;
   }
 }

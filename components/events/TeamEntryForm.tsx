@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { register } from "@/lib/events/actions";
+import SubmitButton, { useSubmit } from "@/components/events/public/SubmitButton";
 import { answerText } from "@/lib/events/format";
 import {
   isAnswered,
@@ -133,7 +134,7 @@ export default function TeamEntryForm({
     {},
   );
   const [formErr, setFormErr] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const { phase, busy: submitting, run } = useSubmit();
   const [doneStatus, setDoneStatus] = useState<"confirmed" | "waitlist">(
     "confirmed",
   );
@@ -225,37 +226,37 @@ export default function TeamEntryForm({
   }
 
   async function send() {
-    setSubmitting(true);
     setFormErr("");
-    let err: string | null = null;
     let status: "confirmed" | "waitlist" = willWaitlist
       ? "waitlist"
       : "confirmed";
-    try {
-      if (onSubmit) {
-        err = await onSubmit(team, phone, sendEmails);
-      } else {
-        const member = team.players[0];
-        const res = await register({
-          slug: event.slug,
-          name: member.name,
-          email: member.email,
-          phone,
-          partySize: 1,
-          guestNames: [],
-          slotIds: [],
-          answers: {},
-          team,
-        });
-        if (res.ok && (res.status === "confirmed" || res.status === "waitlist"))
-          status = res.status;
-        else if (res.ok) status = "confirmed";
-        else err = res.error ?? GENERIC_ERROR;
-      }
-    } catch {
-      err = GENERIC_ERROR;
-    }
-    setSubmitting(false);
+    const err = await run(
+      async (): Promise<string | null> => {
+        try {
+          if (onSubmit) return await onSubmit(team, phone, sendEmails);
+          const member = team.players[0];
+          const res = await register({
+            slug: event.slug,
+            name: member.name,
+            email: member.email,
+            phone,
+            partySize: 1,
+            guestNames: [],
+            slotIds: [],
+            answers: {},
+            team,
+          });
+          if (res.ok && (res.status === "confirmed" || res.status === "waitlist"))
+            status = res.status;
+          else if (res.ok) status = "confirmed";
+          else return res.error ?? GENERIC_ERROR;
+          return null;
+        } catch {
+          return GENERIC_ERROR;
+        }
+      },
+      (e) => e === null,
+    );
     if (err) {
       // Player-specific problems go back to the form, on the right card.
       if (splitRoleError(err).role && step === "review") setStep("form");
@@ -370,18 +371,9 @@ export default function TeamEntryForm({
             >
               Edit
             </button>
-            <button
-              type="button"
-              className="btn"
-              onClick={send}
-              disabled={submitting}
-            >
-              {submitting
-                ? "Submitting…"
-                : isEdit
-                  ? "Save changes"
-                  : "Submit entry"}
-            </button>
+            <SubmitButton type="button" phase={phase} onClick={send}>
+              {isEdit ? "Save changes" : "Submit entry"}
+            </SubmitButton>
           </div>
         </div>
       </div>
