@@ -6,14 +6,19 @@ import type { TeamLine } from "@/lib/events/cards";
 export default function PublicTeamRoster({
   teams,
   countOnly,
+  capacity,
 }: {
   teams: TeamLine[];
   countOnly: boolean;
+  capacity: number | null; // null when the event hides its spots left
 }) {
   return (
     <section className="pub-section reveal stacked">
       <p className="sec-eyebrow">The field</p>
-      <h2>Teams entered &middot; {teams.length}</h2>
+      <h2>
+        Teams entered &middot; {teams.length}
+        {capacity != null && <span className="tr-of"> of {capacity}</span>}
+      </h2>
       <div style={{ marginTop: 14 }}>
         {teams.length === 0 ? (
           <p className="muted" style={{ margin: 0 }}>

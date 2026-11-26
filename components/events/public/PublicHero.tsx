@@ -1,4 +1,5 @@
 import Icon from "@/components/events/Icon";
+import CalendarMenu from "./CalendarMenu";
 import ShareButton from "./ShareButton";
 import { pageSettings } from "@/lib/events/page-settings";
 import { mapUrl } from "@/lib/events/public-page";
@@ -59,6 +60,7 @@ export default function PublicHero({
         </div>
         <div className="hero-actions">
           <CtaButton cta={cta} id="hero-cta" className="btn gold" />
+          <CalendarMenu event={event} />
           <ShareButton title={event.title} />
         </div>
       </div>

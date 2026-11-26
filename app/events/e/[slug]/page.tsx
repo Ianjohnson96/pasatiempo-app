@@ -256,6 +256,7 @@ export default async function PublicEventPage({
           <PublicTeamRoster
             teams={teams}
             countOnly={event.rosterStyle === "count_only"}
+            capacity={settings.showSpots ? event.capacity : null}
           />
         )}
 
