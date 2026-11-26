@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import AppBar from "@/components/events/AppBar";
 import EventManager from "@/components/events/EventManager";
+import EmailCard from "@/components/events/EmailCard";
 import PhotoManager from "@/components/events/PhotoManager";
 import { getEvent, registrationsFor } from "@/lib/events/data";
 import { canManageEvent, requireEventsViewer } from "@/lib/events/auth";
@@ -40,6 +41,8 @@ export default async function ManageEventPage({
           </div>
         )}
         <EventManager event={event} registrations={registrations} />
+        <div style={{ height: 18 }} />
+        <EmailCard event={event} />
         <div style={{ height: 18 }} />
         <PhotoManager
           eventId={event.id}
