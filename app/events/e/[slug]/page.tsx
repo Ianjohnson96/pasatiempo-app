@@ -250,7 +250,11 @@ export default async function PublicEventPage({
           </section>
         )}
 
-        {open && <ManageRegistration event={publicEvent(event)} />}
+        {open && (
+          <div id="manage">
+            <ManageRegistration event={publicEvent(event)} />
+          </div>
+        )}
 
         {event.showRoster && !isSlots && event.type === "tournament" && (
           <PublicTeamRoster

@@ -3991,3 +3991,48 @@
   top: auto;
   bottom: calc(100% + 6px);
 }
+
+/* "Already entered? Manage your registration" under the hero buttons */
+.ep .hero-manage {
+  margin: 14px 0 0;
+  color: color-mix(in srgb, var(--hero-ink) 85%, transparent);
+  font-size: 14px;
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.45);
+}
+.ep .pub-hero.hero-plain .hero-manage {
+  text-shadow: none;
+}
+.ep .hero-manage button {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hero-ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--hero-kicker);
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+/* bigger touch targets on phones: jump links, the map link, role tags */
+@media (max-width: 720px) {
+  .ep .sec-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0;
+  }
+  .ep .pub-hero .hero-meta > .hero-map {
+    min-height: 44px;
+  }
+}
+.ep .team-roster .tr-role {
+  font-size: 10.5px;
+}
+@media (max-width: 720px) {
+  .ep .sec-links a {
+    background-position: 0 calc(100% - 12px);
+  }
+}

@@ -1,5 +1,6 @@
 import Icon from "@/components/events/Icon";
 import CalendarMenu from "./CalendarMenu";
+import ManageLink from "./ManageLink";
 import ShareButton from "./ShareButton";
 import { pageSettings } from "@/lib/events/page-settings";
 import { mapUrl } from "@/lib/events/public-page";
@@ -63,6 +64,7 @@ export default function PublicHero({
           <CalendarMenu event={event} />
           <ShareButton title={event.title} />
         </div>
+        {event.status === "open" && <ManageLink tournament={event.type === "tournament"} />}
       </div>
     </section>
   );
