@@ -1,10 +1,13 @@
-// Public "Teams entered" block. Takes pre-formatted strings only, so nothing
-// private (email, GHIN, answers) can be serialised into the page.
+import type { TeamLine } from "@/lib/events/cards";
+
+// Public "Teams entered" block. Takes display names only (teamLines), so
+// nothing private (email, GHIN, answers) can be serialised into the page.
+// Each name carries its role, so it's clear who is the member and who the guest.
 export default function PublicTeamRoster({
   teams,
   countOnly,
 }: {
-  teams: string[];
+  teams: TeamLine[];
   countOnly: boolean;
 }) {
   return (
@@ -25,7 +28,23 @@ export default function PublicTeamRoster({
             {teams.map((t, i) => (
               <li key={i}>
                 <span className="tr-n">{i + 1}</span>
-                <span>{t}</span>
+                <span className="tr-team">
+                  <span className="tr-player">
+                    {t.member}
+                    <span className="tr-role">Member</span>
+                  </span>
+                  {t.guest && (
+                    <>
+                      <span className="tr-amp" aria-hidden="true">
+                        &amp;
+                      </span>
+                      <span className="tr-player">
+                        {t.guest}
+                        <span className="tr-role guest">Guest</span>
+                      </span>
+                    </>
+                  )}
+                </span>
               </li>
             ))}
           </ol>

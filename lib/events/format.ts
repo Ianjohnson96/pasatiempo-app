@@ -135,7 +135,9 @@ export function formatSlotShort(slot: Slot): string {
 export function rosterName(name: string, style: RosterStyle): string {
   const parts = name.trim().split(/\s+/);
   if (style === "first_initial" && parts.length > 1) {
-    return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+    // capitals however the name was typed ("cary johnson" → "Cary J.")
+    const first = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+    return `${first} ${parts[parts.length - 1][0].toUpperCase()}.`;
   }
   return name.trim();
 }

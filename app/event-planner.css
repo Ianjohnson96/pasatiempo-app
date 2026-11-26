@@ -3913,3 +3913,33 @@
 .ep .email-card-actions .field-err {
   margin: 0;
 }
+
+/* the public team list: each name with its role */
+.ep .team-roster .tr-team {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.ep .team-roster .tr-player {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  white-space: nowrap;
+}
+.ep .team-roster .tr-role {
+  padding: 1px 6px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  color: var(--club);
+  font: 600 9.5px/1.4 var(--sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.ep .team-roster .tr-role.guest {
+  border-color: var(--brass-soft);
+  color: var(--brass-ink);
+}
+.ep .team-roster .tr-amp {
+  color: var(--muted);
+}
