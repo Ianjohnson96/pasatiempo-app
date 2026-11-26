@@ -103,3 +103,41 @@ describe("teamEmails: the event's own words", () => {
     expect(a.text).not.toContain("See you!");
   });
 });
+
+describe("teamEmails: custom subject, opening line and sign-off", () => {
+  it("replaces the confirmed subject and status line, and signs off", () => {
+    const ev = {
+      ...event,
+      theme: {
+        preset: "clubhouse",
+        emailSubject: "You're in the 2027 Invitational",
+        emailIntro: "Your team is in. Get ready for three great days.",
+        emailSignOff: "— The Men's Club",
+      },
+    } as unknown as EventRec;
+    const [a] = teamEmails(ev, [member, guest], {}, "confirmed", null);
+    expect(a.subject).toBe("You're in the 2027 Invitational");
+    expect(a.text).toContain("Your team is in. Get ready for three great days.");
+    expect(a.text).not.toContain("Your team is confirmed.");
+    expect(a.text).toContain("— The Men's Club");
+    const [w] = teamEmails(ev, [member, guest], {}, "waitlist", null);
+    expect(w.subject).toBe("Member-Guest: you're on the waitlist");
+  });
+});
+
+describe("teamEmails: layout", () => {
+  it("puts the status line up top, before the team and answers", () => {
+    const [a] = teamEmails(event, [member, guest], { cart: "Yes" }, "confirmed", null);
+    expect(a.text.indexOf("Your team is confirmed.")).toBeLessThan(a.text.indexOf("Team: "));
+  });
+  it("a question ending in '?' gets no extra colon", () => {
+    const ev = {
+      ...event,
+      customFields: [
+        { id: "skins", label: "Playing the Skins Game?", type: "short_text", required: false, options: [], scope: "team" },
+      ],
+    } as unknown as EventRec;
+    const [a] = teamEmails(ev, [member, guest], { skins: "Yes" }, "confirmed", null);
+    expect(a.text).toContain("Playing the Skins Game? Yes");
+  });
+});

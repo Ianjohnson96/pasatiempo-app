@@ -6,6 +6,7 @@ import type { Mail } from "../mail";
 import { answerText, formatSlot, formatWhen } from "./format";
 import { pageSettings } from "./page-settings";
 import { eventContact } from "./theme";
+import { teamEmails } from "./tournament-email";
 import type { Answers, EventRec } from "./types";
 
 export const esc = (s: string) =>
@@ -15,6 +16,12 @@ export const esc = (s: string) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+
+/** "Label: answer", without a second mark after a question ("Coming? Yes"). */
+export function labelled(label: string, value: string): string {
+  const l = label.trim();
+  return /[?:]$/.test(l) ? `${l} ${value}` : `${l}: ${value}`;
+}
 
 /** Text lines as an email: plain text, and the same lines as simple HTML. */
 export function linesToMail(to: string, subject: string, lines: string[]): Mail {
@@ -32,8 +39,11 @@ export function closingLines(
   change: "change or cancel" | "change or withdraw",
 ): string[] {
   const out: string[] = [];
-  const { thankYou } = pageSettings(event);
-  if (thankYou && status === "confirmed") out.push("", ...thankYou.split("\n"));
+  const { thankYou, email } = pageSettings(event);
+  if (status === "confirmed") {
+    if (thankYou) out.push("", ...thankYou.split("\n"));
+    if (email.signOff) out.push("", ...email.signOff.split("\n"));
+  }
   if (pageUrl) out.push("", `To ${change}, open ${pageUrl} and choose "Manage my registration".`);
   const c = eventContact(event);
   out.push("", `Questions? Contact ${c.name} at ${c.email}.`);
@@ -55,17 +65,18 @@ export function signupEmail(
   status: "confirmed" | "waitlist",
   pageUrl: string | null,
 ): Mail {
+  const own = pageSettings(event).email;
   const subject =
     status === "waitlist"
       ? `${event.title}: you're on the waitlist`
-      : `${event.title}: you're registered`;
+      : (own.subject ?? `${event.title}: you're registered`);
   const first = reg.name.trim().split(/\s+/)[0] || reg.name;
   const lines: string[] = [
     `Hi ${first},`,
     "",
     status === "waitlist"
       ? `You're on the waitlist for ${event.title}. We'll be in touch if a spot opens.`
-      : `You're registered for ${event.title}.`,
+      : (own.intro ?? `You're registered for ${event.title}.`),
     "",
   ];
 
@@ -88,9 +99,48 @@ export function signupEmail(
   const answers = event.customFields
     .map((f) => ({ label: f.label, value: answerText(reg.answers[f.id]) }))
     .filter((a) => a.value.trim() !== "")
-    .map((a) => `${a.label}: ${a.value}`);
+    .map((a) => labelled(a.label, a.value));
   if (answers.length) lines.push("", ...answers);
 
   lines.push(...closingLines(event, status, pageUrl, "change or cancel"));
   return linesToMail(reg.email, subject, lines);
+}
+
+/**
+ * The confirmation email as a sample member would get it, for the editor's
+ * preview: the real email, built from made-up details.
+ */
+export function sampleEmail(event: EventRec, pageUrl: string | null): Mail {
+  const answers: Answers = {};
+  for (const f of event.customFields) answers[f.id] = "(their answer)";
+  if (event.type === "tournament") {
+    const player = (role: "member" | "guest", name: string) => ({
+      role,
+      name,
+      email: `${name.split(" ")[0].toLowerCase()}@example.com`,
+      ghin: "1234567",
+      answers,
+    });
+    return teamEmails(
+      event,
+      [player("member", "Pat Member"), player("guest", "Sam Guest")],
+      answers,
+      "confirmed",
+      pageUrl,
+    )[0];
+  }
+  const guests = event.allowGuests ? ["Lee Guest"] : [];
+  return signupEmail(
+    event,
+    {
+      name: "Pat Member",
+      email: "pat@example.com",
+      partySize: 1 + guests.length,
+      guestNames: guests,
+      slotIds: event.slots.slice(0, 1).map((s) => s.id),
+      answers,
+    },
+    "confirmed",
+    pageUrl,
+  );
 }

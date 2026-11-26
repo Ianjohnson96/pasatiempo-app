@@ -15,6 +15,7 @@ import QuestionBuilder from "@/components/events/QuestionBuilder";
 import TypeTiles from "@/components/events/editor/TypeTiles";
 import EditorSteps from "@/components/events/editor/EditorSteps";
 import LookSection from "@/components/events/editor/LookSection";
+import EmailSection from "@/components/events/editor/EmailSection";
 import {
   PreviewOverlay,
   PreviewPanel,
@@ -923,10 +924,20 @@ export default function EventEditor({
           )}
         </section>
 
-        {/* 8. Publish */}
-        <section id="publish" className="card editor-section">
+        {/* 8. Email */}
+        <section id="email" className="card editor-section">
           <SectionHead
             n={8}
+            title="Confirmation email"
+            sub="What members receive when they sign up. Edit it here before anyone does."
+          />
+          <EmailSection preview={preview} theme={theme} onTheme={setTheme} />
+        </section>
+
+        {/* 9. Publish */}
+        <section id="publish" className="card editor-section">
+          <SectionHead
+            n={9}
             title="Publish"
             sub="Whether sign-ups are open, and who else can manage the event."
           />

@@ -4,7 +4,8 @@
 
 import type { Mail } from "../mail";
 import { answerText, formatWhen } from "./format";
-import { closingLines, linesToMail } from "./registration-email";
+import { pageSettings } from "./page-settings";
+import { closingLines, labelled, linesToMail } from "./registration-email";
 import type { Answers, EventRec, Player } from "./types";
 
 function answerLines(
@@ -17,7 +18,7 @@ function answerLines(
     if (f.scope !== scope) continue;
     const v = answerText(answers[f.id]);
     if (v.trim() === "") continue;
-    lines.push(`${f.label}: ${v}`);
+    lines.push(labelled(f.label, v));
   }
   return lines;
 }
@@ -31,17 +32,19 @@ function buildOne(
   status: "confirmed" | "waitlist",
   pageUrl: string | null,
 ): Mail {
+  const words = pageSettings(event).email;
   const subject =
     status === "waitlist"
       ? `${event.title}: you're on the waitlist`
-      : `${event.title}: your team entry`;
+      : (words.subject ?? `${event.title}: your team entry`);
   const statusLine =
     status === "waitlist"
       ? "Your team is on the waitlist; we'll be in touch if a spot opens."
-      : "Your team is confirmed.";
+      : (words.intro ?? "Your team is confirmed.");
 
   const lines: string[] = [event.title, formatWhen(event.startsAt, event.endsAt)];
   if (event.location) lines.push(event.location);
+  lines.push("", statusLine);
   lines.push("", `Team: ${member.name} & ${guest.name}`);
   if (recipient.role === "guest") {
     lines.push(`${member.name} entered this team for you.`);
@@ -49,7 +52,6 @@ function buildOne(
   const own = answerLines(event, "player", recipient.answers);
   const team = answerLines(event, "team", teamAnswers);
   if (own.length || team.length) lines.push("", ...own, ...team);
-  lines.push("", statusLine);
   lines.push(...closingLines(event, status, pageUrl, "change or withdraw"));
   return linesToMail(recipient.email, subject, lines);
 }

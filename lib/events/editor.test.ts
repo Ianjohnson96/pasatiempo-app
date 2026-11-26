@@ -73,7 +73,7 @@ describe("tiles and steps", () => {
     ]);
   });
 
-  it("has the eight sections in order, Look after Details", () => {
+  it("has the nine sections in order, Look after Details, Email before Publish", () => {
     expect(EDITOR_SECTIONS.map((s) => s.id)).toEqual([
       "details",
       "look",
@@ -82,6 +82,7 @@ describe("tiles and steps", () => {
       "pricing",
       "roster",
       "access",
+      "email",
       "publish",
     ]);
     expect(EDITOR_SECTIONS[1].label).toBe("Look");

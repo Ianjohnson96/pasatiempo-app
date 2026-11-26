@@ -23,12 +23,16 @@ export interface EventTheme {
   hideSpots?: boolean; // true = no "spots left" counts on the page
   headings?: { about?: string; info?: string; register?: string };
   thankYou?: string; // a note from the organisers on the "You're registered" screen
+  // The confirmation email's own words (confirmed sign-ups; waitlist keeps its own)
+  emailSubject?: string;
+  emailIntro?: string; // replaces "You're registered for …"
+  emailSignOff?: string; // e.g. "— The Men's Club"
 }
 
 export type HeroStyle = "photo" | "banner" | "plain";
 export const HERO_STYLES: HeroStyle[] = ["photo", "banner", "plain"];
 /** The longest wording each setting keeps. */
-export const WORDING_LIMITS = { buttonLabel: 28, kicker: 40, heading: 48, thankYou: 280 } as const;
+export const WORDING_LIMITS = { buttonLabel: 28, kicker: 40, heading: 48, thankYou: 280, emailSubject: 100, emailIntro: 300, emailSignOff: 120 } as const;
 
 export interface Preset {
   label: string;
@@ -295,6 +299,10 @@ export function parseTheme(raw: unknown): EventTheme | null {
   if (r.hideSpots === true) t.hideSpots = true;
   const thankYou = wording(r.thankYou, WORDING_LIMITS.thankYou);
   if (thankYou) t.thankYou = thankYou;
+  for (const k of ["emailSubject", "emailIntro", "emailSignOff"] as const) {
+    const v = wording(r[k], WORDING_LIMITS[k]);
+    if (v) t[k] = v;
+  }
   const h = r.headings as Record<string, unknown> | undefined;
   if (h && typeof h === "object") {
     const headings: NonNullable<EventTheme["headings"]> = {};
