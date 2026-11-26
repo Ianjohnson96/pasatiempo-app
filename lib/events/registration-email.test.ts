@@ -156,4 +156,9 @@ describe("testEmail", () => {
     expect(m.text).toContain("Hi Pat,");
     expect(m.html).toContain("This is a test of the confirmation email");
   });
+  it("the note goes inside the email's body, keeping it a valid document", () => {
+    const m = testEmail(sampleEmail(base, url), "staff@club.test");
+    expect(m.html.startsWith("<!DOCTYPE html>")).toBe(true);
+    expect(m.html.indexOf("This is a test")).toBeGreaterThan(m.html.indexOf("<body"));
+  });
 });

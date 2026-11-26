@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { matchesRegSearch } from "./search";
+import { matchesRegFilter, matchesRegSearch, regFilterCounts } from "./search";
 import type { Registration } from "./types";
 
 function reg(over: Partial<Registration> = {}): Registration {
@@ -55,5 +55,27 @@ describe("matchesRegSearch", () => {
   });
   test("matches a phone number by its digits", () => {
     expect(matchesRegSearch(reg(), "5550100")).toBe(true);
+  });
+});
+
+describe("regFilter", () => {
+  const rs = [
+    reg({ id: "a", status: "confirmed" }),
+    reg({ id: "b", status: "confirmed", emailFailed: true }),
+    reg({ id: "c", status: "waitlist", emailFailed: true }),
+    reg({ id: "d", status: "cancelled" }),
+  ];
+  test("each filter keeps its sign-ups", () => {
+    expect(rs.filter((r) => matchesRegFilter(r, "all")).map((r) => r.id)).toEqual(["a", "b", "c", "d"]);
+    expect(rs.filter((r) => matchesRegFilter(r, "confirmed")).map((r) => r.id)).toEqual(["a", "b"]);
+    expect(rs.filter((r) => matchesRegFilter(r, "waitlist")).map((r) => r.id)).toEqual(["c"]);
+    expect(rs.filter((r) => matchesRegFilter(r, "cancelled")).map((r) => r.id)).toEqual(["d"]);
+  });
+  test("'email not sent' skips cancelled sign-ups", () => {
+    const withCancelledFail = [...rs, reg({ id: "e", status: "cancelled", emailFailed: true })];
+    expect(withCancelledFail.filter((r) => matchesRegFilter(r, "email")).map((r) => r.id)).toEqual(["b", "c"]);
+  });
+  test("counts for the buttons", () => {
+    expect(regFilterCounts(rs)).toEqual({ all: 4, confirmed: 2, waitlist: 1, cancelled: 1, email: 2 });
   });
 });

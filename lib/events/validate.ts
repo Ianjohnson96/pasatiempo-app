@@ -2,7 +2,7 @@
 // the page, each tied to the field's DOM id so the summary can link to it.
 
 import { isAnswered } from "./tournament";
-import type { Answers, EventRec } from "./types";
+import type { Answers, CustomField, EventRec } from "./types";
 
 export interface FieldError {
   field: string; // the input's DOM id; "" for a problem with no one field
@@ -29,6 +29,32 @@ export function registrationErrors(input: {
     });
   for (const f of input.event.customFields)
     if (f.required && !isAnswered(input.answers[f.id]))
-      errs.push({ field: `reg-q-${f.id}`, message: `Answer: ${f.label}` });
+      errs.push({ field: `reg-q-${f.id}`, message: questionError(f) });
   return errs;
+}
+
+/** "Dietary restrictions" → "dietary restrictions", but "GHIN number" stays. */
+function inSentence(label: string): string {
+  return /^[A-Z][a-z]/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label;
+}
+
+/**
+ * What to tell someone who skipped a required question, phrased as what to
+ * do: "Enter dietary restrictions", "Choose a shirt size".
+ */
+export function questionError(f: Pick<CustomField, "label" | "type">): string {
+  const label = f.label.trim();
+  if (label.endsWith("?") || f.type === "checkbox") return `Answer “${label}”`;
+  const words = inSentence(label);
+  switch (f.type) {
+    case "select":
+    case "radio":
+      return `Choose ${/^[aeiou]/i.test(words) ? "an" : "a"} ${words}`;
+    case "multi":
+      return `Choose at least one: ${words}`;
+    case "number":
+      return `Enter a number for ${words}`;
+    default:
+      return `Enter ${words}`;
+  }
 }

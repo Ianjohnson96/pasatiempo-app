@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { matchesRegSearch } from "@/lib/events/search";
+import {
+  matchesRegFilter,
+  matchesRegSearch,
+  REG_FILTERS,
+  regFilterCounts,
+  type RegFilter,
+} from "@/lib/events/search";
 import CopyLink from "@/components/events/CopyLink";
 import Icon from "@/components/events/Icon";
 import { whenLineFor } from "@/components/events/public/FactsStrip";
@@ -27,8 +33,10 @@ import {
 } from "@/lib/events/actions";
 import {
   answerText,
+  shownAnswer,
   formatSlot,
   formatPhone,
+  shortDate,
   formatSlotShort,
   TYPE_LABEL,
 } from "@/lib/events/format";
@@ -72,8 +80,20 @@ export default function EventManager({
   const cancelled = registrations.filter((r) => r.status === "cancelled");
   // The search box narrows the lists shown, never the counts or exports.
   const [query, setQuery] = useState("");
+  // Teams are one-line rows; these are the ones opened to show everything.
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
+  const toggleOpen = (id: string) =>
+    setOpenIds((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const searching = query.trim() !== "";
-  const hit = (r: Registration) => matchesRegSearch(r, query);
+  // The filter buttons narrow the list too; like search, never the counts or exports.
+  const [filter, setFilter] = useState<RegFilter>("all");
+  const filterCounts = regFilterCounts(registrations);
+  const hit = (r: Registration) => matchesRegSearch(r, query) && matchesRegFilter(r, filter);
   const shownConfirmed = confirmed.filter(hit);
   const shownWaitlist = waitlist.filter(hit);
   const shownCancelled = cancelled.filter(hit);
@@ -300,21 +320,49 @@ export default function EventManager({
           ];
     const playerFields = event.customFields.filter((f) => f.scope === "player");
     const teamFields = event.customFields.filter((f) => f.scope === "team");
+    const member = players.find((p) => p.role === "member") ?? players[0];
+    const guest = players.find((p) => p.role === "guest");
+    // a search opens the teams it finds; otherwise each row opens on its own
+    const expanded = searching || openIds.has(r.id);
+    const bodyId = `team-${r.id}`;
     return (
-      <div key={r.id} className={`team-card ${r.status}`}>
-        <div className="tc-head">
+      <div key={r.id} className={`team-card team-row ${r.status}${expanded ? " open" : ""}`}>
+        <button
+          type="button"
+          className="tr-sum"
+          aria-expanded={expanded}
+          aria-controls={bodyId}
+          onClick={() => toggleOpen(r.id)}
+        >
+          <span className="tr-chev" aria-hidden="true" />
           {num !== undefined && <span className="tc-num">Team {num}</span>}
-          <span className={`tc-status ${r.status}`}>
-            {STATUS_LABEL[r.status]}
-          </span>
-          {r.emailFailed && (
-            <span
-              className="flag-warn"
-              title="The confirmation email could not be sent"
-            >
-              Email not sent
+          <span className="tr-names">
+            <span>
+              {member.name}
+              <span className="tr-role">Member</span>
             </span>
-          )}
+            {guest && (
+              <span>
+                {guest.name}
+                <span className="tr-role guest">Guest</span>
+              </span>
+            )}
+          </span>
+          <span className="tr-flags">
+            {r.emailFailed && (
+              <span className="flag-warn" title="The confirmation email could not be sent">
+                Email not sent
+              </span>
+            )}
+            {shortDate(r.createdAt) && (
+              <span className="tr-date">Entered {shortDate(r.createdAt)}</span>
+            )}
+            <span className={`tc-status ${r.status}`}>{STATUS_LABEL[r.status]}</span>
+          </span>
+        </button>
+        {expanded && (
+          <div className="tr-body" id={bodyId}>
+        <div className="tc-head">
           <span className="tc-actions">{regActions(r)}</span>
         </div>
         <div className="tc-players">
@@ -325,16 +373,20 @@ export default function EventManager({
               </div>
               <div className="tc-name">{p.name}</div>
               <dl className="tc-list">
-                <TcRow label="Email" value={p.email} />
-                <TcRow label="GHIN #" value={p.ghin} />
+                <TcRow label="Email" value={p.email} href={p.email ? `mailto:${p.email}` : undefined} />
+                <TcRow label="GHIN #" value={p.ghin} copy />
                 {p.role === "member" && r.phone && (
-                  <TcRow label="Phone" value={formatPhone(r.phone)} />
+                  <TcRow
+                    label="Phone"
+                    value={formatPhone(r.phone)}
+                    href={`tel:${r.phone.replace(/[^\d+]/g, "")}`}
+                  />
                 )}
                 {playerFields.map((f) => (
                   <TcRow
                     key={f.id}
                     label={f.label}
-                    value={answerText(p.answers[f.id])}
+                    value={shownAnswer(f, p.answers[f.id])}
                   />
                 ))}
               </dl>
@@ -343,6 +395,8 @@ export default function EventManager({
         </div>
         {teamFields.length > 0 && (
           <TeamAnswers fields={teamFields} answers={r.answers} />
+        )}
+          </div>
         )}
       </div>
     );
@@ -617,6 +671,37 @@ export default function EventManager({
             )}
           </div>
         </div>
+        {registrations.length > 0 && (
+          <div className="reg-filters" role="group" aria-label="Show">
+            {REG_FILTERS.filter((f) => f.id !== "email" || filterCounts.email > 0).map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                className={`reg-filter${filter === f.id ? " on" : ""}${f.id === "email" ? " warn" : ""}`}
+                aria-pressed={filter === f.id}
+                onClick={() => setFilter(f.id)}
+              >
+                {f.label}
+                <span className="rf-n">{filterCounts[f.id]}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {isTournament && registrations.length > 0 && !searching && (
+          <div className="tr-expand">
+            <button
+              type="button"
+              className="linklike"
+              onClick={() => setOpenIds(new Set(registrations.map((r) => r.id)))}
+            >
+              Expand all
+            </button>
+            <span aria-hidden="true">·</span>
+            <button type="button" className="linklike" onClick={() => setOpenIds(new Set())}>
+              Collapse all
+            </button>
+          </div>
+        )}
         {searching && (
           <p className="reg-search-note" role="status">
             {shown === 0
@@ -624,6 +709,14 @@ export default function EventManager({
               : `${shown} ${shown === 1 ? "match" : "matches"} for “${query.trim()}”.`}{" "}
             <button type="button" className="linklike" onClick={() => setQuery("")}>
               Clear
+            </button>
+          </p>
+        )}
+        {!searching && filter !== "all" && shown === 0 && (
+          <p className="reg-search-note" role="status">
+            Nothing to show here.{" "}
+            <button type="button" className="linklike" onClick={() => setFilter("all")}>
+              Show all
             </button>
           </p>
         )}
@@ -662,7 +755,9 @@ export default function EventManager({
           <>
             <div className="tc-stack">
               {shownConfirmed.length === 0 ? (
-                searching ? null : <div className="empty">No confirmed teams.</div>
+                searching || filter !== "all" ? null : (
+                  <div className="empty">No confirmed teams.</div>
+                )
               ) : (
                 shownConfirmed.map(teamCard)
               )}
@@ -678,7 +773,7 @@ export default function EventManager({
               </>
             )}
             {shownCancelled.length > 0 && (
-              <details className="reg-cancelled" open={searching || undefined}>
+              <details className="reg-cancelled" open={searching || filter === "cancelled" || undefined}>
                 <summary>Cancelled · {shownCancelled.length}</summary>
                 <div className="tc-stack">{shownCancelled.map(teamCard)}</div>
               </details>
@@ -711,7 +806,7 @@ export default function EventManager({
               </>
             )}
             {shownCancelled.length > 0 && (
-              <details className="reg-cancelled" open={searching || undefined}>
+              <details className="reg-cancelled" open={searching || filter === "cancelled" || undefined}>
                 <summary>Cancelled · {shownCancelled.length}</summary>
                 <table className="table reg-table">
                   <tbody>{shownCancelled.map(regRow)}</tbody>
@@ -729,12 +824,57 @@ export default function EventManager({
 // squeezing into the label column.
 const LONG_LABEL = 24;
 
-function TcRow({ label, value }: { label: string; value: string }) {
+function TcRow({
+  label,
+  value,
+  href,
+  copy,
+}: {
+  label: string;
+  value: string;
+  href?: string; // the value links here (email, phone)
+  copy?: boolean; // a Copy button beside the value (GHIN, for Golf Genius)
+}) {
+  const v = value.trim();
   return (
     <div className={`tc-row${label.length > LONG_LABEL ? " long" : ""}`}>
       <dt>{label}</dt>
-      <dd>{value.trim() || <span className="muted">—</span>}</dd>
+      <dd>
+        {!v ? (
+          <span className="muted">—</span>
+        ) : href ? (
+          <a className="tc-link" href={href}>
+            {v}
+          </a>
+        ) : (
+          v
+        )}
+        {v && copy && <CopyValue value={v} label={label} />}
+      </dd>
     </div>
+  );
+}
+
+// A small "Copy" beside a value; says "Copied" for a moment.
+function CopyValue({ value, label }: { value: string; label: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      className="tc-copy"
+      aria-label={`Copy ${label} ${value}`}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setDone(true);
+          setTimeout(() => setDone(false), 1500);
+        } catch {
+          // clipboard blocked: the value is still there to select by hand
+        }
+      }}
+    >
+      {done ? "Copied" : "Copy"}
+    </button>
   );
 }
 
@@ -750,7 +890,7 @@ function TeamAnswers({
       <div className="tc-role">Team</div>
       <dl className="tc-list">
         {fields.map((f) => (
-          <TcRow key={f.id} label={f.label} value={answerText(answers[f.id])} />
+          <TcRow key={f.id} label={f.label} value={shownAnswer(f, answers[f.id])} />
         ))}
       </dl>
     </div>

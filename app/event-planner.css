@@ -3928,3 +3928,438 @@
 .ep .email-card-actions .field-err {
   margin: 0;
 }
+
+/* the public team list: each name with its role */
+.ep .team-roster .tr-team {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.ep .team-roster .tr-player {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  white-space: nowrap;
+}
+.ep .team-roster .tr-role {
+  padding: 1px 6px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  color: var(--club);
+  font: 600 9.5px/1.4 var(--sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.ep .team-roster .tr-role.guest {
+  border-color: var(--brass-soft);
+  color: var(--brass-ink);
+}
+.ep .team-roster .tr-amp {
+  color: var(--muted);
+}
+.ep .tr-of {
+  color: var(--muted);
+}
+.ep .tr-of {
+  color: var(--muted);
+}
+
+/* "Add to calendar" in the hero: a small menu under the link */
+.ep .cal-menu {
+  position: relative;
+}
+.ep .cal-pop {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 6px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+}
+.ep .cal-pop a,
+.ep .cal-pop button {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 2px;
+  background: none;
+  color: var(--ink);
+  font: 500 14px/1.3 var(--sans);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ep .cal-pop a:hover,
+.ep .cal-pop button:hover,
+.ep .cal-pop a:focus-visible,
+.ep .cal-pop button:focus-visible {
+  background: var(--green-tint);
+}
+/* open upward: the key facts card sits just below the hero buttons */
+.ep .cal-pop {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+/* "Already entered? Manage your registration" under the hero buttons */
+.ep .hero-manage {
+  margin: 14px 0 0;
+  color: color-mix(in srgb, var(--hero-ink) 85%, transparent);
+  font-size: 14px;
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.45);
+}
+.ep .pub-hero.hero-plain .hero-manage {
+  text-shadow: none;
+}
+.ep .hero-manage button {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hero-ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--hero-kicker);
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+/* bigger touch targets on phones: jump links, the map link, role tags */
+@media (max-width: 720px) {
+  .ep .sec-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0;
+  }
+  .ep .pub-hero .hero-meta > .hero-map {
+    min-height: 44px;
+  }
+}
+.ep .team-roster .tr-role {
+  font-size: 10.5px;
+}
+@media (max-width: 720px) {
+  .ep .sec-links a {
+    background-position: 0 calc(100% - 12px);
+  }
+}
+/* narrow phones: jump links wrap instead of hiding off the edge */
+@media (max-width: 400px) {
+  .ep .sec-links {
+    flex-wrap: wrap;
+    gap: 0 22px;
+    overflow-x: visible;
+  }
+}
+/* text-box headings are real h3s now; keep them looking as before */
+.ep .prose h3.rt-h1,
+.ep .prose h3.rt-h2 {
+  text-transform: none;
+  letter-spacing: -0.005em;
+}
+
+/* ---------- polish pass ("make interfaces feel better") ---------- */
+/* no lone word on a heading's or a short line's last row */
+.ep .pub-section h2,
+.ep .prose h3,
+.ep .facts .val,
+.ep .email-card h3 {
+  text-wrap: balance;
+}
+.ep .prose .rt-ul li,
+.ep .prose .rt-p,
+.ep .facts .fact-sub,
+.ep .hint,
+.ep .notice,
+.ep .manage-cta p {
+  text-wrap: pretty;
+}
+/* counts that change keep their width */
+.ep .sticky-spots,
+.ep .tr-of {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+/* photos keep a crisp edge against the page */
+.ep .gallery img,
+.ep .gallery-grid img {
+  outline: 1px solid rgba(0, 0, 0, 0.1);
+  outline-offset: -1px;
+}
+/* the small text buttons in the hero answer a press */
+.ep .share-btn {
+  transition-property: opacity, transform;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+.ep .share-btn:active {
+  opacity: 0.75;
+  transform: translateY(1px);
+}
+/* the calendar list eases in rather than snapping */
+@keyframes ep-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.ep .cal-pop {
+  animation: ep-pop-in 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ep .cal-pop {
+    animation: none;
+  }
+  .ep .share-btn:active {
+    transform: none;
+  }
+}
+/* desktop: the team form's main button at a natural width, right-aligned
+   under the two player cards, instead of a 1,100px bar */
+@media (min-width: 900px) {
+  .ep .pub .btn.team-submit {
+    display: flex;
+    width: auto;
+    min-width: 320px;
+    margin-left: auto;
+    padding-inline: 40px;
+  }
+}
+
+/* ---------- Manage: teams as rows that open ---------- */
+.ep .tc-stack:has(> .team-row) {
+  gap: 8px;
+}
+.ep .team-card.team-row {
+  padding: 0;
+}
+.ep .team-row .tr-sum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 18px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ep .team-row .tr-sum:hover {
+  background: color-mix(in srgb, var(--club) 4%, transparent);
+}
+.ep .team-row .tr-sum:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.ep .team-row .tr-chev {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 160ms ease-out;
+}
+.ep .team-row.open .tr-chev {
+  transform: rotate(45deg);
+}
+.ep .team-row .tc-num {
+  min-width: 4.4em;
+  font-size: 1.15rem;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.ep .team-row .tr-names {
+  display: flex;
+  flex: 1 1 260px;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+.ep .team-row .tr-names > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.ep .team-row .tr-role {
+  padding: 1px 6px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  color: var(--club);
+  font: 600 10px/1.4 var(--sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.ep .team-row .tr-role.guest {
+  border-color: var(--brass-soft);
+  color: var(--brass-ink);
+}
+.ep .team-row .tr-flags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.ep .team-row .tr-body {
+  padding: 4px 22px 22px;
+  border-top: 1px solid var(--hairline);
+  animation: ep-pop-in 160ms ease-out;
+}
+.ep .team-row .tr-body .tc-head {
+  justify-content: flex-end;
+  margin: 12px 0 14px;
+}
+.ep .tr-expand {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ep .team-row .tr-chev {
+    transition: none;
+  }
+  .ep .team-row .tr-body {
+    animation: none;
+  }
+}
+@media (max-width: 560px) {
+  .ep .team-row .tr-sum {
+    padding: 12px 14px;
+  }
+  .ep .team-row .tr-body {
+    padding: 4px 14px 16px;
+  }
+  .ep .team-row .tr-flags {
+    margin-left: 0;
+  }
+}
+
+/* Manage: filter buttons over the list */
+.ep .reg-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.ep .reg-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 500 13.5px/1 var(--sans);
+  cursor: pointer;
+  transition-property: background-color, border-color, color;
+  transition-duration: 150ms;
+}
+.ep .reg-filter:hover {
+  border-color: var(--rule-strong);
+}
+.ep .reg-filter.on {
+  border-color: var(--club);
+  background: var(--club);
+  color: var(--ivory);
+}
+.ep .reg-filter.warn:not(.on) {
+  border-color: #e6d4ad;
+  background: #faf3e2;
+  color: var(--warn);
+}
+.ep .reg-filter .rf-n {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+.ep .reg-filter:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+@media (max-width: 560px) {
+  .ep .reg-filter {
+    min-height: 44px;
+  }
+}
+/* Manage: when a team entered, and contact/copy in the details */
+.ep .team-row .tr-date {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.ep .tc-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--rule-strong);
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+.ep .tc-link:hover {
+  text-decoration-color: currentColor;
+}
+.ep .tc-copy {
+  margin-left: 10px;
+  padding: 2px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--club);
+  font: 600 10.5px/1.6 var(--sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ep .tc-copy:hover {
+  border-color: var(--rule-strong);
+}
+
+/* the email preview: the real designed email, or its plain text */
+.ep .ep-mail-frame {
+  display: block;
+  width: 100%;
+  height: 620px;
+  border: 0;
+  background: #f5f1e6;
+}
+.ep .ep-mail-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 10px;
+}
+.ep .ep-mail-switch button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 500 13px/1 var(--sans);
+  cursor: pointer;
+}
+.ep .ep-mail-switch button.on {
+  border-color: var(--club);
+  background: var(--club);
+  color: var(--ivory);
+}
+.ep .ep-mail-switch .hint {
+  margin: 0 0 0 4px;
+}

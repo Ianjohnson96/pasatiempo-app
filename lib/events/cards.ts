@@ -59,13 +59,21 @@ export function dateBoxParts(
 export function teamLines(
   regs: Pick<Registration, "status" | "name" | "players">[],
   style: RosterStyle,
-): string[] {
+): TeamLine[] {
   return regs
     .filter((r) => r.status === "confirmed")
     .map((r) => {
       const member = r.players?.find((p) => p.role === "member")?.name ?? r.name;
       const guest = r.players?.find((p) => p.role === "guest")?.name;
-      const m = rosterName(member, style);
-      return guest ? `${m} & ${rosterName(guest, style)}` : m;
+      return {
+        member: rosterName(member, style),
+        guest: guest ? rosterName(guest, style) : null,
+      };
     });
+}
+
+/** One team on the public list: display names only, never contact details. */
+export interface TeamLine {
+  member: string;
+  guest: string | null;
 }
