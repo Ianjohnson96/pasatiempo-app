@@ -4234,3 +4234,83 @@
     margin-left: 0;
   }
 }
+
+/* Manage: filter buttons over the list */
+.ep .reg-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.ep .reg-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 500 13.5px/1 var(--sans);
+  cursor: pointer;
+  transition-property: background-color, border-color, color;
+  transition-duration: 150ms;
+}
+.ep .reg-filter:hover {
+  border-color: var(--rule-strong);
+}
+.ep .reg-filter.on {
+  border-color: var(--club);
+  background: var(--club);
+  color: var(--ivory);
+}
+.ep .reg-filter.warn:not(.on) {
+  border-color: #e6d4ad;
+  background: #faf3e2;
+  color: var(--warn);
+}
+.ep .reg-filter .rf-n {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+.ep .reg-filter:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+@media (max-width: 560px) {
+  .ep .reg-filter {
+    min-height: 44px;
+  }
+}
+/* Manage: when a team entered, and contact/copy in the details */
+.ep .team-row .tr-date {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.ep .tc-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--rule-strong);
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+.ep .tc-link:hover {
+  text-decoration-color: currentColor;
+}
+.ep .tc-copy {
+  margin-left: 10px;
+  padding: 2px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--club);
+  font: 600 10.5px/1.6 var(--sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ep .tc-copy:hover {
+  border-color: var(--rule-strong);
+}
