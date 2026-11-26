@@ -4106,3 +4106,14 @@
     transform: none;
   }
 }
+/* desktop: the team form's main button at a natural width, right-aligned
+   under the two player cards, instead of a 1,100px bar */
+@media (min-width: 900px) {
+  .ep .pub .btn.team-submit {
+    display: flex;
+    width: auto;
+    min-width: 320px;
+    margin-left: auto;
+    padding-inline: 40px;
+  }
+}
