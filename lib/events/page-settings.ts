@@ -17,6 +17,7 @@ export interface PageSettings {
   heroStyle: HeroStyle;
   showSpots: boolean;
   headings: typeof DEFAULT_HEADINGS;
+  thankYou: string | null;
 }
 
 export function pageSettings(event: { type: EventType; theme: EventTheme | null }): PageSettings {
@@ -27,5 +28,6 @@ export function pageSettings(event: { type: EventType; theme: EventTheme | null 
     heroStyle: t?.heroStyle ?? "photo",
     showSpots: !t?.hideSpots,
     headings: { ...DEFAULT_HEADINGS, ...t?.headings },
+    thankYou: t?.thankYou ?? null,
   };
 }

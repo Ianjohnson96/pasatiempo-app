@@ -41,6 +41,7 @@ describe("pageSettings", () => {
         info: "What you need to know",
         register: "Register",
       },
+      thankYou: null,
     });
   });
   test("the event's own wording wins", () => {
@@ -64,5 +65,21 @@ describe("pageSettings", () => {
       info: "What you need to know",
       register: "Enter",
     });
+  });
+});
+
+describe("thank-you message", () => {
+  test("kept trimmed, up to 280 characters, blank dropped", () => {
+    expect(parseTheme({ preset: "clubhouse", thankYou: "  See you on the first tee!  " })?.thankYou).toBe(
+      "See you on the first tee!",
+    );
+    expect(parseTheme({ preset: "clubhouse", thankYou: "z".repeat(400) })?.thankYou).toHaveLength(280);
+    expect(parseTheme({ preset: "clubhouse", thankYou: "   " })?.thankYou).toBeUndefined();
+  });
+  test("pageSettings gives the message, or null without one", () => {
+    expect(pageSettings({ type: "dinner", theme: null }).thankYou).toBeNull();
+    expect(
+      pageSettings({ type: "dinner", theme: { preset: "clubhouse", thankYou: "Cheers!" } }).thankYou,
+    ).toBe("Cheers!");
   });
 });

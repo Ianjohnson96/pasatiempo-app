@@ -367,6 +367,15 @@ export default function EventManager({
       <tr key={r.id} style={{ opacity: r.status === "cancelled" ? 0.55 : 1 }}>
         <td>
           <strong>{r.name}</strong>
+          {r.emailFailed && (
+            <span
+              className="flag-warn"
+              style={{ marginLeft: 8 }}
+              title="The confirmation email could not be sent"
+            >
+              Email not sent
+            </span>
+          )}
           {r.partySize > 1 && (
             <span className="pill" style={{ marginLeft: 8 }}>
               party of {r.partySize}

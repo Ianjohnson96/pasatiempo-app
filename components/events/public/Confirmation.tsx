@@ -2,6 +2,7 @@
 
 import { calendarEntries, googleCalendarUrl, icsText } from "@/lib/events/calendar";
 import { formatSlot, formatWhen } from "@/lib/events/format";
+import { pageSettings } from "@/lib/events/page-settings";
 import { eventContact } from "@/lib/events/theme";
 import type { EventRec } from "@/lib/events/types";
 
@@ -19,6 +20,7 @@ export default function Confirmation({
   slotIds: string[];
 }) {
   const contact = eventContact(event);
+  const { thankYou } = pageSettings(event);
   const entries = status === "confirmed" ? calendarEntries(event, slotIds) : [];
   const dates =
     event.scheduleMode === "slots"
@@ -46,6 +48,9 @@ export default function Confirmation({
 
   return (
     <div className="confirm-extras">
+      {thankYou && status === "confirmed" && (
+        <p className="confirm-note">{thankYou}</p>
+      )}
       {status === "confirmed" && (
         <dl className="confirm-facts">
           <div>

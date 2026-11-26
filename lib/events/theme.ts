@@ -22,12 +22,13 @@ export interface EventTheme {
   heroStyle?: HeroStyle; // absent = "photo"
   hideSpots?: boolean; // true = no "spots left" counts on the page
   headings?: { about?: string; info?: string; register?: string };
+  thankYou?: string; // a note from the organisers on the "You're registered" screen
 }
 
 export type HeroStyle = "photo" | "banner" | "plain";
 export const HERO_STYLES: HeroStyle[] = ["photo", "banner", "plain"];
 /** The longest wording each setting keeps. */
-export const WORDING_LIMITS = { buttonLabel: 28, kicker: 40, heading: 48 } as const;
+export const WORDING_LIMITS = { buttonLabel: 28, kicker: 40, heading: 48, thankYou: 280 } as const;
 
 export interface Preset {
   label: string;
@@ -292,6 +293,8 @@ export function parseTheme(raw: unknown): EventTheme | null {
   if (kicker) t.kicker = kicker;
   if (HERO_STYLES.includes(r.heroStyle as HeroStyle)) t.heroStyle = r.heroStyle as HeroStyle;
   if (r.hideSpots === true) t.hideSpots = true;
+  const thankYou = wording(r.thankYou, WORDING_LIMITS.thankYou);
+  if (thankYou) t.thankYou = thankYou;
   const h = r.headings as Record<string, unknown> | undefined;
   if (h && typeof h === "object") {
     const headings: NonNullable<EventTheme["headings"]> = {};

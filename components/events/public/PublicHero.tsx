@@ -1,6 +1,7 @@
 import Icon from "@/components/events/Icon";
 import ShareButton from "./ShareButton";
 import { pageSettings } from "@/lib/events/page-settings";
+import { mapUrl } from "@/lib/events/public-page";
 import type { Cta } from "@/lib/events/public-page";
 import type { EventRec } from "@/lib/events/types";
 
@@ -44,10 +45,16 @@ export default function PublicHero({
             {whenLine}
           </span>
           {event.location && (
-            <span>
+            <a
+              className="hero-map"
+              href={mapUrl(event.location) ?? undefined}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <Icon name="pin" className="ico" />
               {event.location}
-            </span>
+              <span className="sr-only"> (opens a map)</span>
+            </a>
           )}
         </div>
         <div className="hero-actions">

@@ -70,7 +70,8 @@ describe("teamEmails", () => {
     expect(a.text).not.toContain("Empty");
     expect(a.text).not.toContain("ghost");
     expect(a.text).toContain("Team: Mia Member & Gus Guest");
-    expect(a.text.trim().endsWith("Questions? Contact the golf shop.")).toBe(true);
+    // ends with the event's contact (the default one, as none is set)
+    expect(a.text.trim().endsWith("Questions? Contact Ian Johnson at Ijohnson@pasatiempo.com.")).toBe(true);
   });
 
   it("escapes names in html", () => {
@@ -78,5 +79,27 @@ describe("teamEmails", () => {
     const [a] = teamEmails(event, [member, evil], {}, "confirmed");
     expect(a.html).toContain("&lt;b&gt;x&lt;/b&gt;");
     expect(a.html).not.toContain("<b>x</b>");
+  });
+});
+
+describe("teamEmails: the event's own words", () => {
+  const url = "https://club.test/events/e/member-guest";
+  it("adds the thank-you message, the manage link and the event's contact", () => {
+    const ev = {
+      ...event,
+      theme: { preset: "clubhouse", thankYou: "See you on the first tee!" },
+      contactName: "Sam",
+      contactEmail: "sam@club.test",
+    } as unknown as EventRec;
+    const [a] = teamEmails(ev, [member, guest], {}, "confirmed", url);
+    expect(a.text).toContain("See you on the first tee!");
+    expect(a.text).toContain(`To change or withdraw, open ${url} and choose "Manage my registration".`);
+    expect(a.text).toContain("Questions? Contact Sam at sam@club.test.");
+    expect(a.text).not.toContain("Contact the golf shop");
+  });
+  it("leaves the message off a waitlist email", () => {
+    const ev = { ...event, theme: { preset: "clubhouse", thankYou: "See you!" } } as unknown as EventRec;
+    const [a] = teamEmails(ev, [member, guest], {}, "waitlist", url);
+    expect(a.text).not.toContain("See you!");
   });
 });
