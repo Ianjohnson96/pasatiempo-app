@@ -2,11 +2,12 @@
 // Pure, so the page, the editor preview and tests share one answer.
 
 import type { SeatInfo } from "@/components/events/RegistrationForm";
+import { pageSettings } from "./page-settings";
 import { eventContact } from "./theme";
 import type { EventRec } from "./types";
 
 export type Cta =
-  | { kind: "register"; label: "Register now" }
+  | { kind: "register"; label: string }
   | { kind: "waitlist"; label: "Join the waitlist" }
   | { kind: "contact"; name: string; email: string }
   | { kind: "none" };
@@ -22,7 +23,7 @@ export function ctaState(event: EventRec, seats: SeatInfo, rosterFull: boolean):
     return { kind: "contact", ...eventContact(event) };
   }
   if (full) return { kind: "waitlist", label: "Join the waitlist" };
-  return { kind: "register", label: "Register now" };
+  return { kind: "register", label: pageSettings(event).buttonLabel };
 }
 
 /**

@@ -53,6 +53,11 @@ describe("ctaState", () => {
     expect(ctaState(ev(), open, false)).toEqual({ kind: "register", label: "Register now" });
   });
 
+  test("the register button uses the event's own wording", () => {
+    const e = ev({ theme: { preset: "clubhouse", buttonLabel: "RSVP" } });
+    expect(ctaState(e, open, false)).toEqual({ kind: "register", label: "RSVP" });
+  });
+
   test("full without waitlist offers contact", () => {
     expect(ctaState(ev(), full, false)).toEqual({
       kind: "contact",

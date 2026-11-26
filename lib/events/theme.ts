@@ -16,7 +16,18 @@ export interface EventTheme {
   heroPhoto?: string; // one of event.photos; absent or gone = photos[0]
   heroFocus?: { x: number; y: number }; // 0–100 %
   logo?: { library: LogoId } | { url: string }; // absent = the preset's default
+  // The page's own wording and layout (see page-settings.ts for defaults).
+  buttonLabel?: string; // the main button, e.g. "RSVP"; absent = "Register now"
+  kicker?: string; // the line above the title; absent = the event type
+  heroStyle?: HeroStyle; // absent = "photo"
+  hideSpots?: boolean; // true = no "spots left" counts on the page
+  headings?: { about?: string; info?: string; register?: string };
 }
+
+export type HeroStyle = "photo" | "banner" | "plain";
+export const HERO_STYLES: HeroStyle[] = ["photo", "banner", "plain"];
+/** The longest wording each setting keeps. */
+export const WORDING_LIMITS = { buttonLabel: 28, kicker: 40, heading: 48 } as const;
 
 export interface Preset {
   label: string;
@@ -275,7 +286,29 @@ export function parseTheme(raw: unknown): EventTheme | null {
     if (LOGO_IDS.includes(l.library as LogoId)) t.logo = { library: l.library as LogoId };
     else if (typeof l.url === "string" && /^(https:\/\/|\/)/.test(l.url)) t.logo = { url: l.url };
   }
+  const buttonLabel = wording(r.buttonLabel, WORDING_LIMITS.buttonLabel);
+  if (buttonLabel) t.buttonLabel = buttonLabel;
+  const kicker = wording(r.kicker, WORDING_LIMITS.kicker);
+  if (kicker) t.kicker = kicker;
+  if (HERO_STYLES.includes(r.heroStyle as HeroStyle)) t.heroStyle = r.heroStyle as HeroStyle;
+  if (r.hideSpots === true) t.hideSpots = true;
+  const h = r.headings as Record<string, unknown> | undefined;
+  if (h && typeof h === "object") {
+    const headings: NonNullable<EventTheme["headings"]> = {};
+    for (const k of ["about", "info", "register"] as const) {
+      const v = wording(h[k], WORDING_LIMITS.heading);
+      if (v) headings[k] = v;
+    }
+    if (Object.keys(headings).length > 0) t.headings = headings;
+  }
   return t;
+}
+
+/** Trimmed text cut to `max`, or undefined when blank or not text. */
+function wording(v: unknown, max: number): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const s = v.trim().slice(0, max).trim();
+  return s || undefined;
 }
 
 const DARK_TEXT = "#111111";

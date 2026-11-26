@@ -2,9 +2,18 @@
 
 import { useRef, useState } from "react";
 import { uploadLogo } from "@/lib/events/actions";
+import { TYPE_LABEL } from "@/lib/events/format";
+import {
+  DEFAULT_BUTTON_LABEL,
+  DEFAULT_HEADINGS,
+} from "@/lib/events/page-settings";
+import type { EventType } from "@/lib/events/types";
 import {
   DEFAULT_CONTACT,
+  HERO_STYLES,
   LOGOS,
+  WORDING_LIMITS,
+  type HeroStyle,
   PRESETS,
   type EventTheme,
   type LogoId,
@@ -20,8 +29,25 @@ const PRESET_IDS = Object.keys(PRESETS) as PresetId[];
 
 // The editor's "Look" section: the page's colours, hero photo, logo and the
 // contact members are pointed to. Everything here shows in the live preview.
+const HERO_LABELS: Record<HeroStyle, { name: string; hint: string }> = {
+  photo: { name: "Full photo", hint: "The photo fills the top of the page." },
+  banner: { name: "Banner", hint: "A shorter photo, so the details come sooner." },
+  plain: { name: "No photo", hint: "The title on the look's own colour." },
+};
+
+// Words a button often needs; any other wording can be typed.
+const BUTTON_IDEAS = [
+  DEFAULT_BUTTON_LABEL,
+  "Sign up",
+  "RSVP",
+  "Enter your team",
+  "Reserve your spot",
+  "Book your place",
+];
+
 export default function LookSection({
   eventId,
+  type,
   photos,
   theme,
   onTheme,
@@ -30,6 +56,7 @@ export default function LookSection({
   onContact,
 }: {
   eventId: string | undefined;
+  type: EventType;
   photos: string[];
   theme: EventTheme | null;
   onTheme: (t: EventTheme) => void;
@@ -41,6 +68,13 @@ export default function LookSection({
   const look = themeVars(t);
   const hero = resolveHero(t, photos);
   const set = (patch: Partial<EventTheme>) => onTheme({ ...t, ...patch });
+  // blank wording means "use the page's usual words"
+  const words = (v: string) => (v.trim() ? v : undefined);
+  const setHeading = (k: keyof typeof DEFAULT_HEADINGS, v: string) => {
+    const headings = { ...t.headings, [k]: words(v) };
+    set({ headings: Object.values(headings).some(Boolean) ? headings : undefined });
+  };
+  const heroStyle = t.heroStyle ?? "photo";
 
   return (
     <>
@@ -119,8 +153,33 @@ export default function LookSection({
       </div>
 
       <div className="field">
+        <span className="lbl" id="look-hero-style-lbl">
+          Top of the page
+        </span>
+        <div className="seg" role="radiogroup" aria-labelledby="look-hero-style-lbl">
+          {HERO_STYLES.map((h) => (
+            <label key={h} className={`segbtn ${heroStyle === h ? "on" : ""}`}>
+              <input
+                type="radio"
+                name="look-hero-style"
+                checked={heroStyle === h}
+                onChange={() => set({ heroStyle: h === "photo" ? undefined : h })}
+              />
+              {HERO_LABELS[h].name}
+            </label>
+          ))}
+        </div>
+        <p className="hint">{HERO_LABELS[heroStyle].hint}</p>
+      </div>
+
+      <div className="field">
         <span className="lbl">Hero photo</span>
-        {photos.length === 0 ? (
+        {heroStyle === "plain" ? (
+          <p className="hint">
+            Not shown with &ldquo;No photo&rdquo;. Choose Full photo or Banner to
+            use one.
+          </p>
+        ) : photos.length === 0 ? (
           <p className="hint">Add photos on the event&apos;s Manage page.</p>
         ) : (
           <>
@@ -151,6 +210,73 @@ export default function LookSection({
       </div>
 
       <LogoPicker eventId={eventId} theme={t} onTheme={onTheme} />
+
+      <div className="look-words">
+        <p className="look-words-title">Wording</p>
+        <p className="hint" style={{ marginTop: 0 }}>
+          Leave any box blank to keep the page&apos;s usual words, shown in grey.
+        </p>
+        <div className="row">
+          <div className="field">
+            <label htmlFor="look-button">Main button</label>
+            <input
+              id="look-button"
+              list="look-button-ideas"
+              value={t.buttonLabel ?? ""}
+              maxLength={WORDING_LIMITS.buttonLabel}
+              placeholder={DEFAULT_BUTTON_LABEL}
+              onChange={(e) => set({ buttonLabel: words(e.target.value) })}
+            />
+            <datalist id="look-button-ideas">
+              {BUTTON_IDEAS.map((b) => (
+                <option key={b} value={b} />
+              ))}
+            </datalist>
+          </div>
+          <div className="field">
+            <label htmlFor="look-kicker">Line above the title</label>
+            <input
+              id="look-kicker"
+              value={t.kicker ?? ""}
+              maxLength={WORDING_LIMITS.kicker}
+              placeholder={TYPE_LABEL[type]}
+              onChange={(e) => set({ kicker: words(e.target.value) })}
+            />
+          </div>
+        </div>
+        <div className="row three">
+          {(
+            [
+              ["about", "Overview heading"],
+              ["info", "Details heading"],
+              ["register", "Sign-up heading"],
+            ] as const
+          ).map(([k, label]) => (
+            <div className="field" key={k}>
+              <label htmlFor={`look-h-${k}`}>{label}</label>
+              <input
+                id={`look-h-${k}`}
+                value={t.headings?.[k] ?? ""}
+                maxLength={WORDING_LIMITS.heading}
+                placeholder={DEFAULT_HEADINGS[k]}
+                onChange={(e) => setHeading(k, e.target.value)}
+              />
+            </div>
+          ))}
+        </div>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={!!t.hideSpots}
+            onChange={(e) => set({ hideSpots: e.target.checked || undefined })}
+          />
+          Hide how many spots are left
+        </label>
+        <p className="hint">
+          Members won&apos;t see the counts; the event still fills and closes at
+          its limit.
+        </p>
+      </div>
 
       <div className="row">
         <div className="field">

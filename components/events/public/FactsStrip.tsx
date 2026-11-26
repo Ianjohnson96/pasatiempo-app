@@ -1,4 +1,5 @@
 import { factDate, factTime, formatSlot, formatWhen } from "@/lib/events/format";
+import { pageSettings } from "@/lib/events/page-settings";
 import { priceFact } from "@/lib/events/public-page";
 import type { EventRec } from "@/lib/events/types";
 
@@ -44,7 +45,7 @@ export function spotsMeter(
   event: EventRec,
   avail: { taken: number; remaining: number | null; full: boolean },
 ): Meter | null {
-  if (event.scheduleMode === "slots") return null;
+  if (event.scheduleMode === "slots" || !pageSettings(event).showSpots) return null;
   if (event.capacity == null) return { text: "Open registration", pct: null };
   const pct = Math.min(100, Math.round((avail.taken / event.capacity) * 100));
   // A tournament's capacity is in teams, not people.
@@ -66,7 +67,7 @@ export function rosterMeter(
   event: EventRec,
   roster: { count: number; remaining: number | null; full: boolean },
 ): Meter | null {
-  if (event.rosterLimit == null) return null;
+  if (event.rosterLimit == null || !pageSettings(event).showSpots) return null;
   return {
     text: roster.full
       ? "Roster full"

@@ -3538,3 +3538,102 @@
 .ep .rt-phone:hover {
   text-decoration: underline;
 }
+
+/* ---------- hero styles (the look's "Hero" setting) ---------- */
+/* banner: the same photo, about half as tall, so the details come sooner */
+.ep .pub-hero.hero-banner {
+  min-height: 400px;
+}
+.ep .pub-hero.hero-banner .hero-inner {
+  padding: 72px 32px 88px;
+}
+/* plain: no photo, the title on the look's own colour */
+.ep .pub-hero.hero-plain {
+  min-height: 0;
+}
+.ep .pub-hero.hero-plain .hero-inner {
+  padding: 88px 32px 104px;
+}
+.ep .pub-hero.hero-plain .kicker,
+.ep .pub-hero.hero-plain .hero-meta {
+  text-shadow: none;
+}
+@media (max-width: 720px) {
+  .ep .pub-hero.hero-banner {
+    min-height: 340px;
+  }
+  .ep .pub-hero.hero-banner .hero-inner {
+    padding: 56px 20px 72px;
+  }
+  .ep .pub-hero.hero-plain .hero-inner {
+    padding: 56px 20px 80px;
+  }
+}
+.ep .ep-body .pub-hero.hero-banner,
+.ep .ep-body .pub-hero.hero-plain {
+  min-height: 0;
+}
+.ep .ep-body .pub-hero.hero-banner .hero-inner,
+.ep .ep-body .pub-hero.hero-plain .hero-inner {
+  padding: 40px 20px 56px;
+}
+
+/* the Look section's "Wording" group */
+.ep .look-words {
+  margin: 8px 0 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--hairline);
+}
+.ep .look-words-title {
+  margin: 0 0 4px;
+  color: var(--club);
+  font-family: var(--serif);
+  font-size: 1.25rem;
+}
+.ep .look-words .row.three {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0 18px;
+}
+.ep .look-words .row.three > .field {
+  min-width: 0;
+}
+
+/* the hero's button row: the main action, then a quiet Share */
+.ep .hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 22px;
+}
+.ep .share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--hero-ink);
+  font: 600 12.5px/1 var(--sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+.ep .pub-hero.hero-plain .share-btn {
+  text-shadow: none;
+}
+.ep .share-btn span {
+  background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat;
+  padding-bottom: 3px;
+  transition: background-size 0.3s var(--ease);
+}
+.ep .share-btn:hover span,
+.ep .share-btn:focus-visible span {
+  background-size: 100% 1px;
+}
+.ep .share-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}

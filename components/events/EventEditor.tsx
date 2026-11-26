@@ -418,6 +418,7 @@ export default function EventEditor({
           />
           <LookSection
             eventId={event?.id}
+            type={type}
             photos={event?.photos ?? []}
             theme={theme}
             onTheme={setTheme}
