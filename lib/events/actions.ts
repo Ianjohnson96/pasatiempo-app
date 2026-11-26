@@ -22,7 +22,7 @@ import {
   parseTheme,
   unusedLogoPaths,
 } from "./theme";
-import { TYPE_SWITCH_BLOCKED, crossesTournamentBoundary } from "./editor";
+import { TYPE_SWITCH_BLOCKED, crossesTournamentBoundary, previewEvent } from "./editor";
 import {
   cleanTeam,
   coerceAnswers,
@@ -35,7 +35,7 @@ import {
   type TeamInput,
 } from "./tournament";
 import { teamEmails } from "./tournament-email";
-import { signupEmail } from "./registration-email";
+import { sampleEmail, signupEmail, testEmail } from "./registration-email";
 import { sendMail, type Mail } from "@/lib/mail";
 import { resolveOrigin } from "@/lib/caddie/origin";
 import { headers } from "next/headers";
@@ -1319,4 +1319,35 @@ export async function deleteRegistration(regId: string): Promise<void> {
     .single();
   if (error) throw error;
   revalidatePath(`/admin/events/${data.event_id}`);
+}
+
+/**
+ * Send the confirmation email, as the editor has it now (unsaved changes
+ * included), to the signed-in staff member. Only ever to their own address:
+ * nothing here can send to a member.
+ */
+export async function sendTestEmail(
+  input: EventInput,
+): Promise<{ ok: true; to: string } | { ok: false; error: string }> {
+  try {
+    const viewer = input.id
+      ? await assertCanManageEvent(input.id)
+      : await assertEventsViewer();
+    const ev = previewEvent({ ...input, theme: parseTheme(input.theme) });
+    const url = ev.slug ? await eventPageUrl(ev.slug) : null;
+    const err = await sendMail(testEmail(sampleEmail(ev, url), viewer.email));
+    if (err) {
+      console.error(`Test email to ${viewer.email} failed: ${err}`);
+      return {
+        ok: false,
+        error:
+          err === "Email isn't set up."
+            ? "Email isn't set up on this server, so nothing was sent."
+            : "The test email didn't send. Please try again in a minute.",
+      };
+    }
+    return { ok: true, to: viewer.email };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not send the test." };
+  }
 }

@@ -144,3 +144,17 @@ export function sampleEmail(event: EventRec, pageUrl: string | null): Mail {
     pageUrl,
   );
 }
+
+const TEST_NOTE =
+  "This is a test of the confirmation email, sent to you from the event editor. " +
+  "Members get the same email with their own details.";
+
+/** A sample email readdressed to a staff member and marked as a test. */
+export function testEmail(mail: Mail, to: string): Mail {
+  return {
+    to,
+    subject: `[Test] ${mail.subject}`,
+    text: `${TEST_NOTE}\n\n${mail.text}`,
+    html: `<p style="margin:0 0 12px;padding:8px 12px;background:#faf3e2;border-left:3px solid #a2814a">${esc(TEST_NOTE)}</p>${mail.html}`,
+  };
+}

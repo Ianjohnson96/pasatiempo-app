@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sampleEmail, signupEmail } from "./registration-email";
+import { sampleEmail, signupEmail, testEmail } from "./registration-email";
 import type { EventRec } from "./types";
 
 const base = {
@@ -144,5 +144,16 @@ describe("signupEmail: answers", () => {
     expect(signupEmail(ev, { ...reg, answers: { fire: "Yes" } }, "confirmed", url).text).toContain(
       "Seat near the fire? Yes",
     );
+  });
+});
+
+describe("testEmail", () => {
+  it("goes only to the given staff address, marked as a test", () => {
+    const m = testEmail(sampleEmail(base, url), "staff@club.test");
+    expect(m.to).toBe("staff@club.test");
+    expect(m.subject).toBe("[Test] Holiday Dinner: you're registered");
+    expect(m.text.startsWith("This is a test of the confirmation email")).toBe(true);
+    expect(m.text).toContain("Hi Pat,");
+    expect(m.html).toContain("This is a test of the confirmation email");
   });
 });
