@@ -4050,3 +4050,59 @@
   text-transform: none;
   letter-spacing: -0.005em;
 }
+
+/* ---------- polish pass ("make interfaces feel better") ---------- */
+/* no lone word on a heading's or a short line's last row */
+.ep .pub-section h2,
+.ep .prose h3,
+.ep .facts .val,
+.ep .email-card h3 {
+  text-wrap: balance;
+}
+.ep .prose .rt-ul li,
+.ep .prose .rt-p,
+.ep .facts .fact-sub,
+.ep .hint,
+.ep .notice,
+.ep .manage-cta p {
+  text-wrap: pretty;
+}
+/* counts that change keep their width */
+.ep .sticky-spots,
+.ep .tr-of {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+/* photos keep a crisp edge against the page */
+.ep .gallery img,
+.ep .gallery-grid img {
+  outline: 1px solid rgba(0, 0, 0, 0.1);
+  outline-offset: -1px;
+}
+/* the small text buttons in the hero answer a press */
+.ep .share-btn {
+  transition-property: opacity, transform;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+.ep .share-btn:active {
+  opacity: 0.75;
+  transform: translateY(1px);
+}
+/* the calendar list eases in rather than snapping */
+@keyframes ep-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.ep .cal-pop {
+  animation: ep-pop-in 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ep .cal-pop {
+    animation: none;
+  }
+  .ep .share-btn:active {
+    transform: none;
+  }
+}
