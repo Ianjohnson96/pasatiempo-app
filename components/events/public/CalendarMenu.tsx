@@ -49,17 +49,17 @@ export default function CalendarMenu({ event }: { event: EventRec }) {
       <button
         type="button"
         className="share-btn"
-        aria-haspopup="true"
         aria-expanded={open}
+        aria-controls="cal-pop"
         onClick={() => setOpen((o) => !o)}
       >
         <Icon name="calendar" />
         <span>Add to calendar</span>
       </button>
       {open && (
-        <div className="cal-pop" role="menu">
+        // a plain show/hide list (not an ARIA menu, which promises arrow keys)
+        <div className="cal-pop" id="cal-pop">
           <a
-            role="menuitem"
             href={googleCalendarUrl(entries[0])}
             target="_blank"
             rel="noopener noreferrer"
@@ -67,7 +67,7 @@ export default function CalendarMenu({ event }: { event: EventRec }) {
           >
             Google Calendar
           </a>
-          <button type="button" role="menuitem" onClick={downloadIcs}>
+          <button type="button" onClick={downloadIcs}>
             Apple / Outlook (.ics)
           </button>
         </div>

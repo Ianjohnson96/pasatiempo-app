@@ -4036,3 +4036,17 @@
     background-position: 0 calc(100% - 12px);
   }
 }
+/* narrow phones: jump links wrap instead of hiding off the edge */
+@media (max-width: 400px) {
+  .ep .sec-links {
+    flex-wrap: wrap;
+    gap: 0 22px;
+    overflow-x: visible;
+  }
+}
+/* text-box headings are real h3s now; keep them looking as before */
+.ep .prose h3.rt-h1,
+.ep .prose h3.rt-h2 {
+  text-transform: none;
+  letter-spacing: -0.005em;
+}

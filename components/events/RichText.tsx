@@ -30,7 +30,8 @@ function Block({ b, k }: { b: RichBlock; k: string }) {
   switch (b.kind) {
     case "h1":
     case "h2":
-      return <p className={`rt-${b.kind}`}>{inline(b.text, `${k}-`)}</p>;
+      // real headings under the section's h2, so screen readers can jump between them
+      return <h3 className={`rt-${b.kind}`}>{inline(b.text, `${k}-`)}</h3>;
     case "ul": {
       const timed = b.items.map(timeItem);
       // a list that is mostly times lines its times up in a column
@@ -79,7 +80,7 @@ export default function RichText({
         const inner = (
           <>
             {g.heading !== null && (
-              <p className="rt-h2">{inline(g.heading, `g${i}h-`)}</p>
+              <h3 className="rt-h2">{inline(g.heading, `g${i}h-`)}</h3>
             )}
             {g.blocks.map((b, j) => (
               <Block key={j} b={b} k={`g${i}b${j}`} />
