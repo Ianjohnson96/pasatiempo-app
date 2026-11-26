@@ -5,6 +5,7 @@ import {
   PRESETS,
   type PresetId,
   eventContact,
+  logoUploadCheck,
   logosFor,
   parseTheme,
   resolveHero,
@@ -183,5 +184,22 @@ describe("a custom button colour stands out from the page", () => {
   });
   test("a good accent is left alone", () => {
     expect(themeVars({ preset: "clubhouse", accent: "#b41c14" }).adjusted).toBe(false);
+  });
+});
+
+describe("logoUploadCheck", () => {
+  const MB = 1024 * 1024;
+  test("PNG and JPG under 2 MB are accepted", () => {
+    expect(logoUploadCheck("image/png", 300_000)).toEqual({ ok: true, ext: "png" });
+    expect(logoUploadCheck("image/jpeg", 2 * MB)).toEqual({ ok: true, ext: "jpg" });
+  });
+  test("SVG is refused: it can carry script when opened from the bucket", () => {
+    expect(logoUploadCheck("image/svg+xml", 2_000).ok).toBe(false);
+  });
+  test("too big, empty or another type is refused with the same message", () => {
+    const msg = "Logos must be PNG or JPG under 2 MB.";
+    expect(logoUploadCheck("image/png", 2 * MB + 1)).toEqual({ ok: false, error: msg });
+    expect(logoUploadCheck("image/png", 0)).toEqual({ ok: false, error: msg });
+    expect(logoUploadCheck("application/pdf", 10)).toEqual({ ok: false, error: msg });
   });
 });

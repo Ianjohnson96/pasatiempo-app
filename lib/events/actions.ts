@@ -15,7 +15,13 @@ import { newId, newSlug, slugify } from "./ids";
 import { availability, rosterCount, onRoster } from "./seats";
 import { formatSlot } from "./format";
 import { normalizeFields } from "./question-builder";
-import { type EventTheme, eventContact, parseTheme, unusedLogoPaths } from "./theme";
+import {
+  type EventTheme,
+  eventContact,
+  logoUploadCheck,
+  parseTheme,
+  unusedLogoPaths,
+} from "./theme";
 import { TYPE_SWITCH_BLOCKED, crossesTournamentBoundary } from "./editor";
 import {
   cleanTeam,
@@ -389,12 +395,6 @@ export async function uploadPhoto(
   return { ok: true, photos };
 }
 
-const LOGO_TYPES: Record<string, string> = {
-  "image/png": "png",
-  "image/svg+xml": "svg",
-  "image/jpeg": "jpg",
-};
-
 // Stores a logo for the event's look. The event only points at it once the
 // organiser saves; files the look no longer uses are cleared on save.
 export async function uploadLogo(
@@ -407,9 +407,10 @@ export async function uploadLogo(
     return { ok: false, error: (e as Error).message };
   }
   const file = formData.get("file");
-  const ext = file instanceof File ? LOGO_TYPES[file.type] : undefined;
-  if (!(file instanceof File) || file.size === 0 || !ext || file.size > 2 * 1024 * 1024)
-    return { ok: false, error: "Logos must be PNG, SVG or JPG under 2 MB." };
+  if (!(file instanceof File)) return { ok: false, error: "No file received." };
+  const checked = logoUploadCheck(file.type, file.size);
+  if (!checked.ok) return checked;
+  const ext = checked.ext;
 
   const supa = createAdminClient("events");
   const objectPath = `${eventId}/logo-${newId()}.${ext}`;

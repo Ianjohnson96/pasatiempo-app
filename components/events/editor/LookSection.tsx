@@ -9,6 +9,7 @@ import {
   type EventTheme,
   type LogoId,
   type PresetId,
+  logoUploadCheck,
   logosFor,
   resolveHero,
   resolveLogo,
@@ -273,13 +274,26 @@ function LogoPicker({
     if (!file || !eventId) return;
     setBusy(true);
     setError("");
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await uploadLogo(eventId, fd);
-    setBusy(false);
-    if (input.current) input.current.value = "";
-    if (res.ok) onTheme({ ...theme, logo: { url: res.url } });
-    else setError(res.error);
+    // check here too: a file over the server's request limit never reaches it
+    const checked = logoUploadCheck(file.type, file.size);
+    if (!checked.ok) {
+      setBusy(false);
+      setError(checked.error);
+      if (input.current) input.current.value = "";
+      return;
+    }
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await uploadLogo(eventId, fd);
+      if (res.ok) onTheme({ ...theme, logo: { url: res.url } });
+      else setError(res.error);
+    } catch {
+      setError("The logo didn't upload. Please try again.");
+    } finally {
+      setBusy(false);
+      if (input.current) input.current.value = "";
+    }
   }
 
   const tile = (
@@ -332,7 +346,7 @@ function LogoPicker({
         <input
           ref={input}
           type="file"
-          accept="image/png,image/svg+xml,image/jpeg"
+          accept="image/png,image/jpeg"
           id="look-logo-file"
           className="sr-only"
           disabled={disabled}

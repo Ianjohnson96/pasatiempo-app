@@ -393,3 +393,18 @@ export function unusedLogoPaths(files: string[], keepUrl: string | null): string
   const keep = keepUrl ? keepUrl.split("/").pop() : null;
   return files.filter((f) => /^logo-/.test(f) && f !== keep);
 }
+
+const LOGO_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg" };
+export const LOGO_MAX_BYTES = 2 * 1024 * 1024;
+
+/** Whether an uploaded logo is acceptable. SVG is refused: opened straight
+ *  from the public bucket it could run script. */
+export function logoUploadCheck(
+  type: string,
+  size: number,
+): { ok: true; ext: string } | { ok: false; error: string } {
+  const ext = LOGO_TYPES[type];
+  if (!ext || size <= 0 || size > LOGO_MAX_BYTES)
+    return { ok: false, error: "Logos must be PNG or JPG under 2 MB." };
+  return { ok: true, ext };
+}
