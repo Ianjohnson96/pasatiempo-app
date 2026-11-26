@@ -3295,3 +3295,22 @@
 .ep .already-manage {
   margin-top: 8px;
 }
+
+/* a fact's quieter second line, e.g. what the price covers */
+.ep .fact .fact-sub {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.ep .pub-foot .foot-contact {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+.ep .pub-foot .foot-contact a {
+  color: var(--club);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

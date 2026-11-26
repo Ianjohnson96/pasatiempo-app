@@ -119,9 +119,15 @@ describe("priceFact", () => {
   test("is null when pricing is on but blank", () => {
     expect(priceFact(ev({ pricingEnabled: true, pricing: " \n " }))).toBeNull();
   });
-  test("takes the first non-blank line", () => {
-    expect(priceFact(ev({ pricingEnabled: true, pricing: "\n Members — $85 \nGuests — $95" }))).toBe(
-      "Members — $85",
-    );
+  test("takes the first non-blank line, amount first", () => {
+    expect(
+      priceFact(ev({ pricingEnabled: true, pricing: "\n Members — $85 \nGuests — $95" })),
+    ).toEqual({ amount: "$85", detail: "Members" });
+  });
+  test("a line without an 'item — amount' split stays whole", () => {
+    expect(priceFact(ev({ pricingEnabled: true, pricing: "$320 per person" }))).toEqual({
+      amount: "$320 per person",
+      detail: "",
+    });
   });
 });

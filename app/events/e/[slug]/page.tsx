@@ -279,6 +279,10 @@ export default async function PublicEventPage({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-mark.png" alt="" />
         <div className="est">Pasatiempo Golf Club · Est. 1929</div>
+        <p className="foot-contact">
+          Questions about this event?{" "}
+          <a href={`mailto:${contact.email}`}>Contact {contact.name}</a>
+        </p>
         <Link className="foot-admin" href="/admin/events">
           Pasatiempo staff — manage events →
         </Link>

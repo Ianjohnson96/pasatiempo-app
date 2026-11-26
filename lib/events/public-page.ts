@@ -27,14 +27,17 @@ export function ctaState(event: EventRec, seats: SeatInfo, rosterFull: boolean):
 
 /**
  * The price shown with the key facts: the first pricing line, only when
- * pricing is turned on. Pricing off may mean "charged to your account", so
- * the page never claims an event is free.
+ * pricing is turned on, split so the amount leads ("Team entry — $2,400" →
+ * $2,400 over "Team entry"). Pricing off may mean "charged to your account",
+ * so the page never claims an event is free.
  */
-export function priceFact(event: EventRec): string | null {
+export function priceFact(event: EventRec): { amount: string; detail: string } | null {
   if (!event.pricingEnabled) return null;
   const line = event.pricing
     .split("\n")
     .map((l) => l.trim())
     .find(Boolean);
-  return line ?? null;
+  if (!line) return null;
+  const m = line.match(/^(.*\S)\s+[—–]\s+(\S.*)$/);
+  return m ? { amount: m[2], detail: m[1] } : { amount: line, detail: "" };
 }

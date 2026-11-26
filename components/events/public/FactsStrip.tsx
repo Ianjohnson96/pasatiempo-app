@@ -5,6 +5,7 @@ import type { EventRec } from "@/lib/events/types";
 export interface Fact {
   lbl: string;
   val: string;
+  sub?: string; // a quieter line under the value
 }
 export interface Meter {
   text: string;
@@ -34,7 +35,7 @@ export function factsFor(event: EventRec): Fact[] {
   }
   if (event.location) facts.push({ lbl: "Where", val: event.location });
   const price = priceFact(event);
-  if (price) facts.push({ lbl: "Price", val: price });
+  if (price) facts.push({ lbl: "Price", val: price.amount, sub: price.detail || undefined });
   return facts;
 }
 
@@ -91,6 +92,7 @@ export default function FactsStrip({
         <div className="fact" key={i}>
           <div className="lbl">{f.lbl}</div>
           <div className="val">{f.val}</div>
+          {f.sub && <div className="fact-sub">{f.sub}</div>}
         </div>
       ))}
       {spots && (

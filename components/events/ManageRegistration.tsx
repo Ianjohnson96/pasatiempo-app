@@ -283,8 +283,15 @@ export default function ManageRegistration({ event }: { event: EventRec }) {
         <div className="mc-text">
           <div className="mc-title">Already signed up?</div>
           <p>
-            Change your dates, update your party or guests, or cancel &mdash;
-            all you need is the email you registered with.
+            {event.type === "tournament"
+              ? "Update your team's details or withdraw"
+              : event.scheduleMode === "slots"
+                ? "Change your dates, update your party, or cancel"
+                : event.allowGuests
+                  ? "Update your party or guests, or cancel"
+                  : "Update your details or cancel"}{" "}
+            &mdash; all you need is the email you{" "}
+            {event.type === "tournament" ? "entered with" : "registered with"}.
           </p>
         </div>
         <button className="btn block mc-btn" onClick={() => setOpen(true)}>
