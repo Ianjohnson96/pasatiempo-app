@@ -3314,3 +3314,206 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* ---------- Manage: the sign-up list's header ---------- */
+.ep .reg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ep .reg-title {
+  margin: 0;
+  color: var(--club);
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  font-weight: 500;
+}
+.ep .reg-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1px;
+  margin: 18px 0;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--hairline);
+}
+.ep .reg-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  background: var(--paper);
+}
+.ep .reg-stat.warn {
+  background: #fbf1e1;
+}
+.ep .rs-num {
+  color: var(--club);
+  font-family: var(--serif);
+  font-size: 1.75rem;
+  line-height: 1.1;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.ep .reg-stat.warn .rs-num {
+  color: var(--warn);
+}
+.ep .rs-num small {
+  color: var(--muted);
+  font-size: 0.6em;
+}
+.ep .rs-lbl {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.ep .reg-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+.ep .reg-search {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.ep .reg-search input {
+  width: 100%;
+  padding-left: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235b635d' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 3.5 3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 13px 50%;
+}
+.ep .reg-tool-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ep .reg-search-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.ep .linklike {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--club);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ep .reg-cancelled {
+  margin-top: 22px;
+}
+.ep .reg-cancelled > summary {
+  width: fit-content;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ep .reg-cancelled[open] > summary {
+  margin-bottom: 12px;
+}
+@media (max-width: 720px) {
+  .ep .reg-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ep .reg-tool-group {
+    flex: 1 1 100%;
+  }
+  .ep .reg-tool-group .btn {
+    flex: 1;
+  }
+}
+@media (max-width: 560px) {
+  /* team cards inside a card: less nested padding, actions on one row */
+  .ep .card .team-card {
+    padding: 16px 14px 16px 16px;
+  }
+  .ep .tc-player,
+  .ep .tc-team {
+    padding: 12px 12px;
+  }
+  .ep .tc-head .tc-actions {
+    display: flex;
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .ep .tc-head .tc-actions .btn {
+    flex: 1 1 auto;
+    padding-inline: 8px;
+    white-space: nowrap;
+  }
+  .ep .tc-head .tc-actions .btn.danger {
+    flex: 0 0 44px;
+  }
+  /* a label over its value, so emails don't break mid-word */
+  .ep .tc-row,
+  .ep .tc-team .tc-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .ep .tc-row dd {
+    overflow-wrap: anywhere;
+  }
+}
+.ep .rt-actions {
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  /* a sign-up table becomes a stack of rows, actions underneath */
+  .ep .reg-table,
+  .ep .reg-table tbody,
+  .ep .reg-table tr,
+  .ep .reg-table td {
+    display: block;
+    width: 100%;
+  }
+  .ep .reg-table thead {
+    display: none;
+  }
+  .ep .reg-table tr {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .ep .reg-table td {
+    padding: 2px 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+  .ep .reg-table .rt-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding-top: 10px;
+  }
+  .ep .reg-table .rt-actions .btn {
+    flex: 1 1 auto;
+    padding-inline: 8px;
+  }
+  .ep .reg-table .rt-actions .btn.danger {
+    flex: 0 0 44px;
+  }
+  .ep .reg-table .rt-actions .btn + .btn {
+    margin-left: 0;
+  }
+}
+@media (max-width: 560px) {
+  .ep .tc-head .tc-actions .btn,
+  .ep .reg-table .rt-actions .btn {
+    min-width: 0;
+    padding-inline: 4px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+  }
+  .ep .tc-head .tc-actions .btn:not(.danger),
+  .ep .reg-table .rt-actions .btn:not(.danger) {
+    flex: 1 1 auto;
+  }
+}

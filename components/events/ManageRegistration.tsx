@@ -294,7 +294,7 @@ export default function ManageRegistration({ event }: { event: EventRec }) {
             {event.type === "tournament" ? "entered with" : "registered with"}.
           </p>
         </div>
-        <button className="btn block mc-btn" onClick={() => setOpen(true)}>
+        <button className="btn secondary block mc-btn" onClick={() => setOpen(true)}>
           Manage my registration
         </button>
       </div>

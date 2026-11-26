@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import type { FieldError } from "@/lib/events/validate";
 
 // A box at the top of a form listing everything to fix. It takes focus each
@@ -14,6 +14,7 @@ export default function ErrorSummary({
   focusKey: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   const has = errors.length > 0;
 
   useEffect(() => {
@@ -29,11 +30,12 @@ export default function ErrorSummary({
     <div
       ref={ref}
       className="error-summary"
-      role="alert"
+      // focus (on submit) announces it; role="alert" as well would read it twice
+      role="region"
       tabIndex={-1}
-      aria-labelledby="error-summary-title"
+      aria-labelledby={titleId}
     >
-      <p className="es-title" id="error-summary-title">
+      <p className="es-title" id={titleId}>
         {n === 1 ? "1 thing to fix" : `${n} things to fix`}
       </p>
       <ul>
