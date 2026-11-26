@@ -21,6 +21,8 @@ import {
   logoUploadCheck,
   parseTheme,
   unusedLogoPaths,
+  withEmailWording,
+  type EmailWords,
 } from "./theme";
 import { TYPE_SWITCH_BLOCKED, crossesTournamentBoundary, previewEvent } from "./editor";
 import {
@@ -1349,5 +1351,34 @@ export async function sendTestEmail(
     return { ok: true, to: viewer.email };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Could not send the test." };
+  }
+}
+
+/**
+ * Save only the confirmation email's words (subject, opening line, message,
+ * sign-off) from the Manage page, leaving the rest of the event as it is.
+ */
+export async function saveEmailWording(
+  eventId: string,
+  words: EmailWords,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await assertCanManageEvent(eventId);
+    const supa = createAdminClient("events");
+    const { data: row, error: readErr } = await supa
+      .from("events")
+      .select("theme, slug")
+      .eq("id", eventId)
+      .single();
+    if (readErr || !row) return { ok: false, error: "That event no longer exists." };
+    const theme = withEmailWording(parseTheme(row.theme), words);
+    const { error } = await supa.from("events").update({ theme }).eq("id", eventId);
+    if (error) return { ok: false, error: "Could not save the email. Please try again." };
+    revalidatePath(`/admin/events/${eventId}`);
+    revalidatePath(`/admin/events/${eventId}/edit`);
+    revalidatePath(`/events/e/${row.slug}`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not save the email." };
   }
 }

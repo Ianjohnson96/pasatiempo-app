@@ -452,3 +452,20 @@ export function logoUploadCheck(
     return { ok: false, error: "Logos must be PNG or JPG under 2 MB." };
   return { ok: true, ext };
 }
+
+export const EMAIL_WORD_KEYS = ["emailSubject", "emailIntro", "thankYou", "emailSignOff"] as const;
+export type EmailWords = Partial<Record<(typeof EMAIL_WORD_KEYS)[number], string>>;
+
+/**
+ * The look with only the confirmation email's words replaced (blank = the
+ * usual words). Everything else on the look is kept; nothing else can be set.
+ */
+export function withEmailWording(theme: EventTheme | null, words: EmailWords): EventTheme | null {
+  const next: Record<string, unknown> = { ...(theme ?? { preset: "clubhouse" }) };
+  for (const k of EMAIL_WORD_KEYS) {
+    const v = words[k];
+    if (typeof v === "string" && v.trim()) next[k] = v;
+    else delete next[k];
+  }
+  return parseTheme(next);
+}

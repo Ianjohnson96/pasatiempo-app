@@ -3908,3 +3908,23 @@
   color: var(--club);
   font-size: 14px;
 }
+
+/* Manage: the confirmation email card */
+.ep .email-card-head {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+.ep .email-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+}
+.ep .email-card-actions .email-test-ok,
+.ep .email-card-actions .field-err {
+  margin: 0;
+}
