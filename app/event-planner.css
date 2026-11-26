@@ -3638,7 +3638,7 @@
   outline-offset: 3px;
 }
 
-/* bullet lists in the event text boxes: a brass dash, airy rows */
+/* bullet lists in the event text boxes: a small brass diamond per item */
 .ep .prose .rt-ul {
   margin: 0 0 18px;
   padding: 0;
@@ -3646,18 +3646,158 @@
 }
 .ep .prose .rt-ul li {
   position: relative;
-  margin: 0 0 8px;
-  padding-left: 22px;
+  margin: 0;
+  padding: 7px 0 7px 22px;
+  line-height: 1.55;
 }
 .ep .prose .rt-ul li::before {
   content: "";
   position: absolute;
-  top: 0.85em;
-  left: 2px;
-  width: 9px;
-  height: 1.5px;
+  top: calc(7px + 0.62em);
+  left: 3px;
+  width: 6px;
+  height: 6px;
   background: var(--brass);
+  transform: rotate(45deg);
 }
-.ep .prose .rt-h2 + .rt-ul {
-  margin-top: 4px;
+/* a heading with a list under it: its own panel */
+.ep .prose .rt-panel {
+  margin: 0 0 16px;
+  padding: 20px 24px 14px;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-top: 2px solid var(--brass);
+  border-radius: var(--radius);
+}
+.ep .prose .rt-panel .rt-h2 {
+  margin: 0 0 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--club);
+  font-size: 1.4rem;
+}
+.ep .prose .rt-panel .rt-ul {
+  margin-bottom: 4px;
+}
+.ep .prose .rt-panel .rt-ul li + li {
+  border-top: 1px dotted var(--hairline);
+}
+.ep .prose .rt-panel .rt-p:last-child {
+  margin-bottom: 6px;
+}
+/* outside a panel, headings still lead clearly */
+.ep .prose > .rt-h2 {
+  color: var(--club);
+  font-size: 1.4rem;
+}
+/* a run of times: the time in its own column */
+.ep .prose .rt-sched li.rt-timed {
+  display: grid;
+  grid-template-columns: 5.6em minmax(0, 1fr);
+  gap: 12px;
+  padding-left: 0;
+}
+.ep .prose .rt-sched li.rt-timed::before {
+  display: none;
+}
+.ep .prose .rt-time {
+  color: var(--brass-ink);
+  font-weight: 600;
+  font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .ep .prose .rt-panel {
+    padding: 16px 16px 10px;
+  }
+  .ep .prose .rt-sched li.rt-timed {
+    grid-template-columns: 4.9em minmax(0, 1fr);
+    gap: 10px;
+  }
+}
+
+/* the location opens a map */
+.ep .pub-hero .hero-meta > .hero-map {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+.ep .pub-hero .hero-map:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+.ep .facts .fact-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--brass-soft);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+.ep .facts .fact-link:hover {
+  text-decoration-color: currentColor;
+}
+
+/* "On this page" jump links under the key facts */
+.ep .sec-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 26px;
+  margin: 30px 0 0;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.ep .sec-links a {
+  padding: 6px 0;
+  color: var(--club);
+  font: 600 12px/1.2 var(--sans);
+  letter-spacing: 0.16em;
+  text-decoration: none;
+  text-transform: uppercase;
+  background: linear-gradient(var(--brass), var(--brass)) 0 100% / 0 1.5px no-repeat;
+  transition: background-size 0.3s var(--ease);
+}
+.ep .sec-links a:hover,
+.ep .sec-links a:focus-visible {
+  background-size: 100% 1.5px;
+}
+.ep .pub-section[id] {
+  scroll-margin-top: 16px;
+}
+@media (max-width: 720px) {
+  .ep .sec-links {
+    flex-wrap: nowrap;
+    gap: 22px;
+    margin-top: 22px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .ep .sec-links a {
+    flex: 0 0 auto;
+  }
+}
+
+/* the organisers' own note on the "You're registered" screen */
+.ep .confirm-note {
+  margin: 0 0 18px;
+  padding: 14px 18px;
+  border-left: 2px solid var(--brass);
+  background: color-mix(in srgb, var(--brass) 7%, var(--card));
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  font-style: italic;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+@media (max-width: 720px) {
+  /* untimed rows in a schedule use the full width on phones */
+  .ep .prose .rt-sched li.rt-timed:has(> .rt-time:empty) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ep .prose .rt-sched .rt-time:empty {
+    display: none;
+  }
 }

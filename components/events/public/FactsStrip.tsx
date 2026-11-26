@@ -1,12 +1,13 @@
 import { factDate, factTime, formatSlot, formatWhen } from "@/lib/events/format";
 import { pageSettings } from "@/lib/events/page-settings";
-import { priceFact } from "@/lib/events/public-page";
+import { mapUrl, priceFact } from "@/lib/events/public-page";
 import type { EventRec } from "@/lib/events/types";
 
 export interface Fact {
   lbl: string;
   val: string;
   sub?: string; // a quieter line under the value
+  href?: string; // the value links here (the location opens a map)
 }
 export interface Meter {
   text: string;
@@ -34,7 +35,8 @@ export function factsFor(event: EventRec): Fact[] {
     facts.push({ lbl: "Date", val: factDate(event.startsAt) });
     facts.push({ lbl: "Time", val: factTime(event.startsAt, event.endsAt) });
   }
-  if (event.location) facts.push({ lbl: "Where", val: event.location });
+  if (event.location)
+    facts.push({ lbl: "Where", val: event.location, href: mapUrl(event.location) ?? undefined });
   const price = priceFact(event);
   if (price) facts.push({ lbl: "Price", val: price.amount, sub: price.detail || undefined });
   return facts;
@@ -92,7 +94,16 @@ export default function FactsStrip({
       {facts.map((f, i) => (
         <div className="fact" key={i}>
           <div className="lbl">{f.lbl}</div>
-          <div className="val">{f.val}</div>
+          <div className="val">
+            {f.href ? (
+              <a className="fact-link" href={f.href} target="_blank" rel="noopener noreferrer">
+                {f.val}
+                <span className="sr-only"> (opens a map)</span>
+              </a>
+            ) : (
+              f.val
+            )}
+          </div>
           {f.sub && <div className="fact-sub">{f.sub}</div>}
         </div>
       ))}

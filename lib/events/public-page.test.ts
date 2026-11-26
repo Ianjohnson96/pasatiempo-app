@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { ctaState, priceFact } from "./public-page";
+import { ctaState, mapUrl, priceFact, sectionLinks } from "./public-page";
 import type { EventRec } from "./types";
 import type { SeatInfo } from "@/components/events/RegistrationForm";
 
@@ -134,5 +134,60 @@ describe("priceFact", () => {
       amount: "$320 per person",
       detail: "",
     });
+  });
+});
+
+describe("sectionLinks", () => {
+  test("lists the sections the page has, in page order", () => {
+    const e = ev({
+      description: "About",
+      info: "Info",
+      pricingEnabled: true,
+      pricing: "Entry — $10",
+      photos: ["a.jpg", "b.jpg"],
+    });
+    expect(sectionLinks(e).map((l) => l.id)).toEqual([
+      "about",
+      "details",
+      "pricing",
+      "photos",
+      "register",
+    ]);
+  });
+  test("a short page gets no links", () => {
+    expect(sectionLinks(ev({ description: "About" }))).toEqual([]);
+  });
+  test("a closed event has no Register link", () => {
+    const e = ev({ status: "closed", description: "A", info: "B", pricingEnabled: true, pricing: "x — $1" });
+    expect(sectionLinks(e).map((l) => l.id)).toEqual(["about", "details", "pricing"]);
+  });
+  test("a multi-date event links its schedule", () => {
+    const e = ev({
+      scheduleMode: "slots",
+      slots: [
+        { id: "a", date: "2026-12-01", startTime: "", endTime: "", label: "", note: "", capacity: null },
+        { id: "b", date: "2026-12-08", startTime: "", endTime: "", label: "", note: "", capacity: null },
+      ],
+      description: "A",
+    });
+    expect(sectionLinks(e).map((l) => l.id)).toEqual(["about", "schedule", "register"]);
+  });
+});
+
+describe("mapUrl", () => {
+  test("searches the location in Santa Cruz", () => {
+    expect(mapUrl("Pasatiempo Golf Club · Hollins House")).toBe(
+      "https://www.google.com/maps/search/?api=1&query=" +
+        encodeURIComponent("Pasatiempo Golf Club · Hollins House, Santa Cruz, CA"),
+    );
+  });
+  test("leaves a full address alone", () => {
+    expect(mapUrl("20 Clubhouse Rd, Santa Cruz, CA 95060")).toBe(
+      "https://www.google.com/maps/search/?api=1&query=" +
+        encodeURIComponent("20 Clubhouse Rd, Santa Cruz, CA 95060"),
+    );
+  });
+  test("no location, no link", () => {
+    expect(mapUrl("  ")).toBeNull();
   });
 });

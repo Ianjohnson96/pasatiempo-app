@@ -14,7 +14,7 @@ import {
   registrationsFor,
 } from "@/lib/events/data";
 import { formatSlot, rosterName } from "@/lib/events/format";
-import { ctaState } from "@/lib/events/public-page";
+import { ctaState, sectionLinks } from "@/lib/events/public-page";
 import { pageSettings } from "@/lib/events/page-settings";
 import { eventContact, resolveHero, resolveLogo, themeVars } from "@/lib/events/theme";
 import PublicNav from "@/components/events/public/PublicNav";
@@ -101,8 +101,18 @@ export default async function PublicEventPage({
           roster={rosterMeter(event, rosterAvail)}
         />
 
+        {sectionLinks(event).length > 0 && (
+          <nav className="sec-links" aria-label="On this page">
+            {sectionLinks(event).map((l) => (
+              <a key={l.id} href={`#${l.id}`}>
+                {l.label}
+              </a>
+            ))}
+          </nav>
+        )}
+
         {event.description && (
-          <section className="pub-section reveal">
+          <section className="pub-section reveal" id="about">
             <p className="sec-eyebrow">Overview</p>
             <h2>{settings.headings.about}</h2>
             <RichText text={event.description} className="prose" />
@@ -110,7 +120,7 @@ export default async function PublicEventPage({
         )}
 
         {event.info && (
-          <section className="pub-section reveal">
+          <section className="pub-section reveal" id="details">
             <p className="sec-eyebrow">Particulars</p>
             <h2>{settings.headings.info}</h2>
             <RichText text={event.info} className="prose" />
@@ -118,7 +128,7 @@ export default async function PublicEventPage({
         )}
 
         {event.pricingEnabled && event.pricing && (
-          <section className="pub-section reveal">
+          <section className="pub-section reveal" id="pricing">
             <p className="sec-eyebrow">Entry fees</p>
             <h2>Pricing</h2>
             <div className="pricing-card">
@@ -145,7 +155,7 @@ export default async function PublicEventPage({
         )}
 
         {isSlots && event.slots.length > 1 && (
-          <section className="pub-section reveal">
+          <section className="pub-section reveal" id="schedule">
             <p className="sec-eyebrow">Calendar</p>
             <h2>Schedule</h2>
             <div style={{ marginTop: 12 }}>
@@ -198,7 +208,7 @@ export default async function PublicEventPage({
         )}
 
         {event.photos.length > 1 && (
-          <section className="pub-section reveal">
+          <section className="pub-section reveal" id="photos">
             <p className="sec-eyebrow">Photographs</p>
             <h2>Gallery</h2>
             <div style={{ marginTop: 14 }}>

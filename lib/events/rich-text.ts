@@ -35,3 +35,34 @@ export function parseRichText(text: string): RichBlock[] {
   }
   return out;
 }
+
+export interface RichGroup {
+  heading: string | null; // the "## " line that starts it; null for text before any
+  boxed: boolean; // a heading with a list under it reads best as its own panel
+  blocks: RichBlock[];
+}
+
+/** Blocks gathered under their "## " headings, for drawing as panels. */
+export function groupRichBlocks(blocks: RichBlock[]): RichGroup[] {
+  const groups: RichGroup[] = [];
+  let cur: RichGroup | null = null;
+  for (const b of blocks) {
+    if (b.kind === "h2") {
+      cur = { heading: b.text, boxed: false, blocks: [] };
+      groups.push(cur);
+    } else {
+      if (!cur) groups.push((cur = { heading: null, boxed: false, blocks: [] }));
+      cur.blocks.push(b);
+    }
+  }
+  for (const g of groups) g.boxed = g.heading !== null && g.blocks.some((b) => b.kind === "ul");
+  return groups;
+}
+
+const TIME_ITEM = /^\*\*(\d{1,2}(?::\d{2})?\s?(?:AM|PM|am|pm))\*\*\s*(?:[·—–-]\s*)?(.*)$/;
+
+/** A bullet that starts with a bold time ("**7:30 AM** · Range opens"), split for a time column. */
+export function timeItem(item: string): { time: string; rest: string } | null {
+  const m = item.match(TIME_ITEM);
+  return m ? { time: m[1], rest: m[2] } : null;
+}
