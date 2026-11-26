@@ -75,6 +75,12 @@ export const PRESETS: Record<PresetId, Preset> = {
       "--notice-err-bg": "#f8ece8",
       "--notice-err-line": "#e7c7bf",
       "--focus": "#a2814a",
+      "--prose-ink": "#2b322d",
+      "--hero-bg": "#173a2a",
+      "--hero-ink": "#f5f1e6",
+      "--hero-kicker": "#d4c29a",
+      "--btn-hover": "#21503a",
+      "--hero-btn-hover": "#ffffff",
       "--scrim": CLUB_SCRIM,
     },
   },
@@ -119,6 +125,12 @@ export const PRESETS: Record<PresetId, Preset> = {
       "--notice-err-bg": "#f8ebe6",
       "--notice-err-line": "#e7c7bf",
       "--focus": "#b41c14",
+      "--prose-ink": "#2d3226",
+      "--hero-bg": "#3d4a25",
+      "--hero-ink": "#f5f0e2",
+      "--hero-kicker": "#e2cfb2",
+      "--btn-hover": "#9a1811",
+      "--hero-btn-hover": "#ffffff",
       "--scrim": scrim("31, 36, 25"),
     },
   },
@@ -163,6 +175,12 @@ export const PRESETS: Record<PresetId, Preset> = {
       "--notice-err-bg": "#f8ece8",
       "--notice-err-line": "#e7c7bf",
       "--focus": "#2f6584",
+      "--prose-ink": "#22323d",
+      "--hero-bg": "#1f3b57",
+      "--hero-ink": "#f9fbfb",
+      "--hero-kicker": "#e3d7bd",
+      "--btn-hover": "#27566f",
+      "--hero-btn-hover": "#ffffff",
       "--scrim": scrim("16, 32, 46"),
     },
   },
@@ -208,6 +226,12 @@ export const PRESETS: Record<PresetId, Preset> = {
       "--notice-err-bg": "#2e1c1a",
       "--notice-err-line": "#6a3a33",
       "--focus": "#e2c98f",
+      "--prose-ink": "#e4ddcc",
+      "--hero-bg": "#1d2426",
+      "--hero-ink": "#ece6d6",
+      "--hero-kicker": "#d4c29a",
+      "--btn-hover": "#d9bd85",
+      "--hero-btn-hover": "#d9bd85",
       "--scrim": scrim("20, 25, 26"),
     },
   },
@@ -273,6 +297,16 @@ function inkFor(hex: string, bg: string, dark: boolean): string {
   return c;
 }
 
+/** A hover a few points away from the button's text colour, still readable. */
+function hoverFor(accent: string, on: string): string {
+  const lighten = on === DARK_TEXT || contrast(on, "#000000") < contrast(on, "#ffffff");
+  for (const step of [6, 4, 2]) {
+    const c = shiftLightness(accent, lighten ? step : -step);
+    if (contrast(on, c) >= 4.5) return c;
+  }
+  return accent;
+}
+
 /** The CSS variables for a look, with any custom accent applied safely. */
 export function themeVars(theme: EventTheme | null): {
   vars: Record<string, string>;
@@ -294,6 +328,7 @@ export function themeVars(theme: EventTheme | null): {
   Object.assign(vars, {
     "--btn": accent,
     "--on-btn": onBtn,
+    "--btn-hover": hoverFor(accent, onBtn),
     "--accent": accent,
     "--brass": accent,
     "--gold": accent,

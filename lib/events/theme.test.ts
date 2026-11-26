@@ -20,6 +20,7 @@ describe("theme model", () => {
     expect(v["--club"]).toBe("#173a2a");
     expect(v["--brass"]).toBe("#a2814a");
     expect(v["--btn"]).toBe("#173a2a");
+    expect(v["--prose-ink"]).toBe("#2b322d");
     expect(v["--on-btn"]).toBe("#f5f1e6");
     expect(themeVars(null).adjusted).toBe(false);
     expect(resolveLogo(null)).toBe("/logo-full.png");
@@ -51,6 +52,11 @@ describe("theme model", () => {
       ["--on-hero-btn", "--hero-btn"],
       ["--danger", "--card"],
       ["--warn", "--card"],
+      ["--on-btn", "--btn-hover"],
+      ["--hero-ink", "--hero-bg"],
+      ["--prose-ink", "--bg"],
+      ["--notice-warn-ink", "--notice-warn-bg"],
+      ["--danger", "--notice-err-bg"],
     ];
     for (const id of Object.keys(PRESETS) as PresetId[]) {
       const v = themeVars({ preset: id }).vars;
@@ -63,6 +69,8 @@ describe("theme model", () => {
   test("picks readable button text for a custom accent", () => {
     expect(themeVars({ preset: "clubhouse", accent: "#b41c14" }).vars["--on-btn"]).toBe("#ffffff");
     expect(themeVars({ preset: "clubhouse", accent: "#f2d14b" }).vars["--on-btn"]).toBe("#111111");
+    const y = themeVars({ preset: "clubhouse", accent: "#f2d14b" }).vars;
+    expect(contrast(y["--on-btn"], y["--btn-hover"])).toBeGreaterThanOrEqual(contrast(y["--on-btn"], y["--btn"]));
   });
 
   test("a custom accent colours buttons, rules and small accent text", () => {
@@ -71,6 +79,13 @@ describe("theme model", () => {
     expect(v["--brass"]).toBe("#b41c14");
     expect(v["--accent"]).toBe("#b41c14");
     expect(contrast(v["--brass-ink"], v["--bg"])).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(v["--on-btn"], v["--btn-hover"])).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test("every preset defines the same set of variables", () => {
+    const keys = Object.keys(PRESETS.clubhouse.vars).sort();
+    for (const id of Object.keys(PRESETS) as PresetId[])
+      expect(Object.keys(PRESETS[id].vars).sort(), id).toEqual(keys);
   });
 
   test("nudges a mid-grey accent until text passes", () => {
