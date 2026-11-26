@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { pageSettings } from "./page-settings";
-import { parseTheme } from "./theme";
+import { parseTheme, withEmailWording } from "./theme";
 
 describe("parseTheme: page settings", () => {
   test("keeps trimmed wording and drops blanks", () => {
@@ -106,5 +106,31 @@ describe("confirmation email settings", () => {
     expect(
       pageSettings({ type: "dinner", theme: { preset: "clubhouse", emailSubject: "Hi" } }).email.subject,
     ).toBe("Hi");
+  });
+});
+
+describe("withEmailWording", () => {
+  test("sets only the email's words, keeping the rest of the look", () => {
+    const t = withEmailWording(
+      { preset: "evening", accent: "#123456", kicker: "Since 1952", emailSignOff: "old" },
+      { emailSubject: " You're in! ", emailIntro: "", thankYou: "See you there.", emailSignOff: "  " },
+    );
+    expect(t).toEqual({
+      preset: "evening",
+      accent: "#123456",
+      kicker: "Since 1952",
+      emailSubject: "You're in!",
+      thankYou: "See you there.",
+    });
+  });
+  test("an event with no look yet starts from Clubhouse", () => {
+    expect(withEmailWording(null, { emailSubject: "Hi" })).toEqual({
+      preset: "clubhouse",
+      emailSubject: "Hi",
+    });
+  });
+  test("other keys can't ride along", () => {
+    const t = withEmailWording(null, { emailSubject: "Hi", preset: "evening" } as never);
+    expect(t?.preset).toBe("clubhouse");
   });
 });
