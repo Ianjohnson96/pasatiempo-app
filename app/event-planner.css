@@ -493,6 +493,7 @@
 }
 /* every form field label, built-in or an admin's question: one quiet,
    sentence-case style. Small caps are kept for card and section headers. */
+.ep .field > .lbl,
 .ep .field > label:not(.check):not(.slot) {
   display: block;
   margin-bottom: 8px;
@@ -2813,4 +2814,240 @@
   .ep .editor-sec-head h2 {
     font-size: 1.45rem;
   }
+}
+
+/* ---- Editor: Look section ------------------------------------------------ */
+.ep .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.ep .look-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.ep .look-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.ep .look-tile:hover {
+  border-color: var(--rule-strong);
+}
+.ep .look-tile.on {
+  border-color: var(--club);
+  box-shadow: inset 0 0 0 1px var(--club);
+}
+.ep .look-swatch {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+  height: 44px;
+  padding: 6px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+}
+.ep .look-swatch i {
+  flex: 1;
+  height: 100%;
+  border-radius: 1px;
+}
+.ep .look-swatch i + i {
+  height: 55%;
+}
+.ep .look-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.ep .look-blurb {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.ep .look-accent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ep .look-accent input[type="color"] {
+  width: 48px;
+  height: 40px;
+  padding: 2px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--paper);
+  cursor: pointer;
+}
+.ep .look-hex {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 13px;
+}
+.ep .look-thumbs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.ep .look-thumb {
+  width: 72px;
+  height: 54px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--hairline);
+}
+.ep .look-thumb.on {
+  border-color: var(--club);
+}
+.ep .look-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ep .look-focus {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+.ep .look-focus .hint {
+  grid-column: 1 / -1;
+}
+.ep .look-focus-pick {
+  position: relative;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: crosshair;
+  background: none;
+}
+.ep .look-focus-pick img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.ep .look-cross {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+.ep .look-crops {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+.ep .look-crops figure {
+  margin: 0;
+  text-align: center;
+}
+.ep .look-crops figcaption {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.ep .look-crops .crop {
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+}
+.ep .look-crops .crop img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ep .look-crops .crop.phone {
+  width: 58px;
+  height: 104px;
+}
+.ep .look-crops .crop.desktop {
+  width: 150px;
+  height: 64px;
+}
+.ep .look-logos {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ep .look-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 104px;
+  padding: 10px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 12px;
+}
+.ep .look-logo.on {
+  border-color: var(--club);
+  box-shadow: inset 0 0 0 1px var(--club);
+}
+.ep .look-logo img {
+  height: 44px;
+  max-width: 100%;
+  object-fit: contain;
+}
+.ep .look-upload {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+.ep .look-upload input:focus-visible + label {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.ep .look-upload .is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (max-width: 720px) {
+  .ep .look-focus {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* the live preview shows the real hero, at preview size */
+.ep .ep-body .pub-nav {
+  padding: 10px 12px;
+}
+.ep .ep-body .pub-nav img {
+  height: 40px;
+}
+.ep .ep-body .pub-hero {
+  min-height: 300px;
+}
+.ep .ep-body .pub-hero .hero-inner {
+  padding: 56px 20px 64px;
+}
+.ep .ep-body .pub-hero h1 {
+  font-size: 1.9rem;
+}
+.ep .ep-body .facts {
+  margin: -36px 12px 0;
 }

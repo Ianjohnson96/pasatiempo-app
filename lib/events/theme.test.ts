@@ -5,6 +5,7 @@ import {
   PRESETS,
   type PresetId,
   eventContact,
+  logosFor,
   parseTheme,
   resolveHero,
   resolveLogo,
@@ -154,5 +155,13 @@ describe("unusedLogoPaths", () => {
   });
   test("never touches photos", () => {
     expect(unusedLogoPaths(["a.jpg", "b.png"], null)).toEqual([]);
+  });
+});
+
+describe("logosFor", () => {
+  test("the cream script wordmark is only offered on a dark look", () => {
+    expect(logosFor("evening")).toContain("wordmark");
+    expect(logosFor("clubhouse")).not.toContain("wordmark");
+    expect(logosFor("clubhouse")).toEqual(["club-full", "logo-1929", "mark", "events-tile"]);
   });
 });

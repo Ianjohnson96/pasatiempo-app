@@ -87,6 +87,7 @@ export function effectiveScheduleMode(
 
 export const EDITOR_SECTIONS = [
   { id: "details", label: "Details" },
+  { id: "look", label: "Look" },
   { id: "schedule", label: "Schedule" },
   { id: "questions", label: "Players & Questions" },
   { id: "pricing", label: "Pricing" },

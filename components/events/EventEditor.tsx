@@ -14,6 +14,7 @@ import Icon from "@/components/events/Icon";
 import QuestionBuilder from "@/components/events/QuestionBuilder";
 import TypeTiles from "@/components/events/editor/TypeTiles";
 import EditorSteps from "@/components/events/editor/EditorSteps";
+import LookSection from "@/components/events/editor/LookSection";
 import {
   PreviewOverlay,
   PreviewPanel,
@@ -224,9 +225,10 @@ export default function EventEditor({
 
   // The preview lags a keystroke behind under load rather than slowing typing.
   const deferred = useDeferredValue(state);
+  const photos = event?.photos;
   const preview = useMemo(
-    () => previewEvent(buildEventInput(deferred)),
-    [deferred],
+    () => previewEvent(buildEventInput(deferred), photos ?? []),
+    [deferred, photos],
   );
   const publicHref = event ? `/events/e/${event.slug}` : null;
 
@@ -407,10 +409,31 @@ export default function EventEditor({
           </div>
         </section>
 
-        {/* 2. Schedule */}
-        <section id="schedule" className="card editor-section">
+        {/* 2. Look */}
+        <section id="look" className="card editor-section">
           <SectionHead
             n={2}
+            title="Look"
+            sub="The sign-up page's colours, photo and logo, and who members contact."
+          />
+          <LookSection
+            eventId={event?.id}
+            photos={event?.photos ?? []}
+            theme={theme}
+            onTheme={setTheme}
+            contactName={contactName}
+            contactEmail={contactEmail}
+            onContact={(n, e) => {
+              setContactName(n);
+              setContactEmail(e);
+            }}
+          />
+        </section>
+
+        {/* 3. Schedule */}
+        <section id="schedule" className="card editor-section">
+          <SectionHead
+            n={3}
             title="Schedule"
             sub={
               rules.tournament
@@ -711,10 +734,10 @@ export default function EventEditor({
           </label>
         </section>
 
-        {/* 3. Players & Questions */}
+        {/* 4. Players & Questions */}
         <section id="questions" className="card editor-section">
           <SectionHead
-            n={3}
+            n={4}
             title="Players & Questions"
             sub={
               rules.tournament
@@ -779,10 +802,10 @@ export default function EventEditor({
           </div>
         </section>
 
-        {/* 4. Pricing */}
+        {/* 5. Pricing */}
         <section id="pricing" className="card editor-section">
           <SectionHead
-            n={4}
+            n={5}
             title="Pricing"
             sub="An optional price list on the event page. Sign-ups stay free."
           />
@@ -817,10 +840,10 @@ export default function EventEditor({
           )}
         </section>
 
-        {/* 5. Roster */}
+        {/* 6. Roster */}
         <section id="roster" className="card editor-section">
           <SectionHead
-            n={5}
+            n={6}
             title="Roster"
             sub="Whether members can see who's coming."
           />
@@ -854,9 +877,9 @@ export default function EventEditor({
           )}
         </section>
 
-        {/* 6. Access */}
+        {/* 7. Access */}
         <section id="access" className="card editor-section">
-          <SectionHead n={6} title="Access" sub="Who is allowed to register." />
+          <SectionHead n={7} title="Access" sub="Who is allowed to register." />
           <label className="check" style={{ marginBottom: inviteOnly ? 12 : 0 }}>
             <input
               type="checkbox"
@@ -899,10 +922,10 @@ export default function EventEditor({
           )}
         </section>
 
-        {/* 7. Publish */}
+        {/* 8. Publish */}
         <section id="publish" className="card editor-section">
           <SectionHead
-            n={7}
+            n={8}
             title="Publish"
             sub="Whether sign-ups are open, and who else can manage the event."
           />

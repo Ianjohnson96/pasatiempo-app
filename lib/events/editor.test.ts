@@ -73,9 +73,10 @@ describe("tiles and steps", () => {
     ]);
   });
 
-  it("has the seven sections in order", () => {
+  it("has the eight sections in order, Look after Details", () => {
     expect(EDITOR_SECTIONS.map((s) => s.id)).toEqual([
       "details",
+      "look",
       "schedule",
       "questions",
       "pricing",
@@ -83,7 +84,8 @@ describe("tiles and steps", () => {
       "access",
       "publish",
     ]);
-    expect(EDITOR_SECTIONS[2].label).toBe("Players & Questions");
+    expect(EDITOR_SECTIONS[1].label).toBe("Look");
+    expect(EDITOR_SECTIONS[3].label).toBe("Players & Questions");
   });
 });
 

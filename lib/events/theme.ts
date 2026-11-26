@@ -366,6 +366,12 @@ export function resolveLogo(theme: EventTheme | null): string {
   return pick(preset.defaultLogo);
 }
 
+/** Logos that make sense on a look (the cream script only on dark ones). */
+export function logosFor(preset: PresetId): LogoId[] {
+  const dark = PRESETS[preset].dark;
+  return LOGO_IDS.filter((id) => (dark ? LOGOS[id].dark : LOGOS[id].light));
+}
+
 export const DEFAULT_CONTACT = { name: "Ian Johnson", email: "Ijohnson@pasatiempo.com" };
 
 /** Who members should contact about an event. */
