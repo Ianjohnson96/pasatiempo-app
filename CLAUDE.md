@@ -51,5 +51,4 @@ The opening title sequence on the Invitational page is
   "A Perfect Day" (1929 photographs, year card, ending on the clock). To revert,
   set `DEFAULT_VARIANT` back to `"score"`; nothing else needs to change.
 
-The club needs a licence for the Keane recording before it is played to
-visitors.
+The club holds the licence for the Keane recording (confirmed November 2026).
