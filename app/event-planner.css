@@ -53,6 +53,25 @@
   --warn: #8a5a12;
   --maxw: 1040px;
 
+  /* per-event looks (lib/events/theme.ts) override these on the public page;
+     the defaults are the Clubhouse values, so admin screens never change */
+  --btn: var(--club);
+  --on-btn: var(--ivory);
+  --btn-hover: var(--club-2);
+  --hero-btn: var(--ivory);
+  --on-hero-btn: var(--club);
+  --hero-btn-hover: #fff;
+  --hero-bg: var(--club);
+  --hero-ink: var(--ivory);
+  --hero-kicker: var(--brass-soft);
+  --prose-ink: #2b322d;
+  --focus: var(--brass);
+  --notice-warn-bg: #faf3e2;
+  --notice-warn-line: #e6d4ad;
+  --notice-warn-ink: #5e3f0f;
+  --notice-err-bg: #f8ece8;
+  --notice-err-line: #e7c7bf;
+
   min-height: 100vh;
   background: var(--bg);
   color: var(--ink);
@@ -176,7 +195,7 @@
 .ep button:focus-visible,
 .ep summary:focus-visible,
 .ep [tabindex]:focus-visible {
-  outline: 2px solid var(--brass);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
   box-shadow: none;
 }
@@ -345,10 +364,10 @@
   gap: 10px;
   min-height: 44px;
   padding: 0 22px;
-  border: 1px solid var(--club);
+  border: 1px solid var(--btn);
   border-radius: var(--radius);
-  background: var(--club);
-  color: var(--ivory);
+  background: var(--btn);
+  color: var(--on-btn);
   font-family: var(--sans);
   font-size: 13px;
   font-weight: 600;
@@ -362,18 +381,20 @@
     border-color 0.16s,
     color 0.16s,
     box-shadow 0.16s,
-    transform 0.16s;
+    transform 160ms ease-out;
 }
 .ep .btn:hover:not(:disabled) {
-  background: var(--club-2);
-  border-color: var(--club-2);
+  background: var(--btn-hover);
+  border-color: var(--btn-hover);
   box-shadow: inset 0 -2px 0 var(--brass);
 }
 .ep .btn:active:not(:disabled) {
-  transform: translateY(1px);
+  transform: scale(0.97);
+  transition-duration: 120ms;
+  transition-timing-function: ease-out;
 }
 .ep .btn:focus-visible {
-  outline: 2px solid var(--brass);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .ep .btn:disabled {
@@ -393,7 +414,7 @@
 }
 .ep .btn.secondary {
   background: transparent;
-  border-color: rgba(27, 32, 29, 0.3);
+  border-color: color-mix(in srgb, var(--ink) 30%, transparent);
   color: var(--ink);
 }
 .ep .btn.secondary:hover:not(:disabled) {
@@ -436,11 +457,11 @@
 }
 .ep .btn.danger {
   background: transparent;
-  border-color: rgba(154, 43, 32, 0.55);
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
   color: var(--danger);
 }
 .ep .btn.danger:hover:not(:disabled) {
-  background: rgba(154, 43, 32, 0.06);
+  background: color-mix(in srgb, var(--danger) 6%, transparent);
   border-color: var(--danger);
   box-shadow: none;
 }
@@ -454,17 +475,17 @@
 .ep .btn.gold {
   min-height: 48px;
   padding: 0 30px;
-  background: var(--ivory);
-  border-color: var(--ivory);
-  color: var(--club);
+  background: var(--hero-btn);
+  border-color: var(--hero-btn);
+  color: var(--on-hero-btn);
   font-size: 13px;
   letter-spacing: 0.14em;
   box-shadow: none;
 }
 .ep .btn.gold:hover {
-  background: #fff;
-  border-color: #fff;
-  color: var(--club);
+  background: var(--hero-btn-hover);
+  border-color: var(--hero-btn-hover);
+  color: var(--on-hero-btn);
   box-shadow: inset 0 -2px 0 var(--brass);
 }
 
@@ -474,6 +495,7 @@
 }
 /* every form field label, built-in or an admin's question: one quiet,
    sentence-case style. Small caps are kept for card and section headers. */
+.ep .field > .lbl,
 .ep .field > label:not(.check):not(.slot) {
   display: block;
   margin-bottom: 8px;
@@ -541,7 +563,7 @@
 .ep select:focus {
   outline: none;
   border-color: var(--club);
-  box-shadow: 0 0 0 3px rgba(23, 58, 42, 0.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--club) 12%, transparent);
 }
 .ep input::placeholder,
 .ep textarea::placeholder {
@@ -644,10 +666,10 @@
 .ep .field.has-err input:focus,
 .ep .field.has-err select:focus,
 .ep .field.has-err textarea:focus {
-  box-shadow: 0 0 0 3px rgba(154, 43, 32, 0.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 12%, transparent);
 }
 .ep .field.has-err .choice-chips .chip {
-  border-color: rgba(154, 43, 32, 0.45);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
 }
 
 /* choice chips: square-ish, filled club green when chosen */
@@ -822,14 +844,14 @@
   line-height: 1.55;
 }
 .ep .notice.warn {
-  background: #faf3e2;
-  border-color: #e6d4ad;
+  background: var(--notice-warn-bg);
+  border-color: var(--notice-warn-line);
   border-left-color: var(--brass);
-  color: #5e3f0f;
+  color: var(--notice-warn-ink);
 }
 .ep .notice.err {
-  background: #f8ece8;
-  border-color: #e7c7bf;
+  background: var(--notice-err-bg);
+  border-color: var(--notice-err-line);
   border-left-color: var(--danger);
   color: var(--danger);
 }
@@ -941,6 +963,8 @@
    ========================================================================= */
 .ep .pub {
   background: var(--bg);
+  /* re-declared so text that inherits takes the look's ink, not .ep's */
+  color: var(--ink);
 }
 .ep .pub-nav {
   padding: 18px 16px;
@@ -956,22 +980,28 @@
   align-items: flex-end;
   justify-content: flex-start;
   text-align: left;
-  background: var(--club);
+  background: var(--hero-bg);
 }
 .ep .pub-hero-photo {
   position: absolute;
   inset: 0;
-  background-size: cover;
-  background-position: center 40%;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 40%; /* the look's focal point overrides this inline */
   transform-origin: 50% 60%;
   animation: ep-settle 1.8s var(--ease) both;
 }
+/* each look brings its own scrim; Clubhouse's is the original green one */
 .ep .pub-hero.has-img::after {
-  background: linear-gradient(
-    180deg,
-    rgba(12, 26, 19, 0.3) 0%,
-    rgba(12, 26, 19, 0.34) 40%,
-    rgba(12, 26, 19, 0.9) 100%
+  background: var(
+    --scrim,
+    linear-gradient(
+      180deg,
+      rgba(12, 26, 19, 0.3) 0%,
+      rgba(12, 26, 19, 0.34) 40%,
+      rgba(12, 26, 19, 0.9) 100%
+    )
   );
 }
 .ep .pub-hero .hero-inner {
@@ -987,7 +1017,7 @@
 }
 .ep .pub-hero .kicker {
   margin-bottom: 18px;
-  color: var(--brass-soft);
+  color: var(--hero-kicker);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.22em;
@@ -995,7 +1025,7 @@
 .ep .pub-hero h1 {
   max-width: 15em;
   margin: 0;
-  color: var(--ivory);
+  color: var(--hero-ink);
   font-family: var(--serif);
   font-size: clamp(2.5rem, 5.5vw, 4rem);
   font-weight: 500;
@@ -1014,7 +1044,7 @@
   justify-content: flex-start;
   gap: 10px 32px;
   margin-bottom: 32px;
-  color: rgba(245, 241, 230, 0.92);
+  color: color-mix(in srgb, var(--hero-ink) 92%, transparent);
   font-size: 15px;
   font-variant-numeric: lining-nums;
 }
@@ -1025,7 +1055,7 @@
 }
 .ep .pub-hero .hero-meta .ico {
   margin: 0;
-  color: var(--brass-soft);
+  color: var(--hero-kicker);
   opacity: 1;
 }
 
@@ -1115,7 +1145,7 @@
 .ep .pub-section .prose {
   max-width: 68ch;
   margin: 20px 0 0;
-  color: #2b322d;
+  color: var(--prose-ink);
   font-size: 17px;
   line-height: 1.7;
 }
@@ -1140,23 +1170,8 @@
 .ep .prose > :first-child {
   margin-top: 0;
 }
-@media (min-width: 1024px) {
-  .ep .pub-section:not(.stacked) {
-    display: grid;
-    grid-template-columns: 240px minmax(0, 1fr);
-    grid-template-rows: auto auto 1fr;
-    column-gap: 64px;
-  }
-  .ep .pub-section:not(.stacked) > .sec-eyebrow,
-  .ep .pub-section:not(.stacked) > h2 {
-    grid-column: 1;
-  }
-  .ep .pub-section:not(.stacked) > :not(.sec-eyebrow):not(h2) {
-    grid-column: 2;
-    grid-row: 1 / 4;
-    margin-top: 0 !important;
-  }
-}
+/* Sections read top to bottom at every width: the title over its content,
+   so a wide screen has no empty column beside the text. */
 
 /* pricing: a price list with a dotted leader where there is an amount */
 .ep .pricing-card {
@@ -1224,7 +1239,7 @@
   box-shadow: none;
 }
 .ep .slideshow {
-  background: var(--club);
+  background: var(--hero-bg);
 }
 .ep .slideshow .slide {
   height: 420px;
@@ -2566,12 +2581,27 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* movement becomes a short fade; pressed, busy and done still show */
   .ep *,
   .ep *::before,
   .ep *::after {
     animation: none !important;
-    transition: none !important;
+    transition-property: opacity, color, background-color, border-color !important;
+    transition-duration: 150ms !important;
+    transition-delay: 0s !important;
     scroll-behavior: auto !important;
+  }
+  .ep .reveal {
+    animation: ep-fade 150ms linear both !important;
+  }
+  .ep .btn:active:not(:disabled) {
+    transform: none;
+    opacity: 0.85;
+  }
+  .ep .submit-btn.is-spin .sb-spin {
+    animation: none !important;
+    border-right-color: currentColor;
+    opacity: 0.6;
   }
   .ep .check-mark path {
     stroke-dashoffset: 0;
@@ -2786,4 +2816,1604 @@
   .ep .editor-sec-head h2 {
     font-size: 1.45rem;
   }
+}
+
+/* ---- Editor: Look section ------------------------------------------------ */
+.ep .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.ep .look-tiles {
+  display: grid;
+  /* four looks: 2 x 2, or one row when there's room, never 3 + 1 */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (min-width: 1100px) {
+  .ep .look-tiles {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.ep .look-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.ep .look-tile:hover {
+  border-color: var(--rule-strong);
+}
+.ep .look-tile.on {
+  border-color: var(--club);
+  box-shadow: inset 0 0 0 1px var(--club);
+}
+.ep .look-swatch {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+  height: 44px;
+  padding: 6px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+}
+.ep .look-swatch i {
+  flex: 1;
+  height: 100%;
+  border-radius: 1px;
+}
+.ep .look-swatch i + i {
+  height: 55%;
+}
+.ep .look-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.ep .look-blurb {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.ep .look-accent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ep .look-accent input[type="color"] {
+  width: 48px;
+  height: 40px;
+  padding: 2px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--paper);
+  cursor: pointer;
+}
+.ep .look-hex {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 13px;
+}
+.ep .look-thumbs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.ep .look-thumb {
+  width: 72px;
+  height: 54px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--hairline);
+}
+.ep .look-thumb.on {
+  border-color: var(--club);
+}
+.ep .look-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ep .look-focus {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+.ep .look-focus .hint {
+  grid-column: 1 / -1;
+}
+.ep .look-focus-pick {
+  position: relative;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: crosshair;
+  background: none;
+}
+.ep .look-focus-pick img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.ep .look-cross {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+.ep .look-crops {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+.ep .look-crops figure {
+  margin: 0;
+  text-align: center;
+}
+.ep .look-crops figcaption {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.ep .look-crops .crop {
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+}
+.ep .look-crops .crop img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ep .look-crops .crop.phone {
+  width: 58px;
+  height: 104px;
+}
+.ep .look-crops .crop.desktop {
+  width: 150px;
+  height: 64px;
+}
+.ep .look-logos {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ep .look-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 104px;
+  padding: 10px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 12px;
+}
+.ep .look-logo.on {
+  border-color: var(--club);
+  box-shadow: inset 0 0 0 1px var(--club);
+}
+.ep .look-logo img {
+  height: 44px;
+  max-width: 100%;
+  object-fit: contain;
+}
+.ep .look-upload {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+.ep .look-upload input:focus-visible + label {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.ep .look-upload .is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (max-width: 720px) {
+  .ep .look-focus {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* the live preview shows the real hero, at preview size */
+.ep .ep-body .pub-nav {
+  padding: 10px 12px;
+}
+.ep .ep-body .pub-nav img {
+  height: 40px;
+}
+.ep .ep-body .pub-hero {
+  min-height: 300px;
+}
+.ep .ep-body .pub-hero .hero-inner {
+  padding: 56px 20px 64px;
+}
+.ep .ep-body .pub-hero h1 {
+  font-size: 1.9rem;
+}
+.ep .ep-body .facts {
+  margin: -36px 12px 0;
+}
+
+/* ---- Public page: the phone's sticky Register bar ------------------------ */
+.ep .sticky-cta {
+  display: none;
+}
+@media (max-width: 720px) {
+  .ep .sticky-cta {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--hairline);
+    background: var(--card);
+    box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.08);
+    transform: translateY(110%);
+    transition: transform 160ms ease-out;
+  }
+  .ep .sticky-cta.show {
+    transform: none;
+  }
+  /* room at the very bottom so the bar never covers the footer */
+  .ep .pub:has(.sticky-cta) .pub-foot {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+  .ep .sticky-cta .btn {
+    min-height: 48px;
+    flex: 0 0 auto;
+  }
+  .ep .sticky-spots {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.3;
+  }
+}
+@media (max-width: 720px) and (prefers-reduced-motion: reduce) {
+  .ep .sticky-cta {
+    transform: none;
+    opacity: 0;
+    transition: opacity 150ms linear;
+  }
+  .ep .sticky-cta.show {
+    opacity: 1;
+  }
+}
+
+/* ---- Submit buttons: label stays, spinner after a second, tick on success - */
+.ep .submit-btn {
+  position: relative;
+}
+.ep .submit-btn .sb-spin,
+.ep .submit-btn .sb-tick {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+.ep .submit-btn .sb-spin {
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+}
+.ep .submit-btn .sb-tick {
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+}
+.ep .submit-btn .sb-label {
+  transition: opacity 160ms ease-out;
+}
+.ep .submit-btn:disabled.is-busy,
+.ep .submit-btn:disabled.is-spin,
+.ep .submit-btn:disabled.is-done {
+  opacity: 1;
+  cursor: progress;
+}
+.ep .submit-btn.is-spin .sb-label,
+.ep .submit-btn.is-done .sb-label {
+  opacity: 0;
+}
+.ep .submit-btn.is-spin .sb-spin {
+  opacity: 1;
+  animation: ep-spin 0.8s linear infinite;
+}
+.ep .submit-btn.is-done .sb-tick {
+  opacity: 1;
+  stroke-dashoffset: 0;
+  transition:
+    stroke-dashoffset 300ms ease-out,
+    opacity 120ms ease-out;
+}
+@keyframes ep-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- Public page on phones: text and targets a thumb can use ------------ */
+@media (max-width: 720px) {
+  .ep .pub {
+    font-size: 17px;
+  }
+  .ep .pub input,
+  .ep .pub select,
+  .ep .pub textarea {
+    font-size: 16px; /* below 16px iOS zooms the page on focus */
+  }
+  .ep .pub .btn,
+  .ep .pub .slot,
+  .ep .pub .check,
+  .ep .pub .stepper button,
+  .ep .pub .choice-chips .chip {
+    min-height: 48px;
+  }
+  .ep .pub .slot + .slot,
+  .ep .pub .check + .check {
+    margin-top: 8px;
+  }
+}
+
+/* ---- Error summary: everything to fix, at the top of the form ----------- */
+.ep .error-summary {
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--notice-err-line);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--radius);
+  background: var(--notice-err-bg);
+  color: var(--ink);
+}
+.ep .error-summary:focus-visible,
+.ep .error-summary:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.ep .error-summary .es-title {
+  margin: 0 0 6px;
+  color: var(--danger);
+  font-weight: 600;
+}
+.ep .error-summary ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.ep .error-summary li + li {
+  margin-top: 4px;
+}
+.ep .error-summary a {
+  color: var(--danger);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ---- Confirmation: when/where, calendar, change or cancel, contact ------ */
+.ep .confirm-extras {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+}
+.ep .confirm-facts {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.ep .confirm-facts > div {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+}
+.ep .confirm-facts dt {
+  color: var(--brass-ink);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding-top: 2px;
+}
+.ep .confirm-facts dd {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+.ep .confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ep .confirm-cal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ep .confirm-cal-lbl {
+  font-weight: 600;
+  font-size: 14px;
+  margin-right: 4px;
+}
+.ep .confirm-contact {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+/* "already signed up" on the email field: a way straight to Manage */
+.ep .already-manage {
+  margin-top: 8px;
+}
+
+/* a fact's quieter second line, e.g. what the price covers */
+.ep .fact .fact-sub {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.ep .pub-foot .foot-contact {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+.ep .pub-foot .foot-contact a {
+  color: var(--club);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---------- Manage: the sign-up list's header ---------- */
+.ep .reg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ep .reg-title {
+  margin: 0;
+  color: var(--club);
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  font-weight: 500;
+}
+.ep .reg-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1px;
+  margin: 18px 0;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--hairline);
+}
+.ep .reg-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  background: var(--paper);
+}
+.ep .reg-stat.warn {
+  background: #fbf1e1;
+}
+.ep .rs-num {
+  color: var(--club);
+  font-family: var(--serif);
+  font-size: 1.75rem;
+  line-height: 1.1;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.ep .reg-stat.warn .rs-num {
+  color: var(--warn);
+}
+.ep .rs-num small {
+  color: var(--muted);
+  font-size: 0.6em;
+}
+.ep .rs-lbl {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.ep .reg-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+.ep .reg-search {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.ep .reg-search input {
+  width: 100%;
+  padding-left: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235b635d' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 3.5 3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 13px 50%;
+}
+.ep .reg-tool-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ep .reg-search-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.ep .linklike {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--club);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ep .reg-cancelled {
+  margin-top: 22px;
+}
+.ep .reg-cancelled > summary {
+  width: fit-content;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ep .reg-cancelled[open] > summary {
+  margin-bottom: 12px;
+}
+@media (max-width: 720px) {
+  .ep .reg-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ep .reg-tool-group {
+    flex: 1 1 100%;
+  }
+  .ep .reg-tool-group .btn {
+    flex: 1;
+  }
+}
+@media (max-width: 560px) {
+  /* team cards inside a card: less nested padding, actions on one row */
+  .ep .card .team-card {
+    padding: 16px 14px 16px 16px;
+  }
+  .ep .tc-player,
+  .ep .tc-team {
+    padding: 12px 12px;
+  }
+  .ep .tc-head .tc-actions {
+    display: flex;
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .ep .tc-head .tc-actions .btn {
+    flex: 1 1 auto;
+    padding-inline: 8px;
+    white-space: nowrap;
+  }
+  .ep .tc-head .tc-actions .btn.danger {
+    flex: 0 0 44px;
+  }
+  /* a label over its value, so emails don't break mid-word */
+  .ep .tc-row,
+  .ep .tc-team .tc-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .ep .tc-row dd {
+    overflow-wrap: anywhere;
+  }
+}
+.ep .rt-actions {
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  /* a sign-up table becomes a stack of rows, actions underneath; with a
+     Dates column it no longer fits beside the buttons below this width */
+  .ep .reg-table,
+  .ep .reg-table tbody,
+  .ep .reg-table tr,
+  .ep .reg-table td {
+    display: block;
+    width: 100%;
+  }
+  .ep .reg-table thead {
+    display: none;
+  }
+  .ep .reg-table tr {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .ep .reg-table td {
+    padding: 2px 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+  .ep .reg-table .rt-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding-top: 10px;
+  }
+  .ep .reg-table .rt-actions .btn {
+    flex: 1 1 auto;
+    padding-inline: 8px;
+  }
+  .ep .reg-table .rt-actions .btn.danger {
+    flex: 0 0 44px;
+  }
+  .ep .reg-table .rt-actions .btn + .btn {
+    margin-left: 0;
+  }
+}
+@media (max-width: 560px) {
+  .ep .tc-head .tc-actions .btn,
+  .ep .reg-table .rt-actions .btn {
+    min-width: 0;
+    padding-inline: 4px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+  }
+  .ep .tc-head .tc-actions .btn:not(.danger),
+  .ep .reg-table .rt-actions .btn:not(.danger) {
+    flex: 1 1 auto;
+  }
+}
+@media (min-width: 561px) and (max-width: 900px) {
+  .ep .reg-table .rt-actions .btn,
+  .ep .reg-table .rt-actions .btn:not(.danger) {
+    flex: 0 0 auto;
+    padding-inline: 16px;
+  }
+}
+.ep .rt-phone {
+  color: inherit;
+  text-decoration: none;
+}
+.ep .rt-phone:hover {
+  text-decoration: underline;
+}
+
+/* ---------- hero styles (the look's "Hero" setting) ---------- */
+/* banner: the same photo, about half as tall, so the details come sooner */
+.ep .pub-hero.hero-banner {
+  min-height: 400px;
+}
+.ep .pub-hero.hero-banner .hero-inner {
+  padding: 72px 32px 88px;
+}
+/* plain: no photo, the title on the look's own colour */
+.ep .pub-hero.hero-plain {
+  min-height: 0;
+}
+.ep .pub-hero.hero-plain .hero-inner {
+  padding: 88px 32px 104px;
+}
+.ep .pub-hero.hero-plain .kicker,
+.ep .pub-hero.hero-plain .hero-meta {
+  text-shadow: none;
+}
+@media (max-width: 720px) {
+  .ep .pub-hero.hero-banner {
+    min-height: 340px;
+  }
+  .ep .pub-hero.hero-banner .hero-inner {
+    padding: 56px 20px 72px;
+  }
+  .ep .pub-hero.hero-plain .hero-inner {
+    padding: 56px 20px 80px;
+  }
+}
+.ep .ep-body .pub-hero.hero-banner,
+.ep .ep-body .pub-hero.hero-plain {
+  min-height: 0;
+}
+.ep .ep-body .pub-hero.hero-banner .hero-inner,
+.ep .ep-body .pub-hero.hero-plain .hero-inner {
+  padding: 40px 20px 56px;
+}
+
+/* the Look section's "Wording" group */
+.ep .look-words {
+  margin: 8px 0 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--hairline);
+}
+.ep .look-words-title {
+  margin: 0 0 4px;
+  color: var(--club);
+  font-family: var(--serif);
+  font-size: 1.25rem;
+}
+.ep .look-words .row.three {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0 18px;
+}
+.ep .look-words .row.three > .field {
+  min-width: 0;
+}
+
+/* the hero's button row: the main action, then a quiet Share */
+.ep .hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 22px;
+}
+.ep .share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--hero-ink);
+  font: 600 12.5px/1 var(--sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+.ep .pub-hero.hero-plain .share-btn {
+  text-shadow: none;
+}
+.ep .share-btn span {
+  background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat;
+  padding-bottom: 3px;
+  transition: background-size 0.3s var(--ease);
+}
+.ep .share-btn:hover span,
+.ep .share-btn:focus-visible span {
+  background-size: 100% 1px;
+}
+.ep .share-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* bullet lists in the event text boxes: a small brass diamond per item */
+.ep .prose .rt-ul {
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+}
+.ep .prose .rt-ul li {
+  position: relative;
+  margin: 0;
+  padding: 7px 0 7px 22px;
+  line-height: 1.55;
+}
+.ep .prose .rt-ul li::before {
+  content: "";
+  position: absolute;
+  top: calc(7px + 0.62em);
+  left: 3px;
+  width: 6px;
+  height: 6px;
+  background: var(--brass);
+  transform: rotate(45deg);
+}
+/* a heading with a list under it: its own panel */
+.ep .prose .rt-panel {
+  margin: 0 0 16px;
+  padding: 20px 24px 14px;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-top: 2px solid var(--brass);
+  border-radius: var(--radius);
+}
+.ep .prose .rt-panel .rt-h2 {
+  margin: 0 0 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--club);
+  font-size: 1.4rem;
+}
+.ep .prose .rt-panel .rt-ul {
+  margin-bottom: 4px;
+}
+.ep .prose .rt-panel .rt-ul li + li {
+  border-top: 1px dotted var(--hairline);
+}
+.ep .prose .rt-panel .rt-p:last-child {
+  margin-bottom: 6px;
+}
+/* outside a panel, headings still lead clearly */
+.ep .prose > .rt-h2 {
+  color: var(--club);
+  font-size: 1.4rem;
+}
+/* a run of times: the time in its own column */
+.ep .prose .rt-sched li.rt-timed {
+  display: grid;
+  grid-template-columns: 5.6em minmax(0, 1fr);
+  gap: 12px;
+  padding-left: 0;
+}
+.ep .prose .rt-sched li.rt-timed::before {
+  display: none;
+}
+.ep .prose .rt-time {
+  color: var(--brass-ink);
+  font-weight: 600;
+  font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .ep .prose .rt-panel {
+    padding: 16px 16px 10px;
+  }
+  .ep .prose .rt-sched li.rt-timed {
+    grid-template-columns: 4.9em minmax(0, 1fr);
+    gap: 10px;
+  }
+}
+
+/* the location opens a map */
+.ep .pub-hero .hero-meta > .hero-map {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+.ep .pub-hero .hero-map:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+.ep .facts .fact-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--brass-soft);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+.ep .facts .fact-link:hover {
+  text-decoration-color: currentColor;
+}
+
+/* "On this page" jump links under the key facts */
+.ep .sec-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 26px;
+  margin: 30px 0 0;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.ep .sec-links a {
+  padding: 6px 0;
+  color: var(--club);
+  font: 600 12px/1.2 var(--sans);
+  letter-spacing: 0.16em;
+  text-decoration: none;
+  text-transform: uppercase;
+  background: linear-gradient(var(--brass), var(--brass)) 0 100% / 0 1.5px no-repeat;
+  transition: background-size 0.3s var(--ease);
+}
+.ep .sec-links a:hover,
+.ep .sec-links a:focus-visible {
+  background-size: 100% 1.5px;
+}
+.ep .pub-section[id] {
+  scroll-margin-top: 16px;
+}
+@media (max-width: 720px) {
+  .ep .sec-links {
+    flex-wrap: nowrap;
+    gap: 22px;
+    margin-top: 22px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .ep .sec-links a {
+    flex: 0 0 auto;
+  }
+}
+
+/* the organisers' own note on the "You're registered" screen */
+.ep .confirm-note {
+  margin: 0 0 18px;
+  padding: 14px 18px;
+  border-left: 2px solid var(--brass);
+  background: color-mix(in srgb, var(--brass) 7%, var(--card));
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  font-style: italic;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+@media (max-width: 720px) {
+  /* untimed rows in a schedule use the full width on phones */
+  .ep .prose .rt-sched li.rt-timed:has(> .rt-time:empty) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ep .prose .rt-sched .rt-time:empty {
+    display: none;
+  }
+}
+
+/* ---------- editor: Confirmation email ---------- */
+.ep .email-edit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+@media (min-width: 1000px) {
+  .ep .email-edit {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    align-items: start;
+  }
+  .ep .email-preview {
+    position: sticky;
+    top: 96px;
+  }
+}
+.ep .email-fields textarea {
+  min-height: 0;
+  resize: vertical;
+}
+.ep .email-preview {
+  margin: 0;
+}
+.ep .email-preview figcaption {
+  margin-bottom: 8px;
+  color: var(--brass-ink);
+  font: 600 11px/1.2 var(--sans);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.ep .ep-mail {
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(23, 58, 42, 0.08);
+}
+.ep .ep-mail-head {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--bg);
+  font-size: 13.5px;
+}
+.ep .ep-mail-head > div {
+  display: flex;
+  gap: 10px;
+  padding: 2px 0;
+  overflow-wrap: anywhere;
+}
+.ep .ep-mail-head span {
+  flex: 0 0 56px;
+  color: var(--muted);
+}
+.ep .ep-mail-body {
+  max-height: 520px;
+  overflow: auto;
+  padding: 16px;
+  color: #222;
+  font: 14px/1.55 -apple-system, "Segoe UI", Arial, sans-serif;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- wide screens: use the width ---------- */
+/* text keeps a readable line; panels (a day, a list under a heading) sit
+   two across when there's room, so a long schedule isn't one tall column */
+.ep .pub-section .prose {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: 18px;
+  max-width: none;
+}
+.ep .pub-section .prose > :not(.rt-panel) {
+  grid-column: 1 / -1;
+  max-width: 72ch;
+}
+@media (min-width: 900px) {
+  .ep .pub-section .prose:has(> .rt-panel + .rt-panel) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.ep .pub-section .pricing-card {
+  max-width: 860px;
+}
+@media (min-width: 900px) {
+  /* an odd panel out at the end spans the row instead of sitting alone */
+  .ep .pub-section .prose > .rt-panel:nth-child(odd):last-child {
+    grid-column: 1 / -1;
+  }
+}
+/* big monitors: a wider page so the sides aren't mostly empty */
+@media (min-width: 1440px) {
+  .ep .pub {
+    --maxw: 1200px;
+  }
+}
+/* the section below draws its own rule */
+.ep .sec-links {
+  border-bottom: 0;
+}
+/* right after the jump links, the first section needs no rule or big gap */
+.ep .sec-links + .pub-section {
+  margin-top: 28px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* Manage: the confirmation email card */
+.ep .email-card-head {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+.ep .email-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+}
+.ep .email-card-actions .email-test-ok,
+.ep .email-card-actions .field-err {
+  margin: 0;
+}
+
+/* the public team list: each name with its role */
+.ep .team-roster .tr-team {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.ep .team-roster .tr-player {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  white-space: nowrap;
+}
+.ep .team-roster .tr-role {
+  padding: 1px 6px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  color: var(--club);
+  font: 600 9.5px/1.4 var(--sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.ep .team-roster .tr-role.guest {
+  border-color: var(--brass-soft);
+  color: var(--brass-ink);
+}
+.ep .team-roster .tr-amp {
+  color: var(--muted);
+}
+.ep .tr-of {
+  color: var(--muted);
+}
+.ep .tr-of {
+  color: var(--muted);
+}
+
+/* "Add to calendar" in the hero: a small menu under the link */
+.ep .cal-menu {
+  position: relative;
+}
+.ep .cal-pop {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 6px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+}
+.ep .cal-pop a,
+.ep .cal-pop button {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 2px;
+  background: none;
+  color: var(--ink);
+  font: 500 14px/1.3 var(--sans);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ep .cal-pop a:hover,
+.ep .cal-pop button:hover,
+.ep .cal-pop a:focus-visible,
+.ep .cal-pop button:focus-visible {
+  background: var(--green-tint);
+}
+/* open upward: the key facts card sits just below the hero buttons */
+.ep .cal-pop {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+/* "Already entered? Manage your registration" under the hero buttons */
+.ep .hero-manage {
+  margin: 14px 0 0;
+  color: color-mix(in srgb, var(--hero-ink) 85%, transparent);
+  font-size: 14px;
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.45);
+}
+.ep .pub-hero.hero-plain .hero-manage {
+  text-shadow: none;
+}
+.ep .hero-manage button {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hero-ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--hero-kicker);
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+/* bigger touch targets on phones: jump links, the map link, role tags */
+@media (max-width: 720px) {
+  .ep .sec-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0;
+  }
+  .ep .pub-hero .hero-meta > .hero-map {
+    min-height: 44px;
+  }
+}
+.ep .team-roster .tr-role {
+  font-size: 10.5px;
+}
+@media (max-width: 720px) {
+  .ep .sec-links a {
+    background-position: 0 calc(100% - 12px);
+  }
+}
+/* narrow phones: jump links wrap instead of hiding off the edge */
+@media (max-width: 400px) {
+  .ep .sec-links {
+    flex-wrap: wrap;
+    gap: 0 22px;
+    overflow-x: visible;
+  }
+}
+/* text-box headings are real h3s now; keep them looking as before */
+.ep .prose h3.rt-h1,
+.ep .prose h3.rt-h2 {
+  text-transform: none;
+  letter-spacing: -0.005em;
+}
+
+/* ---------- polish pass ("make interfaces feel better") ---------- */
+/* no lone word on a heading's or a short line's last row */
+.ep .pub-section h2,
+.ep .prose h3,
+.ep .facts .val,
+.ep .email-card h3 {
+  text-wrap: balance;
+}
+.ep .prose .rt-ul li,
+.ep .prose .rt-p,
+.ep .facts .fact-sub,
+.ep .hint,
+.ep .notice,
+.ep .manage-cta p {
+  text-wrap: pretty;
+}
+/* counts that change keep their width */
+.ep .sticky-spots,
+.ep .tr-of {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+/* photos keep a crisp edge against the page */
+.ep .gallery img,
+.ep .gallery-grid img {
+  outline: 1px solid rgba(0, 0, 0, 0.1);
+  outline-offset: -1px;
+}
+/* the small text buttons in the hero answer a press */
+.ep .share-btn {
+  transition-property: opacity, transform;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+.ep .share-btn:active {
+  opacity: 0.75;
+  transform: translateY(1px);
+}
+/* the calendar list eases in rather than snapping */
+@keyframes ep-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.ep .cal-pop {
+  animation: ep-pop-in 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ep .cal-pop {
+    animation: none;
+  }
+  .ep .share-btn:active {
+    transform: none;
+  }
+}
+/* desktop: the team form's main button at a natural width, right-aligned
+   under the two player cards, instead of a 1,100px bar */
+@media (min-width: 900px) {
+  .ep .pub .btn.team-submit {
+    display: flex;
+    width: auto;
+    min-width: 320px;
+    margin-left: auto;
+    padding-inline: 40px;
+  }
+}
+
+/* ---------- Manage: teams as rows that open ---------- */
+.ep .tc-stack:has(> .team-row) {
+  gap: 8px;
+}
+.ep .team-card.team-row {
+  padding: 0;
+}
+.ep .team-row .tr-sum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 18px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ep .team-row .tr-sum:hover {
+  background: color-mix(in srgb, var(--club) 4%, transparent);
+}
+.ep .team-row .tr-sum:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.ep .team-row .tr-chev {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 160ms ease-out;
+}
+.ep .team-row.open .tr-chev {
+  transform: rotate(45deg);
+}
+.ep .team-row .tc-num {
+  min-width: 4.4em;
+  font-size: 1.15rem;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.ep .team-row .tr-names {
+  display: flex;
+  flex: 1 1 260px;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+.ep .team-row .tr-names > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.ep .team-row .tr-role {
+  padding: 1px 6px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  color: var(--club);
+  font: 600 10px/1.4 var(--sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.ep .team-row .tr-role.guest {
+  border-color: var(--brass-soft);
+  color: var(--brass-ink);
+}
+.ep .team-row .tr-flags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.ep .team-row .tr-body {
+  padding: 4px 22px 22px;
+  border-top: 1px solid var(--hairline);
+  animation: ep-pop-in 160ms ease-out;
+}
+.ep .team-row .tr-body .tc-head {
+  justify-content: flex-end;
+  margin: 12px 0 14px;
+}
+.ep .tr-expand {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ep .team-row .tr-chev {
+    transition: none;
+  }
+  .ep .team-row .tr-body {
+    animation: none;
+  }
+}
+@media (max-width: 560px) {
+  .ep .team-row .tr-sum {
+    padding: 12px 14px;
+  }
+  .ep .team-row .tr-body {
+    padding: 4px 14px 16px;
+  }
+  .ep .team-row .tr-flags {
+    margin-left: 0;
+  }
+}
+
+/* Manage: filter buttons over the list */
+.ep .reg-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.ep .reg-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 500 13.5px/1 var(--sans);
+  cursor: pointer;
+  transition-property: background-color, border-color, color;
+  transition-duration: 150ms;
+}
+.ep .reg-filter:hover {
+  border-color: var(--rule-strong);
+}
+.ep .reg-filter.on {
+  border-color: var(--club);
+  background: var(--club);
+  color: var(--ivory);
+}
+.ep .reg-filter.warn:not(.on) {
+  border-color: #e6d4ad;
+  background: #faf3e2;
+  color: var(--warn);
+}
+.ep .reg-filter .rf-n {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+.ep .reg-filter:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+@media (max-width: 560px) {
+  .ep .reg-filter {
+    min-height: 44px;
+  }
+}
+/* Manage: when a team entered, and contact/copy in the details */
+.ep .team-row .tr-date {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.ep .tc-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--rule-strong);
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+.ep .tc-link:hover {
+  text-decoration-color: currentColor;
+}
+.ep .tc-copy {
+  margin-left: 10px;
+  padding: 2px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--club);
+  font: 600 10.5px/1.6 var(--sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ep .tc-copy:hover {
+  border-color: var(--rule-strong);
+}
+
+/* the email preview: the real designed email, or its plain text */
+.ep .ep-mail-frame {
+  display: block;
+  width: 100%;
+  height: 620px;
+  border: 0;
+  background: #f5f1e6;
+}
+.ep .ep-mail-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 10px;
+}
+.ep .ep-mail-switch button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 500 13px/1 var(--sans);
+  cursor: pointer;
+}
+.ep .ep-mail-switch button.on {
+  border-color: var(--club);
+  background: var(--club);
+  color: var(--ivory);
+}
+.ep .ep-mail-switch .hint {
+  margin: 0 0 0 4px;
+}
+
+/* ---- Sign-up dates ------------------------------------------------------- */
+/* "Sign-ups close Fri, Apr 30 at 5:00 PM" under the hero's buttons */
+.ep .pub-hero .hero-window {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 0;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  color: var(--hero-ink);
+  font-variant-numeric: tabular-nums;
+  text-wrap: pretty;
+}
+.ep .pub-hero .hero-window::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  transform: rotate(45deg);
+  background: var(--hero-kicker);
+}
+.ep .pub-hero .hero-window.tone-last {
+  font-weight: 600;
+}
+.ep .pub-hero .hero-window.tone-last::before {
+  background: #e0a33a;
+}
+/* the same line at the top of the form */
+.ep .reg-window {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--brass);
+  background: color-mix(in srgb, var(--brass) 8%, transparent);
+  font-size: 15px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ep .reg-window.tone-last {
+  border-left-color: var(--warn);
+  font-weight: 600;
+}
+/* the editor's "2 weeks before / 1 week before / Day before" */
+.ep .quick-picks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: -4px;
+}
+.ep .quick-picks .hint {
+  margin: 0 4px 0 0;
+}
+.ep .ev-meta .ev-meta-warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+/* Manage: "A spot is open … Move up X" */
+.ep .notice.spot-open {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+.ep .notice.spot-open > span {
+  flex: 1 1 280px;
+  text-wrap: pretty;
 }

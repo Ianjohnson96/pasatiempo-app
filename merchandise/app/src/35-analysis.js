@@ -11,6 +11,15 @@ function anaNow(){
     const names = Object.fromEntries(Object.entries((BASE && BASE.cats) || (PLAN && PLAN.cats) || {}).map(([k, v]) => [k, v.name]));
     ANA = analyze(ASSORT, names, Object.fromEntries(SUBCATS.map(s => [s.id, s.name])));
   }
+  // A category's weeks of supply (and the stock its role's weeks allow) use the budget's forward pace, so the Scorecard,
+  // Stuck money, Budget and Stock & counts agree; its last-year figures stay as wksLY and cogsWkLY. Subcategories keep
+  // last year's pace: they have no forecast of their own.
+  if (ANA && BASE && ENG) for (const c of ANA.cats){
+    if (c.wksLY === undefined){ c.wksLY = c.wks; c.cogsWkLY = c.cogsWk; }
+    const f = fwdWeeklyCost(c.cat);
+    c.cogsWk = f > 0 ? f : null;   // no forecast ahead: no weeks, and no weeks target in dollars (stuckMoney)
+    c.wks = f > 0 ? c.oh / f : null;
+  }
   return ANA;
 }
 const aPct = v => v == null ? '—' : Math.round(v * 100) + '%';
@@ -28,7 +37,9 @@ function anaCmpText(a){
   if (a.cmpMonths >= 12) return 'the last 12 months against the 12 before';
   return `${monthShort(a.cmpFrom)}–${monthShort(a.through || a.months[a.months.length - 1])} against the same months a year earlier`;
 }
-const anaTile = (lab, v, sub, extra = '', x = '') => `<div class="tile"><div class="lab">${lab}</div><div class="v">${v}</div>${sub ? `<div class="d">${sub}</div>` : ''}${extra}${x ? `<div class="x">${x}</div>` : ''}</div>`;
+// A tile: its label, the number, one short line; the explanation sits behind an (i) beside the label.
+const tileTip = (lab, x) => x ? `<button type="button" class="tipi" data-cvt="${esc(String(lab).replace(/<[^>]*>/g, ''))}" data-cv="${esc(String(x).replace(/<[^>]*>/g, ''))}" aria-label="About ${esc(String(lab).replace(/<[^>]*>/g, ''))}">i</button>` : '';
+const anaTile = (lab, v, sub, extra = '', x = '') => `<div class="tile"><div class="lab">${lab}${tileTip(lab, x)}</div><div class="v">${v}</div>${sub ? `<div class="d">${sub}</div>` : ''}${extra}</div>`;
 const anaEmpty = () => `<section class="panel"><div class="note" style="font-size:14px">The analysis appears after the next month-end upload${isAdmin ? ', or press <b>Update brands</b> on the Brands page' : ''}. It needs the category and subcategory report the upload builds.</div></section>`;
 const anaBench = () => `<div class="bench"><b>Rules of thumb</b> (<button type="button" class="btn ghost sm" data-go="guidelines:targets">see or change them on the Guidelines page</button>):${[BENCH.agedPct, BENCH.md, BENCH.wks, BENCH.gmroi, BENCH.turns, BENCH.gm].map(b => b.text).join(' · ')}. Sales are at retail and stock at cost. Special orders in 640 are left out; special orders filed in a category count in its sales but not in its stock, turns, weeks or GMROI.</div>`;
 function anaSugList(list, empty){
@@ -73,7 +84,7 @@ function anaSalesCard(a, {w, go} = {}){
 function anaRow(M, isSub, open){
   const g = k => grade(k, M[k], M.seg || SHOPSEG, M.cat);
   const subKey = isSub && M.cat && M.sub != null && typeof ASSORT !== 'undefined' && ASSORT && ASSORT.rows.some(r => r.cat === M.cat && r.sub === M.sub) ? M.cat + '|' + M.sub : '';
-  const first = isSub ? `<td>${esc(M.name)}${subKey ? ' <span class="sm" style="color:var(--faint);font-size:11px">details ›</span>' : ''}</td>` : `<td title="${esc(roleOf(M.cat).name + ': ' + roleOf(M.cat).judge)}"><span class="caret" aria-hidden="true">▸</span>${esc(M.name)} <span style="color:var(--faint);font-weight:400;font-size:11.5px">${M.subs.length}</span><span class="rolepill" title="${esc(roleOf(M.cat).judge)}">${esc(roleOf(M.cat).name)}</span></td>`;
+  const first = isSub ? `<td>${esc(M.name)}${subKey ? ' <span class="sm" style="color:var(--faint);font-size:11px">details ›</span>' : ''}</td>` : `<td title="${esc(roleOf(M.cat).name + ': ' + roleOf(M.cat).judge)}"><span class="caret" aria-hidden="true">▸</span><a href="#category:${esc(M.cat)}" class="catlink" data-go="category:${esc(M.cat)}" title="Open ${esc(M.name)}'s page">${esc(M.name)}</a> <span style="color:var(--faint);font-weight:400;font-size:11.5px">${M.subs.length}</span><span class="rolepill" title="${esc(roleOf(M.cat).judge)}">${esc(roleOf(M.cat).name)}</span></td>`;
   return `<tr class="${isSub ? 'asub' : 'acat' + (open ? ' open' : '')}" ${isSub ? (subKey ? `data-subrow="${esc(subKey)}" tabindex="0" style="cursor:pointer" title="Open ${esc(M.name)}: best sellers and aged stock"` : '') : `data-anacat="${esc(M.cat)}" tabindex="0" aria-expanded="${open}"`}>${first}
     <td class="r num">${money(M.t12)}</td><td class="r num ${M.growth == null ? '' : M.growth >= 0 ? 'up' : 'dn'}">${aChg(M.growth)}</td><td class="r num ${M.trend3 == null ? '' : M.trend3 >= 0 ? 'up' : 'dn'}">${aChg(M.trend3)}</td>
     <td><div class="sharebar" title="Sales ${aPct(M.share)} · stock ${aPct(M.stockShare)}"><i class="sb-s" style="width:${Math.min(100, M.share * 250)}%"></i><i class="sb-o" style="width:${Math.min(100, M.stockShare * 250)}%"></i></div><span class="num" style="font-size:11px;color:var(--muted)">${aPct(M.share)} / ${aPct(M.stockShare)}</span></td>
@@ -191,13 +202,15 @@ function renderStuck(){
     ${anaBench()}</div>`;
 }
 
+/** A category's page, from a chart, a Trends tile or a Markdowns row. */
+const anaOpen = code => goFrom('category:' + code);   // through goFrom, so the page opens at the top
 document.addEventListener('click', e => {
+  if (e.target.closest && e.target.closest('[data-go]')) return;   // the category name inside a Scorecard row: its link, not the row
   const t = e.target.closest && e.target.closest('[data-anaopen],[data-anacat],[data-analevel],[data-anaall],[data-print]'); if (!t) return;
   const d = t.dataset;
   if (d.print) return window.print();
   if (d.anacat){ AN.open.has(d.anacat) ? AN.open.delete(d.anacat) : AN.open.add(d.anacat); return render(); }
-  if (d.anaopen){ AN.open.add(d.anaopen); goTab('scorecard');
-    return setTimeout(() => document.querySelector(`tr[data-anacat="${CSS.escape(d.anaopen)}"]`)?.scrollIntoView({block: 'center'}), 0); }
+  if (d.anaopen) return anaOpen(d.anaopen);
   if (d.analevel){ AN.level = d.analevel; return render(); }
   if (d.anaall){ const a = anaNow(); if (!a) return; if (AN.open.size >= a.cats.length) AN.open.clear(); else a.cats.forEach(c => AN.open.add(c.cat)); return render(); }
 });

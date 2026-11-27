@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   cancelMyRegistration,
   lookupMyRegistrations,
   updateMyRegistration,
   type MyRegistration,
 } from "@/lib/events/actions";
-import { answerText, formatSlot } from "@/lib/events/format";
+import { answerText, formatSlot, shownAnswer } from "@/lib/events/format";
 import type { EventRec } from "@/lib/events/types";
 import type { TeamInput } from "@/lib/events/tournament";
 import TeamEntryForm from "@/components/events/TeamEntryForm";
@@ -94,7 +94,7 @@ export function TeamRegistration({
                 <SummaryRow
                   key={f.id}
                   label={f.label}
-                  value={answerText(p.answers[f.id])}
+                  value={shownAnswer(f, p.answers[f.id])}
                 />
               ))}
             </dl>
@@ -109,7 +109,7 @@ export function TeamRegistration({
               <SummaryRow
                 key={f.id}
                 label={f.label}
-                value={answerText(reg.answers[f.id])}
+                value={shownAnswer(f, reg.answers[f.id])}
               />
             ))}
           </dl>
@@ -161,6 +161,27 @@ export default function ManageRegistration({ event }: { event: EventRec }) {
   const [dGuests, setDGuests] = useState<string[]>([]);
   const [dSlots, setDSlots] = useState<string[]>([]);
   const [dAnswers, setDAnswers] = useState<Record<string, string>>({});
+
+  // "Change or cancel" on a confirmation opens this panel with the email
+  // already filled in; the member still presses Look up.
+  const lookupBtn = useRef<HTMLButtonElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [prefilled, setPrefilled] = useState(0);
+  useEffect(() => {
+    const onManage = (e: Event) => {
+      const em = (e as CustomEvent<{ email?: string }>).detail?.email ?? "";
+      setOpen(true);
+      setEmail(em);
+      setPrefilled((n) => n + 1);
+    };
+    window.addEventListener("ep:manage", onManage);
+    return () => window.removeEventListener("ep:manage", onManage);
+  }, []);
+  useEffect(() => {
+    if (!prefilled) return;
+    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    lookupBtn.current?.focus({ preventScroll: true });
+  }, [prefilled]);
 
   async function refresh(quiet = false) {
     const res = await lookupMyRegistrations(slug, email);
@@ -258,15 +279,22 @@ export default function ManageRegistration({ event }: { event: EventRec }) {
   // ---- Big, obvious entry point ------------------------------------------
   if (!open) {
     return (
-      <div className="manage-cta">
+      <div className="manage-cta" ref={rootRef}>
         <div className="mc-text">
           <div className="mc-title">Already signed up?</div>
           <p>
-            Change your dates, update your party or guests, or cancel &mdash;
-            all you need is the email you registered with.
+            {event.type === "tournament"
+              ? "Update your team's details or withdraw"
+              : event.scheduleMode === "slots"
+                ? "Change your dates, update your party, or cancel"
+                : event.allowGuests
+                  ? "Update your party or guests, or cancel"
+                  : "Update your details or cancel"}{" "}
+            &mdash; all you need is the email you{" "}
+            {event.type === "tournament" ? "entered with" : "registered with"}.
           </p>
         </div>
-        <button className="btn block mc-btn" onClick={() => setOpen(true)}>
+        <button className="btn secondary block mc-btn" onClick={() => setOpen(true)}>
           Manage my registration
         </button>
       </div>
@@ -274,7 +302,7 @@ export default function ManageRegistration({ event }: { event: EventRec }) {
   }
 
   return (
-    <div className="card manage-open" style={{ marginTop: 22 }}>
+    <div className="card manage-open" style={{ marginTop: 22 }} ref={rootRef}>
       <div className="page-head" style={{ marginBottom: 12 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 22 }}>Manage my registration</h2>
@@ -303,6 +331,7 @@ export default function ManageRegistration({ event }: { event: EventRec }) {
               required
             />
             <button
+              ref={lookupBtn}
               className="btn"
               type="submit"
               disabled={busy}

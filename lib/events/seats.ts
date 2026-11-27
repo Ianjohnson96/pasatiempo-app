@@ -64,6 +64,26 @@ export function onRoster(regs: Registration[], email: string): boolean {
   return regs.some((r) => r.status === "confirmed" && r.email.trim().toLowerCase() === e);
 }
 
+// A live sign-up (confirmed or waitlisted) this email already has, which a
+// new sign-up would double. Cancelled ones don't count, so people can come
+// back. On a multi-date event the same person may add NEW dates; only a date
+// they already hold is a double.
+export function existingSignup(
+  event: Pick<EventRec, "scheduleMode">,
+  regs: Registration[],
+  email: string,
+  slotIds: string[],
+): Registration | null {
+  const e = email.trim().toLowerCase();
+  const mine = regs.filter(
+    (r) =>
+      (r.status === "confirmed" || r.status === "waitlist") &&
+      r.email.trim().toLowerCase() === e,
+  );
+  if (event.scheduleMode !== "slots") return mine[0] ?? null;
+  return mine.find((r) => r.slotIds.some((id) => slotIds.includes(id))) ?? null;
+}
+
 export interface Availability {
   capacity: number | null; // null = unlimited
   taken: number;
@@ -85,4 +105,30 @@ export function availability(
   }
   const remaining = Math.max(0, cap - taken);
   return { capacity: cap, taken, remaining, full: remaining <= 0 };
+}
+
+// ---- Waitlist ----------------------------------------------------------------
+
+/**
+ * The waitlisted entries that fit the open spots right now, first come first
+ * served. Strictly in order: if the next one doesn't fit, nobody behind it
+ * jumps ahead. Multi-date events are left to staff (each date fills apart).
+ */
+export function promotable(event: EventRec, regs: Registration[]): Registration[] {
+  if (event.scheduleMode === "slots") return [];
+  const waiting = regs
+    .filter((r) => r.status === "waitlist")
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  let left = event.capacity == null ? Infinity : event.capacity - takenSeats(regs, null, event);
+  let roster = event.rosterLimit == null ? Infinity : event.rosterLimit - rosterCount(regs);
+  const out: Registration[] = [];
+  for (const r of waiting) {
+    const seats = regWeight(event, r);
+    const people = Math.max(1, r.partySize);
+    if (seats > left || (event.type !== "tournament" && people > roster)) break;
+    out.push(r);
+    left -= seats;
+    roster -= people;
+  }
+  return out;
 }

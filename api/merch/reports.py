@@ -33,7 +33,7 @@ sys.path.insert(0, os.path.join(ROOT, 'merchandise', 'pipeline'))
 import refresh  # noqa: E402
 
 # Last month's documents the reader builds on (the same set /merch/api/refresh hands the page).
-PRIOR_PATHS = ('base/current', 'plan/assumptions', 'skusnap/current', 'brandmap/current', 'brandin/current', 'submap/current')
+PRIOR_PATHS = ('base/current', 'plan/assumptions', 'guidelines/current', 'skusnap/current', 'brandmap/current', 'brandin/current', 'submap/current')
 
 MAX_BODY = 4_400_000  # Vercel accepts request bodies up to 4.5 MB
 MAX_FILES = 20

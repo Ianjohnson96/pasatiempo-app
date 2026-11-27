@@ -59,9 +59,14 @@ export function topCollection(path: string): string {
 // Collections staff may change, named one by one: orders, vendors, subcategories, counts, To do states, checklist
 // ticks, brand assignments (Brands -> Assign brands) and subcategory sorting. Anything new is owner-only until it is
 // added here.
-const STAFF_WRITABLE = new Set(["pos", "vendors", "subcats", "counts", "istate", "checklist", "brandmap", "submap"]);
+// logmatch/{log row key}: a person's call on a receiving log row (matched to an order, or not an order).
+const STAFF_WRITABLE = new Set(["pos", "vendors", "subcats", "counts", "istate", "checklist", "brandmap", "submap", "logmatch"]);
+// Written only by the server: receivinglog/current is the app's read-only copy of the receiving log
+// (lib/merch/receiving-log-server.ts); nobody changes it through the page, the owner included.
+const SERVER_ONLY = new Set(["receivinglog"]);
 
 export function canWrite(role: MerchRole, path: string): boolean {
+  if (SERVER_ONLY.has(topCollection(path))) return false;
   if (role === "owner") return true;
   const c = topCollection(path);
   if (role === "staff") return STAFF_WRITABLE.has(c) && !OWNER_ONLY.has(c);
@@ -83,6 +88,15 @@ export function docProblem(path: string, data: unknown): string | null {
   if (data === null) return null;
   const d = data as Record<string, unknown>;
   switch (topCollection(path)) {
+    case "logmatch": {
+      if (d.state !== "matched" && d.state !== "notorder") return "state must be matched or notorder";
+      if (d.state === "matched") {
+        if (typeof d.po !== "string" || !d.po) return "a match needs the order it belongs to";
+        if (d.amount == null || !isNum(d.amount)) return "amount must be a number";
+        if (typeof d.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(d.date)) return "date must be YYYY-MM-DD";
+      }
+      return null;
+    }
     case "pos": {
       if (d.status != null && !ORDER_STATUS.has(String(d.status))) return "unknown order status";
       for (const k of ["cost", "units", "received"]) if (!isNum(d[k])) return `${k} must be a number`;
@@ -172,12 +186,20 @@ function guidelinesProblem(d: Record<string, unknown>): string | null {
   if (d.mix != null) {
     if (!isObj(d.mix)) return "mix must be an object";
     if (d.mix.total != null && !numIn(d.mix.total, 1, 1e9)) return "mix total must be a positive amount";
+    if (d.mix.follow != null && d.mix.follow !== "suggested") return "mix follow must be 'suggested' or left out";
     if (d.mix.ranges != null) {
       if (!isObj(d.mix.ranges)) return "mix ranges must be an object";
       for (const [r, x] of Object.entries(d.mix.ranges))
         if (!ROLE_KEYS.has(r) || !Array.isArray(x) || x.length !== 2 || !numIn(x[0], 0, 100) || !numIn(x[1], 0, 100) || x[0] > x[1])
           return `${r} mix range must be two percentages, low to high`;
     }
+  }
+  if (d.vendorWords != null) {
+    // the receiving log's extra words per vendor key (Orders & receiving offers them after a hand match)
+    if (!isObj(d.vendorWords) || Object.keys(d.vendorWords).length > 300) return "vendorWords must be an object of word lists";
+    for (const [k, v] of Object.entries(d.vendorWords))
+      if (!k.trim() || !Array.isArray(v) || v.length > 30 || !v.every((w) => typeof w === "string" && w.trim().length > 0 && w.length <= 40))
+        return `vendorWords for ${k} must be a list of words, each 1-40 characters`;
   }
   if (d.history != null) {
     if (!Array.isArray(d.history) || d.history.length > 200) return "history must be a list of at most 200 changes";

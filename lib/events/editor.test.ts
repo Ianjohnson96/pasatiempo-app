@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  deadlineBefore,
   EDITOR_SECTIONS,
   TYPE_TILES,
   TYPE_SWITCH_BLOCKED,
@@ -56,6 +57,13 @@ function state(over: Partial<EditorState> = {}): EditorState {
     rosterStyle: "first_initial",
     managersText: "pro@pasatiempo.com\nother@x.com",
     status: "open",
+    theme: null,
+    contactName: "",
+    contactEmail: "",
+    opensAt: "",
+    closesAt: "",
+    changesAfterClose: false,
+    autoPromote: false,
     ...over,
   };
 }
@@ -70,17 +78,20 @@ describe("tiles and steps", () => {
     ]);
   });
 
-  it("has the seven sections in order", () => {
+  it("has the nine sections in order, Look after Details, Email before Publish", () => {
     expect(EDITOR_SECTIONS.map((s) => s.id)).toEqual([
       "details",
+      "look",
       "schedule",
       "questions",
       "pricing",
       "roster",
       "access",
+      "email",
       "publish",
     ]);
-    expect(EDITOR_SECTIONS[2].label).toBe("Players & Questions");
+    expect(EDITOR_SECTIONS[1].label).toBe("Look");
+    expect(EDITOR_SECTIONS[3].label).toBe("Players & Questions");
   });
 });
 
@@ -143,6 +154,10 @@ describe("buildEventInput", () => {
       rosterStyle: "first_initial",
       managers: ["pro@pasatiempo.com", "other@x.com"],
       status: "open",
+      theme: null,
+      contactName: null,
+      contactEmail: null,
+      rules: null,
     });
   });
 
@@ -189,6 +204,17 @@ describe("editorError", () => {
     expect(
       editorError(state({ type: "tournament", scheduleMode: "slots" })),
     ).toBeNull();
+  });
+  it("a contact's email must look like an email", () => {
+    expect(editorError(state({ contactEmail: "pat at club" }))).toBe(
+      "The contact email doesn't look right — check it, or leave it blank for Ian Johnson.",
+    );
+    expect(editorError(state({ contactEmail: " pat@club.com " }))).toBeNull();
+  });
+  it("a contact name needs an email to go with it", () => {
+    expect(editorError(state({ contactName: "Pat", contactEmail: "" }))).toBe(
+      "Add Pat's email too, or clear the contact name.",
+    );
   });
 });
 
@@ -291,5 +317,55 @@ describe("crossesTournamentBoundary", () => {
     expect(TYPE_SWITCH_BLOCKED).toBe(
       "This event already has sign-ups, so it can't be switched to or from Tournament. Make a new event instead.",
     );
+  });
+});
+
+describe("look and contact", () => {
+  it("buildEventInput carries theme and blank contact becomes null", () => {
+    const input = buildEventInput(
+      state({ theme: { preset: "evening", accent: "#b41c14" }, contactName: "  ", contactEmail: " " }),
+    );
+    expect(input.theme).toEqual({ preset: "evening", accent: "#b41c14" });
+    expect(input.contactName).toBeNull();
+    expect(input.contactEmail).toBeNull();
+    const named = buildEventInput(state({ contactName: " Pat ", contactEmail: " Pat@X.com " }));
+    expect(named.contactName).toBe("Pat");
+    expect(named.contactEmail).toBe("pat@x.com");
+  });
+
+  it("previewEvent carries theme, contact and the event's photos", () => {
+    const ev = previewEvent(
+      buildEventInput(state({ theme: { preset: "coastal" }, contactEmail: "pat@x.com" })),
+      ["/a.jpg"],
+    );
+    expect(ev.theme).toEqual({ preset: "coastal" });
+    expect(ev.contactEmail).toBe("pat@x.com");
+    expect(ev.photos).toEqual(["/a.jpg"]);
+  });
+});
+
+describe("sign-up dates", () => {
+  it("quick deadlines land at 5 PM some days before the start", () => {
+    expect(deadlineBefore("2027-06-25T08:00", 7)).toBe("2027-06-18T17:00");
+    expect(deadlineBefore("2027-03-01T08:00", 1)).toBe("2027-02-28T17:00");
+    expect(deadlineBefore("", 7)).toBe("");
+  });
+  it("blank dates save as no rules", () => {
+    expect(buildEventInput(state()).rules).toBeNull();
+  });
+  it("the deadline and the change setting are saved", () => {
+    const r = buildEventInput(state({ closesAt: "2027-04-30T17:00", changesAfterClose: true })).rules;
+    expect(r?.closesAt).toBe(new Date("2027-04-30T17:00").toISOString());
+    expect(r?.opensAt).toBeNull();
+    expect(r?.changesAfterClose).toBe(true);
+  });
+  it("the deadline must come after the opening", () => {
+    expect(editorError(state({ opensAt: "2027-05-01T08:00", closesAt: "2027-04-30T17:00" }))).toBe(
+      "The entry deadline must be after sign-ups open.",
+    );
+  });
+  it("the preview carries the rules", () => {
+    const input = buildEventInput(state({ closesAt: "2027-04-30T17:00" }));
+    expect(previewEvent(input).rules?.closesAt).toBe(input.rules?.closesAt);
   });
 });

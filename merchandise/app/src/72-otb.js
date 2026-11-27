@@ -73,5 +73,5 @@ function worksheet(ms, CM, chips = ''){
       ${row('On order / received', com)}
       ${row('<b>Left to buy</b>', otb.map((v, i) => v - com[i]), 'tot')}
     </tbody></table></div>
-    <div class="note">This is the standard retail open-to-buy, one month at a time. It ignores budget changes; those show in the grid above.${cats.length === 1 ? ` Target weeks for ${esc(BASE.cats[cats[0]].name)}: ${assumptions().wos[cats[0]]}.` : ''}</div></section>`;
+    <div class="note">This is the standard retail open-to-buy, one month at a time. It ignores budget changes; those show in the grid above.${cats.length === 1 ? ` Target weeks for ${esc(BASE.cats[cats[0]].name)}: ${esc(wosLabel(PLANS.cur.cats[cats[0]], PLANS.cur))}.` : ''} ${esc(mixLinkTxt(PLANS.cur))}</div></section>`;
 }

@@ -16,21 +16,6 @@ function todayRoom(){
     return {fy: PLAN.fy, m, now: left[i], year: left[left.length - 1], left, opens: o > 0 ? w[o] : null, chart: roomChart(S)};
   });
 }
-function todayTiles(a, R){
-  const s = a && a.shop, sp = a ? anaSpr(a) : null, none = 'After the next month-end upload';
-  const roomD = R.now < 0 ? (R.opens ? `Over plan until ${monthShort(R.opens)}` : `Over plan all of ${R.fy}`) : `left to buy through ${monthShort(R.m)}`;
-  const big = a ? a.cats.slice(0, 8) : [];
-  return `<section class="tiles" aria-label="How the shop is doing">
-    ${todayTile('Sales, last 12 months', s ? moneyK(s.t12) : '—', s ? (s.growth == null ? 'retail' : aDelta(s.growth) + ' growth') : none,
-      s ? chSpark(s.series.map((v, i) => i >= a.first ? v : null).slice(-12), {w: 160, h: 30}) : '', 'Retail sales by month. Open Trends & rounds.', 'trends')}
-    ${todayTile('Gross margin', s ? aPct(s.gm) : '—', s ? `${moneyK(s.gp)} earned` : none,
-      big.length ? chSparkBars(big.map(c => c.gm || 0), {w: 160, h: 30, title: 'Margin in the ' + big.length + ' biggest categories'}) : '', s ? `Bars: margin in the ${big.length} biggest categories. ${aGrade(grade('gm', s.gm, SHOPSEG))}` : '', 'scorecard')}
-    ${todayTile(`Room to buy, ${R.fy}`, `<span class="${R.now < 0 ? 'neg' : ''}">${moneyK(R.now)}</span>`, roomD,
-      chSpark(R.left, {w: 160, h: 30}), `${moneyK(R.year)} for the whole year, after what's committed. Open Budget & open-to-buy.`, 'overview')}
-    ${todayTile('Sales per round', sp && sp.spr != null ? money2(sp.spr) : '—', sp ? (sp.sprNow && sp.sprLY ? aDelta(sp.sprNow / sp.sprLY - 1) + ' on a year earlier' : `${int(sp.rounds)} rounds`) : none,
-      sp ? chSpark(sp.pr.slice(-12).map(p => p.spr), {w: 160, h: 30}) : '', 'Retail sales ÷ rounds played, by month.', 'trends')}
-  </section>`;
-}
 // Checklists on the reporting calendar that are due or overdue (78-reports.js): one line, so they don't push the
 // shop's numbers off the first screen. The list itself is on Upload & close.
 function todayChecklists(){
@@ -55,21 +40,39 @@ function todayDue(){
     ${due.length > show.length ? `<div class="note">…and ${due.length - show.length} more on the Receiving page.</div>` : ''}`
     : `<div class="note">Nothing is late or due in ${monthFull(THIS_MONTH)}.</div>`}</section>`;
 }
+/** Home's three lines, one per phase: what's left to buy, what's arriving, how it's selling. null before the first
+    upload. Each is plain text; the page links each to its page. */
+function homeLines(S){
+  if (!S || !BASE || !PLANS.cur) return null;
+  // Home always describes this fiscal year, whichever year the Budget page is showing
+  const R = todayRoom(), buy = withPlan('cur', () => PAGE_VERDICT.overview(stats()));
+  let due = 0, late = 0, inRoom = 0, roomV = 0;
+  for (const p of POS){ const st = rcvOf(p); if (st === 'due') due++; else if (st === 'late') late++; else if (st === 'arrived'){ inRoom++; roomV += storeRoomOf(p); } }
+  const toMatch = receivingQueue().toMatch.length;
+  const arr = [toMatch ? `${toMatch} log row${toMatch === 1 ? '' : 's'} to match` : '', due ? `${due} order${due === 1 ? '' : 's'} due this month` : 'nothing due this month', late ? `${late} late` : '', inRoom ? `${inRoom} in the store room (${money(roomV)}), not in Jonas yet` : ''].filter(Boolean);
+  const a = anaNow(), s = a && a.shop;
+  const selling = s ? `${moneyK(s.t12)} sold in the last 12 months${s.growth == null ? '' : `, ${s.growth >= 0 ? 'up' : 'down'} ${Math.abs(Math.round(s.growth * 100))}% on a year earlier`}; margin ${aPct(s.gm)}${grade('gm', s.gm, SHOPSEG) === 'bad' ? ', below the guideline' : ''}.`
+    : 'Sales show after the next month-end upload.';
+  return {buy: buy ? buy.text : `${moneyK(R.year)} left to buy in ${R.fy}.`, buyTone: buy ? buy.tone : 'ok', arriving: (s => s[0].toUpperCase() + s.slice(1))(arr.join(' · ')) + '.', arrivingTone: late ? 'act' : inRoom || toMatch ? 'watch' : 'ok', selling, sellingTone: s && s.growth != null && s.growth < 0 ? 'watch' : 'ok'};
+}
 function renderToday(S){
-  const a = anaNow(), R = todayRoom(), d = topDecisions(S, 6);
+  const a = anaNow(), L = homeLines(S), d = topDecisions(S, 5);
   const paneW = ($('#pane') || {}).clientWidth || 900, one = typeof matchMedia === 'function' && matchMedia('(max-width:1100px)').matches;
   const w = Math.max(280, Math.round(one ? paneW : (paneW - 18) * 1.35 / 2.35) - 38);
+  const line = (lab, text, tone, go) => `<button type="button" class="homeline ${tone}" data-go="${go}"><span class="hl">${lab}</span><span class="ht">${esc(text)}</span></button>`;
+  const R = L ? todayRoom() : null;
   $('#pane').innerHTML = `<div class="astack">
     ${a ? `<div class="noprint" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:12.5px;color:var(--muted)">Sales data through ${monthLabel(a.through)}. Growth compares ${anaCmpText(a)}.</span><button class="btn sm" type="button" data-print="1">Print this page</button></div>` : ''}
     ${todayChecklists()}
-    ${todayTiles(a, R)}
+    ${L ? `<section class="homelines" aria-label="The shop at a glance">${line('Buy', L.buy, L.buyTone, 'overview')}${line('Arriving', L.arriving, L.arrivingTone, 'receiving')}${line('Selling', L.selling, L.sellingTone, 'trends')}</section>`
+      : '<section class="panel"><div class="note">Home fills in after the first month-end upload.</div></section>'}
     <div class="tgrid">
-      ${a ? anaSalesCard(a, {w, go: 'trends'}) : '<section class="ccard"><h3>Sales by month</h3><div class="cs">Appears after the next month-end upload: it needs the category and subcategory report the upload builds.</div></section>'}
-      <section class="panel"><header><h2>Most important this week</h2><button class="btn ghost sm" type="button" data-tab="attention">See the full list</button></header>
+      <section class="panel"><header><h2>This week's decisions</h2><button class="btn ghost sm" type="button" data-tab="actions">See all actions</button></header>
         <ul class="items">${d.length ? d.map(decisionHtml).join('') : '<li class="item good"><div class="stripe"></div><div class="body"><div class="t">Nothing needs attention.</div></div></li>'}</ul></section>
+      ${a ? anaSalesCard(a, {w, go: 'trends'}) : '<section class="ccard"><h3>Sales by month</h3><div class="cs">Appears after the next month-end upload: it needs the category and subcategory report the upload builds.</div></section>'}
     </div>
     <div class="tgrid">
-      <section class="panel"><header><h2>Receiving room by month</h2><span class="lab">${esc(R.fy)} · cumulative, all categories</span></header>${R.chart}</section>
+      ${R ? `<section class="panel"><header><h2>Receiving room by month</h2><span class="lab">${esc(R.fy)} · cumulative, all categories</span></header>${R.chart}</section>` : ''}
       ${todayDue()}
     </div></div>`;
 }

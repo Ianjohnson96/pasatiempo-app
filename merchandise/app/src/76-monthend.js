@@ -130,7 +130,7 @@ async function readReports(){
     const start = await upJSON(H.base + '/api/refresh?prior=0');  // the reader reads last month's documents itself
     const files = await Promise.all(UP.files.map(async f => ({name: f.name, data: await fileB64(f)})));
     const gv = guideValues(GUIDE);   // the saved role map and member discount, for this month's suggestions
-    UP.result = await upJSON('/api/merch/reports', {ticket: start.ticket, note: UP.note, files, guidelines: {roleOf: gv.roleOf, memberDiscount: gv.memberDiscount}});
+    UP.result = await upJSON('/api/merch/reports', {ticket: start.ticket, note: UP.note, files, guidelines: {roleOf: gv.roleOf, memberDiscount: gv.memberDiscount, mix: {total: gv.mix.total, follow: gv.mix.follow}, bench: {turns: gv.bench.turns}}});
     const arr = UP.result.bundle && UP.result.bundle.docs && UP.result.bundle.docs['arrivals/' + UP.result.summary.asOf];
     UP.rcv = arr ? matchArrivals(arr) : null;
   } catch (e){ UP.error = e.message; UP.found = e.found || null; }

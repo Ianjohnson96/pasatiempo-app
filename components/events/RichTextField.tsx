@@ -46,7 +46,7 @@ export default function RichTextField({
       delta = -prefix.length;
     } else {
       // strip any other heading prefix first
-      const stripped = rest.replace(/^#{1,2} /, "");
+      const stripped = rest.replace(/^(#{1,2}|-) /, "");
       const removed = rest.length - stripped.length;
       next = value.slice(0, lineStart) + prefix + stripped;
       delta = prefix.length - removed;
@@ -78,8 +78,16 @@ export default function RichTextField({
         >
           A<span style={{ fontSize: 9 }}>+</span>
         </button>
+        <button
+          type="button"
+          onClick={() => prefixLine("- ")}
+          title="Make this line a bullet point"
+        >
+          • List
+        </button>
         <span className="rt-hint">
-          Select text, then <b>B</b> for bold; A+ for a bigger line.
+          Select text, then <b>B</b> for bold; A+ for a bigger line; a line starting
+          &ldquo;- &rdquo; is a bullet.
         </span>
       </div>
       <textarea

@@ -79,7 +79,7 @@ function renderOrders(S){
     <tbody class="click">${rows.map((p, i) => `${byMonth && (i === 0 || mkey(rows[i - 1]) !== mkey(p)) ? monthHead(mkey(p)) : ''}<tr class="${rowFlag(p)}" data-po="${esc(p.id)}" tabindex="0">
       <td class="po">${esc(p.poNumber)}</td><td>${esc(vendorName(p))}${RISK_VENDORS.test(vendorName(p)) ? '<span class="sm" style="color:var(--ochre)">cost risk</span>' : ''}</td>
       <td>${catSummary(p)}</td><td>${itemsSummary(p)}</td><td class="nowrap">${monthLabel(p.deliveryMonth)}</td><td class="num nowrap">${p.cancelDate ? dateLabel(p.cancelDate) : '—'}</td>
-      <td class="r num">${money(poTotal(p))}</td><td class="r num">${onOrder(p) ? money(onOrder(p)) : '—'}</td>
+      <td class="r num">${money(poTotal(p))}</td><td class="r num">${onOrder(p) ? money(onOrder(p)) : '—'}${arrivalBarHtml(p)}</td>
       <td><span class="pill ${esc(p.status)}">${STATUS[p.status] || esc(p.status)}</span>${p.status === 'hold' && p.fix ? `<span class="sm fixnote" title="${esc(p.fix)}">${esc(p.fix)}</span>` : ''}</td></tr>`).join('')}</tbody></table></div>
     ${!POS.length ? `<div class="empty"><h3>No purchase orders yet</h3><p>Click <b>+ New order</b> to write one, or use <b>Tools → Paste orders from a spreadsheet</b> to load your current open orders all at once.</p>${canAct() ? '<button class="btn primary" type="button" data-act="new">+ New order</button>' : ''}</div>` : !rows.length ? `<div class="empty"><p>No orders match these filters.</p>${filtered ? '<button type="button" class="btn sm" data-oclear="1">Clear vendor and season</button>' : ''}</div>` : ''}
   </section>`;
@@ -103,54 +103,32 @@ function itemHtml(i, compact){
     ${compact ? '' : `<div class="a"><b>What to do:</b> ${esc(i.action)}</div>`}${who ? `<div class="d">${who}</div>` : ''}
   </div><div class="side">${btns}</div></li>`;
 }
-function renderAttention(S){
-  const all = allAttention(S);
-  const counts = {}; for (const i of all) if (!i.state) counts[i.kind] = (counts[i.kind] || 0) + 1;
-  let list = all.filter(i => (afilt.showResolved || !i.state) && (afilt.kind === 'all' || i.kind === afilt.kind) && (afilt.cat === 'all' || i.cat === afilt.cat));
-  const rank = {crit:0, warn:1, good:2, info:3};
-  list.sort((a,b) => (!!a.state - !!b.state) || (a.kind === 'order' ? -1 : 0) - (b.kind === 'order' ? -1 : 0) || rank[a.sev] - rank[b.sev] || (b.priority || 0) - (a.priority || 0));
-  const fc = (k, l) => `<button type="button" class="fchip" data-akind="${k}" aria-pressed="${afilt.kind === k}">${l}<span class="c">${k === 'all' ? Object.values(counts).reduce((a,b) => a + b, 0) : (counts[k] || 0)}</span></button>`;
-  const top = topDecisions(S);
-  $('#pane').innerHTML = `${top.length ? `<section class="panel" style="margin-bottom:16px">
-    <header><h2>Most important this week</h2><span class="lab">${top.length} decisions · biggest dollars first</span></header>
-    <div class="note" style="border-bottom:1px solid var(--rule)">The few decisions worth the most money right now, from the order problems, the item list below and the scorecard's suggestions. Mark one Done when you've acted, or Not now to take it off this list; everything stays in the full list.</div>
-    <ul class="items">${top.map(decisionHtml).join('')}</ul></section>` : ''}<section class="panel">
-    <header><h2>To do</h2><span class="lab">Item suggestions from the ${dateLabel(INS.asOf)} SKU Analysis · refreshed each month-end</span></header>
-    <div class="chips">${fc('all','All')}${Object.keys(KINDS).map(k => fc(k, KINDS[k])).join('')}
-      <span style="flex:1"></span><select id="aCat" class="field-inline" aria-label="Category"><option value="all">All categories</option>${catList().map(c => `<option value="${c.code}" ${afilt.cat === c.code ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+/* ---------- Actions (Categories › Actions) ----------
+   Every action on one list, biggest dollars at stake first (30-home.js allActions), filtered by kind of decision and
+   category. Set-aside ones show with Show done, after the open ones, with Undo. */
+function renderActions(S){
+  if (!BASE){ $('#pane').innerHTML = '<section class="panel"><div class="note" style="font-size:14px">The actions appear after the first month-end upload.</div></section>'; return; }
+  const all = allActions(S), open = all.filter(actionOpen);
+  const counts = {}; for (const d of open) counts[d.verb] = (counts[d.verb] || 0) + 1;
+  if (afilt.kind !== 'all' && !DECIDE[afilt.kind]) afilt.kind = 'all';
+  const keep = d => (afilt.kind === 'all' || d.verb === afilt.kind) && (afilt.cat === 'all' || d.cat === afilt.cat);
+  const list = open.filter(keep).concat(afilt.showResolved ? all.filter(d => !actionOpen(d) && keep(d)) : []);
+  const fc = (k, l, n) => `<button type="button" class="fchip" data-akind="${k}" aria-pressed="${afilt.kind === k}">${esc(l)}<span class="c">${n}</span></button>`;
+  const cats = [...new Set(all.map(d => d.cat).filter(Boolean))].sort();
+  $('#pane').innerHTML = `<section class="panel">
+    <header><h2>Actions</h2><span class="lab">${open.length} open · biggest dollars first</span></header>
+    <div class="chips">${fc('all', 'All', open.length)}${Object.keys(DECIDE).filter(k => counts[k]).map(k => fc(k, DECIDE[k], counts[k])).join('')}
+      <span style="flex:1"></span><select id="aCat" class="field-inline" aria-label="Category"><option value="all">All categories</option>${cats.map(c => `<option value="${esc(c)}" ${afilt.cat === c ? 'selected' : ''}>${esc(CAT(c).name)}</option>`).join('')}</select>
       <label style="font-size:12.5px;display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="aRes" ${afilt.showResolved ? 'checked' : ''}> Show done</label></div>
-    <div class="note" style="border-bottom:1px solid var(--rule)">${esc(KIND_NOTE[afilt.kind] || KIND_NOTE.all)}</div>
-    ${list.length ? (afilt.kind === 'all' ? attnGroups(list) : `<ul class="items">${list.map(i => itemHtml(i, false)).join('')}</ul>`) : '<ul class="items"><li class="item good"><div class="stripe"></div><div class="body"><div class="t">Nothing here.</div><div class="d">Everything in this view has been dealt with.</div></div></li></ul>'}
+    <div class="note" style="border-bottom:1px solid var(--rule)">Order problems, item to-dos and the scorecard's suggestions, ranked by the dollars at stake at cost. Mark one Done when you've acted, or Not now if it doesn't apply. One that grows by more than a quarter comes back.</div>
+    <ul class="items">${list.length ? list.map(decisionHtml).join('') : '<li class="item good"><div class="stripe"></div><div class="body"><div class="t">Nothing here.</div><div class="d">Everything in this view has been dealt with.</div></div></li>'}</ul>
   </section>`;
   fillPeople();
 }
-/* The All view in groups, one per kind in KINDS order, each showing its first ATTN_SHOW items (already ranked) with
-   a button for the rest; afilt.more holds the kinds opened in full. */
-const ATTN_SHOW = 5;
-function attnGroups(list){
-  const by = {}; for (const i of list) (by[i.kind] = by[i.kind] || []).push(i);
-  return Object.keys(KINDS).filter(k => by[k]).map(k => {
-    const xs = by[k], open = !!(afilt.more || {})[k], show = open ? xs : xs.slice(0, ATTN_SHOW);
-    const more = xs.length > ATTN_SHOW ? `<button type="button" class="btn ghost sm agmore" data-amore="${k}" aria-expanded="${open}">${open ? 'Show the first ' + ATTN_SHOW : `Show all ${xs.length}`}</button>` : '';
-    return `<div class="agrp"><h3 class="agh"><span class="kind ${k}">${esc(KINDS[k])}</span><span class="c">${xs.length}</span></h3>
-      <ul class="items">${show.map(i => itemHtml(i, false)).join('')}</ul>${more}</div>`;
-  }).join('');
-}
-const KIND_NOTE = {
-  all:'Order problems come first, then item suggestions ranked by dollars at stake. Each group shows its five biggest first. Mark one Done when you have acted on it, or Not now if it doesn\'t apply; what you mark stays through each month-end refresh.',
-  order:'Problems with orders you have written: cancel dates, late deliveries, and categories going over budget. These update the moment an order changes.',
-  reorder:'Fast sellers that will run out in under 6 weeks at the pace forecast for the coming weeks. "Start an order" fills in a new order for you.',
-  stockout:'Items that sold well in the last three months but have none on hand. Reorder the ones you are keeping in the line.',
-  overstock:'Items with more than a year of stock at the current pace. Don\'t reorder them; move them with a feature or a markdown.',
-  aged:'Items that have not sold in over a year. "Restocked" means more arrived after it stopped selling — check whether that receipt was a mistake.',
-  margin:'The latest cost is well above what you paid last year, but the selling price hasn\'t changed. Check the invoice, then re-price or renegotiate.',
-  split:'One SKU is being used for several different products. You can\'t tell which design, color or size sells, so reorders are guesses and dead styles never show up as not selling.',
-  data:'Records that can\'t be right, such as negative stock. Fix them before the next count so the numbers the plan uses are real.'
-};
 
 /* ---------- inventory & counts tab ---------- */
 function renderInventory(S){
-  const rows = catList().map(c => { const i = INV.cats[c.code] || {units:0,cost:0,aged:0,skus:0}; const wks = wksNow(c.code, i.cost);
+  const rows = catList().map(c => { const i = INV.cats[c.code] || {units:0,cost:0,aged:0,skus:0}; const wks = catWeeks(c.code, shelfCost(c.code, i.cost));
     return {c, i, wks, tgt: c.target, gap: i.cost - (c.target || 0)}; });
   const T = rows.reduce((a,r) => ({units:a.units + r.i.units, cost:a.cost + r.i.cost, aged:a.aged + r.i.aged, skus:a.skus + r.i.skus}), {units:0,cost:0,aged:0,skus:0});
   const counts = [...COUNTS].sort((a,b) => String(b.date).localeCompare(String(a.date)));
@@ -204,7 +182,7 @@ function renderHelp(){
       <div class="ln tot"><span class="op">=</span><span>What you can still bring in</span><span>budget</span></div></div>
     <p><b>It's based on sales.</b> This year's open months are last year's sales for the month plus a growth rate, and next year is this year plus a growth rate for each category. All of it is on the Forecast page, converted to cost at each category's real margin. <b>Only shelf sales count:</b> special orders — a member's custom clubs, an event's logo order — are bought when the customer orders, so their sales and the stock waiting for them are left out of every budget.</p>
     <h3 style="margin-top:14px">Worked example: General Accessories, ${P.fy}</h3>
-    <div class="formula"><div class="ln"><span class="op"></span><span>Target stock at the end of ${monthLabel(P.window.to)}</span><span>${money(ga.target || 0)}</span></div><div class="sub">${ga.wos || 14} weeks of the cost of shelf sales forecast for the four months after</div>
+    <div class="formula"><div class="ln"><span class="op"></span><span>Target stock at the end of ${monthLabel(P.window.to)}</span><span>${money(ga.target || 0)}</span></div><div class="sub">${ga.wos ? esc(wosLabel(ga, P)) : '14 weeks'} of the cost of shelf sales forecast for the four months after</div>
       <div class="ln"><span class="op">+</span><span>Forecast cost of shelf sales</span><span>${money(ga.cogs || 0)}</span></div><div class="sub">${money(ga.shelf || 0)} of shelf sales at retail, at ${Math.round((ga.gm || 0) * 100)}% margin</div>
       <div class="ln"><span class="op">−</span><span>On hand ${dateLabel(P.asOf)}</span><span>${money(ga.onHand || 0)}</span></div>
       <div class="ln tot"><span class="op">=</span><span>${P.fy} budget</span><span>${money(ga.plan || 0)}</span></div></div>

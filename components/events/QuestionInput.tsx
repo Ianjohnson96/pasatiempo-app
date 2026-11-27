@@ -14,14 +14,17 @@ export default function QuestionInput({
   onChange,
   error,
   disabled,
+  idBase,
 }: {
   field: CustomField;
   value: Answer | undefined;
   onChange: (v: Answer) => void;
   error?: string;
   disabled?: boolean;
+  idBase?: string; // a stable id for the control, so an error summary can link to it
 }) {
-  const id = useId();
+  const generated = useId();
+  const id = idBase ?? generated;
   const errId = `${id}-err`;
   const labelId = `${id}-label`;
   const invalid = error ? true : undefined;

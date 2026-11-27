@@ -63,9 +63,21 @@ describe("teamLines", () => {
       [reg("confirmed", "Ann Smith", "Bob Jones"), reg("waitlist", "No Body", "Wait Er"), reg("cancelled", "X Y", "Z W")],
       "first_last",
     );
-    expect(out).toEqual(["Ann Smith & Bob Jones"]);
+    expect(out).toEqual([{ member: "Ann Smith", guest: "Bob Jones" }]);
   });
   it("honours first-initial style", () => {
-    expect(teamLines([reg("confirmed", "Ann Smith", "Bob Jones")], "first_initial")).toEqual(["Ann S. & Bob J."]);
+    expect(teamLines([reg("confirmed", "Ann Smith", "Bob Jones")], "first_initial")).toEqual([
+      { member: "Ann S.", guest: "Bob J." },
+    ]);
+  });
+  it("a team without a guest yet has guest null", () => {
+    expect(teamLines([reg("confirmed", "Ann Smith")], "first_last")).toEqual([
+      { member: "Ann Smith", guest: null },
+    ]);
+  });
+  it("carries names only, never emails or GHIN numbers", () => {
+    const json = JSON.stringify(teamLines([reg("confirmed", "Ann Smith", "Bob Jones")], "first_last"));
+    expect(json).not.toContain("@");
+    expect(json).not.toContain("1234567");
   });
 });

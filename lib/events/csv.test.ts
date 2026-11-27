@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { csvCell, csvFilename, signupRows, toCsv, tournamentRows } from "./csv";
+import {
+  csvCell,
+  csvFilename,
+  golfGeniusFilename,
+  golfGeniusRows,
+  signupRows,
+  splitName,
+  toCsv,
+  tournamentRows,
+} from "./csv";
 import type { CustomField, EventRec, Player, Registration } from "./types";
 
 const field = (id: string, label: string, scope: "player" | "team"): CustomField => ({
@@ -154,5 +163,72 @@ describe("signupRows / csvFilename", () => {
   it("names files by type", () => {
     expect(csvFilename(ev())).toBe("member-guest-2026-teams.csv");
     expect(csvFilename(ev({ type: "dinner" }))).toBe("member-guest-2026-signups.csv");
+  });
+});
+
+describe("splitName", () => {
+  it("splits first and last on the final word", () => {
+    expect(splitName("Pat Lee")).toEqual({ first: "Pat", last: "Lee", suffix: "" });
+    expect(splitName("  Mary Ann   Smith ")).toEqual({ first: "Mary Ann", last: "Smith", suffix: "" });
+  });
+  it("keeps a suffix out of the last name, so GHIN's name check matches", () => {
+    expect(splitName("John Smith Jr.")).toEqual({ first: "John", last: "Smith", suffix: "Jr." });
+    expect(splitName("Robert Jones III")).toEqual({ first: "Robert", last: "Jones", suffix: "III" });
+  });
+  it("reads 'Last, First'", () => {
+    expect(splitName("Smith, John")).toEqual({ first: "John", last: "Smith", suffix: "" });
+  });
+  it("puts a single word in the last name (the one column Golf Genius requires)", () => {
+    expect(splitName("Cher")).toEqual({ first: "", last: "Cher", suffix: "" });
+  });
+});
+
+describe("golfGeniusRows", () => {
+  const e = ev();
+  const regs = [
+    reg("a", "2026-01-01", {
+      players: [
+        { ...player("member", "Pat Lee", { shirt: "M" }), ghin: "123 456-7" },
+        player("guest", "Sam Ortiz", { shirt: "L" }),
+      ],
+      answers: { cart: "Yes" },
+      phone: "555-0100",
+    }),
+    reg("w", "2026-01-02", { status: "waitlist", players: [player("member", "Wait List"), player("guest", "Wait Guest")] }),
+    reg("c", "2026-01-03", { status: "cancelled", players: [player("member", "Gone Away"), player("guest", "Also Gone")] }),
+    reg("b", "2026-01-04", { players: [player("member", "Ann Bo"), player("guest", "Cy Dee")] }),
+  ];
+  const rows = golfGeniusRows(e, regs);
+
+  it("has the headings Golf Genius matches on", () => {
+    expect(rows[0]).toEqual([
+      "First Name",
+      "Last Name",
+      "Suffix",
+      "Email",
+      "Handicap Service ID",
+      "Team",
+      "Member or Guest",
+      "Phone",
+      "Shirt",
+      "Cart",
+    ]);
+  });
+
+  it("lists confirmed teams only, one row per player, with the shared team number", () => {
+    const body = rows.slice(1);
+    expect(body.map((r) => r[1])).toEqual(["Lee", "Ortiz", "Bo", "Dee"]);
+    // team numbers are the Manage page's: the waitlisted team keeps no. 2
+    expect(body.map((r) => r[5])).toEqual(["1", "1", "3", "3"]);
+  });
+
+  it("cleans GHIN numbers to digits and fills each column", () => {
+    expect(rows[1]).toEqual(["Pat", "Lee", "", "Pat Lee@x.com", "1234567", "1", "Member", "555-0100", "M", "Yes"]);
+    expect(rows[2][6]).toBe("Guest");
+    expect(rows[2][7]).toBe("");
+  });
+
+  it("names the file for Golf Genius", () => {
+    expect(golfGeniusFilename(e)).toBe("member-guest-2026-golf-genius.csv");
   });
 });

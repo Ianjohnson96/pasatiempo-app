@@ -1,14 +1,25 @@
 "use client";
 
+import { signupPhase, windowNote } from "@/lib/events/signup-window";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import {
+  matchesRegFilter,
+  matchesRegSearch,
+  REG_FILTERS,
+  regFilterCounts,
+  type RegFilter,
+} from "@/lib/events/search";
 import CopyLink from "@/components/events/CopyLink";
 import Icon from "@/components/events/Icon";
+import { whenLineFor } from "@/components/events/public/FactsStrip";
 import RegistrationEditor from "@/components/events/RegistrationEditor";
 import TeamEntryForm from "@/components/events/TeamEntryForm";
 import {
   csvFilename,
+  golfGeniusFilename,
+  golfGeniusRows,
   signupRows,
   teamNumbers,
   toCsv,
@@ -23,12 +34,14 @@ import {
 } from "@/lib/events/actions";
 import {
   answerText,
+  shownAnswer,
   formatSlot,
+  formatPhone,
+  shortDate,
   formatSlotShort,
-  formatWhen,
   TYPE_LABEL,
 } from "@/lib/events/format";
-import { availability } from "@/lib/events/seats";
+import { availability, promotable } from "@/lib/events/seats";
 import type { TeamInput } from "@/lib/events/tournament";
 import type {
   CustomField,
@@ -66,6 +79,26 @@ export default function EventManager({
   const confirmed = registrations.filter((r) => r.status === "confirmed");
   const waitlist = registrations.filter((r) => r.status === "waitlist");
   const cancelled = registrations.filter((r) => r.status === "cancelled");
+  // The search box narrows the lists shown, never the counts or exports.
+  const [query, setQuery] = useState("");
+  // Teams are one-line rows; these are the ones opened to show everything.
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
+  const toggleOpen = (id: string) =>
+    setOpenIds((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const searching = query.trim() !== "";
+  // The filter buttons narrow the list too; like search, never the counts or exports.
+  const [filter, setFilter] = useState<RegFilter>("all");
+  const filterCounts = regFilterCounts(registrations);
+  const hit = (r: Registration) => matchesRegSearch(r, query) && matchesRegFilter(r, filter);
+  const shownConfirmed = confirmed.filter(hit);
+  const shownWaitlist = waitlist.filter(hit);
+  const shownCancelled = cancelled.filter(hit);
+  const shown = shownConfirmed.length + shownWaitlist.length + shownCancelled.length;
   const seats = confirmed.reduce((n, r) => n + Math.max(1, r.partySize), 0);
 
   // Program roster: distinct confirmed people (registrant + guests), de-duped by
@@ -82,6 +115,16 @@ export default function EventManager({
   })();
   const rosterFull =
     event.rosterLimit != null && rosterPeople >= event.rosterLimit;
+
+  // The next waitlisted entry that fits an open spot, for the Manage banner.
+  const nextUp = event.rules?.autoPromote ? null : (promotable(event, registrations)[0] ?? null);
+  const entryName = (r: Registration) =>
+    r.players?.length ? r.players.map((p) => p.name).join(" & ") : r.name;
+
+  // Sign-up dates (set in Edit): where the event stands right now.
+  const now = new Date();
+  const phase = signupPhase(event, now);
+  const windowLine = windowNote(event, now);
 
   function changeStatus(s: "draft" | "open" | "closed") {
     start(async () => {
@@ -125,17 +168,28 @@ export default function EventManager({
     });
   }
 
-  function exportCsv() {
-    const rows =
-      event.type === "tournament"
-        ? tournamentRows(event, registrations)
-        : signupRows(event, registrations);
+  function download(rows: string[][], filename: string) {
     const blob = new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = csvFilename(event);
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+
+  function exportCsv() {
+    download(
+      event.type === "tournament"
+        ? tournamentRows(event, registrations)
+        : signupRows(event, registrations),
+      csvFilename(event),
+    );
+  }
+
+  // Confirmed teams, one row per player, ready for Golf Genius's
+  // Golfers > Upload Roster from Spreadsheet.
+  function exportGolfGenius() {
+    download(golfGeniusRows(event, registrations), golfGeniusFilename(event));
   }
 
   // unique confirmed-registrant emails (both players on a tournament team)
@@ -277,21 +331,49 @@ export default function EventManager({
           ];
     const playerFields = event.customFields.filter((f) => f.scope === "player");
     const teamFields = event.customFields.filter((f) => f.scope === "team");
+    const member = players.find((p) => p.role === "member") ?? players[0];
+    const guest = players.find((p) => p.role === "guest");
+    // a search opens the teams it finds; otherwise each row opens on its own
+    const expanded = searching || openIds.has(r.id);
+    const bodyId = `team-${r.id}`;
     return (
-      <div key={r.id} className={`team-card ${r.status}`}>
-        <div className="tc-head">
+      <div key={r.id} className={`team-card team-row ${r.status}${expanded ? " open" : ""}`}>
+        <button
+          type="button"
+          className="tr-sum"
+          aria-expanded={expanded}
+          aria-controls={bodyId}
+          onClick={() => toggleOpen(r.id)}
+        >
+          <span className="tr-chev" aria-hidden="true" />
           {num !== undefined && <span className="tc-num">Team {num}</span>}
-          <span className={`tc-status ${r.status}`}>
-            {STATUS_LABEL[r.status]}
-          </span>
-          {r.emailFailed && (
-            <span
-              className="flag-warn"
-              title="The confirmation email could not be sent"
-            >
-              Email not sent
+          <span className="tr-names">
+            <span>
+              {member.name}
+              <span className="tr-role">Member</span>
             </span>
-          )}
+            {guest && (
+              <span>
+                {guest.name}
+                <span className="tr-role guest">Guest</span>
+              </span>
+            )}
+          </span>
+          <span className="tr-flags">
+            {r.emailFailed && (
+              <span className="flag-warn" title="The confirmation email could not be sent">
+                Email not sent
+              </span>
+            )}
+            {shortDate(r.createdAt) && (
+              <span className="tr-date">Entered {shortDate(r.createdAt)}</span>
+            )}
+            <span className={`tc-status ${r.status}`}>{STATUS_LABEL[r.status]}</span>
+          </span>
+        </button>
+        {expanded && (
+          <div className="tr-body" id={bodyId}>
+        <div className="tc-head">
           <span className="tc-actions">{regActions(r)}</span>
         </div>
         <div className="tc-players">
@@ -302,16 +384,20 @@ export default function EventManager({
               </div>
               <div className="tc-name">{p.name}</div>
               <dl className="tc-list">
-                <TcRow label="Email" value={p.email} />
-                <TcRow label="GHIN #" value={p.ghin} />
+                <TcRow label="Email" value={p.email} href={p.email ? `mailto:${p.email}` : undefined} />
+                <TcRow label="GHIN #" value={p.ghin} copy />
                 {p.role === "member" && r.phone && (
-                  <TcRow label="Phone" value={r.phone} />
+                  <TcRow
+                    label="Phone"
+                    value={formatPhone(r.phone)}
+                    href={`tel:${r.phone.replace(/[^\d+]/g, "")}`}
+                  />
                 )}
                 {playerFields.map((f) => (
                   <TcRow
                     key={f.id}
                     label={f.label}
-                    value={answerText(p.answers[f.id])}
+                    value={shownAnswer(f, p.answers[f.id])}
                   />
                 ))}
               </dl>
@@ -320,6 +406,8 @@ export default function EventManager({
         </div>
         {teamFields.length > 0 && (
           <TeamAnswers fields={teamFields} answers={r.answers} />
+        )}
+          </div>
         )}
       </div>
     );
@@ -344,6 +432,15 @@ export default function EventManager({
       <tr key={r.id} style={{ opacity: r.status === "cancelled" ? 0.55 : 1 }}>
         <td>
           <strong>{r.name}</strong>
+          {r.emailFailed && (
+            <span
+              className="flag-warn"
+              style={{ marginLeft: 8 }}
+              title="The confirmation email could not be sent"
+            >
+              Email not sent
+            </span>
+          )}
           {r.partySize > 1 && (
             <span className="pill" style={{ marginLeft: 8 }}>
               party of {r.partySize}
@@ -357,7 +454,8 @@ export default function EventManager({
           {event.customFields.map((f) =>
             r.answers[f.id] ? (
               <div key={f.id} className="muted" style={{ fontSize: 13 }}>
-                {f.label}: {answerText(r.answers[f.id])}
+                {/[?:]$/.test(f.label.trim()) ? f.label.trim() : `${f.label}:`}{" "}
+                {answerText(r.answers[f.id])}
               </div>
             ) : null,
           )}
@@ -366,7 +464,7 @@ export default function EventManager({
           <div>{r.email}</div>
           {r.phone && (
             <div className="muted" style={{ fontSize: 13 }}>
-              {r.phone}
+              <a href={`tel:${r.phone.replace(/[^\d+]/g, "")}`} className="rt-phone">{formatPhone(r.phone)}</a>
             </div>
           )}
         </td>
@@ -391,7 +489,7 @@ export default function EventManager({
             </div>
           </td>
         )}
-        <td style={{ whiteSpace: "nowrap" }}>{regActions(r)}</td>
+        <td className="rt-actions">{regActions(r)}</td>
       </tr>
     );
   }
@@ -403,18 +501,25 @@ export default function EventManager({
           className="ev-header"
           style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}
         >
-          <div style={{ flex: 1, minWidth: 0 }}>
+          {/* the title keeps a readable width; the buttons wrap below it before it squeezes */}
+          <div style={{ flex: "1 1 360px", minWidth: 0 }}>
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <h2 className="ev-manage-title">{event.title}</h2>
               <span className={`badge ${event.status}`}>{event.status}</span>
             </div>
             <div className="ev-meta" style={{ marginTop: 6 }}>
               <span>{TYPE_LABEL[event.type]}</span>
-              <span>{formatWhen(event.startsAt, event.endsAt)}</span>
+              <span>{whenLineFor(event)}</span>
               {event.location && (
                 <span>
                   <Icon name="pin" />
                   {event.location}
+                </span>
+              )}
+              {windowLine && (
+                <span className={windowLine.tone === "last" ? "ev-meta-warn" : undefined}>
+                  <Icon name="calendar" />
+                  {windowLine.text}
                 </span>
               )}
               {event.inviteOnly && (
@@ -463,7 +568,11 @@ export default function EventManager({
         <div className="section-title">Share this link</div>
         <CopyLink slug={event.slug} />
         <p className="hint" style={{ marginTop: 8 }}>
-          {event.status === "open"
+          {phase === "soon"
+            ? `${windowLine?.text ?? "Sign-ups haven't opened"} — until then the link shows that date and takes no sign-ups.`
+            : phase === "deadline"
+              ? "The entry deadline has passed — the link won't accept new sign-ups. To reopen, change or clear the deadline in Edit."
+              : event.status === "open"
             ? "Anyone with this link can register."
             : event.status === "draft"
               ? "This event is a draft — the link won't accept sign-ups yet. Set it to Open below."
@@ -494,51 +603,8 @@ export default function EventManager({
       </div>
 
       <div className="card">
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <div className="section-title" style={{ margin: 0 }}>
-            Registrations
-          </div>
-          <span className="spacer" style={{ flex: 1 }} />
-          {isTournament ? (
-            <span className="pill">
-              {avail.taken}
-              {avail.capacity != null ? ` of ${avail.capacity}` : ""}{" "}
-              {(avail.capacity ?? avail.taken) === 1 ? "team" : "teams"}
-            </span>
-          ) : (
-            <span className="pill">
-              {seats}
-              {event.capacity ? ` / ${event.capacity}` : ""} confirmed
-            </span>
-          )}
-          {waitlist.length > 0 && (
-            <span className="pill" style={{ background: "#fff1df", color: "var(--warn)" }}>
-              {waitlist.length} waitlist
-            </span>
-          )}
-          <button
-            className="btn small secondary"
-            onClick={copyEmails}
-            disabled={confirmedEmails.length === 0}
-            title="Copy confirmed registrants' emails to paste into your email app"
-          >
-            {copied ? "Copied" : "Copy emails"}
-          </button>
-          <button
-            className="btn small secondary"
-            onClick={emailAll}
-            disabled={confirmedEmails.length === 0}
-            title="Open your email app with everyone BCC'd"
-          >
-            Email all
-          </button>
-          <button
-            className="btn small secondary"
-            onClick={exportCsv}
-            disabled={registrations.length === 0}
-          >
-            Export CSV
-          </button>
+        <div className="reg-head">
+          <h3 className="reg-title">{isTournament ? "Teams" : "Registrations"}</h3>
           {isTournament && (
             <button
               className="btn small"
@@ -549,6 +615,154 @@ export default function EventManager({
             </button>
           )}
         </div>
+
+        <div className="reg-stats">
+          <div className="reg-stat">
+            <span className="rs-num">
+              {isTournament ? avail.taken : seats}
+              {(isTournament ? avail.capacity : event.capacity) != null && (
+                <small> / {isTournament ? avail.capacity : event.capacity}</small>
+              )}
+            </span>
+            <span className="rs-lbl">{isTournament ? "Teams confirmed" : "Confirmed"}</span>
+          </div>
+          <div className={`reg-stat${waitlist.length > 0 ? " warn" : ""}`}>
+            <span className="rs-num">{waitlist.length}</span>
+            <span className="rs-lbl">Waitlist</span>
+          </div>
+          <div className="reg-stat">
+            <span className="rs-num">{cancelled.length}</span>
+            <span className="rs-lbl">Cancelled</span>
+          </div>
+          {avail.remaining != null && (
+            <div className="reg-stat">
+              <span className="rs-num">{avail.remaining}</span>
+              <span className="rs-lbl">{isTournament ? "Teams left" : "Spots left"}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="reg-tools">
+          {registrations.length > 0 && (
+            <label className="reg-search">
+              <span className="sr-only">Search sign-ups</span>
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={isTournament ? "Search players, emails, GHIN" : "Search names or emails"}
+              />
+            </label>
+          )}
+          <div className="reg-tool-group" role="group" aria-label="Email">
+            <button
+              className="btn small secondary"
+              onClick={copyEmails}
+              disabled={confirmedEmails.length === 0}
+              title="Copy confirmed registrants' emails to paste into your email app"
+            >
+              {copied ? "Copied" : "Copy emails"}
+            </button>
+            <button
+              className="btn small secondary"
+              onClick={emailAll}
+              disabled={confirmedEmails.length === 0}
+              title="Open your email app with everyone BCC'd"
+            >
+              Email all
+            </button>
+          </div>
+          <div className="reg-tool-group" role="group" aria-label="Download">
+            <button
+              className="btn small secondary"
+              onClick={exportCsv}
+              disabled={registrations.length === 0}
+            >
+              Export CSV
+            </button>
+            {isTournament && (
+              <button
+                className="btn small secondary"
+                onClick={exportGolfGenius}
+                disabled={confirmed.length === 0}
+                title="Confirmed teams, one row per player, for Golf Genius: Golfers > Upload Roster from Spreadsheet"
+              >
+                Golf Genius roster
+              </button>
+            )}
+          </div>
+        </div>
+        {registrations.length > 0 && (
+          <div className="reg-filters" role="group" aria-label="Show">
+            {REG_FILTERS.filter((f) => f.id !== "email" || filterCounts.email > 0).map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                className={`reg-filter${filter === f.id ? " on" : ""}${f.id === "email" ? " warn" : ""}`}
+                aria-pressed={filter === f.id}
+                onClick={() => setFilter(f.id)}
+              >
+                {f.label}
+                <span className="rf-n">{filterCounts[f.id]}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {isTournament && registrations.length > 0 && !searching && (
+          <div className="tr-expand">
+            <button
+              type="button"
+              className="linklike"
+              onClick={() => setOpenIds(new Set(registrations.map((r) => r.id)))}
+            >
+              Expand all
+            </button>
+            <span aria-hidden="true">·</span>
+            <button type="button" className="linklike" onClick={() => setOpenIds(new Set())}>
+              Collapse all
+            </button>
+          </div>
+        )}
+        {searching && (
+          <p className="reg-search-note" role="status">
+            {shown === 0
+              ? `Nothing matches “${query.trim()}”.`
+              : `${shown} ${shown === 1 ? "match" : "matches"} for “${query.trim()}”.`}{" "}
+            <button type="button" className="linklike" onClick={() => setQuery("")}>
+              Clear
+            </button>
+          </p>
+        )}
+        {!searching && filter !== "all" && shown === 0 && (
+          <p className="reg-search-note" role="status">
+            Nothing to show here.{" "}
+            <button type="button" className="linklike" onClick={() => setFilter("all")}>
+              Show all
+            </button>
+          </p>
+        )}
+
+        {/* A spot opened with people waiting (an event that moves its waitlist up
+            on its own never shows this: the server already did it). */}
+        {nextUp && (
+          <div className="notice warn spot-open" style={{ marginTop: 12 }}>
+            <span>
+              <strong>
+                {avail.remaining === 1 ? "A spot is open" : `${avail.remaining ?? "Spots"} spots are open`}
+              </strong>{" "}
+              and {waitlist.length} {waitlist.length === 1 ? (isTournament ? "team is" : "sign-up is") : isTournament ? "teams are" : "sign-ups are"}{" "}
+              waiting. Next in line: {entryName(nextUp)}.
+            </span>
+            <button
+              type="button"
+              className="btn small"
+              disabled={pending}
+              onClick={() => changeReg(nextUp.id, "confirmed")}
+            >
+              Move them up
+            </button>
+          </div>
+        )}
 
         {regError && (
           <div className="notice err" role="alert" style={{ marginTop: 12 }}>
@@ -583,36 +797,34 @@ export default function EventManager({
         ) : isTournament ? (
           <>
             <div className="tc-stack">
-              {confirmed.length === 0 ? (
-                <div className="empty">No confirmed teams.</div>
+              {shownConfirmed.length === 0 ? (
+                searching || filter !== "all" ? null : (
+                  <div className="empty">No confirmed teams.</div>
+                )
               ) : (
-                confirmed.map(teamCard)
+                shownConfirmed.map(teamCard)
               )}
             </div>
-            {waitlist.length > 0 && (
+            {shownWaitlist.length > 0 && (
               <>
                 <div className="section-title" style={{ marginTop: 22 }}>
                   Waitlist
                 </div>
                 <div className="tc-stack">
-                  {waitlist.map(teamCard)}
+                  {shownWaitlist.map(teamCard)}
                 </div>
               </>
             )}
-            {cancelled.length > 0 && (
-              <>
-                <div className="section-title" style={{ marginTop: 22 }}>
-                  Cancelled
-                </div>
-                <div className="tc-stack">
-                  {cancelled.map(teamCard)}
-                </div>
-              </>
+            {shownCancelled.length > 0 && (
+              <details className="reg-cancelled" open={searching || filter === "cancelled" || undefined}>
+                <summary>Cancelled · {shownCancelled.length}</summary>
+                <div className="tc-stack">{shownCancelled.map(teamCard)}</div>
+              </details>
             )}
           </>
         ) : (
           <>
-            <table className="table" style={{ marginTop: 14 }}>
+            <table className="table reg-table" style={{ marginTop: 14 }}>
               <thead>
                 <tr>
                   <th>Name</th>
@@ -622,29 +834,27 @@ export default function EventManager({
                 </tr>
               </thead>
               <tbody>
-                {confirmed.map(regRow)}
+                {shownConfirmed.map(regRow)}
               </tbody>
             </table>
 
-            {waitlist.length > 0 && (
+            {shownWaitlist.length > 0 && (
               <>
                 <div className="section-title" style={{ marginTop: 22 }}>
                   Waitlist
                 </div>
-                <table className="table">
-                  <tbody>{waitlist.map(regRow)}</tbody>
+                <table className="table reg-table">
+                  <tbody>{shownWaitlist.map(regRow)}</tbody>
                 </table>
               </>
             )}
-            {cancelled.length > 0 && (
-              <>
-                <div className="section-title" style={{ marginTop: 22 }}>
-                  Cancelled
-                </div>
-                <table className="table">
-                  <tbody>{cancelled.map(regRow)}</tbody>
+            {shownCancelled.length > 0 && (
+              <details className="reg-cancelled" open={searching || filter === "cancelled" || undefined}>
+                <summary>Cancelled · {shownCancelled.length}</summary>
+                <table className="table reg-table">
+                  <tbody>{shownCancelled.map(regRow)}</tbody>
                 </table>
-              </>
+              </details>
             )}
           </>
         )}
@@ -657,12 +867,57 @@ export default function EventManager({
 // squeezing into the label column.
 const LONG_LABEL = 24;
 
-function TcRow({ label, value }: { label: string; value: string }) {
+function TcRow({
+  label,
+  value,
+  href,
+  copy,
+}: {
+  label: string;
+  value: string;
+  href?: string; // the value links here (email, phone)
+  copy?: boolean; // a Copy button beside the value (GHIN, for Golf Genius)
+}) {
+  const v = value.trim();
   return (
     <div className={`tc-row${label.length > LONG_LABEL ? " long" : ""}`}>
       <dt>{label}</dt>
-      <dd>{value.trim() || <span className="muted">—</span>}</dd>
+      <dd>
+        {!v ? (
+          <span className="muted">—</span>
+        ) : href ? (
+          <a className="tc-link" href={href}>
+            {v}
+          </a>
+        ) : (
+          v
+        )}
+        {v && copy && <CopyValue value={v} label={label} />}
+      </dd>
     </div>
+  );
+}
+
+// A small "Copy" beside a value; says "Copied" for a moment.
+function CopyValue({ value, label }: { value: string; label: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      className="tc-copy"
+      aria-label={`Copy ${label} ${value}`}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setDone(true);
+          setTimeout(() => setDone(false), 1500);
+        } catch {
+          // clipboard blocked: the value is still there to select by hand
+        }
+      }}
+    >
+      {done ? "Copied" : "Copy"}
+    </button>
   );
 }
 
@@ -678,7 +933,7 @@ function TeamAnswers({
       <div className="tc-role">Team</div>
       <dl className="tc-list">
         {fields.map((f) => (
-          <TcRow key={f.id} label={f.label} value={answerText(answers[f.id])} />
+          <TcRow key={f.id} label={f.label} value={shownAnswer(f, answers[f.id])} />
         ))}
       </dl>
     </div>

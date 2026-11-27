@@ -120,15 +120,15 @@ function closeOverlay(){ $('#overlay').innerHTML = ''; D = null; DX = null; }
 
 /* ---------- render + mode ---------- */
 const renderSoon = () => { $('#pane').innerHTML = `<section class="panel"><div class="note" style="font-size:14px">Coming in this build.</div></section>`; };
-const PAGES = {guidelines: renderGuidelines, today: renderToday, receiving: renderReceiving, seasons: renderSeasons, vendors: renderVendorsPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, attention: renderAttention, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
+const PAGES = {category: renderCategory, actions: renderActions, guidelines: renderGuidelines, today: renderToday, receiving: renderReceiving, seasons: renderSeasons, vendors: renderVendorsPage, scorecard: renderScorecard, rounds: renderRounds, trends: renderTrends, stuck: renderStuck, overview: renderOverview, forecast: renderForecast, orders: renderOrders, brands: renderBrands, subcats: renderSubcats, inventory: renderInventory, monthend: renderMonthEnd, reports: renderReports, help: renderHelp};
 /* Page addresses: each page is #id in the address bar (old ids such as the reminder email's #reports are routed by
    resolveTab), a page change adds a history entry, and Back / Forward move between pages. */
-const pageUrl = id => location.pathname + location.search + '#' + id;
+const pageUrl = id => location.pathname + location.search + '#' + id + (id === 'category' && CATSEL ? ':' + CATSEL : '');
 history.replaceState(null, '', pageUrl(TAB));
 addEventListener('popstate', () => {
-  const t = resolveTab(decodeURIComponent((location.hash || '').slice(1)) || FIRST_TAB);
-  if (t === TAB) return;
-  goTab._pop = true; try { goTab(t); } finally { goTab._pop = false; }
+  const [t, k] = parseHash(location.hash);
+  if (t === TAB && !(t === 'category' && k !== CATSEL)) return;
+  goTab._pop = true; try { goTab(t, k); } finally { goTab._pop = false; }
   if (t !== TAB) history.replaceState(null, '', pageUrl(TAB));  // Guidelines kept the page (unsaved changes): put its address back
 });
 function render(){
@@ -139,6 +139,9 @@ function render(){
   }
   derive();
   TAB = resolveTab(TAB); if (!PAGES[TAB]) TAB = FIRST_TAB;
+  // The address's key (#category:620, #orders:v-fj), once there is data to apply it to.
+  if (INIT_KEY != null){ const k = INIT_KEY; INIT_KEY = null; if (TAB === 'category') CATSEL = k; else { goTab._pop = true; try { goTab(TAB, k); } finally { goTab._pop = false; } return; } }
+  if (TAB === 'category' && !catPageTarget(CATSEL)){ TAB = 'scorecard'; history.replaceState(null, '', pageUrl(TAB)); }
   // The month bar belongs to Orders and to Budget & open-to-buy's By category view; #summary and #kpis are retired
   // (Budget & open-to-buy draws its own tiles).
   const S = stats(), bar = (TAB === 'overview' && BV === 'cats') || TAB === 'orders';
@@ -164,6 +167,10 @@ function goTab(id, key){
   if (id === 'otb') setBV('months');
   if (resolveTab(id) === 'guidelines' && key){ GD.tab = key; try { localStorage.setItem('mp.guideTab', key); } catch (_) {} }
   const toOrders = id === 'orders' && key && !isMonthKey(key);
+  // A category's page: a known code opens it; anything else opens All categories.
+  const prevCat = CATSEL;
+  if (resolveTab(id) === 'category'){ const c = catPageTarget(key); if (c) CATSEL = c; else { id = 'scorecard'; key = null; } }
+  const catMoved = TAB === 'category' && resolveTab(id) === 'category' && CATSEL !== prevCat;   // one category to another
   if (toOrders){ filt.status = 'active'; filt.vendor = key; filt.season = 'all'; filt.cat = 'all'; filt.q = ''; filt.arriving = false; }
   const tab = resolveTab(id), moved = tab !== TAB;
   if (isMonthKey(key)){
@@ -172,10 +179,10 @@ function goTab(id, key){
     SEL = key; try { localStorage.setItem('ob.month', SEL); } catch (_) {}
   }
   TAB = tab;
-  if (moved && !goTab._pop) history.pushState(null, '', pageUrl(TAB));
+  if ((moved || catMoved) && !goTab._pop) history.pushState(null, '', pageUrl(TAB));
   closePops(); closeOverlay(); closeSide();
-  if (moved || isMonthKey(key) || !key || toOrders) render();
-  if (key && !isMonthKey(key)){
+  if (moved || isMonthKey(key) || !key || toOrders || TAB === 'category') render();
+  if (key && !isMonthKey(key) && TAB !== 'category'){
     if (TAB === 'brands' && typeof BRANDS !== 'undefined' && BRANDS && (BRANDS.rows || []).some(r => r.id === key)) openBrand(key);
     else if (PLAN && PLAN.cats && PLAN.cats[key]) openCategory(key);
   }
@@ -208,6 +215,7 @@ function closePops(except){ for (const [p, b] of POPS){ if (p === except || !$(p
 function togglePop(p, b){ closePops(p); const el = $(p); el.hidden = !el.hidden; $(b).setAttribute('aria-expanded', String(!el.hidden)); }
 document.addEventListener('click', e => { const m = e.target.closest('.menu'); closePops(m ? '#' + (m.querySelector('.pop') || {}).id : null); if (!e.target.closest('#side')) closeSide(); }, true);
 document.addEventListener('click', async e => {
+  if (e.target.closest('select')) return;   // a list inside a clickable row (Match an invoice…) mustn't open the row
   const t = e.target.closest('button,[data-go],[data-cat],[data-po],[data-count],tr[data-po],tr[data-brand],tr[data-subrow]'); if (!t) return;
   const ds = t.dataset;
   if (ds.close) return closeOverlay();
@@ -277,7 +285,6 @@ document.addEventListener('click', async e => {
   if (ds.sborders){ filt = {...filt, status: 'all', cat: 'all', vendor: 'all', season: ds.sborders, q: '', arriving: false}; return goTab('orders'); }
   if (ds.oclear){ filt.vendor = 'all'; filt.season = 'all'; return render(); }
   if (ds.akind){ afilt.kind = ds.akind; return render(); }
-  if (ds.amore){ afilt.more = {...(afilt.more || {}), [ds.amore]: !(afilt.more || {})[ds.amore]}; return render(); }
   if (ds.invin) return openInvoiceIn(ds.invin);
   if (ds.invsave) return saveInvoiceIn(ds.invsave, t);
   if (ds.invclear) return clearArrived(ds.invclear);
@@ -287,7 +294,7 @@ document.addEventListener('click', async e => {
   if (ds.istate != null && ds.v != null){
     const id = ds.istate;
     if (!ds.v){ try { await db.doc('istate/' + id).delete(); } catch (err){ writeError(err); } return; }
-    await write('istate/' + id, {status: ds.v, by: myId, at: new Date().toISOString()}); toast(ds.v === 'done' ? 'Marked done' : ds.v ? 'Set aside for now' : 'Back on the list'); return;
+    await write('istate/' + id, {status: ds.v, by: myId, at: new Date().toISOString(), ...(ds.usd ? {usd: num(ds.usd)} : {})}); toast(ds.v === 'done' ? 'Marked done' : ds.v ? 'Set aside for now' : 'Back on the list'); return;
   }
   if (ds.applycount) return applyCount(ds.applycount);
   if (ds.delcount){ if (!confirm('Delete this count?')) return; try { await db.doc('counts/' + ds.delcount).delete(); closeOverlay(); toast('Count deleted'); } catch (err){ writeError(err); } return; }
@@ -431,7 +438,9 @@ render(); applyMode();
     refreshes: () => coll('refreshes', v => REFRESHES = v, 'refreshes'),
     checks: () => coll('checklist', v => CHECKS = Object.fromEntries(v.map(x => [x.id, x])), 'checks'),
     inv: () => db.doc('inventory/current').onSnapshot(s => { if (s.exists) INV = s.data(); live(); }, onErr('inv')),
-    ins: () => db.doc('insights/current').onSnapshot(s => { if (s.exists) INS = s.data(); live(); }, onErr('ins'))
+    ins: () => db.doc('insights/current').onSnapshot(s => { if (s.exists) INS = s.data(); live(); }, onErr('ins')),
+    rlog: () => db.doc('receivinglog/current').onSnapshot(s => { RLOG = s.exists ? s.data() : null; live(); }, onErr('rlog')),
+    logmatch: () => coll('logmatch', v => LOGMATCH = Object.fromEntries(v.map(x => [x.id, x])), 'logmatch')
   };
   Object.values(subs).forEach(f => f());
 })();

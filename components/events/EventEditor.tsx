@@ -14,14 +14,18 @@ import Icon from "@/components/events/Icon";
 import QuestionBuilder from "@/components/events/QuestionBuilder";
 import TypeTiles from "@/components/events/editor/TypeTiles";
 import EditorSteps from "@/components/events/editor/EditorSteps";
+import LookSection from "@/components/events/editor/LookSection";
+import EmailSection from "@/components/events/editor/EmailSection";
 import {
   PreviewOverlay,
   PreviewPanel,
 } from "@/components/events/editor/EditorPreview";
 import { formatSlot } from "@/lib/events/format";
+import type { EventTheme } from "@/lib/events/theme";
 import {
   buildEventInput,
   crossesTournamentBoundary,
+  deadlineBefore,
   editorError,
   previewEvent,
   typeRules,
@@ -167,6 +171,9 @@ export default function EventEditor({
   );
 
   const [status, setStatus] = useState(event?.status ?? "open");
+  const [theme, setTheme] = useState<EventTheme | null>(event?.theme ?? null);
+  const [contactName, setContactName] = useState(event?.contactName ?? "");
+  const [contactEmail, setContactEmail] = useState(event?.contactEmail ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -176,6 +183,12 @@ export default function EventEditor({
   const [genDate, setGenDate] = useState("");
   const [genStart, setGenStart] = useState("18:00");
   const [genEnd, setGenEnd] = useState("");
+  const [opensAt, setOpensAt] = useState(toLocalInput(event?.rules?.opensAt ?? null));
+  const [closesAt, setClosesAt] = useState(toLocalInput(event?.rules?.closesAt ?? null));
+  const [changesAfterClose, setChangesAfterClose] = useState(
+    event?.rules?.changesAfterClose ?? false,
+  );
+  const [autoPromote, setAutoPromote] = useState(event?.rules?.autoPromote ?? false);
   const [genWeeks, setGenWeeks] = useState("4");
   const [genCap, setGenCap] = useState("");
 
@@ -213,13 +226,21 @@ export default function EventEditor({
     rosterStyle,
     managersText,
     status,
+    theme,
+    contactName,
+    contactEmail,
+    opensAt,
+    closesAt,
+    changesAfterClose,
+    autoPromote,
   };
 
   // The preview lags a keystroke behind under load rather than slowing typing.
   const deferred = useDeferredValue(state);
+  const photos = event?.photos;
   const preview = useMemo(
-    () => previewEvent(buildEventInput(deferred)),
-    [deferred],
+    () => previewEvent(buildEventInput(deferred), photos ?? []),
+    [deferred, photos],
   );
   const publicHref = event ? `/events/e/${event.slug}` : null;
 
@@ -400,10 +421,32 @@ export default function EventEditor({
           </div>
         </section>
 
-        {/* 2. Schedule */}
-        <section id="schedule" className="card editor-section">
+        {/* 2. Look */}
+        <section id="look" className="card editor-section">
           <SectionHead
             n={2}
+            title="Look"
+            sub="The sign-up page's colours, photo and logo, and who members contact."
+          />
+          <LookSection
+            eventId={event?.id}
+            type={type}
+            photos={event?.photos ?? []}
+            theme={theme}
+            onTheme={setTheme}
+            contactName={contactName}
+            contactEmail={contactEmail}
+            onContact={(n, e) => {
+              setContactName(n);
+              setContactEmail(e);
+            }}
+          />
+        </section>
+
+        {/* 3. Schedule */}
+        <section id="schedule" className="card editor-section">
+          <SectionHead
+            n={3}
             title="Schedule"
             sub={
               rules.tournament
@@ -702,12 +745,103 @@ export default function EventEditor({
               </span>
             </span>
           </label>
+          {waitlistEnabled && !isSlots && (
+            <label className="check" style={{ marginTop: 10 }}>
+              <input
+                type="checkbox"
+                checked={autoPromote}
+                onChange={(e) => setAutoPromote(e.target.checked)}
+              />
+              <span>
+                <span className="ck-label">
+                  Move the waitlist up automatically
+                </span>
+                <br />
+                <span className="ck-hint">
+                  When {rules.tournament ? "a team withdraws" : "someone cancels"}, the
+                  next {rules.tournament ? "team" : "sign-up"} on the waitlist takes the
+                  spot and gets the confirmation email. Off: you move them up from the
+                  Manage page.
+                </span>
+              </span>
+            </label>
+          )}
+
+          <div className="divider" />
+          <h3 className="editor-sub">Sign-up dates</h3>
+          <div className="row">
+            <div className="field">
+              <label htmlFor="ev-opens">Sign-ups open</label>
+              <input
+                id="ev-opens"
+                type="datetime-local"
+                value={opensAt}
+                onChange={(e) => setOpensAt(e.target.value)}
+              />
+              <p className="hint">Blank: open as soon as the event is.</p>
+            </div>
+            <div className="field">
+              <label htmlFor="ev-closes">
+                {rules.tournament ? "Entry deadline" : "Sign-up deadline"}
+              </label>
+              <input
+                id="ev-closes"
+                type="datetime-local"
+                value={closesAt}
+                onChange={(e) => setClosesAt(e.target.value)}
+              />
+              <p className="hint">Blank: no deadline. Sign-ups close on their own at this time.</p>
+            </div>
+          </div>
+          {scheduleMode === "single" && startsAt && (
+            <div className="quick-picks" role="group" aria-label="Set the deadline">
+              <span className="hint">Deadline:</span>
+              {[
+                { days: 14, label: "2 weeks before" },
+                { days: 7, label: "1 week before" },
+                { days: 1, label: "Day before" },
+              ].map((q) => (
+                <button
+                  key={q.days}
+                  type="button"
+                  className="btn ghost small"
+                  onClick={() => setClosesAt(deadlineBefore(startsAt, q.days))}
+                >
+                  {q.label}
+                </button>
+              ))}
+              {closesAt && (
+                <button type="button" className="btn ghost small" onClick={() => setClosesAt("")}>
+                  No deadline
+                </button>
+              )}
+            </div>
+          )}
+          {closesAt && (
+            <label className="check" style={{ marginTop: 12 }}>
+              <input
+                type="checkbox"
+                checked={changesAfterClose}
+                onChange={(e) => setChangesAfterClose(e.target.checked)}
+              />
+              <span>
+                <span className="ck-label">
+                  Let people change or withdraw after the deadline
+                </span>
+                <br />
+                <span className="ck-hint">
+                  Until the event starts. Off: after the deadline they email the
+                  event contact instead, so the field stays settled.
+                </span>
+              </span>
+            </label>
+          )}
         </section>
 
-        {/* 3. Players & Questions */}
+        {/* 4. Players & Questions */}
         <section id="questions" className="card editor-section">
           <SectionHead
-            n={3}
+            n={4}
             title="Players & Questions"
             sub={
               rules.tournament
@@ -772,10 +906,10 @@ export default function EventEditor({
           </div>
         </section>
 
-        {/* 4. Pricing */}
+        {/* 5. Pricing */}
         <section id="pricing" className="card editor-section">
           <SectionHead
-            n={4}
+            n={5}
             title="Pricing"
             sub="An optional price list on the event page. Sign-ups stay free."
           />
@@ -810,10 +944,10 @@ export default function EventEditor({
           )}
         </section>
 
-        {/* 5. Roster */}
+        {/* 6. Roster */}
         <section id="roster" className="card editor-section">
           <SectionHead
-            n={5}
+            n={6}
             title="Roster"
             sub="Whether members can see who's coming."
           />
@@ -847,9 +981,9 @@ export default function EventEditor({
           )}
         </section>
 
-        {/* 6. Access */}
+        {/* 7. Access */}
         <section id="access" className="card editor-section">
-          <SectionHead n={6} title="Access" sub="Who is allowed to register." />
+          <SectionHead n={7} title="Access" sub="Who is allowed to register." />
           <label className="check" style={{ marginBottom: inviteOnly ? 12 : 0 }}>
             <input
               type="checkbox"
@@ -892,10 +1026,20 @@ export default function EventEditor({
           )}
         </section>
 
-        {/* 7. Publish */}
+        {/* 8. Email */}
+        <section id="email" className="card editor-section">
+          <SectionHead
+            n={8}
+            title="Confirmation email"
+            sub="What members receive when they sign up. Edit it here before anyone does."
+          />
+          <EmailSection preview={preview} theme={theme} onTheme={setTheme} />
+        </section>
+
+        {/* 9. Publish */}
         <section id="publish" className="card editor-section">
           <SectionHead
-            n={7}
+            n={9}
             title="Publish"
             sub="Whether sign-ups are open, and who else can manage the event."
           />

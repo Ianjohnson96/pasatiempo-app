@@ -111,7 +111,7 @@ function gdRoles(){
   const catRows = cats.map(([code, c]) => {
     const path = 'roleOf.' + code, v = gdValue(path), def = gdDefault(path) || 'fashion', changed = v !== def;
     const sel = owner ? `<select class="gd-in" data-gd="${path}" data-kind="role" aria-label="Role for ${esc(c.name)}">${roles.map(r => `<option value="${r}" ${r === v ? 'selected' : ''}>${esc(ROLES_DEFAULT[r].name)}</option>`).join('')}</select>` : esc(gdFmt('role', v));
-    const wk = typeof wksNow === 'function' ? wksNow(code, num(c.onHand)) : null, rw = (ROLES_DEFAULT[v] || {}).wks && gdValue(`roles.${v}.wks`);
+    const wk = typeof catWeeks === 'function' ? catWeeks(code, shelfCost(code, c.onHand)) : null, rw = (ROLES_DEFAULT[v] || {}).wks && gdValue(`roles.${v}.wks`);
     return `<div class="gd-row${changed ? ' changed' : ''}"><div class="gd-what"><b>${code} ${esc(c.name)}</b></div>
       <div class="gd-sug"><b>${esc(gdFmt('role', def))}</b></div>
       <div class="gd-now num ${rw && wk != null && (wk < rw[2] || wk > rw[3]) ? 'neg' : ''}">${wk == null ? '—' : Math.round(wk) + ' wks'}</div>
@@ -158,7 +158,7 @@ function gdTabPaths(t){
   if (t === 'roles') return Object.keys(ROLES_DEFAULT).filter(r => ROLES_DEFAULT[r].wks).flatMap(r => [`roles.${r}.wks`, `roles.${r}.over`])
     .concat(Object.keys((BASE || {}).cats || {}).filter(c => c !== '640').map(c => 'roleOf.' + c));
   if (t === 'seasons') return ['seasons', 'memberDiscount'];
-  if (t === 'mix') return ['mix.total', ...MIX_ROLES.map(r => 'mix.ranges.' + r)];
+  if (t === 'mix') return ['mix.total', 'mix.follow', ...MIX_ROLES.map(r => 'mix.ranges.' + r)];
   return [];
 }
 function renderGuidelines(){
@@ -170,7 +170,7 @@ function renderGuidelines(){
       ${owner ? '' : ' Only the owner can change them.'} Month-end suggestions update at your next upload.</p>
     <div class="gd-tabs" role="tablist" aria-label="Guidelines">${tabs}${owner && resetAll.length ? `<button type="button" class="btn ghost sm gd-resetall" data-gdreset="${esc(resetAll.join(','))}">Reset this tab to suggested</button>` : ''}</div>
     <div class="gd-pane">${GD_PANES[GD.tab]()}</div>
-    ${owner && n ? `<div class="gd-save" role="region" aria-label="Unsaved changes"><b>${n} unsaved change${n === 1 ? '' : 's'}</b>
+    ${owner && n ? `<div class="gd-save" role="region" aria-label="Unsaved changes"><b>${n} unsaved change${n === 1 ? '' : 's'}</b>${gdBudgetEffectHtml()}
       <input class="field-inline" id="gdNote" placeholder="Why (optional), e.g. Peter Millar carries better margin now" value="${esc(GD.note)}">
       <button type="button" class="btn" data-gdact="discard">Discard</button><button type="button" class="btn primary" data-gdact="save">Save changes</button></div>` : ''}`;
   if (typeof fillPeople === 'function') fillPeople();
@@ -219,18 +219,36 @@ document.addEventListener('click', async e => {
       patch[p] = same(v, def) ? undefined : v;
       entries.push({what: gdLabel(p), from: gdShow(p, gdSaved(p)), to: gdShow(p, v)});
     }
+    const eff = gdBudgetEffect();
+    if (eff && entries.length) entries[0].budget = {through: eff.through, change: Math.round(eff.after - eff.before)};
     b.disabled = true;
     if (await saveGuides(patch, entries, GD.note.trim())){ GD.draft = {}; GD.note = ''; toast('Guidelines saved. Every page now uses them.'); }
     else b.disabled = false;
   }
 });
 
+/** What the unsaved guideline edits do to this year's left to buy: they move it when they change the total stock the
+    budget is linked to (the total itself, following the suggestion, or a turns target it follows). null otherwise. */
+function gdBudgetEffect(){
+  if (!BASE || !PLANS.cur || !Object.keys(GD.draft).length || typeof mixTotalOf !== 'function') return null;
+  const rows = (ASSORT && ASSORT.rows) || null, a = assumptions();
+  const t0 = a.mixTotal, t1 = mixTotalOf(gdDoc(false), rows) || null;
+  if ((t0 || 0) === (t1 || 0)) return null;
+  return {before: leftToBuyWith(a), after: leftToBuyWith({...a, mixTotal: t1}), through: PLANS.cur.window.to, t0, t1};
+}
+function gdBudgetEffectHtml(){
+  const e = gdBudgetEffect(); if (!e) return '';
+  return `<span class="faint" style="font-size:13px">${esc(PLANS.cur.fy)} left to buy ${money(e.before)} → <b class="${e.after < 0 ? 'neg' : ''}">${money(e.after)}</b> (stock plan ${e.t1 ? money(e.t1) : 'not linked'})</span>`;
+}
 /** Plain-English name of a guideline path, for the history. */
 function gdLabel(p){
   for (const [, , rows] of GD_TARGETS) for (const r of rows) if (r[0] === p) return r[1];
   const m = /^roleOf\.(\d+)$/.exec(p); if (m) return `Role of ${m[1]} ${(((BASE || {}).cats || {})[m[1]] || {}).name || ''}`.trim();
   const w = /^roles\.(\w+)\.(wks|over)$/.exec(p); if (w) return `${(ROLES_DEFAULT[w[1]] || {}).name} weeks of supply${w[2] === 'over' ? ' (too much)' : ''}`;
   if (p === 'seasons') return 'Season months';
+  if (p === 'mix.total') return 'Total stock to plan for';
+  if (p === 'mix.follow') return 'Total stock follows the suggestion';
+  const mr = /^mix\.ranges\.(\w+)$/.exec(p); if (mr) return `${(ROLES_DEFAULT[mr[1]] || {}).name || mr[1]} mix range`;
   if (p === 'memberDiscount') return 'Member discount';
   return p;
 }
@@ -241,6 +259,9 @@ function gdShow(p, v){
   if (/\.wks$/.test(p)) return `${v[0]}–${v[1]} wks (near ${v[2]}–${v[3]})`;
   for (const [, , rows] of GD_TARGETS) for (const r of rows) if (r[0] === p) return gdFmt(r[3], v);
   if (p === 'memberDiscount') return gdFmt('pct', v);
+  if (p === 'mix.total') return money(v);
+  if (p === 'mix.follow') return v === 'suggested' ? 'yes' : 'no';
+  if (/^mix\.ranges\./.test(p) && Array.isArray(v)) return `${v[0]}–${v[1]}%`;
   return String(v);
 }
 
@@ -250,18 +271,19 @@ let GW = {};
 const gdWosNow = c => assumptions().wos[c];
 function gdBudget(){
   if (!BASE) return gdCard('Target weeks of supply', '', '<div class="empty"><p>The budget loads after the first month-end upload.</p></div>');
-  const owner = gdOwner(), sug = (BASE.defaults || {}).wos || {};
+  const owner = gdOwner(), sug = (BASE.defaults || {}).wos || {}, PC = PLANS.cur || {}, linked = !!mixLinkTxt(PC);
   const codes = BASE.order.filter(c => !(BASE.exclude || ['640']).includes(c));
   const rows = codes.map(c => {
-    const v = c in GW ? GW[c] : gdWosNow(c), changed = v !== sug[c], wk = wksNow(c, num(BASE.cats[c].onHand));
-    const input = owner ? `<input class="gd-in num" data-gdwos="${c}" inputmode="decimal" value="${v}" aria-label="Target weeks for ${esc(BASE.cats[c].name)}"><span class="gd-u">wks</span>` : `<span class="num">${v} wks</span>`;
+    const v = c in GW ? GW[c] : gdWosNow(c), changed = v !== sug[c], wk = catWeeks(c, shelfCost(c, BASE.cats[c].onHand));
+    const eff = linked ? `<div class="faint" style="flex-basis:100%;font-size:12px;margin-top:2px" title="The weeks the budget uses: your weeks × ${PC.scale.toFixed(2)}">${wosNum(v * PC.scale)} wks in the budget</div>` : '';
+    const input = (owner ? `<input class="gd-in num" data-gdwos="${c}" inputmode="decimal" value="${v}" aria-label="Target weeks for ${esc(BASE.cats[c].name)}"><span class="gd-u">wks</span>` : `<span class="num">${v} wks</span>`) + eff;
     return `<div class="gd-row${changed ? ' changed' : ''}${c in GW ? ' pending' : ''}"><div class="gd-what"><b>${c} ${esc(BASE.cats[c].name)}</b><span>On hand ${money(num(BASE.cats[c].onHand))}</span></div>
       <div class="gd-sug"><b class="num">${sug[c] == null ? '—' : sug[c] + ' wks'}</b><span>program default</span></div>
       <div class="gd-now num">${wk == null ? '—' : Math.round(wk) + ' wks'}</div><div class="gd-val">${input}</div>
       <div>${owner && changed ? `<button type="button" class="btn ghost sm" data-gdwosreset="${c}">Reset to ${sug[c]}</button>` : ''}</div></div>`;
   }).join('');
   return gdCard('Target weeks of supply', 'How much stock the budget plans to end each month with. Changing it moves open-to-buy.', gdHead('Category', 'Suggested', 'Weeks now', 'Pasatiempo') + rows
-    + '<div class="note">Nothing changes in the budget until you look at the effect and press Save to the budget.</div>') + gdBudgetPreview();
+    + (typeof gdConflictHtml === 'function' ? gdConflictHtml() : '') + `<div class="note">${linked ? esc(mixLinkTxt(PC)) + ' With the total fixed, changing one category\'s weeks moves budget between categories rather than adding to it. ' : ''}Nothing changes in the budget until you look at the effect and press Save to the budget.</div>`) + gdBudgetPreview();
 }
 /** Left to buy by month, now and with the unsaved weeks: the Budget page's figure (budget less committed) plus the
     change in the plan the engine gives. */

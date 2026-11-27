@@ -3,10 +3,12 @@
 import { useMemo, useState } from "react";
 import { register } from "@/lib/events/actions";
 import { formatSlot } from "@/lib/events/format";
-import { isAnswered } from "@/lib/events/tournament";
 import QuestionInput from "@/components/events/QuestionInput";
 import TeamEntryForm from "@/components/events/TeamEntryForm";
-import Toast from "@/components/events/Toast";
+import ErrorSummary from "@/components/events/public/ErrorSummary";
+import Confirmation from "@/components/events/public/Confirmation";
+import { registrationErrors, type FieldError } from "@/lib/events/validate";
+import SubmitButton, { useSubmit } from "@/components/events/public/SubmitButton";
 import type { Answers, EventRec } from "@/lib/events/types";
 
 export interface SeatInfo {
@@ -45,11 +47,14 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
     return first ? [first.id] : event.slots[0] ? [event.slots[0].id] : [];
   });
   const [answers, setAnswers] = useState<Answers>({});
-  const [submitting, setSubmitting] = useState(false);
+  const { phase, run } = useSubmit();
   const [result, setResult] = useState<
     { status: "confirmed" | "waitlist" } | null
   >(null);
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<FieldError[]>([]);
+  const [tries, setTries] = useState(0);
+  const [alreadyIn, setAlreadyIn] = useState(false);
+  const errFor = (field: string) => errors.find((e) => e.field === field)?.message;
 
   const maxParty = event.allowGuests ? 1 + (event.maxGuests ?? 1) : 1;
 
@@ -84,33 +89,43 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
-    if (isSlots && selected.length === 0) {
-      setError("Please choose at least one date/time.");
-      return;
-    }
-    for (const f of event.customFields) {
-      if (f.required && !isAnswered(answers[f.id])) {
-        setError(`Please answer: ${f.label}`);
-        return;
-      }
-    }
-    setSubmitting(true);
-    const res = await register({
-      slug: event.slug,
+    const found = registrationErrors({
+      event,
       name,
       email,
-      phone,
-      partySize,
-      guestNames,
       slotIds: isSlots ? selected : [],
       answers,
     });
-    setSubmitting(false);
+    setErrors(found);
+    setAlreadyIn(false);
+    setTries((n) => n + 1);
+    if (found.length) return;
+    const res = await run(
+      () =>
+        register({
+          slug: event.slug,
+          name,
+          email,
+          phone,
+          partySize,
+          guestNames,
+          slotIds: isSlots ? selected : [],
+          answers,
+        }),
+      (r) => r.ok && (r.status === "confirmed" || r.status === "waitlist"),
+    );
     if (res.ok && (res.status === "confirmed" || res.status === "waitlist")) {
       setResult({ status: res.status });
     } else {
-      setError(res.error ?? "Something went wrong. Please try again.");
+      setErrors([
+        {
+          // a double sign-up is about the email, so it sits on that field
+          field: res.code === "already_registered" ? "reg-email" : "",
+          message: res.error ?? "Something went wrong. Please try again.",
+        },
+      ]);
+      setAlreadyIn(res.code === "already_registered");
+      setTries((n) => n + 1);
     }
   }
 
@@ -147,13 +162,19 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
             </>
           )}
         </div>
+        <Confirmation
+          event={event}
+          status={result.status}
+          email={email}
+          slotIds={isSlots ? selected : []}
+        />
       </div>
     );
   }
 
   return (
-    <form className="card" onSubmit={submit}>
-      {error && <Toast message={error} onClose={() => setError("")} />}
+    <form className="card" onSubmit={submit} noValidate>
+      <ErrorSummary errors={errors} focusKey={tries} />
 
       {targetFull && event.waitlistEnabled && (
         <div className="notice warn">
@@ -176,10 +197,16 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
               {event.slotsPrompt}
             </p>
           )}
-          <label>
+          <label id="reg-slots-label">
             {multi ? "Choose your date(s)" : "Choose a date / time"}{" "}
             <span className="req">*</span>
           </label>
+          <div
+            id="reg-slots"
+            role="group"
+            aria-labelledby="reg-slots-label"
+            aria-describedby={errFor("reg-slots") ? "reg-slots-err" : undefined}
+          >
           {event.slots.map((s) => {
             const info = seats.slots.find((x) => x.id === s.id);
             const full = !!info?.full;
@@ -212,37 +239,59 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
               </label>
             );
           })}
+          </div>
+          <FieldErr id="reg-slots" message={errFor("reg-slots")} />
         </div>
       )}
 
-      <div className="field">
-        <label>
+      <div className={`field${errFor("reg-name") ? " has-err" : ""}`}>
+        <label htmlFor="reg-name">
           Your name <span className="req">*</span>
         </label>
         <input
+          id="reg-name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
           autoComplete="name"
+          aria-invalid={errFor("reg-name") ? true : undefined}
+          aria-describedby={errFor("reg-name") ? "reg-name-err" : undefined}
         />
+        <FieldErr id="reg-name" message={errFor("reg-name")} />
       </div>
       <div className="row">
-        <div className="field">
-          <label>
+        <div className={`field${errFor("reg-email") ? " has-err" : ""}`}>
+          <label htmlFor="reg-email">
             Email <span className="req">*</span>
           </label>
           <input
+            id="reg-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
+            aria-invalid={errFor("reg-email") ? true : undefined}
+            aria-describedby={errFor("reg-email") ? "reg-email-err" : undefined}
           />
+          <FieldErr id="reg-email" message={errFor("reg-email")} />
+          {alreadyIn && errFor("reg-email") && (
+            <button
+              type="button"
+              className="btn secondary small already-manage"
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent("ep:manage", { detail: { email } }))
+              }
+            >
+              Manage my registration
+            </button>
+          )}
         </div>
         <div className="field">
-          <label>Phone</label>
+          <label htmlFor="reg-phone">Phone</label>
           <input
+            id="reg-phone"
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
@@ -288,16 +337,23 @@ function StandardForm({ event, seats }: { event: EventRec; seats: SeatInfo }) {
           field={f}
           value={answers[f.id]}
           onChange={(v) => setAnswers((a) => ({ ...a, [f.id]: v }))}
+          idBase={`reg-q-${f.id}`}
+          error={errFor(`reg-q-${f.id}`)}
         />
       ))}
 
-      <button className="btn block" type="submit" disabled={submitting}>
-        {submitting
-          ? "Submitting…"
-          : targetFull && event.waitlistEnabled
-            ? "Join the waitlist"
-            : "Register"}
-      </button>
+      <SubmitButton phase={phase} className="btn block">
+        {targetFull && event.waitlistEnabled ? "Join the waitlist" : "Register"}
+      </SubmitButton>
     </form>
+  );
+}
+
+function FieldErr({ id, message }: { id: string; message: string | undefined }) {
+  if (!message) return null;
+  return (
+    <p className="field-err" id={`${id}-err`}>
+      {message}
+    </p>
   );
 }

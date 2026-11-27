@@ -1,6 +1,7 @@
 // Pure CSV builders for the registrations export (no React / Supabase).
 
 import { answerText, formatSlot } from "./format";
+import { normalizeGhin } from "./tournament";
 import type { EventRec, Player, Registration } from "./types";
 
 // A cell a spreadsheet would run as a formula gets a leading ' so it opens as
@@ -119,4 +120,74 @@ export function tournamentRows(event: EventRec, regs: Registration[]): string[][
 export function csvFilename(event: EventRec): string {
   const slug = event.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
   return `${slug}-${event.type === "tournament" ? "teams" : "signups"}.csv`;
+}
+
+// ---- Golf Genius roster --------------------------------------------------------
+// Golfers > Upload Roster from Spreadsheet takes CSV; Golf Genius then matches
+// each heading to its own field (Last Name is the only one it requires), and
+// Golfers > Access GHIN to Update Handicap Index checks every GHIN number
+// against the last name. So: names split cleanly, GHIN as digits, confirmed
+// teams only, and the Manage page's team numbers so teams can be built from
+// the Team column.
+
+const SUFFIXES = new Set(["jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "v"]);
+
+/** "Pat Lee" → Pat / Lee; "John Smith Jr." → John / Smith / Jr.; "Smith, John" → John / Smith. */
+export function splitName(full: string): { first: string; last: string; suffix: string } {
+  const clean = full.trim().replace(/\s+/g, " ");
+  if (clean.includes(",")) {
+    const [last, ...rest] = clean.split(",").map((s) => s.trim());
+    return { first: rest.join(" ").trim(), last, suffix: "" };
+  }
+  const words = clean ? clean.split(" ") : [];
+  let suffix = "";
+  if (words.length > 2 && SUFFIXES.has(words[words.length - 1].toLowerCase()))
+    suffix = words.pop()!;
+  const last = words.pop() ?? "";
+  return { first: words.join(" "), last, suffix };
+}
+
+export function golfGeniusRows(event: EventRec, regs: Registration[]): string[][] {
+  const playerFields = event.customFields.filter((f) => f.scope !== "team");
+  const teamFields = event.customFields.filter((f) => f.scope === "team");
+  const header = [
+    "First Name",
+    "Last Name",
+    "Suffix",
+    "Email",
+    "Handicap Service ID",
+    "Team",
+    "Member or Guest",
+    "Phone",
+    ...playerFields.map((f) => f.label),
+    ...teamFields.map((f) => f.label),
+  ];
+  const nums = teamNumbers(regs);
+  const rows: string[][] = [];
+  regs
+    .filter((r) => r.status === "confirmed" && r.players?.length)
+    .sort(byCreated)
+    .forEach((r) => {
+      for (const p of r.players!) {
+        const n = splitName(p.name);
+        rows.push([
+          n.first,
+          n.last,
+          n.suffix,
+          p.email.trim(),
+          normalizeGhin(p.ghin),
+          String(nums.get(r.id) ?? ""),
+          p.role === "member" ? "Member" : "Guest",
+          p.role === "member" ? r.phone : "",
+          ...playerFields.map((f) => answerText(p.answers[f.id])),
+          ...teamFields.map((f) => answerText(r.answers[f.id])),
+        ]);
+      }
+    });
+  return [header, ...rows];
+}
+
+export function golfGeniusFilename(event: EventRec): string {
+  const slug = event.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+  return `${slug}-golf-genius.csv`;
 }

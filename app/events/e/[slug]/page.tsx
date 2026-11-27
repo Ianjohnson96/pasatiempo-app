@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Gallery from "@/components/events/Gallery";
-import Icon from "@/components/events/Icon";
 import ManageRegistration from "@/components/events/ManageRegistration";
 import PublicTeamRoster from "@/components/events/PublicTeamRoster";
 import RichText from "@/components/events/RichText";
@@ -14,9 +13,22 @@ import {
   getEventBySlug,
   registrationsFor,
 } from "@/lib/events/data";
-import { formatSlot, formatWhen, rosterName, TYPE_LABEL } from "@/lib/events/format";
+import { formatSlot, rosterName } from "@/lib/events/format";
+import { ctaState, sectionLinks } from "@/lib/events/public-page";
+import { pageSettings } from "@/lib/events/page-settings";
+import { eventContact, resolveHero, resolveLogo, themeVars } from "@/lib/events/theme";
+import PublicNav from "@/components/events/public/PublicNav";
+import PublicHero from "@/components/events/public/PublicHero";
+import StickyRegister from "@/components/events/public/StickyRegister";
+import FactsStrip, {
+  factsFor,
+  rosterMeter,
+  spotsMeter,
+  whenLineFor,
+} from "@/components/events/public/FactsStrip";
 import { teamLines } from "@/lib/events/cards";
 import { publicEvent } from "@/lib/events/map";
+import { liveEvent, signupPhase, windowNote } from "@/lib/events/signup-window";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +53,12 @@ export default async function PublicEventPage({
     }),
   };
 
-  const open = event.status === "open";
+  // Sign-up dates: outside them the page treats an open event as closed.
+  const now = new Date();
+  const live = liveEvent(event, now);
+  const phase = signupPhase(event, now);
+  const note = windowNote(event, now);
+  const open = live.status === "open";
   const confirmed = regs.filter((r) => r.status === "confirmed");
   const goingCount = confirmed.reduce((n, r) => n + Math.max(1, r.partySize), 0);
   const isSlots = event.scheduleMode === "slots";
@@ -50,85 +67,12 @@ export default async function PublicEventPage({
   // email, GHIN or answer can reach the page. Confirmed teams only.
   const teams = teamLines(regs, event.rosterStyle);
 
-  const whenLine = isSlots
-    ? event.slots.length === 1
-      ? formatSlot(event.slots[0])
-      : `${event.slots.length} sessions`
-    : formatWhen(event.startsAt, event.endsAt);
-
-  // Facts bar entries
-  const facts: { lbl: string; val: React.ReactNode }[] = [];
-  if (isSlots) {
-    facts.push({ lbl: "Sessions", val: `${event.slots.length} dates` });
-    const firstDated = event.slots.find((s) => s.date);
-    if (firstDated) facts.push({ lbl: "Starts", val: formatSlot(firstDated) });
-  } else if (event.startsAt) {
-    const d = new Date(event.startsAt);
-    facts.push({
-      lbl: "Date",
-      val: d.toLocaleDateString(undefined, {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-      }),
-    });
-    const time = d.toLocaleTimeString(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-    const end = event.endsAt
-      ? new Date(event.endsAt).toLocaleTimeString(undefined, {
-          hour: "numeric",
-          minute: "2-digit",
-        })
-      : "";
-    facts.push({ lbl: "Time", val: end ? `${time} – ${end}` : time });
-  }
-  if (event.location) facts.push({ lbl: "Where", val: event.location });
-
-  // spots fact (single-date only; slots show per-date in the schedule)
-  let spotsFact: { text: string; pct: number | null } | null = null;
-  if (!isSlots) {
-    if (event.capacity == null) spotsFact = { text: "Open registration", pct: null };
-    else {
-      const pct = Math.min(
-        100,
-        Math.round((eventAvail.taken / event.capacity) * 100),
-      );
-      // A tournament's capacity is in teams, not people.
-      spotsFact = {
-        text:
-          event.type === "tournament"
-            ? eventAvail.full
-              ? "Full"
-              : `${eventAvail.remaining} of ${event.capacity} teams left`
-            : eventAvail.full
-              ? "Full — waitlist open"
-              : `${eventAvail.remaining} of ${event.capacity} spots left`,
-        pct,
-      };
-    }
-  }
-
-  // Program roster fact (shown for both single and multi-date events).
-  let rosterFact: { text: string; pct: number; full: boolean } | null = null;
-  if (event.rosterLimit != null) {
-    rosterFact = {
-      text: rosterAvail.full
-        ? "Roster full"
-        : `${rosterAvail.remaining} of ${event.rosterLimit} spots open`,
-      pct: Math.min(
-        100,
-        Math.round((rosterAvail.count / event.rosterLimit) * 100),
-      ),
-      full: rosterAvail.full,
-    };
-  }
-
-  const heroImg = event.photos[0];
-  const heroStyle = heroImg
-    ? { backgroundImage: `url(${heroImg})` }
-    : undefined;
+  const rosterFull = rosterAvail.full;
+  const cta = ctaState(live, seats, rosterFull);
+  const contact = eventContact(event);
+  const look = themeVars(event.theme);
+  const hero = resolveHero(event.theme, event.photos);
+  const settings = pageSettings(event);
 
   // A price line reads as "item — amount" when it has a dash separator; the
   // two halves are set apart with a dotted leader. Anything else stays whole.
@@ -138,94 +82,60 @@ export default async function PublicEventPage({
   };
 
   return (
-    <main className="pub">
-      <nav className="pub-nav">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-full.png" alt="Pasatiempo Golf Club" />
-      </nav>
+    <main
+      className="pub"
+      data-look={event.theme?.preset ?? "clubhouse"}
+      style={look.vars as React.CSSProperties}
+    >
+      <PublicNav logo={resolveLogo(event.theme)} />
 
-      <section className={`pub-hero ${heroImg ? "has-img" : ""}`}>
-        <div className="pub-hero-photo" style={heroStyle} aria-hidden="true" />
-        <div className="hero-inner reveal">
-          <span className="kicker">{TYPE_LABEL[event.type]}</span>
-          <h1>{event.title}</h1>
-          <hr className="hairline" />
-          <div className="hero-meta">
-            <span>
-              <Icon name="calendar" className="ico" />
-              {whenLine}
-            </span>
-            {event.location && (
-              <span>
-                <Icon name="pin" className="ico" />
-                {event.location}
-              </span>
-            )}
-          </div>
-          {open && (
-            <a href="#register" className="btn gold">
-              Register now
-            </a>
-          )}
-        </div>
-      </section>
+      <PublicHero
+        event={event}
+        hero={hero}
+        cta={cta}
+        whenLine={whenLineFor(event)}
+        note={note}
+      />
+      <StickyRegister
+        cta={cta}
+        spots={spotsMeter(event, eventAvail)?.text ?? null}
+      />
 
       <div className="pub-body">
-        {facts.length > 0 && (
-          <div className="facts reveal">
-            {facts.map((f, i) => (
-              <div className="fact" key={i}>
-                <div className="lbl">{f.lbl}</div>
-                <div className="val">{f.val}</div>
-              </div>
+        <FactsStrip
+          facts={factsFor(event)}
+          spots={spotsMeter(event, eventAvail)}
+          roster={rosterMeter(event, rosterAvail)}
+        />
+
+        {sectionLinks(live).length > 0 && (
+          <nav className="sec-links" aria-label="On this page">
+            {sectionLinks(live).map((l) => (
+              <a key={l.id} href={`#${l.id}`}>
+                {l.label}
+              </a>
             ))}
-            {spotsFact && (
-              <div className="fact">
-                <div className="lbl">Availability</div>
-                <div className="val">
-                  <small>{spotsFact.text}</small>
-                </div>
-                {spotsFact.pct != null && (
-                  <div className="spots-bar">
-                    <span style={{ width: `${spotsFact.pct}%` }} />
-                  </div>
-                )}
-              </div>
-            )}
-            {rosterFact && (
-              <div className="fact">
-                <div className="lbl">Program roster</div>
-                <div className="val">
-                  <small style={rosterFact.full ? { color: "var(--danger)" } : undefined}>
-                    {rosterFact.text}
-                  </small>
-                </div>
-                <div className="spots-bar">
-                  <span style={{ width: `${rosterFact.pct}%` }} />
-                </div>
-              </div>
-            )}
-          </div>
+          </nav>
         )}
 
         {event.description && (
-          <section className="pub-section reveal">
+          <section className="pub-section reveal" id="about">
             <p className="sec-eyebrow">Overview</p>
-            <h2>About this event</h2>
+            <h2>{settings.headings.about}</h2>
             <RichText text={event.description} className="prose" />
           </section>
         )}
 
         {event.info && (
-          <section className="pub-section reveal">
+          <section className="pub-section reveal" id="details">
             <p className="sec-eyebrow">Particulars</p>
-            <h2>What you need to know</h2>
+            <h2>{settings.headings.info}</h2>
             <RichText text={event.info} className="prose" />
           </section>
         )}
 
         {event.pricingEnabled && event.pricing && (
-          <section className="pub-section reveal">
+          <section className="pub-section reveal" id="pricing">
             <p className="sec-eyebrow">Entry fees</p>
             <h2>Pricing</h2>
             <div className="pricing-card">
@@ -252,7 +162,7 @@ export default async function PublicEventPage({
         )}
 
         {isSlots && event.slots.length > 1 && (
-          <section className="pub-section reveal">
+          <section className="pub-section reveal" id="schedule">
             <p className="sec-eyebrow">Calendar</p>
             <h2>Schedule</h2>
             <div style={{ marginTop: 12 }}>
@@ -305,7 +215,7 @@ export default async function PublicEventPage({
         )}
 
         {event.photos.length > 1 && (
-          <section className="pub-section reveal">
+          <section className="pub-section reveal" id="photos">
             <p className="sec-eyebrow">Photographs</p>
             <h2>Gallery</h2>
             <div style={{ marginTop: 14 }}>
@@ -325,36 +235,53 @@ export default async function PublicEventPage({
             Registration for this event is <strong>closed</strong>.
           </div>
         )}
+        {phase === "soon" && note && (
+          <div className="notice warn" style={{ marginTop: 28 }} id="register">
+            <strong>{note.text}.</strong> Come back then to{" "}
+            {event.type === "tournament" ? "enter your team" : "sign up"}.
+          </div>
+        )}
+        {phase === "deadline" && note && (
+          <div className="notice err" style={{ marginTop: 28 }} id="register">
+            <strong>{note.text}.</strong> The entry deadline has passed. To ask
+            about a late entry or a change, email {contact.name} at{" "}
+            <a href={`mailto:${contact.email}`}>{contact.email}</a>.
+          </div>
+        )}
 
         {open && <div className="ornament" aria-hidden="true" />}
 
         {open && (
           <section className="pub-section reveal stacked" id="register">
             <p className="sec-eyebrow">Registration</p>
-            <h2>Register</h2>
+            <h2>{settings.headings.register}</h2>
             {rosterAvail.full && (
               <div className="notice warn" style={{ marginTop: 14 }}>
                 The program roster is <strong>full</strong> — new sign-ups are
                 closed. If you&apos;re already on the roster you can still add
-                dates below; otherwise please email Ian Johnson at{" "}
-                <a href="mailto:Ijohnson@pasatiempo.com">
-                  Ijohnson@pasatiempo.com
-                </a>{" "}
+                dates below; otherwise please email {contact.name} at{" "}
+                <a href={`mailto:${contact.email}`}>{contact.email}</a>{" "}
                 to be added to a waiting list.
               </div>
             )}
+            {note && <p className={`reg-window tone-${note.tone}`}>{note.text}</p>}
             <div style={{ marginTop: 14 }}>
               <RegistrationForm event={publicEvent(event)} seats={seats} />
             </div>
           </section>
         )}
 
-        {open && <ManageRegistration event={publicEvent(event)} />}
+        {open && (
+          <div id="manage">
+            <ManageRegistration event={publicEvent(event)} />
+          </div>
+        )}
 
         {event.showRoster && !isSlots && event.type === "tournament" && (
           <PublicTeamRoster
             teams={teams}
             countOnly={event.rosterStyle === "count_only"}
+            capacity={settings.showSpots ? event.capacity : null}
           />
         )}
 
@@ -390,6 +317,10 @@ export default async function PublicEventPage({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-mark.png" alt="" />
         <div className="est">Pasatiempo Golf Club · Est. 1929</div>
+        <p className="foot-contact">
+          Questions about this event?{" "}
+          <a href={`mailto:${contact.email}`}>Contact {contact.name}</a>
+        </p>
         <Link className="foot-admin" href="/admin/events">
           Pasatiempo staff — manage events →
         </Link>

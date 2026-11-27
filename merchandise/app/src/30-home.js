@@ -20,24 +20,36 @@ function orderAlerts(S){
   if (wm) out.push({id:'o-room', kind:'order', sev:'warn', title:`${money(worst)} of deliveries arrive before there is room for them`, detail:`Orders landing through ${monthLabel(wm)} run ahead of the plan's receiving room.`, action:'Ask vendors for later ship dates where you can.', usd:worst});
   return out;
 }
+/* A reorder or out-of-stock item is worth doing only while its category is open to buy by the live budget (this year's
+   call), or for balls and gloves, which never run out. The month-end reader lists them either way (buy: true), so a
+   guideline or plan change that opens or stops a category shows here at once rather than at the next upload. */
+function itemOpenToBuy(i){
+  if (!i.buy) return true;
+  const c = PLANS.cur && PLANS.cur.cats[i.cat];
+  return !c || c.call === 'buy' || c.call === 'replenish' || roleKey(i.cat) === 'consumable';
+}
 function allAttention(S){
-  const items = orderAlerts(S).concat(mixAlerts(),(INS.items || []).map(i => ({...i, sev: KIND_SEV[i.kind] || 'info'})));
+  const items = orderAlerts(S).concat(mixAlerts(),(INS.items || []).filter(itemOpenToBuy).map(i => ({...i, sev: KIND_SEV[i.kind] || 'info'})));
   return items.map(i => ({...i, state: ISTATE[i.id] || null}));
 }
 const openAttention = S => allAttention(S).filter(i => !i.state);
 
-/* The few decisions worth making this week: order problems, item to-dos and the analysis's suggestions on one scale
-   (dollars at stake, at cost), at most two of each kind of decision so one problem can't fill the list. Each can be
-   marked Done or Not now (istate/{id}); the full To do list keeps everything. */
-const DECIDE = {cut: 'Cut orders', cancel: 'Cancel or confirm', chase: 'Chase', push: 'Push out', reorder: 'Reorder', markdown: 'Mark down', hold: 'Hold buying', fix: 'Fix'};
-function topDecisions(S, n = 6){
+/* Actions (stage 3): every order problem, item to-do, scorecard suggestion and mix alert on one scale, dollars at
+   stake at cost, biggest first; those with no dollar figure after, by severity. Done / Not now (istate/{id}) set one
+   aside with its dollars at the time; it comes back (back: true) if its dollars grow by more than a quarter. */
+const DECIDE = {cut: 'Cut orders', cancel: 'Cancel or confirm', chase: 'Chase', push: 'Push out', reorder: 'Reorder', markdown: 'Mark down', hold: 'Hold buying', fix: 'Fix', review: 'Review'};
+const SEV_RANK = {crit: 0, warn: 1, good: 2, info: 3};
+/** Open: not set aside, or set aside and grown by more than a quarter since. */
+const actionOpen = x => !!x && (!x.state || x.back);
+function allActions(S){
   const out = [];
-  for (let i of openAttention(S)){
-    let verb = null, usd = 0, page = null;
+  const put = (x, usd) => { const st = ISTATE[x.id] || null, was = st ? num(st.usd) : 0;
+    out.push({...x, usd, state: st, back: !!(st && was > 0 && usd > was * 1.25)}); };
+  for (let i of allAttention(S)){
+    let verb = 'review', usd = num(i.usd);
     if (i.kind === 'order'){
       const t = i.id.split('-')[1];
-      verb = t === 'stop' || t === 'over' ? 'cut' : t === 'cx' || t === 'cw' ? 'cancel' : t === 'late' ? 'chase' : t === 'room' ? 'push' : null;
-      usd = num(i.usd);
+      verb = t === 'stop' || t === 'over' ? 'cut' : t === 'cx' || t === 'cw' ? 'cancel' : t === 'late' ? 'chase' : t === 'room' ? 'push' : 'review';
     } else {
       const m = i.metrics || {};
       if (i.kind === 'reorder' || i.kind === 'stockout'){ verb = 'reorder'; usd = num(m.suggest) * num(m.cost); }
@@ -47,29 +59,40 @@ function topDecisions(S, n = 6){
     }
     // Cutting orders already placed: say what to do with them, then the category's rule for new ones.
     if (verb === 'cut') i = {...i, action: `Trim or cancel the open orders before their cancel dates. After that: ${i.action}`};
-    if (verb && usd >= 250) out.push({...i, verb, usd, page});
+    put({...i, verb, page: null}, usd);
   }
   const a = typeof anaNow === 'function' ? anaNow() : null;
   for (const x of a ? suggest(a) : []){
     const id = ('sug-' + x.kind + '-' + x.key).replace(/[^A-Za-z0-9_.~:@+-]/g, '_');
-    if (ISTATE[id]) continue;
     const verb = x.kind === 'aged' ? 'markdown' : x.kind === 'short' ? 'reorder' : 'hold';
-    out.push({id, kind: 'suggestion', sev: x.kind === 'short' ? 'good' : 'warn', title: x.title, detail: x.why, action: x.action, cat: x.cat, verb, usd: x.impact, page: x.page});
+    put({id, kind: 'suggestion', sev: x.kind === 'short' ? 'good' : 'warn', title: x.title, detail: x.why, action: x.action, cat: x.cat, verb, page: x.page}, x.impact);
   }
-  out.sort((p, q) => q.usd - p.usd);
+  return out.sort((p, q) => (q.usd > 0) - (p.usd > 0) || q.usd - p.usd || (SEV_RANK[p.sev] ?? 3) - (SEV_RANK[q.sev] ?? 3));
+}
+/** A category's open actions, biggest first. */
+const actionsFor = (S, cat) => allActions(S).filter(x => actionOpen(x) && x.cat === cat);
+/** Home's few decisions: open actions worth $250 or more, at most two of each kind so one problem can't fill the list. */
+function topDecisions(S, n = 5){
   const per = {}, pick = [];
-  for (const d of out){ if ((per[d.verb] || 0) >= 2) continue; per[d.verb] = (per[d.verb] || 0) + 1; pick.push(d); if (pick.length >= n) break; }
+  for (const d of allActions(S)){
+    if (!actionOpen(d) || d.verb === 'review' || d.usd < 250 || (per[d.verb] || 0) >= 2) continue;
+    per[d.verb] = (per[d.verb] || 0) + 1; pick.push(d); if (pick.length >= n) break;
+  }
   return pick;
 }
 function decisionHtml(d, k){
-  const go = d.po ? `<button class="btn sm" type="button" data-openpo="${esc(d.po)}">Open order</button>`
+  const go = (d.kind === 'reorder' || d.kind === 'stockout') && canAct() && !d.state ? `<button class="btn primary sm" type="button" data-startorder="${esc(d.id)}">Start an order</button>`
+    : d.guide ? `<button class="btn sm" type="button" data-go="guidelines:${esc(d.guide)}">Open the guideline</button>`
+    : d.po ? `<button class="btn sm" type="button" data-openpo="${esc(d.po)}">Open order</button>`
     : d.page ? `<button class="btn sm" type="button" data-tab="${esc(d.page)}">Look at it</button>`
-    : d.cat ? `<button class="btn sm" type="button" data-cat="${esc(d.cat)}">Open category</button>` : '';
-  const btns = canAct() ? `<button class="btn sm" type="button" data-istate="${esc(d.id)}" data-v="done">Done</button><button class="btn ghost sm" type="button" data-istate="${esc(d.id)}" data-v="dismissed">Not now</button>` : '';
+    : d.cat ? `<button class="btn sm" type="button" data-go="category:${esc(d.cat)}">Open category</button>` : '';
+  const u = ` data-usd="${Math.round(num(d.usd))}"`;
+  const btns = !canAct() ? '' : d.state && !d.back ? `<button class="btn sm" type="button" data-istate="${esc(d.id)}" data-v="">Undo</button>`
+    : `<button class="btn sm" type="button" data-istate="${esc(d.id)}" data-v="done"${u}>Done</button><button class="btn ghost sm" type="button" data-istate="${esc(d.id)}" data-v="dismissed"${u}>Not now</button>`;
   return `<li class="item ${d.sev}"><div class="stripe"></div><div class="body">
     <div class="t"><span class="num" style="color:var(--muted);margin-right:6px">${k + 1}.</span><span class="kind order">${DECIDE[d.verb]}</span>${esc(d.title)} <span class="num" style="color:var(--muted);font-weight:400">· ${moneyK(d.usd)}</span></div>
     ${d.sku ? `<div class="d"><span class="num">${esc(d.sku)}</span> · ${esc(d.desc)}</div>` : ''}
-    <div class="d">${esc(posDates(d.detail))}</div><div class="a"><b>Do:</b> ${esc(d.action)}</div>
+    <div class="d">${esc(posDates(d.detail))}${d.back ? ` <span class="rstat due">Back: up from ${esc(moneyK(num(d.state.usd)))} when it was set aside</span>` : ''}</div><div class="a"><b>Do:</b> ${esc(d.action)}</div>
   </div><div class="side">${go}${btns}</div></li>`;
 }
 
@@ -91,13 +114,19 @@ function sideBadges(S){
   if (!S) return b;
   // One count failing (a page's data still loading) must not take the whole sidebar with it.
   const put = (id, f) => { try { const v = f(); if (v) b[id] = v; } catch (e){ console.error('Sidebar count for ' + id + ' failed', e); } };
-  put('orders', () => { const n = POS.filter(p => isOpen(p) && (rowFlag(p) === 'flag-crit' || (p.deliveryMonth && p.deliveryMonth < THIS_MONTH))).length; return n ? [n, 'hot'] : null; });
-  put('receiving', () => {
-    let n = 0, late = false;
-    for (const p of POS){ const st = rcvOf(p); if (st === 'arrived' || st === 'late'){ n++; if (st === 'late') late = true; } }
-    return n ? [n, late ? 'hot' : ''] : null;
+  // Orders & receiving: each open order that needs a look counts once (a problem, past its month, or in the store room).
+  put('orders', () => {
+    let n = 0, hot = false;
+    for (const p of POS){
+      if (!isOpen(p)) continue;
+      const st = rcvOf(p), bad = rowFlag(p) === 'flag-crit' || (p.deliveryMonth && p.deliveryMonth < THIS_MONTH) || st === 'late';
+      if (bad || st === 'arrived'){ n++; if (bad) hot = true; }
+    }
+    n += receivingQueue().toMatch.length;   // receiving log rows waiting for a person to match
+    return n ? [n, hot ? 'hot' : ''] : null;
   });
-  put('attention', () => { const n = openAttention(S).filter(i => i.sev === 'crit').length; return n ? [n, 'hot'] : null; });
+  // Home: urgent actions (crit), including set-aside ones that have grown back.
+  put('today', () => { const n = allActions(S).filter(a => actionOpen(a) && a.sev === 'crit').length; return n ? [n, 'hot'] : null; });
   put('monthend', () => {
     const a = RPT ? rptAlerts() : [];
     const due = BASE ? nextRefreshMonth() : null, late = !!due && todayISO > due + '-' + pad(new Date(+due.slice(0,4), +due.slice(5,7), 0).getDate());
@@ -107,20 +136,38 @@ function sideBadges(S){
   put('scorecard', () => { const n = ssUnsorted().length + ssPlace().length; return n ? [n, ''] : null; });
   return b;
 }
+/* A sidebar entry's count: the counts of every page it holds (Orders & receiving: late orders plus the store room;
+   Home: To do's urgent items), hot if any of them is. */
+function sideCount(b, id){
+  const parts = Object.keys(b).filter(k => navParent(k) === id).map(k => b[k]);
+  if (!parts.length) return null;
+  const nums = parts.map(p => p[0]).filter(n => typeof n === 'number');
+  return [nums.length ? nums.reduce((a, n) => a + n, 0) : parts[0][0], parts.some(p => p[1] === 'hot') ? 'hot' : ''];
+}
+/** The view switch under a page's title: the sidebar page's views, the open one pressed; '' for a page without views. */
+function renderViewBar(tab){
+  const vs = VIEWS[navParent(tab)];
+  if (!vs) return '';
+  // Receiving carries what needs doing there: orders that should have arrived (red) and log rows to match.
+  const badge = id => { if (id !== 'receiving') return ''; try { const o = overdueOrders().length, m = receivingQueue().toMatch.length;
+    return o + m ? ` <span class="sb ${o ? 'hot' : ''}">${o + m}</span>` : ''; } catch (e){ return ''; } };
+  return `<div class="seg viewbar" role="group" aria-label="${esc(pageLabel(navParent(tab)))} views">${vs.map(([id, l]) => `<button type="button" data-tab="${id}" aria-pressed="${tab === id}">${esc(l)}${badge(id)}</button>`).join('')}</div>`;
+}
 function renderSide(S){
-  const b = sideBadges(S);
+  const b = sideBadges(S), cur = navParent(TAB);
   const item = ([id, label]) => {
-    const [c, tone] = b[id] || [];
+    const [c, tone] = sideCount(b, id) || [];
     const tail = c != null ? `<span class="sb ${tone || ''}">${c}</span>` : '';
-    const tip = id === 'vendors' ? ' title="Vendor contacts, terms and lead times"' : '';
-    return `<button type="button" class="sitem" data-tab="${id}"${TAB === id ? ' aria-current="page"' : ''}${tip}><span class="sl">${esc(label)}</span>${tail}</button>`;
+    return `<button type="button" class="sitem" data-tab="${sideTarget(id)}"${cur === id ? ' aria-current="page"' : ''}><span class="sl">${esc(label)}</span>${tail}</button>`;
   };
-  $('#sideNav').innerHTML = NAV.map(g => `<div class="sgroup" role="group" aria-label="${esc(g.label)}"><div class="sglab" aria-hidden="true">${esc(g.label)}</div>${g.pages.map(item).join('')}</div>`).join('');
+  $('#sideNav').innerHTML = `<div class="sgroup">${item(HOME_PAGE)}</div>` + NAV.map(g => `<div class="sgroup" role="group" aria-label="${esc(g.label)}"><div class="sglab" aria-hidden="true">${esc(g.label)}</div>${g.pages.map(item).join('')}</div>`).join('');
   const foot = $('#sideFootNav'); if (foot) foot.innerHTML = FOOT_PAGES.map(item).join('');
-  const [title, sub] = TABHEAD[TAB] || [pageLabel(TAB) || 'Today', ''];
+  const [, sub] = TABHEAD[TAB] || ['', ''];
   const grp = NAV.find(g => g.key === pageGroup(TAB));
   $('#pageGroup').textContent = grp ? grp.label : '';
-  $('#pageTitle').textContent = title; $('#pageSub').textContent = sub;
+  $('#pageTitle').textContent = pageLabel(cur) || pageLabel(TAB) || 'Home'; $('#pageSub').textContent = sub;
+  const vb = $('#viewBar'); if (vb){ vb.innerHTML = renderViewBar(TAB); vb.hidden = !vb.innerHTML; }
+  const pv = $('#pageVerdict'); if (pv) pv.innerHTML = verdictHtml(verdictFor(TAB, S));
   $('#pageActs').innerHTML = PAGE_ACTIONS[TAB] ? PAGE_ACTIONS[TAB]() : '';
 }
 const ANALYSIS_TABS = new Set(['today', 'scorecard', 'rounds', 'trends', 'stuck', 'inventory']);
@@ -128,12 +175,15 @@ const ANALYSIS_TABS = new Set(['today', 'scorecard', 'rounds', 'trends', 'stuck'
 const PAGE_ACTIONS = {brands: () => brandActions()};
 // Each page's title (its sidebar label) and one line saying what it is for.
 const TABHEAD = Object.fromEntries(Object.entries({
-  today: "What needs you this week, and how the shop is doing.",
+  today: "What needs you this week, and how the shop is doing: buying, arrivals and sales.",
+  // Views of Orders & receiving, Upload & count and Settings keep their own line.
   orders: "Every purchase order, by vendor, season and month.",
   receiving: "What's arrived but isn't in the POS yet, and what's due.",
-  attention: "Every order problem and item suggestion to work through.",
+  actions: "Every order problem, item to-do and suggestion, biggest dollars first.",
   vendors: "The vendors you buy from.",
   overview: "Room to buy by category and month, against what's committed.",
+  budget: "Room to buy by category and month, against what's committed.",
+  settings: "The rules the program grades and suggests by, and the forecast's assumptions.",
   seasons: "Each season's buy: prebooked, reorders and what's held back.",
   forecast: "Sales by month for this year and next.",
   guidelines: "The rules the program grades and suggests by, beside what's suggested and where the shop is now.",
@@ -174,7 +224,7 @@ function budgetTiles(S){
   </section>`;
 }
 function catRow(c, S){
-  const m = S.m, inv = INV.cats[c.code] || {units:0, cost:0}, wks = wksNow(c.code, inv.cost);
+  const m = S.m, inv = INV.cats[c.code] || {units:0, cost:0}, wks = catWeeks(c.code, shelfCost(c.code, inv.cost));
   const first = `<td data-l="Category"><span class="code">${c.code}</span>${esc(c.name)} <span class="chip ${c.call}">${CALLTXT[c.call]}</span></td><td data-l="Role" class="crole">${esc(roleOf(c.code).name)}</td>`;
   const wk = `<td data-l="Weeks of supply" class="r num">${wks ? Math.round(wks) : '—'}</td>`;
   if (!inOTB(c.code)){

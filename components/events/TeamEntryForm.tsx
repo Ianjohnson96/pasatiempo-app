@@ -2,7 +2,11 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { register } from "@/lib/events/actions";
-import { answerText } from "@/lib/events/format";
+import SubmitButton, { useSubmit } from "@/components/events/public/SubmitButton";
+import ErrorSummary from "@/components/events/public/ErrorSummary";
+import Confirmation from "@/components/events/public/Confirmation";
+import { questionError, type FieldError } from "@/lib/events/validate";
+import { shownAnswer } from "@/lib/events/format";
 import {
   isAnswered,
   isValidGhin,
@@ -62,24 +66,24 @@ function fieldErrors(
   const errs: Errs = {};
   team.players.forEach((p, i) => {
     const role = ROLES[i];
-    if (!p.name.trim()) errs[`${role}.name`] = "Please enter a name.";
+    if (!p.name.trim()) errs[`${role}.name`] = "Enter a name";
     if (!EMAIL_RE.test(p.email.trim()))
-      errs[`${role}.email`] = "Please enter a valid email.";
+      errs[`${role}.email`] = "Enter an email address like name@example.com";
     if (!normalizeGhin(p.ghin))
-      errs[`${role}.ghin`] = "Please enter a GHIN number.";
+      errs[`${role}.ghin`] = "Enter a GHIN number";
     else if (!isValidGhin(p.ghin))
-      errs[`${role}.ghin`] = "GHIN numbers are digits only.";
+      errs[`${role}.ghin`] = "Enter a GHIN number using digits only";
     if (enforceRequired) {
       for (const f of fields) {
         if (f.scope === "player" && f.required && !isAnswered(p.answers[f.id]))
-          errs[`${role}.q.${f.id}`] = "Please answer this question.";
+          errs[`${role}.q.${f.id}`] = questionError(f);
       }
     }
   });
   if (enforceRequired) {
     for (const f of fields) {
       if (f.scope === "team" && f.required && !isAnswered(team.teamAnswers[f.id]))
-        errs[`team.q.${f.id}`] = "Please answer this question.";
+        errs[`team.q.${f.id}`] = questionError(f);
     }
   }
   return errs;
@@ -129,11 +133,12 @@ export default function TeamEntryForm({
   const [sendEmails, setSendEmails] = useState(true);
   const [step, setStep] = useState<Step>("form");
   const [attempt, setAttempt] = useState(0);
+  const [serverTries, setServerTries] = useState(0);
   const [cardErr, setCardErr] = useState<Partial<Record<PlayerRole, string>>>(
     {},
   );
   const [formErr, setFormErr] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const { phase, busy: submitting, run } = useSubmit();
   const [doneStatus, setDoneStatus] = useState<"confirmed" | "waitlist">(
     "confirmed",
   );
@@ -160,22 +165,8 @@ export default function TeamEntryForm({
     rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [step]);
 
-  // After a failed attempt, move focus to the first field that needs fixing.
-  useEffect(() => {
-    if (attempt === 0) return;
-    const el = rootRef.current?.querySelector<HTMLElement>(
-      '[aria-invalid="true"], [data-invalid="true"]',
-    );
-    if (!el) return;
-    const target =
-      el instanceof HTMLInputElement ||
-      el instanceof HTMLSelectElement ||
-      el instanceof HTMLTextAreaElement
-        ? el
-        : el.querySelector<HTMLElement>("input");
-    target?.focus({ preventScroll: true });
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [attempt]);
+  // After a failed attempt the error summary at the top takes focus (see
+  // ErrorSummary); its links lead to each field.
 
   function setPlayer(i: number, patch: Partial<Player>) {
     setTeam((t) => ({
@@ -199,6 +190,7 @@ export default function TeamEntryForm({
 
   // Route an error to the card it belongs to, or to the form as a whole.
   function showError(msg: string) {
+    setServerTries((n) => n + 1);
     const { role, text } = splitRoleError(msg);
     if (role) {
       setCardErr({ [role]: text });
@@ -225,37 +217,37 @@ export default function TeamEntryForm({
   }
 
   async function send() {
-    setSubmitting(true);
     setFormErr("");
-    let err: string | null = null;
     let status: "confirmed" | "waitlist" = willWaitlist
       ? "waitlist"
       : "confirmed";
-    try {
-      if (onSubmit) {
-        err = await onSubmit(team, phone, sendEmails);
-      } else {
-        const member = team.players[0];
-        const res = await register({
-          slug: event.slug,
-          name: member.name,
-          email: member.email,
-          phone,
-          partySize: 1,
-          guestNames: [],
-          slotIds: [],
-          answers: {},
-          team,
-        });
-        if (res.ok && (res.status === "confirmed" || res.status === "waitlist"))
-          status = res.status;
-        else if (res.ok) status = "confirmed";
-        else err = res.error ?? GENERIC_ERROR;
-      }
-    } catch {
-      err = GENERIC_ERROR;
-    }
-    setSubmitting(false);
+    const err = await run(
+      async (): Promise<string | null> => {
+        try {
+          if (onSubmit) return await onSubmit(team, phone, sendEmails);
+          const member = team.players[0];
+          const res = await register({
+            slug: event.slug,
+            name: member.name,
+            email: member.email,
+            phone,
+            partySize: 1,
+            guestNames: [],
+            slotIds: [],
+            answers: {},
+            team,
+          });
+          if (res.ok && (res.status === "confirmed" || res.status === "waitlist"))
+            status = res.status;
+          else if (res.ok) status = "confirmed";
+          else return res.error ?? GENERIC_ERROR;
+          return null;
+        } catch {
+          return GENERIC_ERROR;
+        }
+      },
+      (e) => e === null,
+    );
     if (err) {
       // Player-specific problems go back to the form, on the right card.
       if (splitRoleError(err).role && step === "review") setStep("form");
@@ -319,6 +311,14 @@ export default function TeamEntryForm({
               </>
             )}
           </div>
+          {!isAdmin && (
+            <Confirmation
+              event={event}
+              status={isEdit ? "confirmed" : doneStatus}
+              email={member.email}
+              slotIds={[]}
+            />
+          )}
           <TeamSummary
             team={team}
             phone={phone}
@@ -370,18 +370,9 @@ export default function TeamEntryForm({
             >
               Edit
             </button>
-            <button
-              type="button"
-              className="btn"
-              onClick={send}
-              disabled={submitting}
-            >
-              {submitting
-                ? "Submitting…"
-                : isEdit
-                  ? "Save changes"
-                  : "Submit entry"}
-            </button>
+            <SubmitButton type="button" phase={phase} onClick={send}>
+              {isEdit ? "Save changes" : "Submit entry"}
+            </SubmitButton>
           </div>
         </div>
       </div>
@@ -389,7 +380,23 @@ export default function TeamEntryForm({
   }
 
   // ---- Form ---------------------------------------------------------------
-  const errCount = Object.keys(errs).length;
+  // Everything to fix, for the summary at the top of the form.
+  const summary: FieldError[] = [
+    ...Object.entries(errs).map(([key, msg]) => {
+      const [scope, kind, qid] = key.split(".");
+      const q = kind === "q" ? event.customFields.find((f) => f.id === qid) : undefined;
+      const text = q ? questionError(q) : msg;
+      if (scope === "team") return { field: "", message: `Team — ${text}` };
+      return {
+        field: `pc-${scope}`,
+        message: `${ROLE_LABEL[scope as PlayerRole]} — ${text}`,
+      };
+    }),
+    ...(Object.entries(cardErr) as [PlayerRole, string | undefined][])
+      .filter(([, t]) => !!t)
+      .map(([role, t]) => ({ field: `pc-${role}`, message: `${ROLE_LABEL[role]} — ${t}` })),
+    ...(formErr ? [{ field: "", message: formErr }] : []),
+  ];
   return (
     <div
       className={`team-entry${isPreview ? " preview" : ""}`}
@@ -397,6 +404,7 @@ export default function TeamEntryForm({
     >
       <form onSubmit={onFormSubmit} noValidate>
         <fieldset className="team-fieldset" disabled={isPreview}>
+          <ErrorSummary errors={summary} focusKey={attempt + serverTries} />
           {!isAdmin && willWaitlist && !isEdit && (
             <div className="notice warn">
               The field is full — you can still enter your team on the{" "}
@@ -511,18 +519,6 @@ export default function TeamEntryForm({
             </section>
           )}
 
-          {formErr && (
-            <div className="notice err" role="alert">
-              {formErr}
-            </div>
-          )}
-          {errCount > 0 && (
-            <p className="field-err team-summary-err" role="alert">
-              {errCount === 1
-                ? "One field needs your attention above."
-                : `${errCount} fields need your attention above.`}
-            </p>
-          )}
 
           {isAdmin && !isEdit && (
             <label className="check team-send">
@@ -652,7 +648,7 @@ function TeamSummary({
                   <ReviewRow
                     key={f.id}
                     label={f.label}
-                    value={answerText(p.answers[f.id]).trim()}
+                    value={shownAnswer(f, p.answers[f.id]).trim()}
                   />
                 ))}
               </dl>
@@ -668,7 +664,7 @@ function TeamSummary({
               <ReviewRow
                 key={f.id}
                 label={f.label}
-                value={answerText(team.teamAnswers[f.id]).trim()}
+                value={shownAnswer(f, team.teamAnswers[f.id]).trim()}
               />
             ))}
           </dl>

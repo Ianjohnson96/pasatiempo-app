@@ -4,8 +4,17 @@ import { memo, useEffect, useRef } from "react";
 import RegistrationForm from "@/components/events/RegistrationForm";
 import TeamEntryForm from "@/components/events/TeamEntryForm";
 import Icon from "@/components/events/Icon";
+import PublicNav from "@/components/events/public/PublicNav";
+import PublicHero from "@/components/events/public/PublicHero";
+import FactsStrip, {
+  factsFor,
+  spotsMeter,
+  whenLineFor,
+} from "@/components/events/public/FactsStrip";
 import { previewSeats } from "@/lib/events/editor";
-import { TYPE_LABEL, formatWhen } from "@/lib/events/format";
+import { ctaState } from "@/lib/events/public-page";
+import { resolveHero, resolveLogo, themeVars } from "@/lib/events/theme";
+import { windowNote } from "@/lib/events/signup-window";
 import type { EventRec } from "@/lib/events/types";
 
 // The sign-up form as members will see it, built from the editor's unsaved
@@ -17,29 +26,38 @@ export const PreviewBody = memo(function PreviewBody({
   event: EventRec;
 }) {
   const seats = previewSeats(event);
-  const when =
-    event.scheduleMode === "slots"
-      ? event.slots.length === 0
-        ? "No dates yet"
-        : `${event.slots.length} date${event.slots.length === 1 ? "" : "s"} to choose from`
-      : formatWhen(event.startsAt, event.endsAt);
-  const capacity =
-    event.capacity == null
-      ? null
-      : event.type === "tournament"
-        ? `${event.capacity} teams`
-        : `${event.capacity} spots`;
+  const cta = ctaState(event, seats, false);
+  const look = themeVars(event.theme);
 
   return (
-    <div className="ep-body">
-      <div className="ep-hero">
-        <span className="ep-kicker">{TYPE_LABEL[event.type]}</span>
-        <div className="ep-title">{event.title}</div>
-        <div className="ep-meta">
-          <span>{when}</span>
-          {event.location && <span>{event.location}</span>}
-          {capacity && <span>{capacity}</span>}
-        </div>
+    <div
+      className="ep-body pub"
+      data-look={event.theme?.preset ?? "clubhouse"}
+      style={look.vars as React.CSSProperties}
+    >
+      {/* a picture of the page: its links and buttons do nothing here */}
+      <div inert>
+        <PublicNav logo={resolveLogo(event.theme)} />
+        <PublicHero
+          event={event}
+          hero={resolveHero(event.theme, event.photos)}
+          cta={cta}
+          whenLine={
+            event.scheduleMode === "slots" && event.slots.length === 0
+              ? "No dates yet"
+              : whenLineFor(event)
+          }
+          note={windowNote(event, new Date())}
+        />
+        <FactsStrip
+          facts={factsFor(event)}
+          spots={spotsMeter(event, {
+            taken: 0,
+            remaining: event.capacity,
+            full: false,
+          })}
+          roster={null}
+        />
       </div>
       <div className="ep-form">
         {event.type === "tournament" ? (

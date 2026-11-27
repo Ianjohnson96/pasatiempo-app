@@ -52,16 +52,37 @@ describe("merch access rules", () => {
     expect(docProblem('guidelines/current', { memberDiscount: 2 })).toMatch(/memberDiscount/);
     expect(docProblem('guidelines/current', { roles: { fashion: { wks: [16, 12, 8, 24] } } })).toMatch(/weeks/);
     expect(docProblem('guidelines/current', { mix: { total: -1 } })).toMatch(/total/);
+    expect(docProblem('guidelines/current', { mix: { follow: 'onhand' } })).toMatch(/follow/);
+    expect(docProblem('guidelines/current', { mix: { total: 632720, follow: 'suggested' } })).toBeNull();
     expect(docProblem('guidelines/current', { mix: { ranges: { fashion: [50, 40] } } })).toMatch(/range/);
     expect(docProblem('guidelines/current', { seasons: { spring: 1, summer: 9, fall: 8, holiday: 11 } })).toMatch(/season/);
     expect(docProblem('guidelines/current', { history: 'x' })).toMatch(/history/);
     expect(docProblem('guidelines/current', { history: Array(201).fill({ at: '2026-11-19T00:00:00Z', what: 'x' }) })).toMatch(/history/);
     expect(docProblem('guidelines/current', { roleOf: { '480': 'bogus' } })).toMatch(/role/);
     expect(docProblem('guidelines/current', { bench: { gm: { apparel: 'x' } } })).toMatch(/bench/);
+    expect(docProblem('guidelines/current', { vendorWords: { footjoy: ['fj', 'melin'] } })).toBeNull();
+    expect(docProblem('guidelines/current', { vendorWords: { footjoy: 'melin' } })).toMatch(/vendorWords/);
+    expect(docProblem('guidelines/current', { vendorWords: { footjoy: [''] } })).toMatch(/vendorWords/);
+    expect(docProblem('guidelines/current', { vendorWords: { footjoy: ['x'.repeat(41)] } })).toMatch(/vendorWords/);
     expect(docProblem('guidelines/current', {
       bench: { gm: { apparel: 0.48 } }, roles: { fashion: { wks: [12, 16, 8, 24], over: 30 } }, roleOf: { '480': 'impulse' },
       mix: { total: 700000, ranges: { fashion: [38, 48] } }, seasons: { spring: 1, summer: 5, fall: 8, holiday: 11 }, memberDiscount: 0.25,
       history: [{ at: '2026-11-19T00:00:00Z', by: 'u', what: 'Apparel margin', from: '45%', to: '48%' }],
     })).toBeNull();
   });
+
+describe("receiving log documents", () => {
+  it("nobody writes the log copy through the page; owner and staff write match decisions", () => {
+    expect(canWrite("owner", "receivinglog/current")).toBe(false);
+    expect(canWrite("staff", "receivinglog/current")).toBe(false);
+    expect(canWrite("staff", "logmatch/abc")).toBe(true);
+    expect(canWrite("viewer", "logmatch/abc")).toBe(false);
+  });
+  it("checks a match decision's shape", () => {
+    expect(docProblem("logmatch/abc", { state: "matched", po: "p1", amount: 10, date: "2026-11-02", by: "x" })).toBeNull();
+    expect(docProblem("logmatch/abc", { state: "notorder", by: "x" })).toBeNull();
+    expect(docProblem("logmatch/abc", { state: "maybe" })).toMatch(/state/);
+    expect(docProblem("logmatch/abc", { state: "matched", amount: 10, date: "2026-11-02" })).toMatch(/order/);
+  });
+});
 });

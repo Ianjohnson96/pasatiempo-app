@@ -1,4 +1,6 @@
 import type { EventRec, Registration } from "./types";
+import { parseTheme } from "./theme";
+import { parseRules } from "./signup-window";
 import type { EventFinance, PrizePurchase } from "./finance-types";
 
 // Maps between snake_case DB rows and the camelCase domain types.
@@ -26,6 +28,7 @@ export function rowToEvent(r: any): EventRec {
     capacity: r.capacity,
     rosterLimit: r.roster_limit ?? null,
     waitlistEnabled: r.waitlist_enabled,
+    rules: parseRules(r.rules),
     allowGuests: r.allow_guests,
     maxGuests: r.max_guests,
     collectGuestNames: r.collect_guest_names,
@@ -38,6 +41,9 @@ export function rowToEvent(r: any): EventRec {
     })),
     photos: r.photos ?? [],
     galleryMode: r.gallery_mode,
+    theme: parseTheme(r.theme),
+    contactName: r.contact_name ?? null,
+    contactEmail: r.contact_email ?? null,
     showRoster: r.show_roster,
     rosterStyle: r.roster_style,
     pricingEnabled: r.pricing_enabled ?? false,
@@ -67,6 +73,7 @@ export function eventToRow(e: Partial<EventRec>): Record<string, unknown> {
   if (e.capacity !== undefined) row.capacity = e.capacity;
   if (e.rosterLimit !== undefined) row.roster_limit = e.rosterLimit;
   if (e.waitlistEnabled !== undefined) row.waitlist_enabled = e.waitlistEnabled;
+  if (e.rules !== undefined) row.rules = e.rules;
   if (e.allowGuests !== undefined) row.allow_guests = e.allowGuests;
   if (e.maxGuests !== undefined) row.max_guests = e.maxGuests;
   if (e.collectGuestNames !== undefined)
@@ -78,6 +85,9 @@ export function eventToRow(e: Partial<EventRec>): Record<string, unknown> {
   if (e.customFields !== undefined) row.custom_fields = e.customFields;
   if (e.photos !== undefined) row.photos = e.photos;
   if (e.galleryMode !== undefined) row.gallery_mode = e.galleryMode;
+  if (e.theme !== undefined) row.theme = e.theme;
+  if (e.contactName !== undefined) row.contact_name = e.contactName;
+  if (e.contactEmail !== undefined) row.contact_email = e.contactEmail;
   if (e.showRoster !== undefined) row.show_roster = e.showRoster;
   if (e.rosterStyle !== undefined) row.roster_style = e.rosterStyle;
   if (e.pricingEnabled !== undefined) row.pricing_enabled = e.pricingEnabled;
@@ -155,4 +165,24 @@ export function rowToPrize(r: any): PrizePurchase {
     amountCents: r.amount_cents ?? 0,
     createdAt: r.created_at,
   };
+}
+
+// ---- Before migration-event-looks.sql has run ---------------------------------
+// Saving must keep working if the code ships before the three look columns
+// exist: the save retries without them, and the event keeps the default look.
+// The same goes for `rules` (migration-event-rules.sql); the save action refuses
+// to drop it silently when dates are set.
+const LOOK_COLUMNS = ["theme", "contact_name", "contact_email", "rules"] as const;
+
+export function isMissingLookColumn(
+  err: { code?: string; message?: string } | null | undefined,
+): boolean {
+  if (!err || (err.code !== "PGRST204" && err.code !== "42703")) return false;
+  return LOOK_COLUMNS.some((c) => (err.message ?? "").includes(c));
+}
+
+export function withoutLookColumns(row: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...row };
+  for (const c of LOOK_COLUMNS) delete out[c];
+  return out;
 }

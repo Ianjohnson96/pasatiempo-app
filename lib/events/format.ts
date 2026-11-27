@@ -1,4 +1,4 @@
-import type { Answer, EventType, RosterStyle, Slot } from "./types";
+import type { Answer, CustomField, EventType, RosterStyle, Slot } from "./types";
 
 export const TYPE_LABEL: Record<EventType, string> = {
   dinner: "Dinner / Social",
@@ -63,6 +63,26 @@ export function formatWhen(
   return `${dateStr} · ${timeStr}`;
 }
 
+// The facts strip's "Date" and "Time", in club time wherever the page renders.
+export function factDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    timeZone: CLUB_TIME_ZONE,
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+export function factTime(startIso: string, endIso: string | null): string {
+  const t = (iso: string) =>
+    new Date(iso).toLocaleTimeString("en-US", {
+      timeZone: CLUB_TIME_ZONE,
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  return endIso ? `${t(startIso)} – ${t(endIso)}` : t(startIso);
+}
+
 function to12h(t: string): string {
   if (!t) return "";
   const [h, m] = t.split(":").map(Number);
@@ -115,7 +135,32 @@ export function formatSlotShort(slot: Slot): string {
 export function rosterName(name: string, style: RosterStyle): string {
   const parts = name.trim().split(/\s+/);
   if (style === "first_initial" && parts.length > 1) {
-    return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+    // capitals however the name was typed ("cary johnson" → "Cary J.")
+    const first = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+    return `${first} ${parts[parts.length - 1][0].toUpperCase()}.`;
   }
   return name.trim();
+}
+
+/** A US phone number as (xxx) xxx-xxxx for staff lists; anything else as typed. */
+export function formatPhone(raw: string): string {
+  const t = raw.trim();
+  if (t.startsWith("+") && !t.startsWith("+1")) return raw; // another country
+  const d = t.replace(/\D/g, "");
+  const ten = d.length === 11 && d.startsWith("1") ? d.slice(1) : d;
+  if (ten.length !== 10) return raw;
+  return `(${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6)}`;
+}
+
+/** An answer as people should read it: a yes/no box is "Yes" or "No", never blank. */
+export function shownAnswer(field: Pick<CustomField, "type">, a: Answer | undefined): string {
+  if (field.type === "checkbox") return a === "Yes" ? "Yes" : "No";
+  return answerText(a);
+}
+
+/** A date stamp as "Nov 26", in the club's time zone; "" for blank or broken stamps. */
+export function shortDate(iso: string): string {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: CLUB_TIME_ZONE });
 }

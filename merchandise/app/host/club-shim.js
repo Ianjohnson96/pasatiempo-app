@@ -45,7 +45,9 @@
     if (!isObj(ours) || !isObj(theirs) || !depth) return same(ours, base) ? theirs : ours;
     const b = isObj(base) ? base : {}, out = {};
     for (const k of new Set([...Object.keys(b), ...Object.keys(ours), ...Object.keys(theirs)])){
-      const v = same(ours[k], b[k]) ? theirs[k] : isObj(ours[k]) && isObj(theirs[k]) ? merge3(b[k], ours[k], theirs[k], depth - 1) : ours[k];
+      // an order's invoice entries merge as a list (mergeInvoices in app/src/18-ops.js), so two confirms on one order both survive
+      const v = same(ours[k], b[k]) ? theirs[k] : k === 'invoicesIn' && Array.isArray(ours[k]) && Array.isArray(theirs[k]) && typeof mergeInvoices === 'function' ? mergeInvoices(b[k], ours[k], theirs[k])
+        : isObj(ours[k]) && isObj(theirs[k]) ? merge3(b[k], ours[k], theirs[k], depth - 1) : ours[k];
       if (v !== undefined) out[k] = v;
     }
     return out;

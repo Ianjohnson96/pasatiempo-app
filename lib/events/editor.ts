@@ -1,6 +1,8 @@
 import type { EventInput } from "./actions";
+import { DEFAULT_CONTACT, type EventTheme } from "./theme";
 import type { SeatInfo } from "@/components/events/RegistrationForm";
 import { TYPE_LABEL } from "./format";
+import { parseRules, windowError } from "./signup-window";
 import type {
   CustomField,
   EventRec,
@@ -86,11 +88,13 @@ export function effectiveScheduleMode(
 
 export const EDITOR_SECTIONS = [
   { id: "details", label: "Details" },
+  { id: "look", label: "Look" },
   { id: "schedule", label: "Schedule" },
   { id: "questions", label: "Players & Questions" },
   { id: "pricing", label: "Pricing" },
   { id: "roster", label: "Roster" },
   { id: "access", label: "Access" },
+  { id: "email", label: "Email" },
   { id: "publish", label: "Publish" },
 ] as const;
 
@@ -131,10 +135,25 @@ export interface EditorState {
   rosterStyle: RosterStyle;
   managersText: string;
   status: EventStatus;
+  theme: EventTheme | null;
+  contactName: string; // blank = the planner's default contact
+  contactEmail: string;
+  opensAt: string; // datetime-local; blank = open as soon as the event is
+  closesAt: string; // datetime-local; blank = no entry deadline
+  changesAfterClose: boolean;
+  autoPromote: boolean;
 }
 
 export function fromLocalInput(v: string): string | null {
   return v ? new Date(v).toISOString() : null;
+}
+
+/** A deadline at 5:00 PM, `days` days before a datetime-local start ("" without one). */
+export function deadlineBefore(startsAt: string, days: number): string {
+  const m = startsAt.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return "";
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] - days));
+  return `${d.toISOString().slice(0, 10)}T17:00`;
 }
 
 // The first problem that stops a save, or null.
@@ -145,7 +164,14 @@ export function editorError(s: EditorState): string | null {
     s.slots.length === 0
   )
     return "Add at least one date/time slot, or switch to a single date.";
-  return null;
+  // A contact with no usable email would silently fall back to the default.
+  const contactName = s.contactName.trim();
+  const contactEmail = s.contactEmail.trim();
+  if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail))
+    return `The contact email doesn't look right — check it, or leave it blank for ${DEFAULT_CONTACT.name}.`;
+  if (contactName && !contactEmail)
+    return `Add ${contactName}'s email too, or clear the contact name.`;
+  return windowError({ opensAt: fromLocalInput(s.opensAt), closesAt: fromLocalInput(s.closesAt) });
 }
 
 export function buildEventInput(s: EditorState, id?: string): EventInput {
@@ -185,6 +211,15 @@ export function buildEventInput(s: EditorState, id?: string): EventInput {
     rosterStyle: s.rosterStyle,
     managers: s.managersText.split(/[\n,;]+/),
     status: s.status,
+    theme: s.theme,
+    contactName: s.contactName.trim() || null,
+    contactEmail: s.contactEmail.trim().toLowerCase() || null,
+    rules: parseRules({
+      opensAt: fromLocalInput(s.opensAt),
+      closesAt: fromLocalInput(s.closesAt),
+      changesAfterClose: s.changesAfterClose,
+      autoPromote: s.waitlistEnabled && s.autoPromote,
+    }),
   };
 }
 
@@ -193,7 +228,7 @@ export function buildEventInput(s: EditorState, id?: string): EventInput {
 // The event the sign-up form would see if the editor saved now: what the server
 // keeps (tournament settings forced, slots only in slots mode) with
 // placeholders for what only a save creates.
-export function previewEvent(input: EventInput): EventRec {
+export function previewEvent(input: EventInput, photos: string[] = []): EventRec {
   const tournament = input.type === "tournament";
   const slotsMode = input.scheduleMode === "slots";
   const customFields: CustomField[] = input.customFields.map((f) => ({
@@ -218,6 +253,7 @@ export function previewEvent(input: EventInput): EventRec {
     capacity: input.capacity,
     rosterLimit: tournament ? null : input.rosterLimit,
     waitlistEnabled: input.waitlistEnabled,
+    rules: input.rules,
     allowGuests: tournament ? true : input.allowGuests,
     maxGuests: tournament ? 1 : input.maxGuests,
     collectGuestNames: tournament ? true : input.collectGuestNames,
@@ -225,8 +261,11 @@ export function previewEvent(input: EventInput): EventRec {
     allowlist: [],
     inviteOnlyMessage: input.inviteOnlyMessage,
     customFields,
-    photos: [],
+    photos,
     galleryMode: "slideshow",
+    theme: input.theme,
+    contactName: input.contactName,
+    contactEmail: input.contactEmail,
     pricingEnabled: input.pricingEnabled,
     pricing: input.pricing,
     showRoster: input.showRoster,
