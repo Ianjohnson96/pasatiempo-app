@@ -35,3 +35,20 @@ Photographs from past Invitationals, supplied by the club, live in
 list the home page's "Scenes from the Invitational" gallery shows is
 `GALLERY` in `components/invitational/content.ts` — add a photograph by adding
 both files and a line there. Use these for any later page, card or intro.
+
+## The Invitational intro
+
+The opening title sequence on the Invitational page is
+`components/invitational/IntroReel.tsx`. The one visitors get is
+`DEFAULT_VARIANT`; every other cut still plays with `?intro=<name>`.
+
+- **Default (since November 2026): `somewhere`** — fourteen shots cut to
+  Keane's "Somewhere Only We Know" (`public/invitational/audio/intro-somewhere-only-we-know.mp3`),
+  with two drone flyovers (`public/invitational/video/intro/`), all in colour,
+  no year card, ending on the clock. Its running order, cues and the reasoning
+  behind each cut are in the comment above `SONG_CUES`.
+- **Previous default: `score`** — the twelve-photograph scored dissolve to
+  "A Perfect Day" (1929 photographs, year card, ending on the clock). To revert,
+  set `DEFAULT_VARIANT` back to `"score"`; nothing else needs to change.
+
+The club holds the licence for the Keane recording (confirmed November 2026).

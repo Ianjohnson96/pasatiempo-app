@@ -157,6 +157,11 @@ export const GALLERY: GalleryPhoto[] = [
   { name: "event-iron-impact", alt: "A player strikes an iron through the turf in the evening haze", w: 2000, h: 1333 },
   { name: "event-laughing-group", alt: "Players share a laugh on the tee in the golden light", w: 2000, h: 1333 },
   { name: "event-field-photo", alt: "The Invitational field together on the tee", w: 2000, h: 1333 },
+  { name: "event-chip-shot-fairway", alt: "A player chips from the fairway as his playing partner looks on", w: 2000, h: 1333 },
+  { name: "event-shaka-party", alt: "A player throws a shaka and a wink at the party after the round", w: 2000, h: 1333 },
+  { name: "event-high-five-fairway", alt: "Three players trade a high five on the fairway in the evening light", w: 2000, h: 1333 },
+  { name: "event-cart-wave", alt: "Two players wave from their cart, arms in the air, on the cart path", w: 2000, h: 1333 },
+  { name: "event-driver-backswing", alt: "A player at the top of his backswing on the tee, the fairway stretching out behind", w: 1333, h: 2000 },
   { name: "event-clock-blue-sky", alt: "The Pasatiempo clock, est. 1929, against a blue sky", w: 2000, h: 1333 },
 ];
 

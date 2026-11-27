@@ -74,6 +74,11 @@ interface Frame {
   /** On a tall (phone) screen only: a slow pan across the photograph instead of
    *  the zoom — from and to, as a shift in % of its width. */
   phonePan?: [from: number, to: number];
+  /** A short film played over the photograph (src is its first frame, shown
+   *  until it plays). Muted; it moves on its own. */
+  video?: string;
+  /** How long this photograph takes to dissolve in, if not the cut's usual. */
+  fadeMs?: number;
 }
 
 const FRAMES: Frame[] = [
@@ -289,7 +294,7 @@ const PAN_TAIL: Frame[] = [
   { src: IMG + "hero.webp", hold: 0, era: "today" },
 ];
 
-// ---- The film, scored (the default) ------------------------------------------
+// ---- The film, scored -------------------------------------------------------
 // The film pan, slower and never pausing, timed to the music: "A Perfect Day"
 // (Danny Cope), 0:39–0:54 then 1:11–1:22, crossfaded and faded out
 // (audio/intro-a-perfect-day.mp3, 25 s). The archive runs through the first
@@ -322,7 +327,7 @@ const FILM_TAIL: Frame[] = [
   { src: IMG + "hole-4-approach-poster.webp", hold: 0, era: "today" },
 ];
 
-// ---- The scored dissolve (the default) ---------------------------------------
+// ---- The scored dissolve (the default until November 2026; ?intro=score) -----
 // Twelve full-screen photographs, each easing slowly in (about 6%) and
 // dissolving into the next, cut to the music: "A Perfect Day" (Danny Cope),
 // 0:39–0:54.2 then 1:10.3–1:33.3 — a join placed so the song's five-second
@@ -347,7 +352,18 @@ const SC = "/invitational/img/score/";
 const SA = (f: string) => SC + "archive-" + f;
 /** Every photograph eases in, about 6%, toward its subject (the focus point). */
 const ZOOM: Frame["move"] = [1, 0, 0, 1.06, 0, 0];
-const SCORE: Frame[] = (
+/** A scored cut's frames: each eases in toward its subject and holds until the
+ *  next cue. The last photograph stays on through the title, so its zoom runs
+ *  on (a little further, at the same pace) rather than restarting. */
+function scored(fs: Omit<Frame, "hold">[], cues: number[], titleAt: number, exitAt: number): Frame[] {
+  return fs.map((f, k, all) => ({
+    ...f,
+    move: k === all.length - 1 ? ([1, 0, 0, 1.13, 0, 0] as Frame["move"]) : (f.move ?? ZOOM),
+    zoomMs: k === all.length - 1 ? exitAt - cues[k] + 2200 : f.zoomMs,
+    hold: (k + 1 < cues.length ? cues[k + 1] : titleAt) - cues[k],
+  }));
+}
+const SCORE: Frame[] = scored(
   [
     // 1929. The opening establishing shot (on a phone, framed on the golfer on
     // the tee and the crowd).
@@ -392,19 +408,116 @@ const SCORE: Frame[] = (
       src: SC + "today-clock-1929.webp", era: "today", focus: "18% center",
       phoneWide: { h: 0.7, ar: 1.5, fx: 0.235, fy: 0.31, tx: 1 / 3, ty: 0.3 },
     },
-  ] as Omit<Frame, "hold">[]
-).map((f, k, all) => ({
-  ...f,
-  // The last photograph stays on through the title, so its zoom runs on
-  // (a little further, at the same pace) rather than restarting.
-  move: k === all.length - 1 ? ([1, 0, 0, 1.13, 0, 0] as Frame["move"]) : (f.move ?? ZOOM),
-  zoomMs: k === all.length - 1 ? 9600 : undefined,
-  hold: (k + 1 < SCORE_CUES.length ? SCORE_CUES[k + 1] : SCORE_TITLE_AT) - SCORE_CUES[k],
-}));
+  ] as Omit<Frame, "hold">[],
+  SCORE_CUES,
+  SCORE_TITLE_AT,
+  SCORE_EXIT_AT,
+);
 /** The closing title: the club's 1929 logo (the version for dark backgrounds,
  *  public/brand), and its name in the logo's own script. */
 const MARK = "/brand/pasatiempo-logo-1929-reverse.png";
 const WORDMARK = "/invitational/img/wordmark-pasatiempo.svg";
+
+// ---- The scored dissolve to "Somewhere Only We Know" (the default) -----------
+// The same look as the scored dissolve, cut to Keane's "Somewhere Only We Know"
+// (audio/intro-somewhere-only-we-know.mp3, 41 s): the song's opening piano,
+// four bars (0:00.4–0:11.6), then straight into the last chorus at 3:21.4 —
+// the chord the intro would have gone to next, so the beat carries through the
+// join — and on to the song's ending. In the edit the band comes in at 11.2 s,
+// the music starts to fall away at 22.4 s, all but stops at 28 s, and the
+// final phrase lands at 30.1 s.
+//
+// Cut like a film, to that shape. No year card.
+//   · The piano is a montage: the course, wide, fading up out of black over
+//     the first bar, then a photograph every half bar (two beats, 1.4 s),
+//     players and the course in turn, on quick 0.6 s dissolves.
+//   · The band's entrance is all but a hard cut, onto the drone taking off
+//     over the 4th.
+//   · Through the chorus: last year's champion and a high five on half bars,
+//     the 8th from the air for a bar, the champion laughing for a bar.
+//   · As the music falls away, the whole field, held two bars on a slow pull
+//     back; the clock fades up in the hush before the last phrase, and the
+//     logo rises on it.
+// Dissolves start 0.3 s ahead of their beat, so the photograph has arrived as
+// the beat lands.
+//   beat:  0.1 2.9 4.3 5.7 7.1 8.5 9.9 | 11.2 14.0 15.4 16.8 19.6 | 22.4 | 28.0 | title 30.1
+const SONG_MUSIC = "/invitational/audio/intro-somewhere-only-we-know.mp3";
+const SONG_CUES = [
+  0, 2570, 3960, 5370, 6760, 8150, 9560, 11110, 13720, 15130, 16520, 19320, 21910, 27370,
+];
+const SONG_TITLE_AT = 29950;
+const SONG_EXIT_AT = 37100; // the title holds about 7 s, as the last chord rings
+const FLY = "/invitational/video/intro/";
+/** A flyover: the film moves on its own, so no zoom on top of it. On a phone
+ *  the crop is centred on the green (about 50% across the 4th's film, 53%
+ *  across the 8th's). */
+const flyover = (hole: number, focus: string, phoneFocus: string): Omit<Frame, "hold"> => ({
+  src: FLY + `hole-${hole}-flyover.webp`,
+  video: FLY + `hole-${hole}-flyover.mp4`,
+  era: "today",
+  focus,
+  phoneFocus,
+  move: [1, 0, 0, 1, 0, 0],
+});
+const SONG: Frame[] = scored(
+  [
+    // S · The course, wide, fading up out of black.
+    { src: SC + "course-wide.webp", era: "today", focus: "center 55%", phoneFocus: "50% 55%", fadeMs: 1600 },
+    // A · High fives on the first tee (on a phone, zoomed out so both players show).
+    {
+      src: SC + "event-high-five-first-tee.webp", era: "today", focus: "42% 40%",
+      phoneWide: { h: 0.75, ar: 1800 / 1090, fx: 0.42, fy: 0.42, tx: 0.5, ty: 0.44 },
+    },
+    // 1 · The course from the air at dawn (on a phone, the green and its bunkers).
+    { src: SC + "today-aerial-dawn.webp", era: "today", focus: "center 50%", phoneFocus: "45% 50%" },
+    // G · The golf staff at registration (on a phone, zoomed out so all four show).
+    {
+      src: SC + "event-registration-team.webp", era: "today", focus: "center 35%",
+      phoneWide: { h: 0.45, ar: 1800 / 1554, fx: 0.48, fy: 0.4, tx: 0.5, ty: 0.45 },
+    },
+    // 2 · Two chairs looking out over the course to the bay.
+    { src: SC + "today-chairs-bay.webp", era: "today", focus: "center 45%" },
+    // J · A chip from the fairway, his partner watching (on a phone, zoomed out to both).
+    {
+      src: SC + "event-chip-shot-fairway.webp", era: "today", focus: "center 45%",
+      phoneWide: { h: 0.42, ar: 1.5, fx: 0.45, fy: 0.45, tx: 0.5, ty: 0.45 },
+    },
+    // 3 · The bridge.
+    { src: SC + "today-bridge.webp", era: "today", focus: "center 62%" },
+    // 4 · The band comes in: all but a hard cut, low over the bunkers of the 4th.
+    { ...flyover(4, "center 60%", "50% 60%"), fadeMs: 250 },
+    // 5 · Last year's champion, an iron through the turf in the evening haze.
+    { src: SC + "event-iron-impact.webp", era: "today", focus: "55% 45%", phoneFocus: "52% 50%" },
+    // 6 · A high five in the sun (on a phone, a tall one on the green instead).
+    {
+      src: SC + "event-high-five-sweater.webp", era: "today", focus: "55% 30%",
+      phoneSrc: SC + "event-high-five-green.webp", phoneFocus: "50% 20%",
+    },
+    // 7 · Over the 8th, under the cypresses.
+    flyover(8, "center 55%", "54% 55%"),
+    // 8 · The champion again, sharing a laugh on the tee in the golden light.
+    { src: SC + "event-laughing-group.webp", era: "today", focus: "62% 35%", phoneFocus: "62% 40%" },
+    // 9 · The whole field together, as the music falls away (on a phone, zoomed
+    // out so the line of players, 6–91% of the photograph's width, shows end
+    // to end).
+    {
+      src: SC + "event-field-photo.webp", era: "today", focus: "center 55%", move: [1.08, 0, 0, 1.01, 0, 0],
+      phoneWide: { h: 0.34, ar: 1.5, fx: 0.485, fy: 0.55, tx: 0.5, ty: 0.45 },
+      fadeMs: 1000, zoomMs: 7000,
+    },
+    // 10 · In the hush before the last phrase, and under the title: the club's
+    // clock, est. 1929, at dusk (on a phone, the clock face on the upper-left
+    // third, clear of the title below it).
+    {
+      src: SC + "today-clock-1929.webp", era: "today", focus: "18% center",
+      phoneWide: { h: 0.7, ar: 1.5, fx: 0.235, fy: 0.31, tx: 1 / 3, ty: 0.3 },
+      fadeMs: 1200,
+    },
+  ] as Omit<Frame, "hold">[],
+  SONG_CUES,
+  SONG_TITLE_AT,
+  SONG_EXIT_AT,
+);
 
 interface ReelLook {
   /** How far the camera pulls back between frames (1 = not at all). */
@@ -415,7 +528,7 @@ interface ReelLook {
 
 type Variant =
   | "flip" | "dissolve" | "wipe" | "letters" | "tight" | "focus" | "iris" | "leak" | "panels"
-  | "reel" | "reel-wide" | "whip" | "whip-wide" | "pan" | "pan-step" | "film" | "score";
+  | "reel" | "reel-wide" | "whip" | "whip-wide" | "pan" | "pan-step" | "film" | "score" | "somewhere";
 interface Cut {
   frames: Frame[];
   /** How long PASATIEMPO holds, in ms. */
@@ -436,6 +549,10 @@ interface Cut {
   /** Cut to the music: when each frame starts, the title rises and the reel
    *  lifts, in ms from the first beat of black — kept to the music's own clock. */
   cues?: { frames: number[]; title: number; exit: number };
+  /** The scored dissolve's look, and its title: the 1929 logo and the wordmark. */
+  crest?: boolean;
+  /** No year card (1929 / 2027) at the foot of the photographs. */
+  noYear?: boolean;
 }
 const VARIANTS: Record<Variant, Cut> = {
   flip: { frames: FRAMES, titleMs: TITLE_MS },
@@ -470,10 +587,25 @@ const VARIANTS: Record<Variant, Cut> = {
     fast: true,
     music: MUSIC,
     cues: { frames: SCORE_CUES, title: SCORE_TITLE_AT, exit: SCORE_EXIT_AT },
+    crest: true,
+  },
+  somewhere: {
+    frames: SONG,
+    titleMs: SONG_EXIT_AT - SONG_TITLE_AT,
+    leadMs: SONG_CUES[0],
+    cine: true,
+    fast: true,
+    music: SONG_MUSIC,
+    cues: { frames: SONG_CUES, title: SONG_TITLE_AT, exit: SONG_EXIT_AT },
+    crest: true,
+    noYear: true,
   },
 };
-/** The intro visitors get. The others play with ?intro=<name>. */
-const DEFAULT_VARIANT: Variant = "score";
+/** The intro visitors get. The others play with ?intro=<name>.
+ *  To go back to the previous default — the twelve-photograph scored dissolve
+ *  to "A Perfect Day", with the 1929 photographs and the year card — set this
+ *  to "score" (it still plays any time with ?intro=score). */
+const DEFAULT_VARIANT: Variant = "somewhere";
 function readVariant(): Variant {
   try {
     const v = new URLSearchParams(location.search).get("intro");
@@ -646,7 +778,7 @@ export default function IntroReel({
             ...(VARIANTS[v].reel?.whip ? WHIP_PAST.map((f) => f.src) : []),
             ...(VARIANTS[v].pan ? (VARIANTS[v].pan.tail ?? PAN_TAIL).map((f) => f.src) : []),
             SETTLE_ON,
-            ...(v === "score" ? [MARK, WORDMARK] : []),
+            ...(VARIANTS[v].crest ? [MARK, WORDMARK] : []),
           ];
     // The soundtrack loads alongside the photographs (it never holds them up long).
     const src = VARIANTS[v].music;
@@ -666,6 +798,7 @@ export default function IntroReel({
     const cued = !!VARIANTS[v].cues;
     const first = cued ? [MARK, WORDMARK, ...VARIANTS[v].frames.slice(0, 3).map((f) => f.src)] : [];
     if (cued) void preload([...new Set(srcs)], 60000);
+    for (const f of VARIANTS[v].frames) if (f.video) void fetch(f.video).catch(() => undefined);
     Promise.all([
       cued ? preloadDecoded(first, 12000) : preload([LOGO, ...new Set(srcs)], 3000),
       Promise.race([audioReady, new Promise((r) => setTimeout(r, cued ? 8000 : 3000))]),
@@ -837,6 +970,7 @@ export default function IntroReel({
     <div
       className={
         "mci-intro is-" + phase + " era-" + era + " var-" + variant +
+        (cut.crest && variant !== "score" ? " var-score" : "") +
         (calm ? " is-calm" : "") + (cut.cine ? " is-cine" : "") + (cut.fast ? " is-fast" : "") +
         (cut.reel ? " is-film" : "") + (cut.pan ? " is-pan" : "") +
         (solid ? " is-solid" : "") + (quick ? " is-quick" : "")
@@ -921,7 +1055,7 @@ export default function IntroReel({
       )}
 
       {/* The years: 1929 over the archive, a hard cut to 2027 with the colour. */}
-      {inReel && (
+      {inReel && !cut.noYear && (
         <div
           className={"mci-reel-year" + (frame.era === "today" ? " is-now" : "")}
           key={frame.era}
@@ -931,7 +1065,7 @@ export default function IntroReel({
         </div>
       )}
 
-      {inTitle && variant === "score" && (
+      {inTitle && cut.crest && (
         <div className="mci-reel-title mci-st">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="mci-st-mark" src={MARK} alt={`Pasatiempo Golf Club, ${FOUNDED}`} />
@@ -941,7 +1075,7 @@ export default function IntroReel({
           <div className="mci-st-sub">{`The ${EVENT.name} · ${EVENT.year}`}</div>
         </div>
       )}
-      {inTitle && variant !== "score" && (
+      {inTitle && !cut.crest && (
         <div className="mci-reel-title">
           <div className="mci-reel-title-crest">
             <Medal size={110} />
@@ -1041,6 +1175,7 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
           "--focus": f.focus ?? "center",
           "--focus-m": f.phoneFocus ?? f.focus ?? "center",
           ...(f.zoomMs ? { "--zoom": f.zoomMs + "ms" } : {}),
+          ...(f.fadeMs ? { "--xfade": f.fadeMs + "ms" } : {}),
           ...(f.phonePan ? { "--pan-a": f.phonePan[0] + "%", "--pan-b": f.phonePan[1] + "%" } : {}),
           ...(f.phoneWide
             ? {
@@ -1066,6 +1201,9 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
           className={"mci-page-fill" + (f.fit ? "" : " is-phone")}
           style={{ backgroundImage: `url(${f.src})` }}
         />
+      )}
+      {f.video && (
+        <video className="mci-page-video" src={f.video} muted autoPlay playsInline preload="auto" aria-hidden />
       )}
       {f.trio ? (
         f.trio.map((p) => (

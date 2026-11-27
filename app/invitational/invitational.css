@@ -394,6 +394,9 @@ body:has(.mci){margin:0;}
 .mci-page img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:var(--focus);
   animation:mci-push var(--hold) linear both;}
 @keyframes mci-push{from{transform:scale(1.1);}to{transform:scale(1.02);}}
+/* A flyover over its first frame: the film moves on its own, so no zoom. */
+.mci-page-video{position:absolute;inset:0;z-index:1;width:100%;height:100%;object-fit:cover;object-position:var(--focus);pointer-events:none;}
+@media (max-aspect-ratio:4/5){.mci-page-video{object-position:var(--focus-m,var(--focus));}}
 /* 1929: a warm silver print. */
 .mci-page.era-archive img{filter:grayscale(1) sepia(.3) contrast(1.12) brightness(.95);}
 
@@ -729,6 +732,8 @@ body:has(.mci){margin:0;}
    photograph, so nothing ever stops on screen. Long, soft dissolves. */
 .mci-intro.var-score .mci-bars{display:none;}
 .mci-intro.var-score .mci-page{animation:mci-xfade 1.35s cubic-bezier(.45,0,.35,1) both;}
+/* "Somewhere Only We Know": quicker cuts, so quicker dissolves (a photograph can set its own, --xfade). */
+.mci-intro.var-somewhere .mci-page{animation-duration:var(--xfade,.6s);}
 .mci-intro.var-score .mci-page img{transform-origin:var(--focus);animation-duration:var(--zoom,4.4s);animation-timing-function:linear;}
 /* The last photograph stays on under the title (dimmed by the title's scrim)
    and fades away first as the intro lifts. */
