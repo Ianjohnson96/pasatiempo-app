@@ -12,8 +12,16 @@ import {
   withoutLookColumns,
 } from "./map";
 import { newId, newSlug, slugify } from "./ids";
-import { availability, existingSignup, rosterCount, onRoster } from "./seats";
+import { availability, existingSignup, rosterCount, onRoster, promotable } from "./seats";
 import { formatSlot } from "./format";
+import {
+  parseRules,
+  selfServiceError,
+  signupPhase,
+  windowError,
+  windowNote,
+  type SignupRules,
+} from "./signup-window";
 import { normalizeFields } from "./question-builder";
 import {
   type EventTheme,
@@ -83,6 +91,10 @@ async function withLookFallback<T extends { error: { code?: string; message?: st
 ): Promise<T> {
   const first = await write(row);
   if (!isMissingLookColumn(first.error)) return first;
+  if (row.rules != null && /rules/.test(first.error?.message ?? ""))
+    throw new Error(
+      "Sign-up dates need a one-time database update (supabase/migration-event-rules.sql) before they can be saved.",
+    );
   console.warn("Event looks: run supabase/migration-event-looks.sql — saved without the look.");
   return write(withoutLookColumns(row));
 }
@@ -126,6 +138,7 @@ export interface EventInput {
   theme: EventTheme | null;
   contactName: string | null;
   contactEmail: string | null;
+  rules: SignupRules | null;
 }
 
 export type SaveEventResult =
@@ -206,7 +219,10 @@ async function saveEventInner(input: EventInput): Promise<SaveEventResult> {
     theme: parseTheme(input.theme),
     contactName: input.contactName?.trim() || null,
     contactEmail: input.contactEmail?.trim().toLowerCase() || null,
+    rules: parseRules(input.rules),
   };
+  const badWindow = fields.rules && windowError(fields.rules);
+  if (badWindow) return { ok: false, error: badWindow };
 
   // A tournament is one date, a Member + Guest team, capacity in teams.
   if (input.type === "tournament") {
@@ -289,6 +305,7 @@ async function saveEventInner(input: EventInput): Promise<SaveEventResult> {
 
   revalidatePath("/admin");
   revalidatePath("/admin/events");
+  await promoteWaitlist(supa, saved.id);
   revalidatePath(`/admin/events/${saved.id}`);
   revalidatePath(`/events/e/${saved.slug}`);
   return { ok: true, event: saved };
@@ -593,6 +610,56 @@ async function sendConfirmations(regId: string, mails: Mail[]): Promise<void> {
   }
 }
 
+// When a spot opens on an event that moves its waitlist up on its own (see
+// events.rules.autoPromote), the next entries in line are confirmed and get
+// the confirmation email. Safe to call after any change: it only acts when
+// there's room. Never throws; a failure leaves the waitlist for staff.
+async function promoteWaitlist(
+  supa: ReturnType<typeof createAdminClient>,
+  eventId: string,
+): Promise<void> {
+  try {
+    const { data: evRow } = await supa.from("events").select("*").eq("id", eventId).maybeSingle();
+    if (!evRow) return;
+    const ev = rowToEvent(evRow);
+    if (!ev.rules?.autoPromote || !ev.waitlistEnabled) return;
+    const { data: rows } = await supa.from("registrations").select("*").eq("event_id", eventId);
+    const next = promotable(ev, (rows ?? []).map(rowToReg));
+    if (next.length === 0) return;
+    const url = await eventPageUrl(ev.slug);
+    for (const r of next) {
+      const { data: moved } = await supa
+        .from("registrations")
+        .update({ status: "confirmed" })
+        .eq("id", r.id)
+        .eq("status", "waitlist") // someone else may have moved it already
+        .select("id");
+      if (!moved?.length) continue;
+      const mails = r.players
+        ? teamEmails(ev, r.players, r.answers, "confirmed", url)
+        : [
+            signupEmail(
+              ev,
+              {
+                name: r.name,
+                email: r.email,
+                partySize: r.partySize,
+                guestNames: r.guestNames,
+                slotIds: r.slotIds,
+                answers: r.answers,
+              },
+              "confirmed",
+              url,
+            ),
+          ];
+      await sendConfirmations(r.id, mails);
+    }
+    revalidatePath(`/events/e/${ev.slug}`);
+  } catch (e) {
+    console.error("promoteWaitlist", e);
+  }
+}
+
 // The member's and the guest's emails for a tournament team.
 async function sendTeamConfirmation(
   regId: string,
@@ -624,7 +691,13 @@ export async function register(input: RegisterInput): Promise<RegisterResult> {
   if (!evRow) return { ok: false, error: "Event not found." };
   const ev = rowToEvent(evRow);
 
-  if (ev.status !== "open")
+  const now = new Date();
+  const phase = signupPhase(ev, now);
+  if (phase === "soon")
+    return { ok: false, error: `${windowNote(ev, now)?.text ?? "Sign-ups haven't opened yet"}.` };
+  if (phase === "deadline")
+    return { ok: false, error: "The entry deadline has passed, so sign-ups are closed." };
+  if (phase !== "open")
     return { ok: false, error: "Registration for this event is closed." };
   if (ev.type === "tournament") return registerTeam(supa, ev, input);
 
@@ -781,7 +854,7 @@ async function registerTeam(
   const regs: Registration[] = (regRows ?? []).map(rowToReg);
 
   const dup = findDuplicate(regs, team);
-  if (dup) return { ok: false, error: duplicateMessage(dup) };
+  if (dup) return { ok: false, error: duplicateMessage(dup, eventContact(ev)) };
 
   // availability() counts teams for a tournament; there's no roster cap.
   const a = availability(ev, regs, null);
@@ -913,12 +986,8 @@ export async function updateMyRegistration(
     .maybeSingle();
   if (!evRow) return { ok: false, error: "Event not found." };
   const ev = rowToEvent(evRow);
-  if (ev.status !== "open")
-    return {
-      ok: false,
-      error:
-        `This event is closed — please email ${whoToEmail(ev)}.`,
-    };
+  const locked = selfServiceError(ev, new Date());
+  if (locked) return { ok: false, error: locked };
 
   const { data: allRows } = await supa
     .from("registrations")
@@ -940,7 +1009,7 @@ export async function updateMyRegistration(
         error: "To change the member's email, contact the golf shop.",
       };
     const dup = findDuplicate(all, team, regId);
-    if (dup) return { ok: false, error: duplicateMessage(dup) };
+    if (dup) return { ok: false, error: duplicateMessage(dup, eventContact(ev)) };
 
     // email is unchanged (checked above). No emails are re-sent on edits.
     const { error } = await supa
@@ -950,6 +1019,7 @@ export async function updateMyRegistration(
     if (error) return { ok: false, error: "Could not save your changes." };
 
     revalidatePath(`/events/e/${slug}`);
+    await promoteWaitlist(supa, ev.id);
     revalidatePath(`/admin/events/${ev.id}`);
     revalidatePath(`/admin/events/${ev.id}/roster`);
     return { ok: true };
@@ -1014,9 +1084,24 @@ export async function updateMyRegistration(
   if (error) return { ok: false, error: "Could not save your changes." };
 
   revalidatePath(`/events/e/${slug}`);
+  await promoteWaitlist(supa, ev.id);
   revalidatePath(`/admin/events/${ev.id}`);
   revalidatePath(`/admin/events/${ev.id}/roster`);
   return { ok: true };
+}
+
+// After the entry deadline, members change or withdraw through the event's
+// contact unless the event allows otherwise. (A hand-closed event still lets
+// people withdraw, as it always has.)
+async function deadlineLock(
+  supa: ReturnType<typeof createAdminClient>,
+  slug: string,
+): Promise<string | null> {
+  const { data } = await supa.from("events").select("*").eq("slug", slug).maybeSingle();
+  if (!data) return null;
+  const ev = rowToEvent(data);
+  const now = new Date();
+  return signupPhase(ev, now) === "deadline" ? selfServiceError(ev, now) : null;
 }
 
 // Cancel an entire registration (verifies the email matches).
@@ -1029,16 +1114,19 @@ export async function cancelMyRegistration(
   const supa = createAdminClient("events");
   const { data: reg } = await supa
     .from("registrations")
-    .select("id,email")
+    .select("id,email,event_id")
     .eq("id", regId)
     .maybeSingle();
   if (!reg || reg.email !== e)
     return { ok: false, error: "That registration wasn't found for that email." };
+  const locked = await deadlineLock(supa, slug);
+  if (locked) return { ok: false, error: locked };
   const { error } = await supa
     .from("registrations")
     .update({ status: "cancelled" })
     .eq("id", regId);
   if (error) return { ok: false, error: "Could not cancel. Please try again." };
+  await promoteWaitlist(supa, reg.event_id as string);
   revalidatePath(`/events/e/${slug}`);
   return { ok: true };
 }
@@ -1060,6 +1148,8 @@ export async function dropMySlot(
     .maybeSingle();
   if (!reg || reg.email !== e)
     return { ok: false, error: "That registration wasn't found for that email." };
+  const locked = await deadlineLock(supa, slug);
+  if (locked) return { ok: false, error: locked };
 
   const remaining = ((reg.slot_ids as string[]) ?? []).filter(
     (id) => id !== slotId,
@@ -1121,7 +1211,7 @@ export async function setRegStatus(
         { players: reg.players, teamAnswers: {} },
         regId,
       );
-      if (dup) return { ok: false, error: duplicateMessage(dup) };
+      if (dup) return { ok: false, error: duplicateMessage(dup, null) };
     }
   }
 
@@ -1130,6 +1220,8 @@ export async function setRegStatus(
     .update({ status })
     .eq("id", regId);
   if (error) return { ok: false, error: error.message };
+  // a cancellation frees a spot; moving someone to the waitlist by hand is deliberate
+  if (status === "cancelled") await promoteWaitlist(supa, reg.eventId);
   revalidatePath(`/admin/events/${reg.eventId}`);
   return { ok: true };
 }
@@ -1206,6 +1298,7 @@ export async function updateRegistration(
     .single();
   if (error) return { ok: false, error: error.message };
 
+  if (input.status !== "waitlist") await promoteWaitlist(supa, data.event_id);
   revalidatePath(`/admin/events/${data.event_id}`);
   revalidatePath(`/admin/events/${data.event_id}/roster`);
   return { ok: true };
@@ -1231,7 +1324,7 @@ async function updateTeamRegistration(
   // A team being cancelled can't clash with anyone, so don't block the save.
   if (input.status !== "cancelled") {
     const dup = findDuplicate(regs, team, input.id);
-    if (dup) return { ok: false, error: duplicateMessage(dup) };
+    if (dup) return { ok: false, error: duplicateMessage(dup, null) };
   }
 
   const { error } = await supa
@@ -1244,6 +1337,7 @@ async function updateTeamRegistration(
     .eq("id", input.id);
   if (error) return { ok: false, error: error.message };
 
+  if (input.status !== "waitlist") await promoteWaitlist(supa, ev.id);
   revalidatePath(`/admin/events/${ev.id}`);
   revalidatePath(`/admin/events/${ev.id}/roster`);
   return { ok: true };
@@ -1283,7 +1377,7 @@ export async function adminAddTeam(
     .eq("event_id", ev.id);
   if (regErr) return { ok: false, error: regErr.message };
   const dup = findDuplicate((regRows ?? []).map(rowToReg), clean);
-  if (dup) return { ok: false, error: duplicateMessage(dup) };
+  if (dup) return { ok: false, error: duplicateMessage(dup, null) };
 
   const { data, error } = await supa
     .from("registrations")
@@ -1320,6 +1414,7 @@ export async function deleteRegistration(regId: string): Promise<void> {
     .select("event_id")
     .single();
   if (error) throw error;
+  await promoteWaitlist(supa, data.event_id);
   revalidatePath(`/admin/events/${data.event_id}`);
 }
 

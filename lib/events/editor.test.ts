@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  deadlineBefore,
   EDITOR_SECTIONS,
   TYPE_TILES,
   TYPE_SWITCH_BLOCKED,
@@ -59,6 +60,10 @@ function state(over: Partial<EditorState> = {}): EditorState {
     theme: null,
     contactName: "",
     contactEmail: "",
+    opensAt: "",
+    closesAt: "",
+    changesAfterClose: false,
+    autoPromote: false,
     ...over,
   };
 }
@@ -152,6 +157,7 @@ describe("buildEventInput", () => {
       theme: null,
       contactName: null,
       contactEmail: null,
+      rules: null,
     });
   });
 
@@ -335,5 +341,31 @@ describe("look and contact", () => {
     expect(ev.theme).toEqual({ preset: "coastal" });
     expect(ev.contactEmail).toBe("pat@x.com");
     expect(ev.photos).toEqual(["/a.jpg"]);
+  });
+});
+
+describe("sign-up dates", () => {
+  it("quick deadlines land at 5 PM some days before the start", () => {
+    expect(deadlineBefore("2027-06-25T08:00", 7)).toBe("2027-06-18T17:00");
+    expect(deadlineBefore("2027-03-01T08:00", 1)).toBe("2027-02-28T17:00");
+    expect(deadlineBefore("", 7)).toBe("");
+  });
+  it("blank dates save as no rules", () => {
+    expect(buildEventInput(state()).rules).toBeNull();
+  });
+  it("the deadline and the change setting are saved", () => {
+    const r = buildEventInput(state({ closesAt: "2027-04-30T17:00", changesAfterClose: true })).rules;
+    expect(r?.closesAt).toBe(new Date("2027-04-30T17:00").toISOString());
+    expect(r?.opensAt).toBeNull();
+    expect(r?.changesAfterClose).toBe(true);
+  });
+  it("the deadline must come after the opening", () => {
+    expect(editorError(state({ opensAt: "2027-05-01T08:00", closesAt: "2027-04-30T17:00" }))).toBe(
+      "The entry deadline must be after sign-ups open.",
+    );
+  });
+  it("the preview carries the rules", () => {
+    const input = buildEventInput(state({ closesAt: "2027-04-30T17:00" }));
+    expect(previewEvent(input).rules?.closesAt).toBe(input.rules?.closesAt);
   });
 });

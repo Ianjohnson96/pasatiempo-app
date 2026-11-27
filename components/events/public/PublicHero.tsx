@@ -6,6 +6,7 @@ import { pageSettings } from "@/lib/events/page-settings";
 import { mapUrl } from "@/lib/events/public-page";
 import type { Cta } from "@/lib/events/public-page";
 import type { EventRec } from "@/lib/events/types";
+import type { WindowNote } from "@/lib/events/signup-window";
 
 // The sign-up page's hero: the chosen photo at its focal point, the title and
 // the main button. Shared with the editor preview.
@@ -14,11 +15,13 @@ export default function PublicHero({
   hero,
   cta,
   whenLine,
+  note = null,
 }: {
   event: EventRec;
   hero: { src: string; focus: { x: number; y: number } } | null;
   cta: Cta;
   whenLine: string;
+  note?: WindowNote | null; // "Sign-ups close …", from lib/events/signup-window
 }) {
   const settings = pageSettings(event);
   // "plain" sets the title on the look's colour band, with no photo
@@ -64,6 +67,7 @@ export default function PublicHero({
           <CalendarMenu event={event} />
           <ShareButton title={event.title} />
         </div>
+        {note && <p className={`hero-window tone-${note.tone}`}>{note.text}</p>}
         {event.status === "open" && <ManageLink tournament={event.type === "tournament"} />}
       </div>
     </section>

@@ -1,4 +1,5 @@
 import type { EventTheme } from "./theme";
+import type { SignupRules } from "./signup-window";
 // Domain model for the Pasatiempo event registration app.
 // Kept storage-agnostic so the file-backed prototype store (lib/db.ts) can later
 // be swapped for Supabase without touching the UI or server actions.
@@ -74,6 +75,9 @@ export interface EventRec {
   // total enrollment. Once someone is on the roster they can still add more dates.
   rosterLimit: number | null;
   waitlistEnabled: boolean;
+
+  // Sign-up dates on top of `status` (see lib/events/signup-window.ts); null = none.
+  rules: SignupRules | null;
 
   // Guests
   allowGuests: boolean;

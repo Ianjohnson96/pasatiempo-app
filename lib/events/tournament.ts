@@ -196,8 +196,18 @@ export function needsDuplicateCheck(from: RegStatus, to: RegStatus): boolean {
   return from === "cancelled" && (to === "confirmed" || to === "waitlist");
 }
 
-export function duplicateMessage(role: PlayerRole): string {
+/**
+ * Why a team can't be entered: one of its players is already on another team.
+ * Members are pointed to their own entry and the event's contact; staff
+ * (contact null) get it plainly.
+ */
+export function duplicateMessage(
+  role: PlayerRole,
+  contact: { name: string; email: string } | null,
+): string {
+  if (!contact) return `The ${role} is already on another team.`;
+  const who = `${contact.name} at ${contact.email}`;
   return role === "guest"
-    ? "That guest is already entered on another team. Questions? Contact the golf shop."
-    : "You're already entered on another team. Questions? Contact the golf shop.";
+    ? `Your guest is already entered on another team, and players can only be on one. If that's a mistake, email ${who}.`
+    : `You're already entered on another team — one entry per member. To change it, use “Manage your registration” on this page, or email ${who}.`;
 }

@@ -106,3 +106,29 @@ export function availability(
   const remaining = Math.max(0, cap - taken);
   return { capacity: cap, taken, remaining, full: remaining <= 0 };
 }
+
+// ---- Waitlist ----------------------------------------------------------------
+
+/**
+ * The waitlisted entries that fit the open spots right now, first come first
+ * served. Strictly in order: if the next one doesn't fit, nobody behind it
+ * jumps ahead. Multi-date events are left to staff (each date fills apart).
+ */
+export function promotable(event: EventRec, regs: Registration[]): Registration[] {
+  if (event.scheduleMode === "slots") return [];
+  const waiting = regs
+    .filter((r) => r.status === "waitlist")
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  let left = event.capacity == null ? Infinity : event.capacity - takenSeats(regs, null, event);
+  let roster = event.rosterLimit == null ? Infinity : event.rosterLimit - rosterCount(regs);
+  const out: Registration[] = [];
+  for (const r of waiting) {
+    const seats = regWeight(event, r);
+    const people = Math.max(1, r.partySize);
+    if (seats > left || (event.type !== "tournament" && people > roster)) break;
+    out.push(r);
+    left -= seats;
+    roster -= people;
+  }
+  return out;
+}

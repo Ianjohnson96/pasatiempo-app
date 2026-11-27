@@ -4,6 +4,7 @@ import Icon from "@/components/events/Icon";
 import TypeIcon from "@/components/events/TypeIcon";
 import { dateBoxParts, fillLabel, fillPercent } from "@/lib/events/cards";
 import { formatWhen, TYPE_LABEL } from "@/lib/events/format";
+import { windowNote } from "@/lib/events/signup-window";
 import type { EventRec } from "@/lib/events/types";
 
 // One event on the admin list: type stripe + icon, date box, title and status,
@@ -25,6 +26,7 @@ export default function EventCard({
         : `${ev.slots.length} sessions`
       : formatWhen(ev.startsAt, ev.endsAt);
   const pct = fillPercent(taken, ev.capacity);
+  const deadline = windowNote(ev, new Date()); // "Sign-ups close …" while it matters
   return (
     <article className="evcard" data-type={ev.type}>
       <span className="evcard-stripe" aria-hidden />
@@ -53,6 +55,7 @@ export default function EventCard({
                 {TYPE_LABEL[ev.type]}
               </span>
               <span>{when}</span>
+              {deadline && <span>{deadline.text}</span>}
               {ev.location && (
                 <span>
                   <Icon name="pin" />

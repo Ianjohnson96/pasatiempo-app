@@ -1,5 +1,6 @@
 import type { EventRec, Registration } from "./types";
 import { parseTheme } from "./theme";
+import { parseRules } from "./signup-window";
 import type { EventFinance, PrizePurchase } from "./finance-types";
 
 // Maps between snake_case DB rows and the camelCase domain types.
@@ -27,6 +28,7 @@ export function rowToEvent(r: any): EventRec {
     capacity: r.capacity,
     rosterLimit: r.roster_limit ?? null,
     waitlistEnabled: r.waitlist_enabled,
+    rules: parseRules(r.rules),
     allowGuests: r.allow_guests,
     maxGuests: r.max_guests,
     collectGuestNames: r.collect_guest_names,
@@ -71,6 +73,7 @@ export function eventToRow(e: Partial<EventRec>): Record<string, unknown> {
   if (e.capacity !== undefined) row.capacity = e.capacity;
   if (e.rosterLimit !== undefined) row.roster_limit = e.rosterLimit;
   if (e.waitlistEnabled !== undefined) row.waitlist_enabled = e.waitlistEnabled;
+  if (e.rules !== undefined) row.rules = e.rules;
   if (e.allowGuests !== undefined) row.allow_guests = e.allowGuests;
   if (e.maxGuests !== undefined) row.max_guests = e.maxGuests;
   if (e.collectGuestNames !== undefined)
@@ -167,7 +170,9 @@ export function rowToPrize(r: any): PrizePurchase {
 // ---- Before migration-event-looks.sql has run ---------------------------------
 // Saving must keep working if the code ships before the three look columns
 // exist: the save retries without them, and the event keeps the default look.
-const LOOK_COLUMNS = ["theme", "contact_name", "contact_email"] as const;
+// The same goes for `rules` (migration-event-rules.sql); the save action refuses
+// to drop it silently when dates are set.
+const LOOK_COLUMNS = ["theme", "contact_name", "contact_email", "rules"] as const;
 
 export function isMissingLookColumn(
   err: { code?: string; message?: string } | null | undefined,

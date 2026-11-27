@@ -1,5 +1,6 @@
 "use client";
 
+import { signupPhase, windowNote } from "@/lib/events/signup-window";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -40,7 +41,7 @@ import {
   formatSlotShort,
   TYPE_LABEL,
 } from "@/lib/events/format";
-import { availability } from "@/lib/events/seats";
+import { availability, promotable } from "@/lib/events/seats";
 import type { TeamInput } from "@/lib/events/tournament";
 import type {
   CustomField,
@@ -114,6 +115,16 @@ export default function EventManager({
   })();
   const rosterFull =
     event.rosterLimit != null && rosterPeople >= event.rosterLimit;
+
+  // The next waitlisted entry that fits an open spot, for the Manage banner.
+  const nextUp = event.rules?.autoPromote ? null : (promotable(event, registrations)[0] ?? null);
+  const entryName = (r: Registration) =>
+    r.players?.length ? r.players.map((p) => p.name).join(" & ") : r.name;
+
+  // Sign-up dates (set in Edit): where the event stands right now.
+  const now = new Date();
+  const phase = signupPhase(event, now);
+  const windowLine = windowNote(event, now);
 
   function changeStatus(s: "draft" | "open" | "closed") {
     start(async () => {
@@ -505,6 +516,12 @@ export default function EventManager({
                   {event.location}
                 </span>
               )}
+              {windowLine && (
+                <span className={windowLine.tone === "last" ? "ev-meta-warn" : undefined}>
+                  <Icon name="calendar" />
+                  {windowLine.text}
+                </span>
+              )}
               {event.inviteOnly && (
                 <span>
                   <Icon name="lock" />
@@ -551,7 +568,11 @@ export default function EventManager({
         <div className="section-title">Share this link</div>
         <CopyLink slug={event.slug} />
         <p className="hint" style={{ marginTop: 8 }}>
-          {event.status === "open"
+          {phase === "soon"
+            ? `${windowLine?.text ?? "Sign-ups haven't opened"} — until then the link shows that date and takes no sign-ups.`
+            : phase === "deadline"
+              ? "The entry deadline has passed — the link won't accept new sign-ups. To reopen, change or clear the deadline in Edit."
+              : event.status === "open"
             ? "Anyone with this link can register."
             : event.status === "draft"
               ? "This event is a draft — the link won't accept sign-ups yet. Set it to Open below."
@@ -719,6 +740,28 @@ export default function EventManager({
               Show all
             </button>
           </p>
+        )}
+
+        {/* A spot opened with people waiting (an event that moves its waitlist up
+            on its own never shows this: the server already did it). */}
+        {nextUp && (
+          <div className="notice warn spot-open" style={{ marginTop: 12 }}>
+            <span>
+              <strong>
+                {avail.remaining === 1 ? "A spot is open" : `${avail.remaining ?? "Spots"} spots are open`}
+              </strong>{" "}
+              and {waitlist.length} {waitlist.length === 1 ? (isTournament ? "team is" : "sign-up is") : isTournament ? "teams are" : "sign-ups are"}{" "}
+              waiting. Next in line: {entryName(nextUp)}.
+            </span>
+            <button
+              type="button"
+              className="btn small"
+              disabled={pending}
+              onClick={() => changeReg(nextUp.id, "confirmed")}
+            >
+              Move them up
+            </button>
+          </div>
         )}
 
         {regError && (
