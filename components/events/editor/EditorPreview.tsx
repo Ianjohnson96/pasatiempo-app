@@ -14,6 +14,7 @@ import FactsStrip, {
 import { previewSeats } from "@/lib/events/editor";
 import { ctaState } from "@/lib/events/public-page";
 import { resolveHero, resolveLogo, themeVars } from "@/lib/events/theme";
+import { windowNote } from "@/lib/events/signup-window";
 import type { EventRec } from "@/lib/events/types";
 
 // The sign-up form as members will see it, built from the editor's unsaved
@@ -46,6 +47,7 @@ export const PreviewBody = memo(function PreviewBody({
               ? "No dates yet"
               : whenLineFor(event)
           }
+          note={windowNote(event, new Date())}
         />
         <FactsStrip
           facts={factsFor(event)}

@@ -1,5 +1,6 @@
 "use client";
 
+import { signupPhase, windowNote } from "@/lib/events/signup-window";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -114,6 +115,11 @@ export default function EventManager({
   })();
   const rosterFull =
     event.rosterLimit != null && rosterPeople >= event.rosterLimit;
+
+  // Sign-up dates (set in Edit): where the event stands right now.
+  const now = new Date();
+  const phase = signupPhase(event, now);
+  const windowLine = windowNote(event, now);
 
   function changeStatus(s: "draft" | "open" | "closed") {
     start(async () => {
@@ -505,6 +511,12 @@ export default function EventManager({
                   {event.location}
                 </span>
               )}
+              {windowLine && (
+                <span className={windowLine.tone === "last" ? "ev-meta-warn" : undefined}>
+                  <Icon name="calendar" />
+                  {windowLine.text}
+                </span>
+              )}
               {event.inviteOnly && (
                 <span>
                   <Icon name="lock" />
@@ -551,7 +563,11 @@ export default function EventManager({
         <div className="section-title">Share this link</div>
         <CopyLink slug={event.slug} />
         <p className="hint" style={{ marginTop: 8 }}>
-          {event.status === "open"
+          {phase === "soon"
+            ? `${windowLine?.text ?? "Sign-ups haven't opened"} — until then the link shows that date and takes no sign-ups.`
+            : phase === "deadline"
+              ? "The entry deadline has passed — the link won't accept new sign-ups. To reopen, change or clear the deadline in Edit."
+              : event.status === "open"
             ? "Anyone with this link can register."
             : event.status === "draft"
               ? "This event is a draft — the link won't accept sign-ups yet. Set it to Open below."

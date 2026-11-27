@@ -25,6 +25,7 @@ import type { EventTheme } from "@/lib/events/theme";
 import {
   buildEventInput,
   crossesTournamentBoundary,
+  deadlineBefore,
   editorError,
   previewEvent,
   typeRules,
@@ -182,6 +183,11 @@ export default function EventEditor({
   const [genDate, setGenDate] = useState("");
   const [genStart, setGenStart] = useState("18:00");
   const [genEnd, setGenEnd] = useState("");
+  const [opensAt, setOpensAt] = useState(toLocalInput(event?.rules?.opensAt ?? null));
+  const [closesAt, setClosesAt] = useState(toLocalInput(event?.rules?.closesAt ?? null));
+  const [changesAfterClose, setChangesAfterClose] = useState(
+    event?.rules?.changesAfterClose ?? false,
+  );
   const [genWeeks, setGenWeeks] = useState("4");
   const [genCap, setGenCap] = useState("");
 
@@ -222,6 +228,9 @@ export default function EventEditor({
     theme,
     contactName,
     contactEmail,
+    opensAt,
+    closesAt,
+    changesAfterClose,
   };
 
   // The preview lags a keystroke behind under load rather than slowing typing.
@@ -734,6 +743,76 @@ export default function EventEditor({
               </span>
             </span>
           </label>
+
+          <div className="divider" />
+          <h3 className="editor-sub">Sign-up dates</h3>
+          <div className="row">
+            <div className="field">
+              <label htmlFor="ev-opens">Sign-ups open</label>
+              <input
+                id="ev-opens"
+                type="datetime-local"
+                value={opensAt}
+                onChange={(e) => setOpensAt(e.target.value)}
+              />
+              <p className="hint">Blank: open as soon as the event is.</p>
+            </div>
+            <div className="field">
+              <label htmlFor="ev-closes">
+                {rules.tournament ? "Entry deadline" : "Sign-up deadline"}
+              </label>
+              <input
+                id="ev-closes"
+                type="datetime-local"
+                value={closesAt}
+                onChange={(e) => setClosesAt(e.target.value)}
+              />
+              <p className="hint">Blank: no deadline. Sign-ups close on their own at this time.</p>
+            </div>
+          </div>
+          {scheduleMode === "single" && startsAt && (
+            <div className="quick-picks" role="group" aria-label="Set the deadline">
+              <span className="hint">Deadline:</span>
+              {[
+                { days: 14, label: "2 weeks before" },
+                { days: 7, label: "1 week before" },
+                { days: 1, label: "Day before" },
+              ].map((q) => (
+                <button
+                  key={q.days}
+                  type="button"
+                  className="btn ghost small"
+                  onClick={() => setClosesAt(deadlineBefore(startsAt, q.days))}
+                >
+                  {q.label}
+                </button>
+              ))}
+              {closesAt && (
+                <button type="button" className="btn ghost small" onClick={() => setClosesAt("")}>
+                  No deadline
+                </button>
+              )}
+            </div>
+          )}
+          {closesAt && (
+            <label className="check" style={{ marginTop: 12 }}>
+              <input
+                type="checkbox"
+                checked={changesAfterClose}
+                onChange={(e) => setChangesAfterClose(e.target.checked)}
+              />
+              <span>
+                <span className="ck-label">
+                  Let people change or withdraw after the deadline
+                </span>
+                <br />
+                <span className="ck-hint">
+                  Until the event starts. Off: after the deadline they email the
+                  event contact instead, so the field stays settled.
+                </span>
+              </span>
+            </label>
+          )}
         </section>
 
         {/* 4. Players & Questions */}

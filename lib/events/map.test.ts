@@ -129,6 +129,24 @@ describe("look and contact columns", () => {
   });
 });
 
+describe("sign-up dates column", () => {
+  it("rowToEvent reads and cleans rules, null when missing", () => {
+    expect(rowToEvent(baseEvent).rules).toBeNull();
+    expect(
+      rowToEvent({ ...baseEvent, rules: { closesAt: "2027-05-01T00:00:00Z", changesAfterClose: true } }).rules,
+    ).toEqual({ opensAt: null, closesAt: "2027-05-01T00:00:00.000Z", changesAfterClose: true });
+  });
+  it("eventToRow writes rules only when given", () => {
+    expect(eventToRow({ rules: null })).toEqual({ rules: null });
+    expect(eventToRow({ title: "x" })).not.toHaveProperty("rules");
+  });
+  it("a save without the rules column drops it", () => {
+    const err = { code: "PGRST204", message: "Could not find the 'rules' column of 'events'" };
+    expect(isMissingLookColumn(err)).toBe(true);
+    expect(withoutLookColumns({ title: "T", rules: null })).toEqual({ title: "T" });
+  });
+});
+
 describe("saving before the look migration has run", () => {
   it("recognises PostgREST's missing-column error for the look columns", () => {
     expect(

@@ -4348,3 +4348,60 @@
 .ep .ep-mail-switch .hint {
   margin: 0 0 0 4px;
 }
+
+/* ---- Sign-up dates ------------------------------------------------------- */
+/* "Sign-ups close Fri, Apr 30 at 5:00 PM" under the hero's buttons */
+.ep .pub-hero .hero-window {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 0;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  color: var(--hero-ink);
+  font-variant-numeric: tabular-nums;
+  text-wrap: pretty;
+}
+.ep .pub-hero .hero-window::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  transform: rotate(45deg);
+  background: var(--hero-kicker);
+}
+.ep .pub-hero .hero-window.tone-last {
+  font-weight: 600;
+}
+.ep .pub-hero .hero-window.tone-last::before {
+  background: #e0a33a;
+}
+/* the same line at the top of the form */
+.ep .reg-window {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--brass);
+  background: color-mix(in srgb, var(--brass) 8%, transparent);
+  font-size: 15px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ep .reg-window.tone-last {
+  border-left-color: var(--warn);
+  font-weight: 600;
+}
+/* the editor's "2 weeks before / 1 week before / Day before" */
+.ep .quick-picks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: -4px;
+}
+.ep .quick-picks .hint {
+  margin: 0 4px 0 0;
+}
+.ep .ev-meta .ev-meta-warn {
+  color: var(--warn);
+  font-weight: 600;
+}

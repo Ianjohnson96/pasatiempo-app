@@ -28,6 +28,7 @@ import FactsStrip, {
 } from "@/components/events/public/FactsStrip";
 import { teamLines } from "@/lib/events/cards";
 import { publicEvent } from "@/lib/events/map";
+import { liveEvent, signupPhase, windowNote } from "@/lib/events/signup-window";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,12 @@ export default async function PublicEventPage({
     }),
   };
 
-  const open = event.status === "open";
+  // Sign-up dates: outside them the page treats an open event as closed.
+  const now = new Date();
+  const live = liveEvent(event, now);
+  const phase = signupPhase(event, now);
+  const note = windowNote(event, now);
+  const open = live.status === "open";
   const confirmed = regs.filter((r) => r.status === "confirmed");
   const goingCount = confirmed.reduce((n, r) => n + Math.max(1, r.partySize), 0);
   const isSlots = event.scheduleMode === "slots";
@@ -62,7 +68,7 @@ export default async function PublicEventPage({
   const teams = teamLines(regs, event.rosterStyle);
 
   const rosterFull = rosterAvail.full;
-  const cta = ctaState(event, seats, rosterFull);
+  const cta = ctaState(live, seats, rosterFull);
   const contact = eventContact(event);
   const look = themeVars(event.theme);
   const hero = resolveHero(event.theme, event.photos);
@@ -88,6 +94,7 @@ export default async function PublicEventPage({
         hero={hero}
         cta={cta}
         whenLine={whenLineFor(event)}
+        note={note}
       />
       <StickyRegister
         cta={cta}
@@ -101,9 +108,9 @@ export default async function PublicEventPage({
           roster={rosterMeter(event, rosterAvail)}
         />
 
-        {sectionLinks(event).length > 0 && (
+        {sectionLinks(live).length > 0 && (
           <nav className="sec-links" aria-label="On this page">
-            {sectionLinks(event).map((l) => (
+            {sectionLinks(live).map((l) => (
               <a key={l.id} href={`#${l.id}`}>
                 {l.label}
               </a>
@@ -228,6 +235,19 @@ export default async function PublicEventPage({
             Registration for this event is <strong>closed</strong>.
           </div>
         )}
+        {phase === "soon" && note && (
+          <div className="notice warn" style={{ marginTop: 28 }} id="register">
+            <strong>{note.text}.</strong> Come back then to{" "}
+            {event.type === "tournament" ? "enter your team" : "sign up"}.
+          </div>
+        )}
+        {phase === "deadline" && note && (
+          <div className="notice err" style={{ marginTop: 28 }} id="register">
+            <strong>{note.text}.</strong> The entry deadline has passed. To ask
+            about a late entry or a change, email {contact.name} at{" "}
+            <a href={`mailto:${contact.email}`}>{contact.email}</a>.
+          </div>
+        )}
 
         {open && <div className="ornament" aria-hidden="true" />}
 
@@ -244,6 +264,7 @@ export default async function PublicEventPage({
                 to be added to a waiting list.
               </div>
             )}
+            {note && <p className={`reg-window tone-${note.tone}`}>{note.text}</p>}
             <div style={{ marginTop: 14 }}>
               <RegistrationForm event={publicEvent(event)} seats={seats} />
             </div>

@@ -21,6 +21,7 @@ function ev(over: Partial<EventRec> = {}): EventRec {
     capacity: 40,
     rosterLimit: null,
     waitlistEnabled: false,
+    rules: null,
     allowGuests: false,
     maxGuests: null,
     collectGuestNames: false,

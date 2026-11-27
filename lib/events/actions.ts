@@ -14,6 +14,14 @@ import {
 import { newId, newSlug, slugify } from "./ids";
 import { availability, existingSignup, rosterCount, onRoster } from "./seats";
 import { formatSlot } from "./format";
+import {
+  parseRules,
+  selfServiceError,
+  signupPhase,
+  windowError,
+  windowNote,
+  type SignupRules,
+} from "./signup-window";
 import { normalizeFields } from "./question-builder";
 import {
   type EventTheme,
@@ -83,6 +91,10 @@ async function withLookFallback<T extends { error: { code?: string; message?: st
 ): Promise<T> {
   const first = await write(row);
   if (!isMissingLookColumn(first.error)) return first;
+  if (row.rules != null && /rules/.test(first.error?.message ?? ""))
+    throw new Error(
+      "Sign-up dates need a one-time database update (supabase/migration-event-rules.sql) before they can be saved.",
+    );
   console.warn("Event looks: run supabase/migration-event-looks.sql — saved without the look.");
   return write(withoutLookColumns(row));
 }
@@ -126,6 +138,7 @@ export interface EventInput {
   theme: EventTheme | null;
   contactName: string | null;
   contactEmail: string | null;
+  rules: SignupRules | null;
 }
 
 export type SaveEventResult =
@@ -206,7 +219,10 @@ async function saveEventInner(input: EventInput): Promise<SaveEventResult> {
     theme: parseTheme(input.theme),
     contactName: input.contactName?.trim() || null,
     contactEmail: input.contactEmail?.trim().toLowerCase() || null,
+    rules: parseRules(input.rules),
   };
+  const badWindow = fields.rules && windowError(fields.rules);
+  if (badWindow) return { ok: false, error: badWindow };
 
   // A tournament is one date, a Member + Guest team, capacity in teams.
   if (input.type === "tournament") {
@@ -624,7 +640,13 @@ export async function register(input: RegisterInput): Promise<RegisterResult> {
   if (!evRow) return { ok: false, error: "Event not found." };
   const ev = rowToEvent(evRow);
 
-  if (ev.status !== "open")
+  const now = new Date();
+  const phase = signupPhase(ev, now);
+  if (phase === "soon")
+    return { ok: false, error: `${windowNote(ev, now)?.text ?? "Sign-ups haven't opened yet"}.` };
+  if (phase === "deadline")
+    return { ok: false, error: "The entry deadline has passed, so sign-ups are closed." };
+  if (phase !== "open")
     return { ok: false, error: "Registration for this event is closed." };
   if (ev.type === "tournament") return registerTeam(supa, ev, input);
 
@@ -913,12 +935,8 @@ export async function updateMyRegistration(
     .maybeSingle();
   if (!evRow) return { ok: false, error: "Event not found." };
   const ev = rowToEvent(evRow);
-  if (ev.status !== "open")
-    return {
-      ok: false,
-      error:
-        `This event is closed — please email ${whoToEmail(ev)}.`,
-    };
+  const locked = selfServiceError(ev, new Date());
+  if (locked) return { ok: false, error: locked };
 
   const { data: allRows } = await supa
     .from("registrations")
@@ -1019,6 +1037,20 @@ export async function updateMyRegistration(
   return { ok: true };
 }
 
+// After the entry deadline, members change or withdraw through the event's
+// contact unless the event allows otherwise. (A hand-closed event still lets
+// people withdraw, as it always has.)
+async function deadlineLock(
+  supa: ReturnType<typeof createAdminClient>,
+  slug: string,
+): Promise<string | null> {
+  const { data } = await supa.from("events").select("*").eq("slug", slug).maybeSingle();
+  if (!data) return null;
+  const ev = rowToEvent(data);
+  const now = new Date();
+  return signupPhase(ev, now) === "deadline" ? selfServiceError(ev, now) : null;
+}
+
 // Cancel an entire registration (verifies the email matches).
 export async function cancelMyRegistration(
   slug: string,
@@ -1034,6 +1066,8 @@ export async function cancelMyRegistration(
     .maybeSingle();
   if (!reg || reg.email !== e)
     return { ok: false, error: "That registration wasn't found for that email." };
+  const locked = await deadlineLock(supa, slug);
+  if (locked) return { ok: false, error: locked };
   const { error } = await supa
     .from("registrations")
     .update({ status: "cancelled" })
@@ -1060,6 +1094,8 @@ export async function dropMySlot(
     .maybeSingle();
   if (!reg || reg.email !== e)
     return { ok: false, error: "That registration wasn't found for that email." };
+  const locked = await deadlineLock(supa, slug);
+  if (locked) return { ok: false, error: locked };
 
   const remaining = ((reg.slot_ids as string[]) ?? []).filter(
     (id) => id !== slotId,

@@ -1,4 +1,5 @@
 import { factDate, factTime, formatSlot, formatWhen } from "@/lib/events/format";
+import { deadlineFact } from "@/lib/events/signup-window";
 import { pageSettings } from "@/lib/events/page-settings";
 import { mapUrl, priceFact } from "@/lib/events/public-page";
 import type { EventRec } from "@/lib/events/types";
@@ -37,6 +38,8 @@ export function factsFor(event: EventRec): Fact[] {
   }
   if (event.location)
     facts.push({ lbl: "Where", val: event.location, href: mapUrl(event.location) ?? undefined });
+  const deadline = deadlineFact(event);
+  if (deadline) facts.push({ lbl: deadline.k, val: deadline.v, sub: deadline.sub });
   const price = priceFact(event);
   if (price) facts.push({ lbl: "Price", val: price.amount, sub: price.detail || undefined });
   return facts;
