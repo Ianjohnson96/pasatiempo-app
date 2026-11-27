@@ -1,4 +1,5 @@
-// When people can sign up for an event, and change or withdraw on their own.
+// When people can sign up for an event, and change or withdraw on their own,
+// plus the event's other sign-up rules (stored together in events.rules).
 //
 // An event's status (draft / open / closed) is set by hand. On top of it an
 // open event can carry dates: sign-ups open at `opensAt` and close at the entry
@@ -13,6 +14,7 @@ export interface SignupRules {
   opensAt: string | null; // ISO; sign-ups open at this moment
   closesAt: string | null; // ISO; the entry deadline
   changesAfterClose: boolean; // members may still change or withdraw after the deadline (until the event starts)
+  autoPromote: boolean; // when a spot opens, the next waitlisted entry moves up on its own
 }
 
 type Ruled = Pick<EventRec, "status" | "rules" | "startsAt" | "contactName" | "contactEmail">;
@@ -28,8 +30,9 @@ export function parseRules(raw: unknown): SignupRules | null {
     opensAt: iso(r.opensAt),
     closesAt: iso(r.closesAt),
     changesAfterClose: r.changesAfterClose === true,
+    autoPromote: r.autoPromote === true,
   };
-  return out.opensAt || out.closesAt ? out : null;
+  return out.opensAt || out.closesAt || out.autoPromote ? out : null;
 }
 
 export type SignupPhase = "draft" | "closed" | "soon" | "open" | "deadline";

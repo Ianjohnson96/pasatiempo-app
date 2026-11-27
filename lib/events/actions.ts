@@ -12,7 +12,7 @@ import {
   withoutLookColumns,
 } from "./map";
 import { newId, newSlug, slugify } from "./ids";
-import { availability, existingSignup, rosterCount, onRoster } from "./seats";
+import { availability, existingSignup, rosterCount, onRoster, promotable } from "./seats";
 import { formatSlot } from "./format";
 import {
   parseRules,
@@ -305,6 +305,7 @@ async function saveEventInner(input: EventInput): Promise<SaveEventResult> {
 
   revalidatePath("/admin");
   revalidatePath("/admin/events");
+  await promoteWaitlist(supa, saved.id);
   revalidatePath(`/admin/events/${saved.id}`);
   revalidatePath(`/events/e/${saved.slug}`);
   return { ok: true, event: saved };
@@ -606,6 +607,56 @@ async function sendConfirmations(regId: string, mails: Mail[]): Promise<void> {
       console.error(`Could not flag email_failed on ${regId}: ${error.message}`);
   } catch (e) {
     console.error(`Confirmation email crashed for ${regId}:`, e);
+  }
+}
+
+// When a spot opens on an event that moves its waitlist up on its own (see
+// events.rules.autoPromote), the next entries in line are confirmed and get
+// the confirmation email. Safe to call after any change: it only acts when
+// there's room. Never throws; a failure leaves the waitlist for staff.
+async function promoteWaitlist(
+  supa: ReturnType<typeof createAdminClient>,
+  eventId: string,
+): Promise<void> {
+  try {
+    const { data: evRow } = await supa.from("events").select("*").eq("id", eventId).maybeSingle();
+    if (!evRow) return;
+    const ev = rowToEvent(evRow);
+    if (!ev.rules?.autoPromote || !ev.waitlistEnabled) return;
+    const { data: rows } = await supa.from("registrations").select("*").eq("event_id", eventId);
+    const next = promotable(ev, (rows ?? []).map(rowToReg));
+    if (next.length === 0) return;
+    const url = await eventPageUrl(ev.slug);
+    for (const r of next) {
+      const { data: moved } = await supa
+        .from("registrations")
+        .update({ status: "confirmed" })
+        .eq("id", r.id)
+        .eq("status", "waitlist") // someone else may have moved it already
+        .select("id");
+      if (!moved?.length) continue;
+      const mails = r.players
+        ? teamEmails(ev, r.players, r.answers, "confirmed", url)
+        : [
+            signupEmail(
+              ev,
+              {
+                name: r.name,
+                email: r.email,
+                partySize: r.partySize,
+                guestNames: r.guestNames,
+                slotIds: r.slotIds,
+                answers: r.answers,
+              },
+              "confirmed",
+              url,
+            ),
+          ];
+      await sendConfirmations(r.id, mails);
+    }
+    revalidatePath(`/events/e/${ev.slug}`);
+  } catch (e) {
+    console.error("promoteWaitlist", e);
   }
 }
 
@@ -968,6 +1019,7 @@ export async function updateMyRegistration(
     if (error) return { ok: false, error: "Could not save your changes." };
 
     revalidatePath(`/events/e/${slug}`);
+    await promoteWaitlist(supa, ev.id);
     revalidatePath(`/admin/events/${ev.id}`);
     revalidatePath(`/admin/events/${ev.id}/roster`);
     return { ok: true };
@@ -1032,6 +1084,7 @@ export async function updateMyRegistration(
   if (error) return { ok: false, error: "Could not save your changes." };
 
   revalidatePath(`/events/e/${slug}`);
+  await promoteWaitlist(supa, ev.id);
   revalidatePath(`/admin/events/${ev.id}`);
   revalidatePath(`/admin/events/${ev.id}/roster`);
   return { ok: true };
@@ -1061,7 +1114,7 @@ export async function cancelMyRegistration(
   const supa = createAdminClient("events");
   const { data: reg } = await supa
     .from("registrations")
-    .select("id,email")
+    .select("id,email,event_id")
     .eq("id", regId)
     .maybeSingle();
   if (!reg || reg.email !== e)
@@ -1073,6 +1126,7 @@ export async function cancelMyRegistration(
     .update({ status: "cancelled" })
     .eq("id", regId);
   if (error) return { ok: false, error: "Could not cancel. Please try again." };
+  await promoteWaitlist(supa, reg.event_id as string);
   revalidatePath(`/events/e/${slug}`);
   return { ok: true };
 }
@@ -1166,6 +1220,8 @@ export async function setRegStatus(
     .update({ status })
     .eq("id", regId);
   if (error) return { ok: false, error: error.message };
+  // a cancellation frees a spot; moving someone to the waitlist by hand is deliberate
+  if (status === "cancelled") await promoteWaitlist(supa, reg.eventId);
   revalidatePath(`/admin/events/${reg.eventId}`);
   return { ok: true };
 }
@@ -1242,6 +1298,7 @@ export async function updateRegistration(
     .single();
   if (error) return { ok: false, error: error.message };
 
+  if (input.status !== "waitlist") await promoteWaitlist(supa, data.event_id);
   revalidatePath(`/admin/events/${data.event_id}`);
   revalidatePath(`/admin/events/${data.event_id}/roster`);
   return { ok: true };
@@ -1280,6 +1337,7 @@ async function updateTeamRegistration(
     .eq("id", input.id);
   if (error) return { ok: false, error: error.message };
 
+  if (input.status !== "waitlist") await promoteWaitlist(supa, ev.id);
   revalidatePath(`/admin/events/${ev.id}`);
   revalidatePath(`/admin/events/${ev.id}/roster`);
   return { ok: true };
@@ -1356,6 +1414,7 @@ export async function deleteRegistration(regId: string): Promise<void> {
     .select("event_id")
     .single();
   if (error) throw error;
+  await promoteWaitlist(supa, data.event_id);
   revalidatePath(`/admin/events/${data.event_id}`);
 }
 

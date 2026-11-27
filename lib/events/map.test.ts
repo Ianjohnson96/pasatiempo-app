@@ -134,7 +134,7 @@ describe("sign-up dates column", () => {
     expect(rowToEvent(baseEvent).rules).toBeNull();
     expect(
       rowToEvent({ ...baseEvent, rules: { closesAt: "2027-05-01T00:00:00Z", changesAfterClose: true } }).rules,
-    ).toEqual({ opensAt: null, closesAt: "2027-05-01T00:00:00.000Z", changesAfterClose: true });
+    ).toEqual({ opensAt: null, closesAt: "2027-05-01T00:00:00.000Z", changesAfterClose: true, autoPromote: false });
   });
   it("eventToRow writes rules only when given", () => {
     expect(eventToRow({ rules: null })).toEqual({ rules: null });

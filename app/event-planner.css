@@ -4405,3 +4405,15 @@
   color: var(--warn);
   font-weight: 600;
 }
+/* Manage: "A spot is open … Move up X" */
+.ep .notice.spot-open {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+.ep .notice.spot-open > span {
+  flex: 1 1 280px;
+  text-wrap: pretty;
+}

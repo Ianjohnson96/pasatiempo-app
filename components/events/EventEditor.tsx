@@ -188,6 +188,7 @@ export default function EventEditor({
   const [changesAfterClose, setChangesAfterClose] = useState(
     event?.rules?.changesAfterClose ?? false,
   );
+  const [autoPromote, setAutoPromote] = useState(event?.rules?.autoPromote ?? false);
   const [genWeeks, setGenWeeks] = useState("4");
   const [genCap, setGenCap] = useState("");
 
@@ -231,6 +232,7 @@ export default function EventEditor({
     opensAt,
     closesAt,
     changesAfterClose,
+    autoPromote,
   };
 
   // The preview lags a keystroke behind under load rather than slowing typing.
@@ -743,6 +745,27 @@ export default function EventEditor({
               </span>
             </span>
           </label>
+          {waitlistEnabled && !isSlots && (
+            <label className="check" style={{ marginTop: 10 }}>
+              <input
+                type="checkbox"
+                checked={autoPromote}
+                onChange={(e) => setAutoPromote(e.target.checked)}
+              />
+              <span>
+                <span className="ck-label">
+                  Move the waitlist up automatically
+                </span>
+                <br />
+                <span className="ck-hint">
+                  When {rules.tournament ? "a team withdraws" : "someone cancels"}, the
+                  next {rules.tournament ? "team" : "sign-up"} on the waitlist takes the
+                  spot and gets the confirmation email. Off: you move them up from the
+                  Manage page.
+                </span>
+              </span>
+            </label>
+          )}
 
           <div className="divider" />
           <h3 className="editor-sub">Sign-up dates</h3>

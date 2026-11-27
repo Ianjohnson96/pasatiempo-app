@@ -63,6 +63,7 @@ function state(over: Partial<EditorState> = {}): EditorState {
     opensAt: "",
     closesAt: "",
     changesAfterClose: false,
+    autoPromote: false,
     ...over,
   };
 }

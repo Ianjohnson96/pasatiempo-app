@@ -141,6 +141,7 @@ export interface EditorState {
   opensAt: string; // datetime-local; blank = open as soon as the event is
   closesAt: string; // datetime-local; blank = no entry deadline
   changesAfterClose: boolean;
+  autoPromote: boolean;
 }
 
 export function fromLocalInput(v: string): string | null {
@@ -217,6 +218,7 @@ export function buildEventInput(s: EditorState, id?: string): EventInput {
       opensAt: fromLocalInput(s.opensAt),
       closesAt: fromLocalInput(s.closesAt),
       changesAfterClose: s.changesAfterClose,
+      autoPromote: s.waitlistEnabled && s.autoPromote,
     }),
   };
 }

@@ -21,7 +21,7 @@ const ev = (over: Partial<EventRec> = {}): EventRec =>
     contactEmail: null,
     ...over,
   }) as unknown as EventRec;
-const rules = (r: object) => ev({ rules: { opensAt: null, closesAt: null, changesAfterClose: false, ...r } });
+const rules = (r: object) => ev({ rules: { opensAt: null, closesAt: null, changesAfterClose: false, autoPromote: false, ...r } });
 
 const OPENS = "2027-04-01T15:00:00.000Z"; // Thu, Apr 1, 8:00 AM
 const CLOSES = "2027-05-01T00:00:00.000Z"; // Fri, Apr 30, 5:00 PM
@@ -32,12 +32,22 @@ describe("parseRules", () => {
       opensAt: OPENS,
       closesAt: null,
       changesAfterClose: false,
+      autoPromote: false,
     });
   });
   it("nothing set is no rules at all", () => {
     expect(parseRules(null)).toBeNull();
     expect(parseRules({})).toBeNull();
     expect(parseRules({ opensAt: null, closesAt: null, changesAfterClose: false })).toBeNull();
+  });
+  it("moving the waitlist up automatically is a setting of its own", () => {
+    expect(parseRules({ autoPromote: true })).toEqual({
+      opensAt: null,
+      closesAt: null,
+      changesAfterClose: false,
+      autoPromote: true,
+    });
+    expect(parseRules({ opensAt: OPENS })?.autoPromote).toBe(false);
   });
   it("keeps the change setting with a deadline", () => {
     expect(parseRules({ closesAt: CLOSES, changesAfterClose: true })?.changesAfterClose).toBe(true);
