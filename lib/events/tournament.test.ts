@@ -138,13 +138,18 @@ describe("findDuplicate", () => {
     expect(findDuplicate([existing("confirmed", null)], t)).toBeNull();
   });
 
-  it("has the contact-the-shop copy", () => {
-    expect(duplicateMessage("guest")).toBe(
-      "That guest is already entered on another team. Questions? Contact the golf shop.",
+  it("points a member to their existing entry and the event's contact", () => {
+    const c = { name: "Sam Lee", email: "sam@club.test" };
+    expect(duplicateMessage("member", c)).toBe(
+      "You're already entered on another team — one entry per member. To change it, use “Manage your registration” on this page, or email Sam Lee at sam@club.test.",
     );
-    expect(duplicateMessage("member")).toBe(
-      "You're already entered on another team. Questions? Contact the golf shop.",
+    expect(duplicateMessage("guest", c)).toBe(
+      "Your guest is already entered on another team, and players can only be on one. If that's a mistake, email Sam Lee at sam@club.test.",
     );
+  });
+  it("tells staff plainly", () => {
+    expect(duplicateMessage("member", null)).toBe("The member is already on another team.");
+    expect(duplicateMessage("guest", null)).toBe("The guest is already on another team.");
   });
 });
 

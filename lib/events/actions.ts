@@ -803,7 +803,7 @@ async function registerTeam(
   const regs: Registration[] = (regRows ?? []).map(rowToReg);
 
   const dup = findDuplicate(regs, team);
-  if (dup) return { ok: false, error: duplicateMessage(dup) };
+  if (dup) return { ok: false, error: duplicateMessage(dup, eventContact(ev)) };
 
   // availability() counts teams for a tournament; there's no roster cap.
   const a = availability(ev, regs, null);
@@ -958,7 +958,7 @@ export async function updateMyRegistration(
         error: "To change the member's email, contact the golf shop.",
       };
     const dup = findDuplicate(all, team, regId);
-    if (dup) return { ok: false, error: duplicateMessage(dup) };
+    if (dup) return { ok: false, error: duplicateMessage(dup, eventContact(ev)) };
 
     // email is unchanged (checked above). No emails are re-sent on edits.
     const { error } = await supa
@@ -1157,7 +1157,7 @@ export async function setRegStatus(
         { players: reg.players, teamAnswers: {} },
         regId,
       );
-      if (dup) return { ok: false, error: duplicateMessage(dup) };
+      if (dup) return { ok: false, error: duplicateMessage(dup, null) };
     }
   }
 
@@ -1267,7 +1267,7 @@ async function updateTeamRegistration(
   // A team being cancelled can't clash with anyone, so don't block the save.
   if (input.status !== "cancelled") {
     const dup = findDuplicate(regs, team, input.id);
-    if (dup) return { ok: false, error: duplicateMessage(dup) };
+    if (dup) return { ok: false, error: duplicateMessage(dup, null) };
   }
 
   const { error } = await supa
@@ -1319,7 +1319,7 @@ export async function adminAddTeam(
     .eq("event_id", ev.id);
   if (regErr) return { ok: false, error: regErr.message };
   const dup = findDuplicate((regRows ?? []).map(rowToReg), clean);
-  if (dup) return { ok: false, error: duplicateMessage(dup) };
+  if (dup) return { ok: false, error: duplicateMessage(dup, null) };
 
   const { data, error } = await supa
     .from("registrations")
