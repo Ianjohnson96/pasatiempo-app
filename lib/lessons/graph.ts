@@ -31,7 +31,8 @@ export function graphConfigured(): boolean {
   );
 }
 
-async function accessToken(): Promise<string> {
+/** An app-only Graph token (also used by lib/mail.ts to send through Microsoft 365). */
+export async function accessToken(): Promise<string> {
   const tenant = process.env.MS_TENANT_ID!;
   const body = new URLSearchParams({
     client_id: process.env.MS_CLIENT_ID!,
