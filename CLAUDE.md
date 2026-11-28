@@ -42,13 +42,15 @@ The opening title sequence on the Invitational page is
 `components/invitational/IntroReel.tsx`. The one visitors get is
 `DEFAULT_VARIANT`; every other cut still plays with `?intro=<name>`.
 
-- **Default (since November 2026): `somewhere`** — fourteen shots cut to
-  Keane's "Somewhere Only We Know" (`public/invitational/audio/intro-somewhere-only-we-know.mp3`),
-  with two drone flyovers (`public/invitational/video/intro/`), all in colour,
-  no year card, ending on the clock. Its running order, cues and the reasoning
-  behind each cut are in the comment above `SONG_CUES`.
-- **Previous default: `score`** — the twelve-photograph scored dissolve to
-  "A Perfect Day" (1929 photographs, year card, ending on the clock). To revert,
-  set `DEFAULT_VARIANT` back to `"score"`; nothing else needs to change.
+- **Default: `somewhere`** — cut to Keane's "Somewhere Only We Know" with its
+  first chorus (`public/invitational/audio/intro-somewhere-lyrics.mp3`, 48 s):
+  the opening piano, the first chorus, the song's ending. Twenty shots,
+  photographs and three drone flyovers (`public/invitational/video/intro/`),
+  timed to the words; all in colour, no year card, ending on the clock. The
+  shots are named in `SHOT` (the names on the running-order board); the cut,
+  its cues and the reasoning are in the comment above `SONG_LYRICS_CUES`.
+- **Earlier defaults, kept:** `somewhere-37` (37 s, the song's last chorus
+  only) and `score` (the twelve-photograph scored dissolve to "A Perfect Day",
+  1929 photographs and year card). To revert, set `DEFAULT_VARIANT` to either.
 
 The club holds the licence for the Keane recording (confirmed November 2026).

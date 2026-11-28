@@ -418,7 +418,7 @@ const SCORE: Frame[] = scored(
 const MARK = "/brand/pasatiempo-logo-1929-reverse.png";
 const WORDMARK = "/invitational/img/wordmark-pasatiempo.svg";
 
-// ---- The scored dissolve to "Somewhere Only We Know" (the default) -----------
+// ---- "Somewhere", the 37-second cut (the default until November 2026; ?intro=somewhere-37)
 // The same look as the scored dissolve, cut to Keane's "Somewhere Only We Know"
 // (audio/intro-somewhere-only-we-know.mp3, 41 s): the song's opening piano,
 // four bars (0:00.4–0:11.6), then straight into the last chorus at 3:21.4 —
@@ -558,57 +558,41 @@ const SONG: Frame[] = scored(
   SONG_EXIT_AT,
 );
 
-// ---- Longer "Somewhere" cuts, to choose between (?intro=somewhere-43 etc.) ----
-// The same shots in the same order, with more of the song and more
-// photographs. Course shots hold a bar to breathe, people cut on half bars.
-// Cues are measured from each edit's own beat grid; TITLE is the song's final
-// phrase and EXIT the lift.
-//   43 s (audio/intro-somewhere-43.mp3): six bars of piano — bars 1–2 and 5–8
-//     — then the last chorus at 3:21.4 and the ending, as above.
-//   48 s (intro-somewhere-48.mp3): the whole eight-bar piano intro, then the
-//     same.
-//   54 s (intro-somewhere-54.mp3): four bars of piano, the band from 2:03.3,
-//     the song's pull-back at 2:14, its big re-entry at 2:25.6 — onto the 11th
-//     from the air — and, from 2:31.2, the soft ending at 3:32.6.
-const SONG_43_CUES = [0, 2600, 3990, 5390, 6780, 8170, 9560, 10950, 12340, 13730, 15120, 16680, 19140, 20680, 22070, 24700, 27630, 33200];
-const SONG_43_TITLE = 35530;
-const SONG_43_EXIT = 42710;
-const SONG_43: Frame[] = scored(
-  shots([
-    ["S", "s"], ["A", "n"], ["1", "n"], ["G", "n"], ["2", "n"], ["HF", "n"], ["AER", "n"], ["J", "n"],
-    ["HERO", "n"], ["CW", "n"], ["3", "n"],
-    ["4", "c"], ["5", "f"], ["6", "n"], ["7", "n"], ["8", "f"], ["9", "n"], ["10", "n"],
-  ]),
-  SONG_43_CUES,
-  SONG_43_TITLE,
-  SONG_43_EXIT,
-);
-const SONG_48_CUES = [0, 2600, 3990, 6780, 8170, 9560, 12340, 13730, 15130, 17910, 19300, 22250, 24720, 26260, 27650, 30280, 33220, 38780];
-const SONG_48_TITLE = 41110;
-const SONG_48_EXIT = 48290;
-const SONG_48: Frame[] = scored(
-  shots([
-    ["S", "s"], ["A", "n"], ["1", "n"], ["G", "n"], ["HF", "n"], ["2", "n"], ["J", "n"], ["CW", "n"],
-    ["HERO", "n"], ["SHAKA", "n"], ["3", "n"],
-    ["4", "c"], ["5", "f"], ["6", "n"], ["7", "n"], ["8", "f"], ["9", "n"], ["10", "n"],
-  ]),
-  SONG_48_CUES,
-  SONG_48_TITLE,
-  SONG_48_EXIT,
-);
-const SONG_54_CUES = [0, 2590, 3980, 5370, 6760, 8150, 9540, 11110, 13570, 15110, 16500, 19140, 22070, 24850, 27640, 30420, 33370, 35840, 37380, 38770, 44340];
-const SONG_54_TITLE = 46700;
-const SONG_54_EXIT = 53880;
-const SONG_54: Frame[] = scored(
+// ---- "Somewhere", with the first chorus (the default; ?intro=somewhere) --------
+// The opening piano, cut a beat short (0:00.4–0:10.95), straight into the
+// first chorus on its pickup ("And if you have a minute…", 1:51.4) — piano and
+// chorus meet on the same beat of the bar, and the pickup starts just as the
+// line before it ends — through "…somewhere only we know" (2:14.4), then on
+// the same chord into the song's last two "somewhere only we know"s and its
+// ending (3:32.6). audio/intro-somewhere-lyrics.mp3, 48 s on screen.
+//
+// The pictures follow the words:
+//   · the piano: the course and the people in turn, a photograph every half
+//     bar (S A 1 G 2 J 3);
+//   · "And if you have a minute, why don't we go": the band hits on the 4th
+//     from the air, then last year's champion, high fives, the cart;
+//   · "talk about it…": a shaka at the party, the champion's handshake;
+//   · "This could be the end of everything": the 8th from the air, then the
+//     champion laughing on the tee;
+//   · "So why don't we go": from the tee, down the fairway;
+//   · "somewhere only we know": the 11th from the air, then — as the music
+//     falls away and the line comes back — the whole field, held;
+//   · the clock in the hush before the last line, and the logo on it.
+// Cues come from the edit's own beat grid; dissolves start just ahead of
+// their beat, so the photograph has arrived as it lands.
+const SONG_LYRICS_MUSIC = "/invitational/audio/intro-somewhere-lyrics.mp3";
+const SONG_LYRICS_CUES = [0, 2600, 3990, 5390, 6780, 8170, 9560, 11120, 13590, 15130, 16520, 17910, 19310, 20700, 22090, 24720, 27660, 30440, 33020, 38790];
+const SONG_LYRICS_TITLE = 41120;
+const SONG_LYRICS_EXIT = 48300;
+const SONG_LYRICS: Frame[] = scored(
   shots([
     ["S", "s"], ["A", "n"], ["1", "n"], ["G", "n"], ["2", "n"], ["J", "n"], ["3", "n"],
-    ["4", "c"], ["5", "f"], ["6", "n"], ["7", "n"], ["8", "f"],
-    ["SUN", "n"], ["HS", "n"], ["AER", "n"], ["HERO", "n"],
-    ["11", "c"], ["HF", "f"], ["CW", "n"], ["9", "n"], ["10", "n"],
+    ["4", "c"], ["5", "f"], ["6", "n"], ["HF", "n"], ["CW", "n"], ["SHAKA", "n"], ["HS", "n"],
+    ["7", "n"], ["8", "f"], ["HERO", "n"], ["11", "n"], ["9", "n"], ["10", "n"],
   ]),
-  SONG_54_CUES,
-  SONG_54_TITLE,
-  SONG_54_EXIT,
+  SONG_LYRICS_CUES,
+  SONG_LYRICS_TITLE,
+  SONG_LYRICS_EXIT,
 );
 
 interface ReelLook {
@@ -620,7 +604,7 @@ interface ReelLook {
 
 type Variant =
   | "flip" | "dissolve" | "wipe" | "letters" | "tight" | "focus" | "iris" | "leak" | "panels"
-  | "reel" | "reel-wide" | "whip" | "whip-wide" | "pan" | "pan-step" | "film" | "score" | "somewhere" | "somewhere-43" | "somewhere-48" | "somewhere-54";
+  | "reel" | "reel-wide" | "whip" | "whip-wide" | "pan" | "pan-step" | "film" | "score" | "somewhere" | "somewhere-37";
 interface Cut {
   frames: Frame[];
   /** How long PASATIEMPO holds, in ms. */
@@ -681,7 +665,7 @@ const VARIANTS: Record<Variant, Cut> = {
     cues: { frames: SCORE_CUES, title: SCORE_TITLE_AT, exit: SCORE_EXIT_AT },
     crest: true,
   },
-  somewhere: {
+  "somewhere-37": {
     frames: SONG,
     titleMs: SONG_EXIT_AT - SONG_TITLE_AT,
     leadMs: SONG_CUES[0],
@@ -692,44 +676,23 @@ const VARIANTS: Record<Variant, Cut> = {
     crest: true,
     noYear: true,
   },
-  "somewhere-43": {
-    frames: SONG_43,
-    titleMs: SONG_43_EXIT - SONG_43_TITLE,
+  somewhere: {
+    frames: SONG_LYRICS,
+    titleMs: SONG_LYRICS_EXIT - SONG_LYRICS_TITLE,
     leadMs: 0,
     cine: true,
     fast: true,
-    music: "/invitational/audio/intro-somewhere-43.mp3",
-    cues: { frames: SONG_43_CUES, title: SONG_43_TITLE, exit: SONG_43_EXIT },
-    crest: true,
-    noYear: true,
-  },
-  "somewhere-48": {
-    frames: SONG_48,
-    titleMs: SONG_48_EXIT - SONG_48_TITLE,
-    leadMs: 0,
-    cine: true,
-    fast: true,
-    music: "/invitational/audio/intro-somewhere-48.mp3",
-    cues: { frames: SONG_48_CUES, title: SONG_48_TITLE, exit: SONG_48_EXIT },
-    crest: true,
-    noYear: true,
-  },
-  "somewhere-54": {
-    frames: SONG_54,
-    titleMs: SONG_54_EXIT - SONG_54_TITLE,
-    leadMs: 0,
-    cine: true,
-    fast: true,
-    music: "/invitational/audio/intro-somewhere-54.mp3",
-    cues: { frames: SONG_54_CUES, title: SONG_54_TITLE, exit: SONG_54_EXIT },
+    music: SONG_LYRICS_MUSIC,
+    cues: { frames: SONG_LYRICS_CUES, title: SONG_LYRICS_TITLE, exit: SONG_LYRICS_EXIT },
     crest: true,
     noYear: true,
   },
 };
 /** The intro visitors get. The others play with ?intro=<name>.
- *  To go back to the previous default — the twelve-photograph scored dissolve
- *  to "A Perfect Day", with the 1929 photographs and the year card — set this
- *  to "score" (it still plays any time with ?intro=score). */
+ *  Earlier defaults, kept so any can come back: "somewhere-37" — the
+ *  37-second cut to the same song's last chorus (default from late November
+ *  2026) — and "score", the twelve-photograph scored dissolve to "A Perfect
+ *  Day" with the 1929 photographs and the year card. */
 const DEFAULT_VARIANT: Variant = "somewhere";
 function readVariant(): Variant {
   try {
