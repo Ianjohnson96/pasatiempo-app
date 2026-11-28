@@ -418,7 +418,7 @@ const SCORE: Frame[] = scored(
 const MARK = "/brand/pasatiempo-logo-1929-reverse.png";
 const WORDMARK = "/invitational/img/wordmark-pasatiempo.svg";
 
-// ---- The scored dissolve to "Somewhere Only We Know" (the default) -----------
+// ---- "Somewhere", the 37-second cut (the default until November 2026; ?intro=somewhere-37)
 // The same look as the scored dissolve, cut to Keane's "Somewhere Only We Know"
 // (audio/intro-somewhere-only-we-know.mp3, 41 s): the song's opening piano,
 // four bars (0:00.4–0:11.6), then straight into the last chorus at 3:21.4 —
@@ -438,12 +438,12 @@ const WORDMARK = "/invitational/img/wordmark-pasatiempo.svg";
 //   · As the music falls away, the whole field, held two bars on a slow pull
 //     back; the clock fades up in the hush before the last phrase, and the
 //     logo rises on it.
-// Dissolves start 0.3 s ahead of their beat, so the photograph has arrived as
-// the beat lands.
+// Dissolves start 0.3 s ahead of their beat (0.45 s out of a flyover, whose
+// dissolve is longer), so the photograph has arrived as the beat lands.
 //   beat:  0.1 2.9 4.3 5.7 7.1 8.5 9.9 | 11.2 14.0 15.4 16.8 19.6 | 22.4 | 28.0 | title 30.1
 const SONG_MUSIC = "/invitational/audio/intro-somewhere-only-we-know.mp3";
 const SONG_CUES = [
-  0, 2570, 3960, 5370, 6760, 8150, 9560, 11110, 13720, 15130, 16520, 19320, 21910, 27370,
+  0, 2570, 3960, 5370, 6760, 8150, 9560, 11110, 13570, 15130, 16520, 19170, 21910, 27370,
 ];
 const SONG_TITLE_AT = 29950;
 const SONG_EXIT_AT = 37100; // the title holds about 7 s, as the last chord rings
@@ -459,64 +459,140 @@ const flyover = (hole: number, focus: string, phoneFocus: string): Omit<Frame, "
   phoneFocus,
   move: [1, 0, 0, 1, 0, 0],
 });
+/** Every shot the "Somewhere" cuts draw on, by its name on the running-order board. */
+const SHOT: Record<string, Omit<Frame, "hold">> = {
+  // S · The course, wide.
+  S: { src: SC + "course-wide.webp", era: "today", focus: "center 55%", phoneFocus: "50% 55%" },
+  // A · High fives on the first tee (on a phone, zoomed out so both players show).
+  A: {
+    src: SC + "event-high-five-first-tee.webp", era: "today", focus: "42% 40%",
+    phoneWide: { h: 0.75, ar: 1800 / 1090, fx: 0.42, fy: 0.42, tx: 0.5, ty: 0.44 },
+  },
+  // 1 · The course from the air at dawn (on a phone, the green and its bunkers).
+  "1": { src: SC + "today-aerial-dawn.webp", era: "today", focus: "center 50%", phoneFocus: "45% 50%" },
+  // G · The golf staff at registration (on a phone, zoomed out so all four show).
+  G: {
+    src: SC + "event-registration-team.webp", era: "today", focus: "center 35%",
+    phoneWide: { h: 0.45, ar: 1800 / 1554, fx: 0.48, fy: 0.4, tx: 0.5, ty: 0.45 },
+  },
+  // 2 · Two chairs looking out over the course to the bay.
+  "2": { src: SC + "today-chairs-bay.webp", era: "today", focus: "center 45%" },
+  // J · A chip from the fairway, his partner watching (on a phone, zoomed out to both).
+  J: {
+    src: SC + "event-chip-shot-fairway.webp", era: "today", focus: "center 45%",
+    phoneWide: { h: 0.42, ar: 1.5, fx: 0.45, fy: 0.45, tx: 0.5, ty: 0.45 },
+  },
+  // 3 · The bridge.
+  "3": { src: SC + "today-bridge.webp", era: "today", focus: "center 62%" },
+  // 4 · Low over the bunkers of the 4th.
+  "4": flyover(4, "center 60%", "50% 60%"),
+  // 5 · Last year's champion, an iron through the turf in the evening haze.
+  "5": { src: SC + "event-iron-impact.webp", era: "today", focus: "55% 45%", phoneFocus: "52% 50%" },
+  // 6 · A high five in the sun (on a phone, a tall one on the green instead).
+  "6": {
+    src: SC + "event-high-five-sweater.webp", era: "today", focus: "55% 30%",
+    phoneSrc: SC + "event-high-five-green.webp", phoneFocus: "50% 20%",
+  },
+  // 7 · Over the 8th, under the cypresses.
+  "7": flyover(8, "center 55%", "54% 55%"),
+  // 8 · The champion again, sharing a laugh on the tee in the golden light.
+  "8": { src: SC + "event-laughing-group.webp", era: "today", focus: "62% 35%", phoneFocus: "62% 40%" },
+  // 9 · The whole field together (on a phone, zoomed out so the line of
+  // players, 6–91% of the photograph's width, shows end to end).
+  "9": {
+    src: SC + "event-field-photo.webp", era: "today", focus: "center 55%", move: [1.08, 0, 0, 1.01, 0, 0],
+    phoneWide: { h: 0.34, ar: 1.5, fx: 0.485, fy: 0.55, tx: 0.5, ty: 0.45 },
+    fadeMs: 1000, zoomMs: 7000,
+  },
+  // 10 · The club's clock, est. 1929, at dusk, under the title (on a phone,
+  // the clock face on the upper-left third, clear of the title below it).
+  "10": {
+    src: SC + "today-clock-1929.webp", era: "today", focus: "18% center",
+    phoneWide: { h: 0.7, ar: 1.5, fx: 0.235, fy: 0.31, tx: 1 / 3, ty: 0.3 },
+    fadeMs: 1200,
+  },
+  // 11 · Over the 11th, across the barranca.
+  "11": flyover(11, "center 55%", "40% 55%"),
+  // HF · Three players trade a high five on the fairway (on a phone, zoomed out to all three).
+  HF: {
+    src: SC + "event-high-five-fairway.webp", era: "today", focus: "center 40%",
+    phoneWide: { h: 0.42, ar: 1.5, fx: 0.45, fy: 0.42, tx: 0.5, ty: 0.45 },
+  },
+  // CW · Two players wave from their cart, arms up (on a phone, zoomed out to the whole cart).
+  CW: {
+    src: SC + "event-cart-wave.webp", era: "today", focus: "center 40%",
+    phoneWide: { h: 0.5, ar: 1.5, fx: 0.5, fy: 0.42, tx: 0.5, ty: 0.45 },
+  },
+  // SHAKA · A shaka and a wink at the party after the round.
+  SHAKA: { src: SC + "event-shaka-party.webp", era: "today", focus: "45% 35%", phoneFocus: "45% 35%" },
+  // SUN · A tee shot into the low sun, the field watching.
+  SUN: { src: SC + "event-sunset-tee-shot.webp", era: "today", focus: "53% 55%", phoneFocus: "54% 55%" },
+  // HS · Last year's champion shakes hands on the green.
+  HS: { src: SC + "event-handshake-green.webp", era: "today", focus: "42% 40%", phoneFocus: "43% 45%" },
+  // AER · The course from directly above.
+  AER: { src: SC + "aerial.webp", era: "today", focus: "center 50%", phoneFocus: "40% 50%" },
+  // HERO · From the tee down the fairway to the green, the bay beyond.
+  HERO: { src: SC + "hero.webp", era: "today", focus: "center 55%", phoneFocus: "55% 50%" },
+};
+/** How a shot arrives: n — the usual quick dissolve; c — all but a hard cut,
+ *  for the band's entrance and the song's big re-entry; f — out of a flyover:
+ *  the film softens and pushes on (see the CSS) while the photograph comes in
+ *  already drifting forward, so the camera seems to keep moving through the
+ *  cut; s — fading up out of black. */
+type Arrive = "n" | "c" | "f" | "s";
+const ARRIVE: Record<Arrive, Partial<Frame>> = {
+  n: {},
+  c: { fadeMs: 250 },
+  f: { fadeMs: 900, move: [1, 0, 0, 1.08, 0, 0], zoomMs: 3000 },
+  s: { fadeMs: 1600 },
+};
+const shots = (list: [name: string, arrive: Arrive][]): Omit<Frame, "hold">[] =>
+  list.map(([name, how]) => ({ ...SHOT[name], ...ARRIVE[how] }));
 const SONG: Frame[] = scored(
-  [
-    // S · The course, wide, fading up out of black.
-    { src: SC + "course-wide.webp", era: "today", focus: "center 55%", phoneFocus: "50% 55%", fadeMs: 1600 },
-    // A · High fives on the first tee (on a phone, zoomed out so both players show).
-    {
-      src: SC + "event-high-five-first-tee.webp", era: "today", focus: "42% 40%",
-      phoneWide: { h: 0.75, ar: 1800 / 1090, fx: 0.42, fy: 0.42, tx: 0.5, ty: 0.44 },
-    },
-    // 1 · The course from the air at dawn (on a phone, the green and its bunkers).
-    { src: SC + "today-aerial-dawn.webp", era: "today", focus: "center 50%", phoneFocus: "45% 50%" },
-    // G · The golf staff at registration (on a phone, zoomed out so all four show).
-    {
-      src: SC + "event-registration-team.webp", era: "today", focus: "center 35%",
-      phoneWide: { h: 0.45, ar: 1800 / 1554, fx: 0.48, fy: 0.4, tx: 0.5, ty: 0.45 },
-    },
-    // 2 · Two chairs looking out over the course to the bay.
-    { src: SC + "today-chairs-bay.webp", era: "today", focus: "center 45%" },
-    // J · A chip from the fairway, his partner watching (on a phone, zoomed out to both).
-    {
-      src: SC + "event-chip-shot-fairway.webp", era: "today", focus: "center 45%",
-      phoneWide: { h: 0.42, ar: 1.5, fx: 0.45, fy: 0.45, tx: 0.5, ty: 0.45 },
-    },
-    // 3 · The bridge.
-    { src: SC + "today-bridge.webp", era: "today", focus: "center 62%" },
-    // 4 · The band comes in: all but a hard cut, low over the bunkers of the 4th.
-    { ...flyover(4, "center 60%", "50% 60%"), fadeMs: 250 },
-    // 5 · Last year's champion, an iron through the turf in the evening haze.
-    { src: SC + "event-iron-impact.webp", era: "today", focus: "55% 45%", phoneFocus: "52% 50%" },
-    // 6 · A high five in the sun (on a phone, a tall one on the green instead).
-    {
-      src: SC + "event-high-five-sweater.webp", era: "today", focus: "55% 30%",
-      phoneSrc: SC + "event-high-five-green.webp", phoneFocus: "50% 20%",
-    },
-    // 7 · Over the 8th, under the cypresses.
-    flyover(8, "center 55%", "54% 55%"),
-    // 8 · The champion again, sharing a laugh on the tee in the golden light.
-    { src: SC + "event-laughing-group.webp", era: "today", focus: "62% 35%", phoneFocus: "62% 40%" },
-    // 9 · The whole field together, as the music falls away (on a phone, zoomed
-    // out so the line of players, 6–91% of the photograph's width, shows end
-    // to end).
-    {
-      src: SC + "event-field-photo.webp", era: "today", focus: "center 55%", move: [1.08, 0, 0, 1.01, 0, 0],
-      phoneWide: { h: 0.34, ar: 1.5, fx: 0.485, fy: 0.55, tx: 0.5, ty: 0.45 },
-      fadeMs: 1000, zoomMs: 7000,
-    },
-    // 10 · In the hush before the last phrase, and under the title: the club's
-    // clock, est. 1929, at dusk (on a phone, the clock face on the upper-left
-    // third, clear of the title below it).
-    {
-      src: SC + "today-clock-1929.webp", era: "today", focus: "18% center",
-      phoneWide: { h: 0.7, ar: 1.5, fx: 0.235, fy: 0.31, tx: 1 / 3, ty: 0.3 },
-      fadeMs: 1200,
-    },
-  ] as Omit<Frame, "hold">[],
+  shots([
+    ["S", "s"], ["A", "n"], ["1", "n"], ["G", "n"], ["2", "n"], ["J", "n"], ["3", "n"],
+    ["4", "c"], ["5", "f"], ["6", "n"], ["7", "n"], ["8", "f"], ["9", "n"], ["10", "n"],
+  ]),
   SONG_CUES,
   SONG_TITLE_AT,
   SONG_EXIT_AT,
+);
+
+// ---- "Somewhere", with the first chorus (the default; ?intro=somewhere) --------
+// The opening piano, cut a beat short (0:00.4–0:10.95), straight into the
+// first chorus on its pickup ("And if you have a minute…", 1:51.4) — piano and
+// chorus meet on the same beat of the bar, and the pickup starts just as the
+// line before it ends — through "…somewhere only we know" (2:14.4), then on
+// the same chord into the song's last two "somewhere only we know"s and its
+// ending (3:32.6). audio/intro-somewhere-lyrics.mp3, 48 s on screen.
+//
+// The pictures follow the words:
+//   · the piano: the course and the people in turn, a photograph every half
+//     bar (S A 1 G 2 J 3);
+//   · "And if you have a minute, why don't we go": the band hits on the 4th
+//     from the air, then last year's champion, high fives, the cart;
+//   · "talk about it…": a shaka at the party, the champion's handshake;
+//   · "This could be the end of everything": the 8th from the air, then the
+//     champion laughing on the tee;
+//   · "So why don't we go": from the tee, down the fairway;
+//   · "somewhere only we know": the 11th from the air, then — as the music
+//     falls away and the line comes back — the whole field, held;
+//   · the clock in the hush before the last line, and the logo on it.
+// Cues come from the edit's own beat grid; dissolves start just ahead of
+// their beat, so the photograph has arrived as it lands.
+const SONG_LYRICS_MUSIC = "/invitational/audio/intro-somewhere-lyrics.mp3";
+const SONG_LYRICS_CUES = [0, 2600, 3990, 5390, 6780, 8170, 9560, 11120, 13590, 15130, 16520, 17910, 19310, 20700, 22090, 24720, 27660, 30440, 33020, 38790];
+const SONG_LYRICS_TITLE = 41120;
+const SONG_LYRICS_EXIT = 48300;
+const SONG_LYRICS: Frame[] = scored(
+  shots([
+    ["S", "s"], ["A", "n"], ["1", "n"], ["G", "n"], ["2", "n"], ["J", "n"], ["3", "n"],
+    ["4", "c"], ["5", "f"], ["6", "n"], ["HF", "n"], ["CW", "n"], ["SHAKA", "n"], ["HS", "n"],
+    ["7", "n"], ["8", "f"], ["HERO", "n"], ["11", "n"], ["9", "n"], ["10", "n"],
+  ]),
+  SONG_LYRICS_CUES,
+  SONG_LYRICS_TITLE,
+  SONG_LYRICS_EXIT,
 );
 
 interface ReelLook {
@@ -528,7 +604,7 @@ interface ReelLook {
 
 type Variant =
   | "flip" | "dissolve" | "wipe" | "letters" | "tight" | "focus" | "iris" | "leak" | "panels"
-  | "reel" | "reel-wide" | "whip" | "whip-wide" | "pan" | "pan-step" | "film" | "score" | "somewhere";
+  | "reel" | "reel-wide" | "whip" | "whip-wide" | "pan" | "pan-step" | "film" | "score" | "somewhere" | "somewhere-37";
 interface Cut {
   frames: Frame[];
   /** How long PASATIEMPO holds, in ms. */
@@ -589,7 +665,7 @@ const VARIANTS: Record<Variant, Cut> = {
     cues: { frames: SCORE_CUES, title: SCORE_TITLE_AT, exit: SCORE_EXIT_AT },
     crest: true,
   },
-  somewhere: {
+  "somewhere-37": {
     frames: SONG,
     titleMs: SONG_EXIT_AT - SONG_TITLE_AT,
     leadMs: SONG_CUES[0],
@@ -600,11 +676,23 @@ const VARIANTS: Record<Variant, Cut> = {
     crest: true,
     noYear: true,
   },
+  somewhere: {
+    frames: SONG_LYRICS,
+    titleMs: SONG_LYRICS_EXIT - SONG_LYRICS_TITLE,
+    leadMs: 0,
+    cine: true,
+    fast: true,
+    music: SONG_LYRICS_MUSIC,
+    cues: { frames: SONG_LYRICS_CUES, title: SONG_LYRICS_TITLE, exit: SONG_LYRICS_EXIT },
+    crest: true,
+    noYear: true,
+  },
 };
 /** The intro visitors get. The others play with ?intro=<name>.
- *  To go back to the previous default — the twelve-photograph scored dissolve
- *  to "A Perfect Day", with the 1929 photographs and the year card — set this
- *  to "score" (it still plays any time with ?intro=score). */
+ *  Earlier defaults, kept so any can come back: "somewhere-37" — the
+ *  37-second cut to the same song's last chorus (default from late November
+ *  2026) — and "score", the twelve-photograph scored dissolve to "A Perfect
+ *  Day" with the 1929 photographs and the year card. */
 const DEFAULT_VARIANT: Variant = "somewhere";
 function readVariant(): Variant {
   try {
@@ -971,6 +1059,7 @@ export default function IntroReel({
       className={
         "mci-intro is-" + phase + " era-" + era + " var-" + variant +
         (cut.crest && variant !== "score" ? " var-score" : "") +
+        (variant.startsWith("somewhere-") ? " var-somewhere" : "") +
         (calm ? " is-calm" : "") + (cut.cine ? " is-cine" : "") + (cut.fast ? " is-fast" : "") +
         (cut.reel ? " is-film" : "") + (cut.pan ? " is-pan" : "") +
         (solid ? " is-solid" : "") + (quick ? " is-quick" : "")
@@ -1167,6 +1256,7 @@ function Page({ f, under }: { f: Frame; under?: boolean }) {
     <div
       className={
         "mci-page era-" + f.era + (under ? " is-under" : "") + (f.trio ? " is-trio" : "") +
+        (f.video ? " has-video" : "") +
         (f.develop ? " is-develop" : "")
       }
       style={

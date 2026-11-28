@@ -734,6 +734,10 @@ body:has(.mci){margin:0;}
 .mci-intro.var-score .mci-page{animation:mci-xfade 1.35s cubic-bezier(.45,0,.35,1) both;}
 /* "Somewhere Only We Know": quicker cuts, so quicker dissolves (a photograph can set its own, --xfade). */
 .mci-intro.var-somewhere .mci-page{animation-duration:var(--xfade,.6s);}
+/* Out of a flyover: as the next photograph dissolves in, the film keeps pushing
+   forward and softens, as if the drone flew on through the cut. */
+.mci-intro.var-somewhere .mci-page.is-under.has-video .mci-page-video{animation:mci-fly-on 1.1s cubic-bezier(.4,0,.7,.4) both;}
+@keyframes mci-fly-on{from{transform:scale(1);filter:none;}to{transform:scale(1.07);filter:blur(5px) brightness(1.06);}}
 .mci-intro.var-score .mci-page img{transform-origin:var(--focus);animation-duration:var(--zoom,4.4s);animation-timing-function:linear;}
 /* The last photograph stays on under the title (dimmed by the title's scrim)
    and fades away first as the intro lifts. */
