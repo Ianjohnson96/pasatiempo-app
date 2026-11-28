@@ -4,7 +4,7 @@
 // email-layout.ts.
 
 import type { Mail } from "../mail";
-import { renderEmail, type EmailDoc } from "./email-layout";
+import { esc, renderEmail, type EmailDoc } from "./email-layout";
 import { formatSlot, formatWhen, shownAnswer } from "./format";
 import { pageSettings } from "./page-settings";
 import { eventContact } from "./theme";
@@ -135,4 +135,24 @@ export function sampleEmail(event: EventRec, pageUrl: string | null): Mail {
     "confirmed",
     pageUrl,
   );
+}
+
+const TEST_NOTE =
+  "This is a test of the confirmation email, sent to you from the event editor. " +
+  "Members get the same email with their own details.";
+
+/** A sample email readdressed to a staff member and marked as a test. */
+export function testEmail(mail: Mail, to: string): Mail {
+  return {
+    to,
+    subject: `[Test] ${mail.subject}`,
+    text: `${TEST_NOTE}\n\n${mail.text}`,
+    // the note goes just inside <body>, so the email stays a valid document
+    html: mail.html.replace(
+      /<body[^>]*>/,
+      (body) =>
+        `${body}
+<div style="margin:0;padding:10px 16px;background:#faf3e2;border-bottom:1px solid #e6d4ad;font:14px/1.5 Helvetica, Arial, sans-serif;color:#5e3f0f;">${esc(TEST_NOTE)}</div>`,
+    ),
+  };
 }

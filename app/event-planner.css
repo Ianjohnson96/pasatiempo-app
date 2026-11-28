@@ -3893,6 +3893,21 @@
   padding-top: 0;
   border-top: 0;
 }
+.ep .email-test {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 14px;
+}
+.ep .email-test .hint {
+  margin: 0;
+}
+.ep .email-test-ok {
+  margin: 10px 0 0;
+  color: var(--club);
+  font-size: 14px;
+}
 
 /* Manage: the confirmation email card */
 .ep .email-card-head {

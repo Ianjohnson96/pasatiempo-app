@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
+import { sendTestEmail, type EventInput } from "@/lib/events/actions";
 import { sampleEmail } from "@/lib/events/registration-email";
 import { WORDING_LIMITS, type EventTheme } from "@/lib/events/theme";
 import type { EventRec } from "@/lib/events/types";
@@ -14,11 +15,33 @@ export default function EmailSection({
   preview,
   theme,
   onTheme,
+  testInput,
 }: {
   preview: EventRec; // the event as the editor has it now, unsaved changes included
   theme: EventTheme | null;
   onTheme: (t: EventTheme) => void;
+  testInput?: () => EventInput; // the editor's form, for "Send me a test"; absent = no button
 }) {
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function sendTest() {
+    if (!testInput) return;
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await sendTestEmail(testInput());
+      setResult(
+        res.ok
+          ? { ok: true, text: `Sent to ${res.to}. It may take a minute to arrive.` }
+          : { ok: false, text: res.error },
+      );
+    } catch {
+      setResult({ ok: false, text: "The test email didn't send. Please try again." });
+    } finally {
+      setSending(false);
+    }
+  }
   const t: EventTheme = theme ?? { preset: "clubhouse" };
   // blank means "use the usual words"
   const set = (patch: Partial<EventTheme>) => onTheme({ ...t, ...patch });
@@ -130,6 +153,24 @@ export default function EmailSection({
           ))}
           <span className="hint">Email programs that don&apos;t show designs get the plain text.</span>
         </div>
+        {testInput && (
+          <div className="email-test">
+            <button
+              type="button"
+              className="btn secondary small"
+              onClick={sendTest}
+              disabled={sending}
+            >
+              {sending ? "Sending…" : "Send me a test"}
+            </button>
+            <span className="hint">Only to you, as it reads now. Nothing is saved.</span>
+          </div>
+        )}
+        {result && (
+          <p className={result.ok ? "email-test-ok" : "field-err"} role="status">
+            {result.text}
+          </p>
+        )}
       </figure>
     </div>
   );

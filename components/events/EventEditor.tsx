@@ -1033,7 +1033,12 @@ export default function EventEditor({
             title="Confirmation email"
             sub="What members receive when they sign up. Edit it here before anyone does."
           />
-          <EmailSection preview={preview} theme={theme} onTheme={setTheme} />
+          <EmailSection
+            preview={preview}
+            theme={theme}
+            onTheme={setTheme}
+            testInput={() => buildEventInput(state, event?.id)}
+          />
         </section>
 
         {/* 9. Publish */}
